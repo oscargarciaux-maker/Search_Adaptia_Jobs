@@ -80,10 +80,24 @@ _SALARIO = re.compile(rf"{_MONEDA}\s?{_NUM}(?:\s*(?:-|–|a|to|hasta)\s*{_MONEDA
                       re.I)
 
 
+# Cifras de la empresa que no son sueldo ("raised $300M", "ronda de US$ 50 millones").
+_NO_SALARIO = re.compile(r"(?:rais|fund|financ|invest|inversi|valuat|valua|revenue|ingres|factur|ARR|serie[s]?\s+[a-e]\b|"
+                         r"ronda|round|backed|respald|capital|transacci|transaction|volume|volumen|loans?|pr[eé]stamo|"
+                         r"billion|mil millones)", re.I)
+
+
 def salario(texto):
     """Primer rango de salario publicado (texto corto), o ''."""
-    for m in _SALARIO.finditer(str(texto or "")[:15000]):
+    texto = str(texto or "")[:15000]
+    for m in _SALARIO.finditer(texto):
         valor = m.group(0).strip()
-        if re.search(r"\d", valor) and len(re.sub(r"\D", "", valor)) >= 3:
-            return valor[:60]
+        if not (re.search(r"\d", valor) and len(re.sub(r"\D", "", valor)) >= 3):
+            continue
+        # Solo la misma frase: lo que va antes desde el último punto y lo que sigue hasta el próximo.
+        antes = re.split(r"[.!?\n]\s", texto[max(0, m.start() - 60):m.start()])[-1]
+        despues = re.split(r"[.!?\n]", texto[m.end():m.end() + 25])[0]
+        contexto = antes + " " + despues
+        if _NO_SALARIO.search(contexto):
+            continue
+        return valor[:60]
     return ""
