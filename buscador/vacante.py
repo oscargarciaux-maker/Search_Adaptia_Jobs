@@ -16,9 +16,10 @@ def huella(empresa, titulo):
 
 
 def crear(titulo, empresa, enlace, fuente, ubicacion="", descripcion="", fecha="", remoto=None, enlace_directo="",
-          hoy=None):
+          hoy=None, consulta=""):
     """Vacante en el formato común, con familias, países y etiquetas calculadas. Devuelve None si no sirve:
-    sin título, sin enlace entregable o sin ninguna familia del mapa."""
+    sin título, sin enlace entregable o sin ninguna familia del mapa. En una búsqueda profunda de un cargo que no está
+    en el mapa (`consulta`), también entra si su título contiene esas palabras."""
     hoy = hoy or date.today().isoformat()
     titulo = " ".join(str(titulo or "").split())
     empresa = " ".join(str(empresa or "").split()) or "Empresa confidencial"
@@ -31,6 +32,10 @@ def crear(titulo, empresa, enlace, fuente, ubicacion="", descripcion="", fecha="
         return None
     directo = enlaces.mejor([u for u in candidatos if u != principal and not enlaces.es_linkedin(u)])
     fams = familias.clasificar(titulo, descripcion)
+    if not fams and consulta:
+        frase = normalizar.titulo_base(consulta)
+        if frase and normalizar.contiene_frase(normalizar.titulo_base(titulo), frase):
+            fams = [{"familia": "busqueda:" + frase, "coincidencia": "exacto"}]
     if not fams:
         return None
     lugar = paises.elegibles(titulo, ubicacion, descripcion, remoto)

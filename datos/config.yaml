@@ -19,3 +19,17 @@ apify:
 # Brave Search (paso 6): búsquedas por corrida para descubrir empresas con sistema de postulación
 brave:
   busquedas_por_corrida: 30
+
+# Cuánto trabaja cada fuente por corrida. Más alto = más vacantes, pero más tiempo y más riesgo de bloqueo (LinkedIn).
+# Las fuentes corren en paralelo; cada una se detiene sola al llegar a minutos_por_fuente.
+presupuestos:
+  minutos_por_fuente: 40
+  linkedin_busquedas: 450      # páginas de resultados por noche (10 avisos cada una)
+  linkedin_fichas: 350         # avisos a los que se les lee la descripción completa
+  pausa_linkedin: [1.0, 2.5]   # segundos entre peticiones a LinkedIn
+  indeed_busquedas: 90
+  apify_busquedas: 60          # solo con APIFY_TOKEN
+  remotos_paginas: 250         # páginas de tableros remotos que se abren para encontrar el original
+  empresas_por_probar: 80      # empresas nuevas que se prueban en los sistemas de postulación
+  brave_busquedas: 30          # solo con BRAVE_API_KEY
+  getonbrd_busquedas: 60
