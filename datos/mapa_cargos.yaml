@@ -1,0 +1,884 @@
+# Mapa de cargos. Cada familia agrupa un cargo con sus parecidos para que una búsqueda traiga volumen:
+#   exactos:      el mismo cargo en español, inglés y portugués
+#   similares:    cargos que hacen casi lo mismo
+#   cercanos:     cargos vecinos que también le pueden servir a la persona
+#   herramientas: palabras del oficio en la descripción; con 2 o más y una palabra de `genericos` en el título, la
+#                 vacante entra como cercana aunque su título sea raro ("Editor" que pide Premiere y CapCut)
+#   genericos:    palabras sueltas del oficio en el título (editor, diseñador, desarrollador…)
+#   excluir:      palabras del título que delatan otro oficio con nombre parecido ("UI Artist" de videojuegos)
+#   consultas:    lo que se le pide a las fuentes (pocas, para que cueste menos); en LinkedIn van unidas con OR
+# No escribas niveles (junior, senior, lead…): el programa los quita y los guarda aparte. Mayúsculas y tildes dan igual.
+# Para agregar una familia o un título: skill `nueva-familia` o editar aquí; `python -m pytest` revisa el formato.
+
+familias:
+
+# ───────────── Diseño ─────────────
+- id: diseno-producto-ux
+  nombre: Diseño de producto y UX/UI
+  area: Diseño
+  consultas: [product designer, ux ui designer, diseñador ux ui, diseñador de producto, ux designer, ui designer]
+  exactos: [product designer, product design, diseñador de producto, diseñador de producto digital, designer de produto,
+            ux designer, ui designer, ux/ui designer, ui/ux designer, ux ui designer, ui ux designer, diseñador ux,
+            diseñador ui, diseñador ux/ui, diseñador ui/ux, diseñador ux ui, diseñador ui ux, ux/ui, ui/ux,
+            diseñador de experiencia de usuario, diseñador de interfaces, diseñador de interfaz, ux ui, ui ux,
+            designer ux, designer ui, designer ux/ui, product designer ux/ui, experience designer, digital product designer]
+  similares: [interaction designer, diseñador de interacción, ux researcher, investigador ux, design systems designer,
+              design system designer, diseñador de sistemas de diseño, visual designer, diseñador visual, ux lead,
+              design lead, product design lead, head of design, head of product design, design manager,
+              service designer, diseñador de servicios, conversational designer, diseñador conversacional,
+              information architect, arquitecto de información, ux architect, ux strategist, ux specialist,
+              especialista ux, especialista ux/ui, consultor ux, ux consultant, mobile designer, app designer,
+              diseñador de aplicaciones, designer de interface, ux/ui specialist, ux analyst, analista ux]
+  cercanos: [product owner, product manager, ux writer, content designer, cx designer, diseñador cx,
+             customer experience designer, diseñador de experiencia de cliente, web designer, diseñador web,
+             ux engineer, design technologist, creative technologist, growth designer, brand designer]
+  herramientas: [figma, sketch, adobe xd, prototipos, prototyping, wireframes, design system, sistema de diseño,
+                 usabilidad, usability, user research, investigación con usuarios, user flows, journey map, handoff,
+                 maze, framer, protopie]
+  genericos: [diseñador, designer, design, diseño]
+  excluir: [ui artist, game artist, unreal, diseñador industrial, industrial designer, diseño industrial, interiores,
+            interior designer, moda, fashion, textil, joyería, instruccional, instructional, mecánico, mechanical,
+            civil, eléctrico, electrical, packaging, empaque, arquitectónico, architectural,
+            developer, desarrollador, programador, engineer, ingeniero, desenvolvedor]
+
+- id: ux-research
+  nombre: UX Research
+  area: Diseño
+  consultas: [ux researcher, user researcher, investigador ux, design researcher]
+  exactos: [ux researcher, user researcher, ux research, investigador ux, investigador de experiencia de usuario,
+            investigador de usuarios, design researcher, pesquisador ux, ux research specialist]
+  similares: [research ops, researchops, usability researcher, usability analyst, ux research lead, research lead,
+              customer researcher, qualitative researcher, investigador cualitativo, ux analyst, analista ux]
+  cercanos: [product designer, ux designer, service designer, cx researcher, consumer insights, market researcher,
+             investigador de mercados, insights analyst]
+  herramientas: [entrevistas, interviews, usability testing, pruebas de usabilidad, encuestas, surveys, maze,
+                 dovetail, user testing, research plan, personas, journey map]
+  genericos: [researcher, investigador, research]
+  excluir: [clinical, clínico, laboratorio, laboratory, phd, postdoc, biomedical, química, chemistry]
+
+- id: diseno-web
+  nombre: Diseño web
+  area: Diseño
+  consultas: [diseñador web, web designer, diseñador de sitios web, webflow designer]
+  exactos: [diseñador web, web designer, diseño web, web design, designer web, diseñador de sitios web,
+            diseñador de páginas web, website designer, webflow designer, diseñador webflow]
+  similares: [web ui designer, landing page designer, diseñador de landing pages, diseñador digital, digital designer,
+              diseñador web ux/ui, web/ux designer, wordpress designer, diseñador wordpress, shopify designer,
+              diseñador ecommerce, e-commerce designer, email designer, diseñador de email]
+  cercanos: [ux/ui designer, ui designer, product designer, front end developer, frontend developer, webmaster,
+             web master, desarrollador web, web developer, diseñador gráfico]
+  herramientas: [webflow, wordpress, elementor, figma, html, css, landing pages, shopify, framer, responsive]
+  genericos: [diseñador, designer, web]
+  excluir: [ui artist, unreal, industrial, developer, desarrollador, programador, engineer, desenvolvedor]
+
+- id: diseno-grafico
+  nombre: Diseño gráfico y visual
+  area: Diseño
+  consultas: [diseñador gráfico, graphic designer, diseñador visual, brand designer]
+  exactos: [diseñador gráfico, graphic designer, diseño gráfico, graphic design, designer gráfico, design gráfico,
+            diseñador grafico digital]
+  similares: [visual designer, diseñador visual, brand designer, diseñador de marca, branding designer,
+              diseñador publicitario, diseñador de comunicación visual, communication designer, diseñador editorial,
+              editorial designer, diseñador de packaging, packaging designer, diseñador de empaques,
+              social media designer, diseñador de redes sociales, diseñador de contenido, content designer gráfico,
+              diseñador digital, digital designer, marketing designer, diseñador de marketing, presentation designer,
+              diseñador de presentaciones, creative designer, diseñador creativo, art director, director de arte,
+              diretor de arte, diseñador multimedia, multimedia designer, paid media designer, ad designer]
+  cercanos: [ilustrador, illustrator, motion designer, motion graphics designer, web designer, diseñador web,
+             ui designer, creativo publicitario, copy creativo, creative director, director creativo]
+  herramientas: [photoshop, illustrator, indesign, canva, after effects, figma, branding, identidad visual, piezas gráficas,
+                 piezas publicitarias, adobe creative suite, suite adobe, corel, coreldraw]
+  genericos: [diseñador, designer, diseño, design, creativo, creative]
+  excluir: [industrial designer, diseñador industrial, interiores, interior, moda, fashion, textil, mecánico, civil,
+            ui artist, game designer, level designer, cad]
+
+- id: ilustracion
+  nombre: Ilustración
+  area: Diseño
+  consultas: [ilustrador, illustrator, ilustrador digital, concept artist]
+  exactos: [ilustrador, illustrator, ilustrador digital, digital illustrator, ilustração, ilustrador 2d,
+            2d illustrator, ilustrador infantil, children's book illustrator]
+  similares: [concept artist, artista conceptual, artista 2d, 2d artist, character designer, diseñador de personajes,
+              storyboard artist, storyboarder, artista digital, digital artist, comic artist, historietista,
+              artista de cómic, tattoo designer, visual artist, artista visual, pixel artist, artista pixel art]
+  cercanos: [diseñador gráfico, graphic designer, animador 2d, 2d animator, motion designer, game artist, artista de juegos,
+             diseñador editorial]
+  herramientas: [procreate, photoshop, illustrator, clip studio, krita, ilustración, illustration, dibujo, drawing,
+                 sketching, wacom]
+  genericos: [ilustrador, illustrator, artista, artist]
+  excluir: [adobe illustrator developer, makeup, maquillaje, tattoo artist apprentice]
+
+- id: motion-animacion
+  nombre: Motion graphics y animación
+  area: Diseño
+  consultas: [motion designer, motion graphics, animador 2d, animador 3d, animator]
+  exactos: [motion designer, motion graphics designer, motion graphics, motion graphic designer, diseñador de motion,
+            motion design, animador, animator, animador 2d, animador 3d, 2d animator, 3d animator, animação,
+            motion graphics artist, diseñador motion graphics]
+  similares: [video animator, animador digital, character animator, animador de personajes, rigger, rigging artist,
+              compositor, compositing artist, vfx artist, artista vfx, efectos visuales, visual effects artist,
+              explainer video animator, lottie animator, motion artist, artista de motion]
+  cercanos: [editor de video, video editor, diseñador gráfico, graphic designer, ilustrador, 3d artist, artista 3d,
+             post producer, postproductor, ui motion designer]
+  herramientas: [after effects, cinema 4d, c4d, blender, maya, premiere, lottie, animación, animation, keyframes,
+                 toon boom, spine, 3ds max, houdini, nuke]
+  genericos: [animador, animator, motion, artista, artist]
+  excluir: [motion control, control de movimiento]
+
+- id: diseno-3d
+  nombre: Diseño y modelado 3D
+  area: Diseño
+  consultas: [artista 3d, 3d artist, modelador 3d, 3d designer]
+  exactos: [artista 3d, 3d artist, modelador 3d, 3d modeler, 3d modeller, diseñador 3d, 3d designer, generalista 3d,
+            3d generalist, modelado 3d, 3d modeling artist]
+  similares: [render artist, visualizador 3d, 3d visualizer, archviz artist, artista de render, texture artist,
+              artista de texturas, lighting artist, environment artist, artista de entornos, prop artist, 3d animator,
+              animador 3d, product visualization artist]
+  cercanos: [motion designer, game artist, artista de videojuegos, vfx artist, diseñador industrial, industrial designer]
+  herramientas: [blender, maya, 3ds max, cinema 4d, zbrush, substance painter, unreal, unity, keyshot, v-ray, vray,
+                 render, modelado, modeling, texturizado, texturing]
+  genericos: [artista, artist, modelador, modeler, diseñador, designer]
+  excluir: [impresión 3d técnico, 3d printing technician, cad drafter, dibujante cad]
+
+- id: diseno-videojuegos
+  nombre: Arte y diseño de videojuegos
+  area: Diseño
+  consultas: [game designer, game artist, diseñador de videojuegos, ui artist]
+  exactos: [game designer, diseñador de videojuegos, diseñador de juegos, level designer, diseñador de niveles,
+            game artist, artista de videojuegos, ui artist, game ui artist, game ui designer, technical artist,
+            artista técnico, narrative designer, diseñador narrativo, systems designer games]
+  similares: [environment artist, character artist, artista de personajes, concept artist, prop artist, vfx artist games,
+              game economy designer, monetization designer, combat designer, quest designer, gameplay designer,
+              ux designer games, game ux designer]
+  cercanos: [desarrollador de videojuegos, game developer, unity developer, unreal developer, 3d artist, ilustrador]
+  herramientas: [unity, unreal, unreal engine, godot, game design document, gdd, level design, gameplay, umg, slate]
+  genericos: [game, juegos, videojuegos, gaming]
+  excluir: [casino dealer, crupier, lottery]
+
+- id: diseno-servicios-cx
+  nombre: Diseño de servicios y experiencia de cliente
+  area: Diseño
+  consultas: [service designer, diseñador de servicios, cx designer, customer experience designer]
+  exactos: [service designer, diseñador de servicios, diseño de servicios, service design, cx designer, diseñador cx,
+            customer experience designer, diseñador de experiencia de cliente, diseñador de experiencia del cliente,
+            designer de serviços]
+  similares: [customer journey designer, journey designer, cx specialist, especialista cx, cx strategist, estratega cx,
+              customer experience specialist, especialista en experiencia de cliente, cx consultant, consultor cx,
+              innovation designer, diseñador de innovación, design thinking facilitator, facilitador design thinking]
+  cercanos: [ux designer, product designer, ux researcher, customer experience manager, gerente de experiencia de cliente,
+             cx analyst, analista cx, business designer]
+  herramientas: [service blueprint, blueprint, customer journey, journey map, design thinking, mapa de empatía,
+                 nps, voz del cliente, voice of the customer]
+  genericos: [diseñador, designer, experiencia, experience, cx]
+  excluir: [call center agent, agente de call center]
+
+- id: diseno-instruccional
+  nombre: Diseño instruccional y e-learning
+  area: Diseño
+  consultas: [diseñador instruccional, instructional designer, e-learning developer]
+  exactos: [diseñador instruccional, instructional designer, diseño instruccional, instructional design,
+            designer instrucional, learning designer, diseñador de aprendizaje, learning experience designer, lxd]
+  similares: [e-learning developer, elearning developer, desarrollador e-learning, desarrollador de contenidos e-learning,
+              curriculum designer, diseñador curricular, course designer, diseñador de cursos, content developer learning,
+              training designer, diseñador de formación]
+  cercanos: [tutor virtual, docente virtual, online tutor, trainer, capacitador, content writer educativo]
+  herramientas: [articulate, storyline, rise, captivate, moodle, scorm, lms, addie, canvas lms]
+  genericos: [diseñador, designer, learning, aprendizaje, e-learning, elearning]
+  excluir: []
+
+# ───────────── Video, foto y audio ─────────────
+- id: edicion-video
+  nombre: Edición de video
+  area: Video y audio
+  consultas: [editor de video, video editor, editor audiovisual, video editor capcut, editor de reels]
+  exactos: [editor de video, video editor, editor de vídeo, editor de videos, editora de video, video editing,
+            edición de video, editor audiovisual, editor de vídeos, editor de vídeo, video editor/motion designer]
+  similares: [editor de reels, reels editor, short form video editor, editor de contenido audiovisual,
+              youtube video editor, editor de youtube, tiktok editor, editor de tiktok, social media video editor,
+              editor de videos para redes, post producer, postproductor, post-production editor, editor de postproducción,
+              colorista, colorist, video producer, productor de video, videógrafo, videographer, filmmaker,
+              content creator video, creador de contenido audiovisual, ugc video editor, podcast video editor,
+              editor y animador, video specialist, especialista en video]
+  cercanos: [motion designer, motion graphics, animador, animator, camarógrafo, camera operator, community manager,
+             content creator, creador de contenido, productor audiovisual, realizador audiovisual]
+  herramientas: [premiere, premiere pro, adobe premiere, capcut, after effects, davinci, davinci resolve, final cut,
+                 final cut pro, avid, reels, tiktok, youtube, edición, editing, color grading, corrección de color,
+                 subtitulado, subtítulos]
+  genericos: [editor, editora, video, vídeo, audiovisual, postproducción, post-production]
+  excluir: [editor de texto, copy editor, editor de contenidos escritos, editor periodístico, managing editor,
+            editor in chief, editor en jefe, video game, videojuegos, surveillance, cctv, seguridad]
+
+- id: produccion-audiovisual
+  nombre: Producción audiovisual y fotografía
+  area: Video y audio
+  consultas: [productor audiovisual, fotógrafo, videographer, camarógrafo]
+  exactos: [productor audiovisual, audiovisual producer, realizador audiovisual, fotógrafo, photographer, fotografo,
+            fotógrafo de producto, product photographer, camarógrafo, camera operator, videógrafo, videographer,
+            filmmaker]
+  similares: [director audiovisual, director de fotografía, director of photography, productor de contenido,
+              content producer, productor de video, video producer, retocador fotográfico, photo retoucher,
+              retoque fotográfico, editor de fotografía, photo editor, productor creativo, creative producer,
+              coordinador audiovisual, asistente de producción, production assistant, gaffer, sonidista]
+  cercanos: [editor de video, video editor, motion designer, community manager, creador de contenido]
+  herramientas: [lightroom, photoshop, cámara, camera, iluminación, lighting, sony, canon, rodaje, shooting, producción]
+  genericos: [productor, producer, fotógrafo, photographer, audiovisual]
+  excluir: [producer music only]
+
+- id: audio-sonido
+  nombre: Audio, sonido y podcast
+  area: Video y audio
+  consultas: [editor de audio, audio editor, podcast editor, ingeniero de sonido]
+  exactos: [editor de audio, audio editor, editor de podcast, podcast editor, ingeniero de sonido, sound engineer,
+            audio engineer, ingeniero de audio, sound designer, diseñador de sonido, productor de podcast,
+            podcast producer]
+  similares: [mezclador, mixing engineer, mastering engineer, técnico de sonido, sound technician, locutor, voice actor,
+              voice over artist, actor de doblaje, music producer, productor musical, audio producer, productor de audio]
+  cercanos: [editor de video, video editor, productor audiovisual]
+  herramientas: [pro tools, audition, adobe audition, logic pro, ableton, reaper, mezcla, mixing, mastering, podcast]
+  genericos: [audio, sonido, sound, podcast]
+  excluir: [audiologist, audiólogo, hearing]
+
+# ───────────── Desarrollo ─────────────
+- id: desarrollo-software
+  nombre: Desarrollo de software (general)
+  area: Desarrollo
+  consultas: [desarrollador de software, software developer, software engineer, desarrollador, programador]
+  exactos: [desarrollador de software, software developer, software engineer, ingeniero de software,
+            ingeniero de desarrollo, desenvolvedor de software, engenheiro de software, programador, programmer,
+            desarrollador, developer, desenvolvedor, software development engineer]
+  similares: [frontend developer, backend developer, full stack developer, fullstack developer, mobile developer,
+              web developer, desarrollador web, desarrollador frontend, desarrollador backend, desarrollador full stack,
+              desarrollador móvil, java developer, python developer, .net developer, node.js developer, react developer,
+              php developer, desarrollador java, desarrollador python, desarrollador .net, desarrollador php,
+              application developer, desarrollador de aplicaciones, analista programador, analista desarrollador]
+  cercanos: [tech lead, arquitecto de software, devops engineer, qa automation, data engineer, game developer]
+  herramientas: [java, python, javascript, typescript, c#, .net, php, node.js, react, sql, git, api rest, docker]
+  genericos: [developer, desarrollador, programador, engineer, ingeniero, desenvolvedor]
+  excluir: [business developer, desarrollador de negocios, desarrollo de negocios, desarrollador comercial,
+            sales engineer, ingeniero de ventas, ingeniero civil, civil engineer, ingeniero mecánico, mechanical engineer,
+            ingeniero eléctrico, electrical engineer, ingeniero industrial, industrial engineer, ingeniero químico,
+            chemical engineer, ingeniero de procesos, process engineer, ingeniero de mantenimiento,
+            maintenance engineer, ingeniero ambiental, ingeniero agrónomo, ingeniero de obra]
+
+- id: frontend
+  nombre: Desarrollo frontend
+  area: Desarrollo
+  consultas: [frontend developer, desarrollador frontend, react developer, desarrollador front end]
+  exactos: [frontend developer, front end developer, front-end developer, desarrollador frontend, desarrollador front end,
+            desarrollador front-end, frontend engineer, front end engineer, front-end engineer, ingeniero frontend,
+            programador frontend, desenvolvedor front end, desenvolvedor frontend, frontend, front end]
+  similares: [react developer, desarrollador react, react engineer, angular developer, desarrollador angular,
+              vue developer, desarrollador vue, vue.js developer, next.js developer, javascript developer,
+              desarrollador javascript, typescript developer, ui developer, desarrollador ui, ui engineer, web ui developer,
+              react native developer, ux engineer, design engineer]
+  cercanos: [fullstack developer, full stack developer, desarrollador full stack, web developer, desarrollador web,
+             wordpress developer, mobile developer]
+  herramientas: [react, angular, vue, javascript, typescript, html, css, next.js, tailwind, redux, sass, webpack, vite]
+  genericos: [developer, desarrollador, programador, engineer, ingeniero, desenvolvedor]
+  excluir: []
+
+- id: backend
+  nombre: Desarrollo backend
+  area: Desarrollo
+  consultas: [backend developer, desarrollador backend, java developer, python developer, node.js developer, .net developer]
+  exactos: [backend developer, back end developer, back-end developer, desarrollador backend, desarrollador back end,
+            desarrollador back-end, backend engineer, back end engineer, back-end engineer, ingeniero backend,
+            programador backend, desenvolvedor backend, desenvolvedor back end, backend, back end]
+  similares: [java developer, desarrollador java, java engineer, python developer, desarrollador python, python engineer,
+              node.js developer, node developer, desarrollador node.js, desarrollador node, .net developer,
+              desarrollador .net, c# developer, desarrollador c#, php developer, desarrollador php, laravel developer,
+              ruby developer, ruby on rails developer, go developer, golang developer, desarrollador golang,
+              api developer, desarrollador de apis, kotlin developer, scala developer, rust developer, elixir developer, django developer, spring developer]
+  cercanos: [software engineer, ingeniero de software, software developer, desarrollador de software,
+             fullstack developer, full stack developer, desarrollador full stack, devops engineer, data engineer,
+             arquitecto de software, software architect, integration developer, desarrollador de integraciones]
+  herramientas: [java, python, node.js, nodejs, .net, c#, php, go, golang, ruby, spring, django, flask, fastapi,
+                 laravel, express, sql, postgresql, mysql, mongodb, api rest, rest api, microservicios, microservices]
+  genericos: [developer, desarrollador, programador, engineer, ingeniero, desenvolvedor]
+  excluir: [sales engineer, ingeniero de ventas, ingeniero civil, civil engineer, ingeniero mecánico, mechanical engineer,
+            ingeniero eléctrico, electrical engineer, ingeniero industrial, industrial engineer, ingeniero químico,
+            chemical engineer, desarrollador de negocios, business developer, business development,
+            desarrollador comercial, desarrollo de negocios]
+
+- id: fullstack
+  nombre: Desarrollo full stack
+  area: Desarrollo
+  consultas: [full stack developer, desarrollador full stack, fullstack developer, mern developer]
+  exactos: [full stack developer, fullstack developer, full-stack developer, desarrollador full stack,
+            desarrollador fullstack, desarrollador full-stack, full stack engineer, fullstack engineer,
+            full-stack engineer, ingeniero full stack, programador full stack, desenvolvedor full stack, full stack, fullstack]
+  similares: [mern developer, mean developer, javascript full stack, web developer, desarrollador web, web engineer,
+              software engineer, ingeniero de software, software developer, desarrollador de software,
+              ruby on rails developer, laravel developer, django developer]
+  cercanos: [frontend developer, backend developer, desarrollador frontend, desarrollador backend, tech lead,
+             wordpress developer]
+  herramientas: [react, node.js, javascript, typescript, python, php, sql, mongodb, postgresql, aws, docker]
+  genericos: [developer, desarrollador, programador, engineer, ingeniero, desenvolvedor]
+  excluir: [business developer, desarrollador de negocios, desarrollo de negocios]
+
+- id: movil
+  nombre: Desarrollo móvil
+  area: Desarrollo
+  consultas: [mobile developer, desarrollador móvil, flutter developer, ios developer, android developer, react native developer]
+  exactos: [mobile developer, desarrollador móvil, desarrollador mobile, mobile engineer, ingeniero móvil,
+            desenvolvedor mobile, ios developer, desarrollador ios, ios engineer, android developer,
+            desarrollador android, android engineer, flutter developer, desarrollador flutter, react native developer,
+            desarrollador react native, app developer, desarrollador de aplicaciones, desarrollador de apps]
+  similares: [swift developer, kotlin developer, desarrollador kotlin, desarrollador swift, xamarin developer,
+              ionic developer, cross-platform developer, mobile software engineer]
+  cercanos: [frontend developer, fullstack developer, software engineer, qa mobile, mobile designer]
+  herramientas: [swift, swiftui, kotlin, flutter, dart, react native, android studio, xcode, jetpack compose, ionic]
+  genericos: [developer, desarrollador, programador, engineer, desenvolvedor]
+  excluir: []
+
+- id: videojuegos-desarrollo
+  nombre: Desarrollo de videojuegos
+  area: Desarrollo
+  consultas: [game developer, unity developer, desarrollador de videojuegos, unreal developer]
+  exactos: [game developer, desarrollador de videojuegos, desarrollador de juegos, game programmer, programador de videojuegos,
+            unity developer, desarrollador unity, unreal developer, desarrollador unreal, unreal engine developer,
+            gameplay programmer, gameplay engineer, game engineer]
+  similares: [graphics programmer, engine programmer, tools programmer, technical artist, c++ game developer,
+              godot developer, multiplayer engineer]
+  cercanos: [game designer, software engineer, mobile developer]
+  herramientas: [unity, unreal, unreal engine, c#, c++, godot, gameplay, shaders]
+  genericos: [developer, desarrollador, programador, engineer, programmer]
+  excluir: []
+
+- id: wordpress-cms
+  nombre: Desarrollo web WordPress, Shopify y CMS
+  area: Desarrollo
+  consultas: [wordpress developer, desarrollador wordpress, shopify developer, web developer]
+  exactos: [wordpress developer, desarrollador wordpress, shopify developer, desarrollador shopify, webflow developer,
+            desarrollador webflow, web developer, desarrollador web, programador web, web programmer,
+            desenvolvedor web, webmaster, web master]
+  similares: [cms developer, desarrollador cms, drupal developer, magento developer, woocommerce developer,
+              hubspot developer, php wordpress developer, theme developer, landing page developer,
+              ecommerce developer, desarrollador ecommerce, html email developer, email developer]
+  cercanos: [frontend developer, diseñador web, web designer, fullstack developer]
+  herramientas: [wordpress, elementor, shopify, liquid, woocommerce, php, webflow, html, css, javascript, drupal,
+                 magento, hubspot cms]
+  genericos: [developer, desarrollador, programador, web, webmaster]
+  excluir: [business developer]
+
+- id: no-code
+  nombre: No-code, low-code y automatizaciones
+  area: Desarrollo
+  consultas: [no code developer, low code developer, automation specialist, bubble developer, zapier]
+  exactos: [no code developer, no-code developer, desarrollador no code, low code developer, low-code developer,
+            desarrollador low code, bubble developer, desarrollador bubble, automation specialist,
+            especialista en automatización, automation developer, desarrollador de automatizaciones, zapier expert,
+            make automation specialist, n8n developer, power apps developer, desarrollador power apps,
+            power platform developer, rpa developer, desarrollador rpa]
+  similares: [ai automation specialist, especialista en automatizaciones con ia, workflow automation, integraciones,
+              integration specialist, airtable developer, glide developer, flutterflow developer, uipath developer,
+              automation engineer software, power automate developer]
+  cercanos: [fullstack developer, business analyst, analista de procesos, ai engineer]
+  herramientas: [bubble, zapier, make, n8n, airtable, power apps, power automate, flutterflow, uipath, retool, glide,
+                 integromat, webhooks]
+  genericos: [developer, desarrollador, specialist, especialista, automation, automatización]
+  excluir: [automatización industrial, industrial automation, plc, scada, automation technician]
+
+- id: crm-erp
+  nombre: Salesforce, SAP y sistemas CRM/ERP
+  area: Desarrollo
+  consultas: [salesforce developer, sap consultant, consultor sap, salesforce administrator, hubspot administrator]
+  exactos: [salesforce developer, desarrollador salesforce, salesforce administrator, administrador salesforce,
+            salesforce consultant, consultor salesforce, sap consultant, consultor sap, sap developer,
+            desarrollador sap, abap developer, desarrollador abap, sap functional consultant, consultor funcional sap,
+            dynamics developer, dynamics 365 consultant, consultor dynamics, odoo developer, desarrollador odoo,
+            hubspot administrator, crm developer, desarrollador crm, erp consultant, consultor erp]
+  similares: [salesforce architect, sap fico, sap mm, sap sd, sap basis, oracle developer, netsuite developer,
+              netsuite administrator, zoho developer, crm administrator, administrador crm, crm specialist]
+  cercanos: [business analyst, analista funcional, backend developer]
+  herramientas: [salesforce, apex, lightning, sap, abap, s/4hana, dynamics 365, odoo, netsuite, hubspot, zoho, crm, erp]
+  genericos: [developer, desarrollador, consultor, consultant, administrador, administrator]
+  excluir: []
+
+- id: blockchain
+  nombre: Blockchain y Web3
+  area: Desarrollo
+  consultas: [blockchain developer, solidity developer, web3 developer]
+  exactos: [blockchain developer, desarrollador blockchain, blockchain engineer, solidity developer,
+            desarrollador solidity, web3 developer, desarrollador web3, smart contract developer,
+            smart contract engineer, rust blockchain developer]
+  similares: [crypto developer, defi developer, protocol engineer, blockchain architect]
+  cercanos: [backend developer, fullstack developer]
+  herramientas: [solidity, ethereum, web3, smart contracts, defi, rust, hardhat, foundry, evm]
+  genericos: [developer, desarrollador, engineer]
+  excluir: []
+
+- id: arquitectura-software
+  nombre: Arquitectura de software y liderazgo técnico
+  area: Desarrollo
+  consultas: [software architect, arquitecto de software, tech lead, engineering manager]
+  exactos: [software architect, arquitecto de software, solutions architect, arquitecto de soluciones, tech lead,
+            líder técnico, technical lead, engineering manager, gerente de ingeniería, cto, head of engineering,
+            arquitecto de software senior, enterprise architect, arquitecto empresarial]
+  similares: [principal engineer, staff engineer, development manager, gerente de desarrollo, team lead developer,
+              líder de desarrollo, director of engineering, vp engineering, arquitecto de integración,
+              integration architect, cloud architect, arquitecto cloud]
+  cercanos: [backend developer, fullstack developer, devops engineer]
+  herramientas: [arquitectura, architecture, microservicios, microservices, aws, azure, gcp, kubernetes, system design]
+  genericos: [arquitecto, architect, lead, líder]
+  excluir: [arquitecto de obra, architect building, arquitectura de interiores]
+
+# ───────────── Calidad ─────────────
+- id: qa
+  nombre: QA y pruebas de software
+  area: Calidad (QA)
+  consultas: [qa analyst, qa engineer, analista qa, tester, qa automation]
+  exactos: [qa analyst, analista qa, qa engineer, ingeniero qa, qa tester, tester, software tester, qa automation,
+            qa automation engineer, automatizador de pruebas, analista de pruebas, test analyst, test engineer,
+            quality assurance analyst, quality assurance engineer, analista de calidad de software, qa, sdet,
+            analista de testing, testing analyst]
+  similares: [qa manual, manual tester, tester manual, performance tester, pruebas de rendimiento, qa lead, test lead,
+              mobile tester, game tester, probador de videojuegos, accessibility tester, uat tester,
+              software quality engineer, qa specialist, especialista qa]
+  cercanos: [desarrollador, software engineer, business analyst, analista funcional, devops engineer]
+  herramientas: [selenium, cypress, playwright, appium, jmeter, postman, jira, testrail, cucumber, gherkin,
+                 pruebas automatizadas, test cases, casos de prueba]
+  genericos: [qa, tester, testing, pruebas, quality]
+  excluir: [quality assurance alimentos, food quality, calidad de alimentos, inspector de calidad, quality inspector,
+            control de calidad planta, manufacturing quality]
+
+# ───────────── Datos e IA ─────────────
+- id: analista-datos
+  nombre: Análisis de datos
+  area: Datos
+  consultas: [data analyst, analista de datos, business intelligence analyst, analista bi]
+  exactos: [data analyst, analista de datos, analista de data, data analytics, analytics analyst, analista de analítica,
+            analista de información, analista de dados, product analyst, analista de producto]
+  similares: [reporting analyst, analista de reportes, insights analyst, marketing analyst, analista de marketing digital,
+              growth analyst, web analyst, analista web, digital analyst, analista digital, sql analyst,
+              analista de inteligencia de negocios, operations analyst, analista de operaciones, people analytics]
+  cercanos: [business intelligence analyst, analista bi, data scientist, científico de datos, business analyst,
+             analista de negocio, financial analyst, analista financiero]
+  herramientas: [sql, excel, power bi, tableau, looker, python, google analytics, ga4, bigquery, dashboards, r]
+  genericos: [analista, analyst, data, datos]
+  excluir: []
+
+- id: bi
+  nombre: Business Intelligence
+  area: Datos
+  consultas: [business intelligence analyst, analista bi, power bi developer, desarrollador bi]
+  exactos: [business intelligence analyst, analista de business intelligence, analista bi, bi analyst, bi developer,
+            desarrollador bi, power bi developer, desarrollador power bi, analista power bi, bi engineer,
+            business intelligence developer, business intelligence engineer, bi specialist, especialista bi]
+  similares: [tableau developer, looker developer, data visualization specialist, especialista en visualización de datos,
+              reporting developer, analytics engineer, ingeniero de analítica]
+  cercanos: [data analyst, analista de datos, data engineer]
+  herramientas: [power bi, tableau, looker, qlik, dax, sql, etl, data warehouse, ssis]
+  genericos: [bi, analista, analyst, developer]
+  excluir: []
+
+- id: ciencia-datos
+  nombre: Ciencia de datos
+  area: Datos
+  consultas: [data scientist, científico de datos, cientifico de datos]
+  exactos: [data scientist, científico de datos, cientista de dados, data science, ciencia de datos,
+            data science analyst]
+  similares: [machine learning scientist, applied scientist, research scientist ml, statistician, estadístico,
+              quantitative analyst, analista cuantitativo, decision scientist]
+  cercanos: [data analyst, analista de datos, machine learning engineer, ai engineer, data engineer]
+  herramientas: [python, r, machine learning, scikit-learn, pandas, estadística, statistics, modelos predictivos,
+                 tensorflow, pytorch]
+  genericos: [scientist, científico, data]
+  excluir: [clinical scientist, lab scientist, científico de laboratorio]
+
+- id: ingenieria-datos
+  nombre: Ingeniería de datos
+  area: Datos
+  consultas: [data engineer, ingeniero de datos, etl developer, big data engineer]
+  exactos: [data engineer, ingeniero de datos, engenheiro de dados, data engineering, ingeniería de datos,
+            big data engineer, ingeniero big data, etl developer, desarrollador etl, data pipeline engineer]
+  similares: [analytics engineer, ingeniero de analítica, data architect, arquitecto de datos, database developer,
+              desarrollador de bases de datos, data platform engineer, spark developer, databricks engineer,
+              snowflake developer]
+  cercanos: [backend developer, bi developer, dba, data scientist, cloud engineer]
+  herramientas: [spark, airflow, databricks, snowflake, dbt, kafka, etl, sql, python, aws glue, bigquery, redshift]
+  genericos: [engineer, ingeniero, data, datos]
+  excluir: []
+
+- id: ia-ml
+  nombre: Inteligencia artificial y machine learning
+  area: Inteligencia artificial
+  consultas: [machine learning engineer, ai engineer, ingeniero de inteligencia artificial, llm engineer]
+  exactos: [machine learning engineer, ml engineer, ingeniero de machine learning, ai engineer, ingeniero de ia,
+            ingeniero de inteligencia artificial, artificial intelligence engineer, llm engineer, genai engineer,
+            generative ai engineer, mlops engineer, deep learning engineer, computer vision engineer,
+            nlp engineer, ai developer, desarrollador de ia, desarrollador de inteligencia artificial]
+  similares: [ai specialist, especialista en ia, ai solutions architect, prompt engineer, ingeniero de prompts,
+              conversational ai developer, chatbot developer, desarrollador de chatbots, ai researcher, ml researcher,
+              ai product engineer, applied ai engineer]
+  cercanos: [data scientist, científico de datos, data engineer, backend developer, ai trainer]
+  herramientas: [pytorch, tensorflow, llm, openai, langchain, rag, hugging face, mlops, computer vision, nlp,
+                 machine learning, deep learning]
+  genericos: [engineer, ingeniero, developer, desarrollador, ai, ia]
+  excluir: []
+
+- id: entrenamiento-ia
+  nombre: Entrenamiento y evaluación de IA
+  area: Inteligencia artificial
+  consultas: [ai trainer, entrenador de ia, data annotator, ai writing evaluator]
+  exactos: [ai trainer, entrenador de ia, ai tutor, ai writing trainer, ai data trainer, data annotator, anotador de datos,
+            data labeler, etiquetador de datos, ai evaluator, evaluador de ia, rater, search quality rater,
+            ai content reviewer, rlhf]
+  similares: [prompt writer, escritor de prompts, ai annotation specialist, linguist ai, lingüista ia,
+              annotation specialist, model evaluator, ai red teamer, freelance ai trainer, coding ai trainer,
+              bilingual ai trainer]
+  cercanos: [content moderator, moderador de contenido, traductor, translator, copywriter]
+  herramientas: [annotation, anotación, labeling, rlhf, llm, evaluación de respuestas, prompts]
+  genericos: [trainer, annotator, evaluator, rater]
+  excluir: [personal trainer, entrenador personal, entrenador deportivo, fitness]
+
+# ───────────── Infraestructura, soporte y seguridad ─────────────
+- id: devops-sre
+  nombre: DevOps y SRE
+  area: Infraestructura y soporte
+  consultas: [devops engineer, ingeniero devops, site reliability engineer, platform engineer]
+  exactos: [devops engineer, ingeniero devops, devops, devops specialist, especialista devops, site reliability engineer,
+            sre, platform engineer, ingeniero de plataforma, devsecops engineer, release engineer,
+            build engineer, ci/cd engineer]
+  similares: [infrastructure engineer, ingeniero de infraestructura, kubernetes engineer, cloud devops engineer,
+              automation engineer devops, observability engineer, production engineer]
+  cercanos: [cloud engineer, ingeniero cloud, sysadmin, administrador de sistemas, backend developer]
+  herramientas: [docker, kubernetes, terraform, ansible, jenkins, github actions, gitlab ci, aws, azure, gcp,
+                 prometheus, grafana, ci/cd, linux]
+  genericos: [engineer, ingeniero, devops]
+  excluir: []
+
+- id: cloud
+  nombre: Cloud (AWS, Azure, GCP)
+  area: Infraestructura y soporte
+  consultas: [cloud engineer, ingeniero cloud, aws engineer, azure engineer]
+  exactos: [cloud engineer, ingeniero cloud, ingeniero de nube, cloud architect, arquitecto cloud, arquitecto de nube,
+            aws engineer, aws architect, azure engineer, azure architect, gcp engineer, cloud specialist,
+            especialista cloud, cloud consultant, consultor cloud, cloud administrator, administrador cloud]
+  similares: [solutions architect aws, cloud operations engineer, cloud support engineer, finops analyst,
+              cloud security engineer, migration engineer cloud]
+  cercanos: [devops engineer, sysadmin, ingeniero de infraestructura, data engineer]
+  herramientas: [aws, azure, gcp, google cloud, ec2, s3, lambda, terraform, cloudformation, kubernetes]
+  genericos: [engineer, ingeniero, architect, arquitecto, cloud]
+  excluir: []
+
+- id: soporte-ti
+  nombre: Soporte técnico y mesa de ayuda
+  area: Infraestructura y soporte
+  consultas: [soporte técnico, help desk, technical support, analista de soporte, it support]
+  exactos: [soporte técnico, technical support, tech support, it support, soporte ti, soporte it, help desk,
+            helpdesk, mesa de ayuda, service desk, analista de soporte, support analyst, technical support engineer,
+            ingeniero de soporte, técnico de soporte, técnico de sistemas, suporte técnico, desktop support]
+  similares: [it technician, técnico informático, técnico en sistemas, soporte de aplicaciones, application support,
+              application support analyst, analista de soporte de aplicaciones, field technician it,
+              soporte nivel 1, soporte nivel 2, l1 support, l2 support, tier 1 support, tier 2 support,
+              it specialist, especialista ti, it analyst, analista de ti, analista de sistemas]
+  cercanos: [sysadmin, administrador de sistemas, administrador de redes, customer support, atención al cliente,
+             qa analyst]
+  herramientas: [active directory, office 365, windows, linux, tickets, itil, jira service management, servicenow,
+                 zendesk, freshdesk, redes, hardware]
+  genericos: [soporte, support, técnico, technician, help desk]
+  excluir: [soporte de ventas, sales support, soporte administrativo]
+
+- id: sistemas-redes
+  nombre: Sistemas, redes y bases de datos
+  area: Infraestructura y soporte
+  consultas: [administrador de sistemas, sysadmin, network engineer, ingeniero de redes, dba]
+  exactos: [administrador de sistemas, sysadmin, system administrator, systems administrator, administrador de redes,
+            network administrator, network engineer, ingeniero de redes, ingeniero de telecomunicaciones,
+            telecommunications engineer, dba, database administrator, administrador de bases de datos,
+            administrador de base de datos, linux administrator, administrador linux, windows administrator]
+  similares: [infrastructure analyst, analista de infraestructura, ingeniero de infraestructura, noc engineer,
+              noc analyst, analista noc, voip engineer, oracle dba, sql server dba, postgresql dba, storage engineer,
+              virtualization engineer, ingeniero de virtualización, it infrastructure specialist]
+  cercanos: [devops engineer, cloud engineer, soporte técnico, ciberseguridad]
+  herramientas: [linux, windows server, vmware, cisco, ccna, firewall, tcp/ip, active directory, sql server, oracle,
+                 postgresql, mysql, backup]
+  genericos: [administrador, administrator, engineer, ingeniero, analista]
+  excluir: [administrador de empresas, business administrator, administrador de restaurante, administrador de tienda,
+            administrador de obra, administrador de propiedades, property administrator]
+
+- id: ciberseguridad
+  nombre: Ciberseguridad
+  area: Seguridad
+  consultas: [cybersecurity analyst, analista de ciberseguridad, security engineer, pentester]
+  exactos: [cybersecurity analyst, analista de ciberseguridad, analista de seguridad informática, security analyst,
+            information security analyst, analista de seguridad de la información, security engineer,
+            ingeniero de seguridad, ingeniero de ciberseguridad, cybersecurity engineer, pentester,
+            penetration tester, ethical hacker, hacker ético, soc analyst, analista soc]
+  similares: [appsec engineer, application security engineer, cloud security engineer, grc analyst, analista grc,
+              security architect, arquitecto de seguridad, incident responder, threat analyst, threat intelligence,
+              vulnerability analyst, analista de vulnerabilidades, iam engineer, iam analyst, devsecops,
+              red team, blue team, especialista en ciberseguridad, cybersecurity specialist, ciso]
+  cercanos: [administrador de redes, network engineer, devops engineer, auditor de sistemas, it auditor]
+  herramientas: [siem, splunk, owasp, iso 27001, nist, firewall, burp suite, kali, edr, soc, pentesting]
+  genericos: [security, seguridad, ciberseguridad, cybersecurity]
+  excluir: [guardia de seguridad, security guard, vigilante, seguridad física, physical security, escolta, guarda]
+
+# ───────────── Producto y proyectos ─────────────
+- id: product-manager
+  nombre: Product Manager
+  area: Producto y proyectos
+  consultas: [product manager, gerente de producto, product lead, technical product manager]
+  exactos: [product manager, gerente de producto, product management, gestor de producto, technical product manager,
+            digital product manager, product lead, head of product, gerente de producto digital, gerente de produto,
+            group product manager, associate product manager, apm]
+  similares: [product specialist, especialista de producto, product strategist, growth product manager,
+              product operations, product ops, product marketing manager, cpo, chief product officer, director de producto]
+  cercanos: [product owner, product designer, business analyst, project manager, product analyst]
+  herramientas: [roadmap, discovery, okrs, product discovery, priorización, backlog, jira, amplitude, mixpanel]
+  genericos: [product, producto, produto]
+  excluir: [product manager industrial, gerente de producto farmacéutico, pharma product manager, brand manager consumo,
+            category manager, gerente de categoría]
+
+- id: product-owner
+  nombre: Product Owner
+  area: Producto y proyectos
+  consultas: [product owner, dueño de producto]
+  exactos: [product owner, dueño de producto, po, product owner técnico, technical product owner, digital product owner]
+  similares: [proxy product owner, business owner, analista de producto, product analyst, product specialist]
+  cercanos: [product manager, scrum master, business analyst, analista funcional, product designer, project manager]
+  herramientas: [backlog, historias de usuario, user stories, scrum, jira, criterios de aceptación, refinamiento]
+  genericos: [product, producto, owner]
+  excluir: []
+
+- id: project-manager
+  nombre: Gestión de proyectos y agilidad
+  area: Producto y proyectos
+  consultas: [project manager, gerente de proyectos, scrum master, coordinador de proyectos]
+  exactos: [project manager, gerente de proyectos, gestor de proyectos, jefe de proyectos, líder de proyectos,
+            coordinador de proyectos, project coordinator, scrum master, agile coach, coach ágil, delivery manager,
+            program manager, gerente de programa, pmo, analista pmo, technical project manager, it project manager,
+            gerente de proyectos ti, project lead]
+  similares: [project analyst, analista de proyectos, delivery lead, release manager, agile project manager,
+              kanban lead, project specialist, especialista en proyectos, implementation manager,
+              gerente de implementación, implementation consultant, consultor de implementación]
+  cercanos: [product owner, product manager, business analyst, operations manager, gerente de operaciones]
+  herramientas: [scrum, kanban, jira, pmp, agile, ágil, gantt, ms project, asana, monday, trello, confluence]
+  genericos: [project, proyectos, proyecto, scrum, agile]
+  excluir: [construction project manager, gerente de obra, director de obra, residente de obra, ingeniero residente,
+            proyectos de construcción, civil project manager]
+
+- id: analista-negocio
+  nombre: Análisis de negocio y funcional
+  area: Producto y proyectos
+  consultas: [business analyst, analista de negocio, analista funcional, analista de procesos]
+  exactos: [business analyst, analista de negocio, analista de negocios, analista funcional, functional analyst,
+            analista de procesos, process analyst, systems analyst, analista de sistemas de negocio,
+            business systems analyst, requirements analyst, analista de requerimientos]
+  similares: [consultor funcional, functional consultant, process improvement analyst, analista de mejora continua,
+              business process analyst, analista bpm, it business analyst, digital business analyst]
+  cercanos: [product owner, project manager, data analyst, qa analyst, product analyst]
+  herramientas: [requerimientos, requirements, bpmn, historias de usuario, user stories, uml, sql, jira, visio]
+  genericos: [analista, analyst]
+  excluir: []
+
+# ───────────── Contenido ─────────────
+- id: copywriting-redaccion
+  nombre: Copywriting y redacción
+  area: Contenido
+  consultas: [copywriter, redactor, content writer, redactor creativo]
+  exactos: [copywriter, redactor, redactor de contenidos, content writer, escritor de contenidos, redactor creativo,
+            copy creativo, redactor publicitario, writer, escritor, redator, redator publicitário, copywriting]
+  similares: [content creator escritor, technical writer, redactor técnico, escritor técnico, blog writer,
+              redactor de blogs, ghostwriter, escritor fantasma, scriptwriter, guionista, editor de contenidos,
+              content editor, copy editor, corrector de estilo, proofreader, corrector, editor de textos,
+              periodista digital, digital journalist, email copywriter, conversion copywriter, ux writer]
+  cercanos: [community manager, content strategist, estratega de contenido, seo specialist, social media manager,
+             marketing de contenidos, content marketing]
+  herramientas: [redacción, writing, blogs, seo, storytelling, copy, guiones, scripts, wordpress, contenido]
+  genericos: [writer, escritor, redactor, copy, editor]
+  excluir: [video editor, editor de video, editor de vídeo]
+
+- id: ux-writing-contenido
+  nombre: UX writing y estrategia de contenido
+  area: Contenido
+  consultas: [ux writer, content designer, content strategist, estratega de contenido]
+  exactos: [ux writer, ux writing, content designer, diseñador de contenido, content strategist, estratega de contenido,
+            estratega de contenidos, conversation designer, diseñador conversacional, product writer, microcopy writer]
+  similares: [content design lead, content manager, gerente de contenido, editorial manager, content lead,
+              líder de contenido, content operations, technical writer]
+  cercanos: [copywriter, redactor, product designer, ux designer, community manager]
+  herramientas: [microcopy, voz y tono, voice and tone, figma, guía de estilo, style guide, content design]
+  genericos: [writer, contenido, content]
+  excluir: [video editor, editor de video]
+
+- id: community-redes
+  nombre: Community manager y redes sociales
+  area: Contenido
+  consultas: [community manager, social media manager, gestor de redes sociales, creador de contenido]
+  exactos: [community manager, social media manager, gestor de redes sociales, administrador de redes sociales,
+            social media specialist, especialista en redes sociales, social media, community specialist,
+            gestor de comunidad, creador de contenido, content creator, creador de contenido digital,
+            social media strategist, estratega de redes sociales]
+  similares: [influencer marketing specialist, tiktok specialist, instagram manager, social media coordinator,
+              coordinador de redes sociales, ugc creator, creador ugc, community coordinator, moderador de comunidad,
+              community moderator, social media analyst, analista de redes sociales]
+  cercanos: [marketing digital, digital marketing specialist, copywriter, editor de video, diseñador gráfico,
+             content strategist]
+  herramientas: [instagram, tiktok, facebook, linkedin, meta business suite, hootsuite, canva, capcut, reels,
+                 calendario editorial, metricool]
+  genericos: [community, social media, redes sociales, contenido, content]
+  excluir: []
+
+- id: seo-sem
+  nombre: SEO y SEM
+  area: Contenido
+  consultas: [seo specialist, especialista seo, sem specialist, analista seo]
+  exactos: [seo specialist, especialista seo, analista seo, seo analyst, seo manager, seo consultant, consultor seo,
+            seo strategist, sem specialist, especialista sem, seo/sem specialist, seo, sem, technical seo]
+  similares: [seo content writer, link builder, link building specialist, ppc specialist, especialista ppc,
+              google ads specialist, especialista en google ads, search specialist, aso specialist]
+  cercanos: [marketing digital, performance marketing, copywriter, analista web, content strategist]
+  herramientas: [semrush, ahrefs, google search console, keyword research, link building, screaming frog, google ads]
+  genericos: [seo, sem, search]
+  excluir: []
+
+- id: traduccion
+  nombre: Traducción e idiomas
+  area: Contenido
+  consultas: [traductor, translator, intérprete, localization specialist]
+  exactos: [traductor, translator, traductora, intérprete, interpreter, tradutor, localization specialist,
+            especialista en localización, translation specialist, traductor inglés español, english spanish translator]
+  similares: [subtitulador, subtitler, transcriptor, transcriber, linguist, lingüista, localization manager,
+              language specialist, profesor de inglés online, online english teacher, english tutor, tutor de idiomas]
+  cercanos: [copywriter, redactor, ai trainer, editor de contenidos]
+  herramientas: [trados, memoq, cat tools, subtitulado, localización, localization, transcripción]
+  genericos: [traductor, translator, intérprete, linguist]
+  excluir: []
+
+# ───────────── Marketing ─────────────
+- id: marketing-digital
+  nombre: Marketing digital
+  area: Marketing
+  consultas: [marketing digital, digital marketing specialist, especialista en marketing digital, marketing manager]
+  exactos: [marketing digital, digital marketing, especialista en marketing digital, digital marketing specialist,
+            analista de marketing digital, digital marketing analyst, coordinador de marketing digital,
+            digital marketing coordinator, ejecutivo de marketing digital, marketing digital specialist,
+            gerente de marketing digital, digital marketing manager, marketing manager, gerente de marketing]
+  similares: [content marketing specialist, marketing de contenidos, email marketing specialist,
+              especialista en email marketing, crm marketing specialist, marketing automation specialist,
+              especialista en automatización de marketing, inbound marketing, hubspot specialist, brand manager,
+              marketing analyst, analista de marketing, marketing coordinator, coordinador de marketing,
+              trade marketing digital, product marketing, marketing specialist, especialista de marketing]
+  cercanos: [community manager, seo specialist, performance marketing, copywriter, diseñador gráfico, growth]
+  herramientas: [google ads, meta ads, hubspot, mailchimp, google analytics, ga4, seo, sem, crm, email marketing,
+                 marketing automation, embudos, funnels]
+  genericos: [marketing, mercadeo]
+  excluir: [network marketing, marketing multinivel, mlm, telemarketing, vendedor puerta a puerta]
+
+- id: performance-growth
+  nombre: Performance, paid media y growth
+  area: Marketing
+  consultas: [performance marketing, paid media specialist, growth marketer, trafficker digital]
+  exactos: [performance marketing, performance marketer, performance marketing specialist, paid media specialist,
+            especialista en pauta digital, paid media manager, trafficker digital, trafficker, media buyer,
+            comprador de medios, growth marketer, growth marketing, growth hacker, growth manager,
+            especialista en growth, acquisition manager, user acquisition manager]
+  similares: [ppc specialist, sem specialist, google ads specialist, meta ads specialist, facebook ads specialist,
+              especialista en meta ads, programmatic specialist, especialista programática, cro specialist,
+              conversion rate optimization, retention marketing, lifecycle marketing, analista de pauta]
+  cercanos: [marketing digital, seo specialist, data analyst, community manager]
+  herramientas: [google ads, meta ads, facebook ads, tiktok ads, linkedin ads, dv360, programática, cpa, roas, cro,
+                 a/b testing, appsflyer]
+  genericos: [growth, performance, paid, pauta, ads]
+  excluir: []
+
+- id: ecommerce
+  nombre: E-commerce y marketplaces
+  area: Marketing
+  consultas: [ecommerce specialist, especialista ecommerce, ecommerce manager, marketplace specialist]
+  exactos: [ecommerce specialist, e-commerce specialist, especialista ecommerce, especialista en e-commerce,
+            ecommerce manager, e-commerce manager, gerente de ecommerce, ecommerce coordinator, coordinador ecommerce,
+            ecommerce analyst, analista ecommerce, marketplace specialist, especialista marketplace,
+            amazon specialist, especialista amazon, mercado libre specialist, ecommerce executive, ejecutivo ecommerce]
+  similares: [shopify manager, store manager online, tienda online, online store manager, catalog specialist,
+              analista de catálogo, amazon account manager, marketplace manager, gerente de marketplace]
+  cercanos: [marketing digital, performance marketing, wordpress developer, diseñador web]
+  herramientas: [shopify, vtex, magento, woocommerce, amazon seller central, mercado libre, catálogo, marketplace]
+  genericos: [ecommerce, e-commerce, marketplace]
+  excluir: []
+
+# ───────────── Ventas y clientes ─────────────
+- id: ventas-tech
+  nombre: Ventas de tecnología (SDR, BDR, AE)
+  area: Ventas y clientes
+  consultas: [sales development representative, sdr, account executive, ejecutivo de ventas saas]
+  exactos: [sales development representative, sdr, business development representative, bdr, account executive,
+            ejecutivo de cuenta, ejecutivo de ventas, inside sales, inside sales representative, saas sales,
+            ventas saas, ejecutivo comercial ti, sales executive, account manager, ejecutivo de cuentas]
+  similares: [lead generation specialist, especialista en generación de leads, appointment setter, setter,
+              closer, sales closer, business developer, desarrollador de negocios, desarrollo de negocios,
+              partnerships manager, gerente de alianzas, presales, preventa, sales engineer, ingeniero de preventa,
+              solutions consultant, revops, sales operations, sales ops]
+  cercanos: [customer success, account manager, marketing digital]
+  herramientas: [salesforce, hubspot, pipedrive, outbound, cold calling, prospección, prospecting, crm, linkedin sales
+                 navigator, apollo]
+  genericos: [sales, ventas, comercial, business development]
+  excluir: [vendedor de mostrador, asesor de ventas tienda, retail sales associate, vendedor puerta a puerta,
+            vendedor de seguros, ventas de inmuebles, real estate agent, agente inmobiliario]
+
+- id: customer-success
+  nombre: Customer Success y atención al cliente
+  area: Ventas y clientes
+  consultas: [customer success, customer support, atención al cliente, customer service representative]
+  exactos: [customer success manager, customer success, customer success specialist, especialista en customer success,
+            customer support, customer support specialist, soporte al cliente, customer service,
+            customer service representative, representante de servicio al cliente, atención al cliente,
+            agente de atención al cliente, servicio al cliente, customer experience specialist, cx agent,
+            customer care, onboarding specialist, especialista de onboarding, implementation specialist]
+  similares: [account manager, technical account manager, support specialist, chat support, soporte por chat,
+              email support, bilingual customer service, servicio al cliente bilingüe, call center bilingüe,
+              customer support agent, agente de soporte, community support, client success, client services]
+  cercanos: [soporte técnico, help desk, ventas, ejecutivo de cuenta, cx designer]
+  herramientas: [zendesk, intercom, freshdesk, hubspot, salesforce service cloud, gorgias, crm, tickets, onboarding,
+                 churn, nps]
+  genericos: [customer, cliente, soporte, support, atención]
+  excluir: []
+
+# ───────────── Personas y administración ─────────────
+- id: reclutamiento
+  nombre: Reclutamiento y recursos humanos tech
+  area: Recursos humanos
+  consultas: [technical recruiter, reclutador it, talent acquisition specialist, recruiter]
+  exactos: [technical recruiter, tech recruiter, it recruiter, reclutador it, reclutador ti, reclutador tecnológico,
+            recruiter, reclutador, talent acquisition specialist, especialista en adquisición de talento,
+            talent acquisition, analista de selección, analista de reclutamiento, sourcer, talent sourcer,
+            recrutador, headhunter]
+  similares: [people partner, hr business partner, hrbp, people operations, analista de gestión humana,
+              analista de recursos humanos, hr generalist, generalista de rrhh, employer branding specialist,
+              hr coordinator, coordinador de talento humano, people analyst]
+  cercanos: [customer success, project coordinator, asistente virtual]
+  herramientas: [ats, greenhouse, lever, workable, linkedin recruiter, sourcing, entrevistas, boolean search]
+  genericos: [recruiter, reclutador, talent, talento, rrhh, hr]
+  excluir: []
+
+- id: asistente-virtual
+  nombre: Asistente virtual y operaciones remotas
+  area: Administración
+  consultas: [asistente virtual, virtual assistant, executive assistant remote, operations assistant]
+  exactos: [asistente virtual, virtual assistant, executive assistant, asistente ejecutivo, administrative assistant,
+            asistente administrativo, personal assistant, asistente personal, operations assistant,
+            asistente de operaciones, assistente virtual, remote assistant]
+  similares: [operations coordinator, coordinador de operaciones, operations specialist, especialista en operaciones,
+              office manager, data entry, digitador, data entry specialist, back office, appointment setter,
+              scheduler, coordinador administrativo, project assistant, asistente de proyectos, bookkeeper,
+              auxiliar contable remoto]
+  cercanos: [customer support, atención al cliente, community manager, project coordinator, reclutador]
+  herramientas: [google workspace, gmail, calendario, calendar, excel, notion, asana, trello, slack, canva, crm]
+  genericos: [assistant, asistente, operations, operaciones]
+  excluir: []
+
+- id: educacion-tech
+  nombre: Enseñanza de tecnología y tutorías
+  area: Administración
+  consultas: [instructor de programación, coding instructor, teaching assistant bootcamp, tutor de programación]
+  exactos: [instructor de programación, coding instructor, programming instructor, profesor de programación,
+            tutor de programación, coding tutor, bootcamp instructor, instructor bootcamp, teaching assistant,
+            mentor técnico, technical mentor, instructor de diseño ux, profesor de diseño, docente de tecnología]
+  similares: [technical trainer, capacitador técnico, curriculum developer tech, profesor online, online teacher,
+              tutor online, mentor de programación, code reviewer bootcamp]
+  cercanos: [diseño instruccional, instructional designer, developer advocate, devrel]
+  herramientas: [bootcamp, curso, clases, enseñanza, teaching, mentoría, mentoring, lms]
+  genericos: [instructor, profesor, tutor, docente, teacher, mentor]
+  excluir: [profesor de educación física, docente de preescolar]
