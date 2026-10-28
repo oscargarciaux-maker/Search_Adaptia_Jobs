@@ -1,0 +1,27 @@
+name: Diagnóstico
+
+# Revisa la configuración, cada fuente, las claves opcionales (Apify, Brave) y la última bodega publicada.
+# A mano: Actions > Diagnóstico > Run workflow. El resultado queda en el resumen de la corrida.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Revisar
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python -m buscador.diagnostico
