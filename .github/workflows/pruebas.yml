@@ -1,0 +1,21 @@
+name: Pruebas
+
+# En cada push y PR: un cambio que rompa algo no se fusiona. Desde el paso 8 también corren las pruebas de la página.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q

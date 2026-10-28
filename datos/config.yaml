@@ -1,0 +1,21 @@
+# Configuración del buscador. Aquí no van claves: esas son secretos de GitHub (APIFY_TOKEN, BRAVE_API_KEY) y de
+# Cloudflare (GITHUB_TOKEN_FLUJOS). Lo que se cambia aquí lo lee la bodega en su próxima corrida.
+
+# Países de LATAM que se buscan (códigos ISO; el detalle de cada uno vive en datos/paises.yaml desde el paso 2)
+paises_activos: [AR, BO, BR, CL, CO, CR, CU, DO, EC, GT, HN, MX, NI, PA, PE, PR, PY, SV, UY, VE]
+
+# Vacantes más viejas que esto se borran de la bodega
+dias_maximos: 30
+
+# Hora de la bodega nocturna en Bogotá (UTC−5). El horario real está en .github/workflows/bodega.yml (paso 7).
+hora_bodega_bogota: "01:17"
+
+# Apify (paso 6): actor principal y de respaldo para LinkedIn sin sesión, y tope de gasto por corrida en dólares
+apify:
+  actor_linkedin: ""          # se elige en el paso 6 comparando dos actores
+  actor_linkedin_respaldo: ""
+  tope_por_corrida_usd: 3
+
+# Brave Search (paso 6): búsquedas por corrida para descubrir empresas con sistema de postulación
+brave:
+  busquedas_por_corrida: 30
