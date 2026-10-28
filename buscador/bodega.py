@@ -169,7 +169,7 @@ def limpiar(previas, crudas, hoy, dias_maximos, enlaces_ats, empresas_leidas, co
         nuevas.append(v)
     limite = (date.fromisoformat(hoy) - timedelta(days=dias_maximos)).isoformat()
     vistas_hoy = {v["id"] for v in nuevas}
-    todas = vacante.juntar(list(previas) + nuevas)
+    todas = vacante.juntar([vacante.reetiquetar(dict(v)) for v in previas] + nuevas)
     salida = []
     for v in todas:
         if _fecha_de(v) and _fecha_de(v) < limite:

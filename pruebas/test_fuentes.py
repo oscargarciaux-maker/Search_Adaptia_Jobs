@@ -160,3 +160,13 @@ def test_limpiar_junta_quita_viejas_y_cerradas():
     assert descartes["más de 30 días"] == 1
     assert descartes["cerrada en el portal de la empresa"] == 1
     assert descartes["sin enlace donde postular"] == 1
+
+
+def test_limpiar_vuelve_a_leer_el_salario_de_las_previas():
+    hoy = "2026-10-28"
+    previa = vacante.crear("Product Designer", "Cleo", "https://www.linkedin.com/jobs/view/5", "LinkedIn",
+                           "Remote - LATAM", descripcion="Cleo has raised $300M from investors.", fecha="2026-10-27",
+                           hoy="2026-10-27")
+    previa["salario"] = "$300M"  # como quedó con el código anterior
+    vacantes, _, _ = bodega.limpiar([previa], [], hoy, 30, enlaces_ats=set(), empresas_leidas=set())
+    assert vacantes[0]["salario"] == ""

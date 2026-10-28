@@ -73,8 +73,10 @@ def anos_min(texto):
     return mejor
 
 
-_MONEDA = r"(?:US\$|USD|U\$S|COP|MXN|ARS|CLP|PEN|BRL|R\$|S/\.?|Bs\.?|€|EUR|\$)"
-_NUM = r"\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d+)?\s*(?:k|K|mil|millones|M)?"
+# "S/" (soles) en mayúscula y sin una letra o "/" antes: si no, toma rutas de enlaces como "s/348".
+_MONEDA = r"(?:US\$|USD|U\$S|COP|MXN|ARS|CLP|PEN|BRL|R\$|(?<![\w/])(?-i:S/)\.?|Bs\.?|€|EUR|\$)"
+# La "M" de millones no puede ser el comienzo de "MXN" o "MENSUALES".
+_NUM = r"\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d+)?\s*(?:k|K|mil|millones|M)?(?![A-Za-zÁÉÍÓÚáéíóú])"
 _SALARIO = re.compile(rf"{_MONEDA}\s?{_NUM}(?:\s*(?:-|–|a|to|hasta)\s*{_MONEDA}?\s?{_NUM})?"
                       rf"(?:\s*(?:{_MONEDA}))?(?:\s*(?:/|por|per|al|a la|a el)\s*(?:mes|month|año|year|hora|hour|hr|h))?",
                       re.I)
@@ -83,7 +85,13 @@ _SALARIO = re.compile(rf"{_MONEDA}\s?{_NUM}(?:\s*(?:-|–|a|to|hasta)\s*{_MONEDA
 # Cifras de la empresa que no son sueldo ("raised $300M", "ronda de US$ 50 millones").
 _NO_SALARIO = re.compile(r"(?:rais|fund|financ|invest|inversi|valuat|valua|revenue|ingres|factur|ARR|serie[s]?\s+[a-e]\b|"
                          r"ronda|round|backed|respald|capital|transacci|transaction|volume|volumen|loans?|pr[eé]stamo|"
-                         r"billion|mil millones)", re.I)
+                         r"billion|mil millones|presupuest|budget)", re.I)
+# Millones en dólares o euros son cifras de la empresa, no un sueldo (en pesos chilenos o colombianos sí puede serlo).
+_MILLONES = re.compile(r"\d\s*(?:M|millones)\b", re.I)
+_MONEDA_LOCAL = re.compile(r"COP|CLP|ARS|PYG|UYU", re.I)
+_MILLONES_DESPUES = re.compile(r"\s*(?:mil+(?:l|h)|bill|bn\b|B\b|M\b|mm\b)", re.I)
+# "Compensation: $100,000" o "Sueldo: $15.000" justo antes de la cifra: es sueldo aunque la frase hable de ventas.
+_ROTULO_SUELDO = re.compile(r"(?:salar|sueldo|compensa|remunera|pago|pay|rango|range)\w*\W{0,4}$", re.I)
 
 
 def salario(texto):
@@ -97,7 +105,10 @@ def salario(texto):
         antes = re.split(r"[.!?\n]\s", texto[max(0, m.start() - 60):m.start()])[-1]
         despues = re.split(r"[.!?\n]", texto[m.end():m.end() + 25])[0]
         contexto = antes + " " + despues
-        if _NO_SALARIO.search(contexto):
+        local = _MONEDA_LOCAL.search(valor + " " + despues)
+        if (_MILLONES.search(valor) or _MILLONES_DESPUES.match(despues)) and not local:
+            continue
+        if _NO_SALARIO.search(contexto) and not _ROTULO_SUELDO.search(antes):
             continue
         return valor[:60]
     return ""
