@@ -94,6 +94,9 @@ def test_idioma_anos_y_salario():
     assert etiquetas.salario("Salario: $3.000.000 - $4.000.000 COP mensuales") == "$3.000.000 - $4.000.000 COP"
     assert etiquetas.salario("USD 2,500 - 3,000 per month") == "USD 2,500 - 3,000 per month"
     assert etiquetas.salario("Trabajo con 2 personas") == ""
+    assert etiquetas.salario("Cleo has raised $300M from top investors.") == ""
+    assert etiquetas.salario("Procesamos US$ 2.000 millones en transacciones. Salario: USD 1,500 - 2,000 per month") \
+        == "USD 1,500 - 2,000 per month"
 
 
 def _v(**k):
