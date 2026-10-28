@@ -1,0 +1,141 @@
+# Países de LATAM que cubre el buscador. Por cada uno: código ISO, nombre para la página, nombres con los que aparece
+# en los avisos (español, inglés, portugués), gentilicios, ciudades principales y zona horaria (UTC, hora estándar).
+# Se puede agregar una ciudad o un nombre sin tocar código; las pruebas revisan el formato.
+paises:
+  - codigo: AR
+    nombre: Argentina
+    nombres: [argentina]
+    gentilicios: [argentino, argentina, argentinos]
+    ciudades: [buenos aires, cordoba, rosario, mendoza, la plata, mar del plata, tucuman, caba]
+    utc: -3
+  - codigo: BO
+    nombre: Bolivia
+    nombres: [bolivia]
+    gentilicios: [boliviano, boliviana]
+    ciudades: [la paz, santa cruz de la sierra, cochabamba, sucre, el alto]
+    utc: -4
+  - codigo: BR
+    nombre: Brasil
+    nombres: [brasil, brazil]
+    gentilicios: [brasileno, brasilena, brasileiro, brazilian]
+    ciudades: [sao paulo, rio de janeiro, belo horizonte, brasilia, curitiba, porto alegre, florianopolis, recife,
+               salvador, fortaleza, campinas, goiania, itajai, joinville]
+    utc: -3
+  - codigo: CL
+    nombre: Chile
+    nombres: [chile]
+    gentilicios: [chileno, chilena]
+    ciudades: [santiago de chile, santiago, valparaiso, vina del mar, concepcion, antofagasta, temuco, las condes, providencia]
+    utc: -4
+  - codigo: CO
+    nombre: Colombia
+    nombres: [colombia]
+    gentilicios: [colombiano, colombiana, colombianos]
+    ciudades: [bogota, medellin, cali, barranquilla, cartagena, bucaramanga, pereira, manizales, cucuta, ibague,
+               santa marta, villavicencio, envigado, itagui, sabaneta, chia, mosquera, capital district]
+    utc: -5
+  - codigo: CR
+    nombre: Costa Rica
+    nombres: [costa rica]
+    gentilicios: [costarricense, tico, tica]
+    ciudades: [san jose, heredia, alajuela, cartago, escazu, santa ana, belen]
+    utc: -6
+  - codigo: CU
+    nombre: Cuba
+    nombres: [cuba]
+    gentilicios: [cubano, cubana]
+    ciudades: [la habana, havana, santiago de cuba]
+    utc: -5
+  - codigo: DO
+    nombre: República Dominicana
+    nombres: [republica dominicana, dominican republic]
+    gentilicios: [dominicano, dominicana]
+    ciudades: [santo domingo, santiago de los caballeros, punta cana]
+    utc: -4
+  - codigo: EC
+    nombre: Ecuador
+    nombres: [ecuador]
+    gentilicios: [ecuatoriano, ecuatoriana]
+    ciudades: [quito, guayaquil, cuenca, manta, ambato]
+    utc: -5
+  - codigo: GT
+    nombre: Guatemala
+    nombres: [guatemala]
+    gentilicios: [guatemalteco, guatemalteca]
+    ciudades: [ciudad de guatemala, guatemala city, quetzaltenango, antigua guatemala]
+    utc: -6
+  - codigo: HN
+    nombre: Honduras
+    nombres: [honduras]
+    gentilicios: [hondureno, hondurena]
+    ciudades: [tegucigalpa, san pedro sula]
+    utc: -6
+  - codigo: MX
+    nombre: México
+    nombres: [mexico]
+    gentilicios: [mexicano, mexicana, mexicanos]
+    ciudades: [ciudad de mexico, mexico city, cdmx, guadalajara, monterrey, puebla, queretaro, merida, tijuana, leon,
+               zapopan, cancun, aguascalientes, san luis potosi, chihuahua, hermosillo, toluca]
+    utc: -6
+  - codigo: NI
+    nombre: Nicaragua
+    nombres: [nicaragua]
+    gentilicios: [nicaraguense]
+    ciudades: [managua, leon nicaragua, granada nicaragua]
+    utc: -6
+  - codigo: PA
+    nombre: Panamá
+    nombres: [panama]
+    gentilicios: [panameno, panamena]
+    ciudades: [ciudad de panama, panama city, colon panama, david chiriqui]
+    utc: -5
+  - codigo: PE
+    nombre: Perú
+    nombres: [peru]
+    gentilicios: [peruano, peruana, peruanos]
+    ciudades: [lima, arequipa, trujillo, cusco, chiclayo, piura, miraflores, san isidro, callao]
+    utc: -5
+  - codigo: PR
+    nombre: Puerto Rico
+    nombres: [puerto rico]
+    gentilicios: [puertorriqueno, puertorriquena]
+    ciudades: [san juan puerto rico, bayamon, ponce]
+    utc: -4
+  - codigo: PY
+    nombre: Paraguay
+    nombres: [paraguay]
+    gentilicios: [paraguayo, paraguaya]
+    ciudades: [asuncion, ciudad del este, encarnacion]
+    utc: -3
+  - codigo: SV
+    nombre: El Salvador
+    nombres: [el salvador]
+    gentilicios: [salvadoreno, salvadorena]
+    ciudades: [san salvador, santa ana el salvador]
+    utc: -6
+  - codigo: UY
+    nombre: Uruguay
+    nombres: [uruguay]
+    gentilicios: [uruguayo, uruguaya]
+    ciudades: [montevideo, punta del este]
+    utc: -3
+  - codigo: VE
+    nombre: Venezuela
+    nombres: [venezuela]
+    gentilicios: [venezolano, venezolana, venezolanos]
+    ciudades: [caracas, maracaibo, valencia venezuela, barquisimeto, maracay, puerto ordaz]
+    utc: -4
+
+# Palabras que abren una vacante remota a toda LATAM
+toda_latam: [latam, latin america, latinoamerica, america latina, south america, sudamerica, suramerica, americas,
+             the americas, central america, centroamerica, worldwide, anywhere, global, globally, any country,
+             cualquier pais, todo el mundo, international]
+
+# Lugares fuera de LATAM: si el aviso solo nombra estos, nadie de LATAM puede aplicar
+fuera_de_latam: [united states, us, usa, u.s., u.s.a, estados unidos, eeuu, ee.uu, us only, canada, north america,
+                 united kingdom, uk, england, london, ireland, dublin, europe, european union, eu, emea, spain, espana,
+                 madrid, barcelona, portugal, lisbon, lisboa, germany, berlin, france, paris, netherlands, amsterdam,
+                 italy, poland, romania, ukraine, india, bangalore, bengaluru, pakistan, philippines, manila, apac,
+                 asia, australia, new zealand, singapore, japan, israel, uae, dubai, south africa, nigeria, kenya,
+                 egypt, new york, san francisco, california, texas, florida, miami, seattle, boston, chicago, austin,
+                 los angeles, toronto, vancouver, atlanta, denver, washington]

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Vacantes LATAM</title>
+  <meta name="description" content="Buscador de vacantes de tecnología y áreas creativas abiertas en LATAM o remotas para LATAM.">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="estilos.css">
+  <script src="config.js" onerror="window.BUSCADOR_CONFIG = {}"></script>
+  <script src="motor.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="saltar" href="#principal">Saltar al contenido</a>
+  <header class="cabecera">
+    <div class="cabecera__fila">
+      <h1 class="cabecera__titulo">Vacantes LATAM</h1>
+      <p class="cabecera__estado" id="estado-datos" aria-live="polite">Cargando vacantes…</p>
+    </div>
+    <nav class="pestanas" role="tablist" aria-label="Secciones">
+      <button role="tab" id="tab-buscar" aria-controls="panel-buscar" aria-selected="true" data-panel="buscar">Buscar</button>
+      <button role="tab" id="tab-salud" aria-controls="panel-salud" aria-selected="false" tabindex="-1" data-panel="salud">Estado</button>
+      <button role="tab" id="tab-mapa" aria-controls="panel-mapa" aria-selected="false" tabindex="-1" data-panel="mapa">Cargos</button>
+    </nav>
+  </header>
+
+  <main id="principal">
+    <!-- Buscar -->
+    <section id="panel-buscar" role="tabpanel" aria-labelledby="tab-buscar" class="panel">
+      <form class="tarjeta busqueda" id="form-busqueda" autocomplete="off">
+        <div class="campo campo--cargo">
+          <label for="cargo">Cargo</label>
+          <div class="combo">
+            <input id="cargo" type="search" role="combobox" aria-autocomplete="list" aria-expanded="false"
+                   aria-controls="sugerencias" placeholder="Ej.: product designer, editor de video, desarrollador" enterkeyhint="search">
+            <ul id="sugerencias" role="listbox" class="sugerencias" hidden></ul>
+          </div>
+        </div>
+        <div class="campo campo--pais">
+          <label for="pais">País de la persona</label>
+          <select id="pais"><option value="">Toda LATAM</option></select>
+        </div>
+        <div class="campo campo--dias">
+          <label for="dias">Antigüedad</label>
+          <select id="dias">
+            <option value="7">Últimos 7 días</option>
+            <option value="14">Últimos 14 días</option>
+            <option value="30" selected>Últimos 30 días</option>
+          </select>
+        </div>
+        <fieldset class="interruptores">
+          <legend class="sr">Modalidad y opciones</legend>
+          <label class="chip-check"><input type="checkbox" id="remotas" checked><span>Remotas</span></label>
+          <label class="chip-check"><input type="checkbox" id="presenciales" checked><span>Presenciales</span></label>
+          <label class="chip-check"><input type="checkbox" id="ocultar-enviadas" checked><span>Ocultar enviadas</span></label>
+          <label class="chip-check"><input type="checkbox" id="confianza"><span>País confirmado</span></label>
+        </fieldset>
+      </form>
+
+      <section class="tarjeta palabras" id="palabras" hidden aria-labelledby="palabras-titulo">
+        <div class="palabras__cabeza">
+          <h2 id="palabras-titulo">Cargos incluidos</h2>
+          <button type="button" class="enlace-boton" id="ver-titulos" aria-expanded="false">Ver todos los títulos</button>
+        </div>
+        <div class="grados" id="grados"></div>
+        <div class="titulos" id="titulos" hidden></div>
+        <details class="extra-caja">
+          <summary>Afinar con palabras del título</summary>
+          <div class="extra">
+          <div class="campo">
+            <label for="palabras-extra">Sumar palabras del título</label>
+            <input id="palabras-extra" type="text" placeholder="Ej.: capcut, webflow (separadas por coma)">
+          </div>
+          <div class="campo">
+            <label for="palabras-excluir">Quitar las que digan</label>
+            <input id="palabras-excluir" type="text" placeholder="Ej.: senior, freelance">
+          </div>
+          </div>
+        </details>
+      </section>
+
+      <section class="resultados" aria-labelledby="resultados-titulo">
+        <div class="resultados__cabeza">
+          <h2 id="resultados-titulo" aria-live="polite">Escribe un cargo para empezar</h2>
+          <p class="resumen" id="resumen"></p>
+        </div>
+        <div class="filtros" id="filtros" hidden>
+          <div class="campo campo--corto">
+            <label for="nivel">Nivel</label>
+            <select id="nivel">
+              <option value="">Todos</option><option value="trainee">Trainee o práctica</option><option value="junior">Junior</option>
+              <option value="semi senior">Semi senior</option><option value="senior">Senior</option><option value="lead">Lead o más</option>
+              <option value="sin dato">Sin nivel en el título</option>
+            </select>
+          </div>
+          <div class="campo campo--corto">
+            <label for="idioma">Idioma del aviso</label>
+            <select id="idioma"><option value="">Todos</option><option value="es">Español</option><option value="en">Inglés</option><option value="pt">Portugués</option></select>
+          </div>
+          <div class="campo campo--corto">
+            <label for="ingles">Inglés que pide</label>
+            <select id="ingles"><option value="">Cualquiera</option><option value="hasta-intermedio">No pide, básico o intermedio</option><option value="avanzado-o-mas">Avanzado o más</option></select>
+          </div>
+          <div class="campo campo--corto">
+            <label for="orden">Orden</label>
+            <select id="orden"><option value="relevancia">Más parecidas primero</option><option value="fecha">Más nuevas primero</option></select>
+          </div>
+        </div>
+        <div id="lista" class="lista" role="list"></div>
+        <div class="mas" id="mas" hidden><button type="button" class="boton boton--secundario" id="ver-mas">Ver más</button></div>
+        <div class="vacio" id="vacio" hidden></div>
+      </section>
+    </section>
+
+    <!-- Estado -->
+    <section id="panel-salud" role="tabpanel" aria-labelledby="tab-salud" class="panel" hidden>
+      <div id="salud" class="tarjeta">Cargando…</div>
+      <section class="tarjeta" aria-labelledby="enviadas-titulo">
+        <h2 id="enviadas-titulo">Historial de enviadas</h2>
+        <p id="enviadas-resumen"></p>
+        <div class="acciones-fila">
+          <button type="button" class="boton boton--secundario" id="exportar-enviadas">Exportar historial</button>
+          <label class="boton boton--secundario" for="importar-enviadas">Importar historial</label>
+          <input type="file" id="importar-enviadas" accept="application/json" class="sr">
+          <button type="button" class="boton boton--secundario" id="borrar-enviadas">Borrar historial</button>
+        </div>
+      </section>
+    </section>
+
+    <!-- Cargos -->
+    <section id="panel-mapa" role="tabpanel" aria-labelledby="tab-mapa" class="panel" hidden>
+      <div id="mapa" class="tarjeta">Cargando…</div>
+    </section>
+  </main>
+
+  <div class="barra-acciones" id="barra-acciones" hidden>
+    <div class="barra-acciones__dentro">
+      <p class="barra-acciones__cuenta" id="cuenta-seleccion" aria-live="polite">0 seleccionadas</p>
+      <div class="barra-acciones__botones">
+        <button type="button" class="boton boton--secundario" id="seleccionar">Elegir las 20 primeras</button>
+        <button type="button" class="boton" id="copiar" disabled>Copiar para WhatsApp</button>
+        <button type="button" class="boton boton--secundario" id="excel" disabled>Excel</button>
+        <button type="button" class="boton boton--secundario" id="marcar" disabled>Marcar enviadas</button>
+      </div>
+    </div>
+  </div>
+  <div class="aviso" id="aviso" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
