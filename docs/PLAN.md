@@ -109,7 +109,7 @@ Una vacante puede quedar en varias familias. Cada una guarda su nivel de coincid
 Cada vacante lleva la lista de países de LATAM desde los que se puede postular; al elegir un país en la página salen las
 de ese país más todas las remotas que lo incluyen.
 
-**Archivo `datos/paises.yaml`:** los 19 países de LATAM continental más Cuba, República Dominicana y Puerto Rico. Por
+**Archivo `datos/paises.yaml`:** los 17 países de LATAM continental de habla hispana y portuguesa más Cuba, República Dominicana y Puerto Rico (20). Por
 cada uno: código ISO, nombres en español, inglés y portugués, gentilicio, las ciudades principales y su zona horaria
 (por ejemplo Venezuela UTC−4, México UTC−6, Brasil UTC−3).
 
