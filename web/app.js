@@ -156,8 +156,18 @@
 
   function pintarPalabras() {
     const caja = $("palabras");
-    if (!estado.familia) { caja.hidden = !$("palabras-extra").value.trim() && !estado.texto; $("grados").innerHTML = ""; $("titulos").innerHTML = ""; $("ver-titulos").hidden = true; return; }
+    if (!estado.familia) {
+      caja.hidden = !$("palabras-extra").value.trim() && !estado.texto;
+      $("palabras-titulo").textContent = "Búsqueda por palabras";
+      $("grados").innerHTML = "";
+      $("grados").append(el("p", { class: "nota", text: `«${estado.texto}» no está en la lista de cargos: se busca tal cual en los títulos. ` +
+        "Si es un cargo que vas a buscar seguido, pide agregarlo (skill «nueva-familia»)." }));
+      $("titulos").innerHTML = "";
+      $("ver-titulos").hidden = true;
+      return;
+    }
     caja.hidden = false;
+    $("palabras-titulo").textContent = "Cargos incluidos";
     $("ver-titulos").hidden = false;
     const f = estado.mapaPorId[estado.familia];
     const base = M.filtrar(estado.vacantes, { ...opciones(), grados: M.GRADOS, nivel: "", idioma: "", ingles: "" });
@@ -229,8 +239,10 @@
     $("mas").hidden = r.length <= estado.visibles;
     $("ver-mas").textContent = `Ver ${fmt.format(Math.min(POR_PAGINA, r.length - estado.visibles))} más (quedan ${fmt.format(r.length - estado.visibles)})`;
     if (!r.length) {
+      const ideas = [$("dias").value !== "30" ? "los últimos 30 días" : null, $("pais").value ? "«Toda LATAM»" : null,
+        estado.familia && estado.grados.size < 3 ? "las cercanas" : null, !$("remotas").checked || !$("presenciales").checked ? "las dos modalidades" : null].filter(Boolean);
       mostrarVacio(`No hay vacantes de ${nombreBusqueda()} con estos filtros.`,
-        "Prueba con 30 días, con «Toda LATAM» o activando las cercanas. También puedes pedir una búsqueda en vivo:", true);
+        (ideas.length ? `Prueba con ${ideas.join(", ")}. ` : "") + "También puedes pedir una búsqueda en vivo en todas las fuentes:", true);
     } else {
       $("vacio").hidden = true;
     }
@@ -270,6 +282,7 @@
     const total = `${fmt.format(estado.resultados.length)} ${estado.resultados.length === 1 ? "vacante" : "vacantes"}`;
     $("cuenta-seleccion").textContent = n ? `${total} · ${fmt.format(n)} ${n === 1 ? "elegida" : "elegidas"}` : `${total} · elige las que vas a mandar`;
     ["copiar", "excel", "marcar"].forEach(id => { $(id).disabled = !n; });
+    $("seleccionar").disabled = !estado.resultados.length;
     $("seleccionar").textContent = n ? "Quitar selección" : `Elegir las ${SEL_RAPIDA} primeras`;
   }
 
