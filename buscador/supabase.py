@@ -13,8 +13,16 @@ from buscador import contrato
 LOTE = 500   # el contrato acepta hasta 500 filas por llamada
 
 
+def base(url):
+    """Solo https://<proyecto>.supabase.co: la pantalla Data API de Supabase muestra la dirección con /rest/v1/ al final,
+    y si se pega así la API responde «Invalid path» (PGRST125)."""
+    from urllib.parse import urlparse
+    p = urlparse(str(url or "").strip())
+    return f"{p.scheme}://{p.netloc}" if p.scheme and p.netloc else str(url or "").strip().rstrip("/")
+
+
 def credenciales():
-    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    url = base(os.environ.get("SUPABASE_URL", ""))
     clave = (os.environ.get("SUPABASE_SECRET_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
     return (url, clave) if url and clave else (None, None)
 
@@ -50,6 +58,7 @@ def subir(filas, url=None, clave=None, sesion=None):
     """Inserta las filas en lotes de 500. Devuelve un resumen para salud.json (nunca lanza error)."""
     if url is None:
         url, clave = credenciales()
+    url = base(url)
     if not url:
         return {"omitida": "sin SUPABASE_URL o SUPABASE_SECRET_KEY"}
     sesion = sesion or requests.Session()
@@ -77,6 +86,7 @@ def probar(url=None, clave=None, sesion=None):
     """Comprueba la conexión y que la tabla exista, sin escribir nada. Devuelve (ok, mensaje en español)."""
     if url is None:
         url, clave = credenciales()
+    url = base(url)
     if not url:
         return False, "Faltan los secretos SUPABASE_URL o SUPABASE_SECRET_KEY en GitHub."
     cabeceras = {"apikey": clave}

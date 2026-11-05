@@ -228,3 +228,13 @@ def test_entrada_del_actor_y_sin_token():
     assert crudas == [] and "omitida" in stats
     consultas = entrega.config()["consultas_publicaciones"]
     assert consultas and all(sum(c.count(op) for op in (" AND ", " OR ", " NOT ")) <= 5 for c in consultas)
+
+
+def test_direccion_de_supabase_con_ruta():
+    """La pantalla Data API muestra https://<proyecto>.supabase.co/rest/v1/: se usa solo el dominio."""
+    assert supabase.base("https://abc.supabase.co/rest/v1/") == "https://abc.supabase.co"
+    assert supabase.base(" https://abc.supabase.co/ ") == "https://abc.supabase.co"
+    s = _Sesion()
+    supabase.subir([dict.fromkeys(contrato.COLUMNAS + contrato.EXTRAS, "") | {"external_id": "x"}],
+                   "https://abc.supabase.co/rest/v1", "sb_secret_1", sesion=s)
+    assert s.llamadas[0][0] == "https://abc.supabase.co/rest/v1/ofertas?on_conflict=external_id"
