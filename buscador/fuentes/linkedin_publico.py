@@ -68,15 +68,24 @@ def consulta_or(consultas, maximo=4):
     return " OR ".join(f'"{c}"' for c in consultas[:maximo])
 
 
+def orden(estado, hoy, prioritarias):
+    """Primero las familias prioritarias (los roles de la entrega diaria) que aún no se revisaron hoy: así se buscan
+    todas las noches; después, las combinaciones que hace más tiempo no se revisan."""
+    def clave(c):
+        ultima = estado.get(f"{c[0]}@{c[2]}", "")
+        return (0 if c[0] in prioritarias and ultima < hoy else 1, ultima)
+    return clave
+
+
 def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fichas=250, max_dias=30,
-           reloj=time.monotonic, limite_segundos=None):
+           reloj=time.monotonic, limite_segundos=None, prioritarias=()):
     """Recorre las combinaciones menos recientes hasta gastar el presupuesto de búsquedas.
     estado: dict {clave_combinacion: fecha ISO de la última revisión}; se actualiza aquí.
     Devuelve (vacantes crudas, estadísticas)."""
     hoy = hoy or datetime.now(timezone.utc).date().isoformat()
     inicio = reloj()
     todas = combinaciones(mapa, paises_activos)
-    todas.sort(key=lambda c: estado.get(f"{c[0]}@{c[2]}", ""))
+    todas.sort(key=orden(estado, hoy, set(prioritarias)))
     vistos, avisos = set(), []
     hechas = fallidas = seguidas = 0
     for familia, consultas, lugar, params in todas:
@@ -101,13 +110,16 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
                 if f["id"] not in vistos:
                     vistos.add(f["id"])
                     f["lugar_busqueda"] = lugar
+                    f["familia"] = familia
                     avisos.append(f)
             if len(filas) < 10:
                 break
         if seguidas == 0:
             estado[clave] = hoy
-    # Descripción completa y estado de los avisos (los remotos y los más nuevos primero: ahí la descripción decide el país)
-    avisos.sort(key=lambda a: (a["lugar_busqueda"] not in ("LATAM", "REMOTO"), a["fecha"] or ""), reverse=False)
+    # Descripción completa y estado de los avisos: primero los de las familias prioritarias (la entrega diaria solo usa
+    # avisos con descripción) y los remotos (ahí la descripción decide el país)
+    avisos.sort(key=lambda a: (a["familia"] not in prioritarias, a["lugar_busqueda"] not in ("LATAM", "REMOTO"),
+                               a["fecha"] or ""))
     crudas, con_ficha, cerradas = [], 0, 0
     for a in avisos:
         descripcion, cerrado, externo, remoto = "", False, "", None

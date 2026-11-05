@@ -1,8 +1,8 @@
 # Configuración del buscador. Aquí no van claves: esas son secretos de GitHub (APIFY_TOKEN, BRAVE_API_KEY) y de
 # Cloudflare (GITHUB_TOKEN_FLUJOS). Lo que se cambia aquí lo lee la bodega en su próxima corrida.
 
-# Países de LATAM que se buscan (códigos ISO; el detalle de cada uno vive en datos/paises.yaml desde el paso 2)
-paises_activos: [AR, BO, BR, CL, CO, CR, CU, DO, EC, GT, HN, MX, NI, PA, PE, PR, PY, SV, UY, VE]
+# Países que se buscan: LATAM y España (códigos ISO; el detalle de cada uno vive en datos/paises.yaml desde el paso 2)
+paises_activos: [AR, BO, BR, CL, CO, CR, CU, DO, EC, ES, GT, HN, MX, NI, PA, PE, PR, PY, SV, UY, VE]
 
 # Vacantes más viejas que esto se borran de la bodega
 dias_maximos: 30
@@ -10,9 +10,15 @@ dias_maximos: 30
 # Hora de la bodega nocturna en Bogotá (UTC−5). El horario real está en .github/workflows/bodega.yml (paso 7).
 hora_bodega_bogota: "01:17"
 
-# Apify (paso 6): actor principal y de respaldo para LinkedIn sin sesión, y tope de gasto por corrida en dólares
+# Apify (secreto APIFY_TOKEN). Nunca un actor que pida cookie o sesión de LinkedIn.
+#   actor_publicaciones: publicaciones «contratando» del feed (fuentes/publicaciones_apify.py). Se paga por publicación
+#     (≈ USD 2 por 1.000): con publicaciones_por_dia = 72 son ≈ USD 4,3 al mes, dentro de los USD 5 del plan gratis.
+#     Alternativa si el plan gratis no lo deja correr: "lofomachines/linkedin-post-search-scraper" (10 por corrida).
+#   actor_linkedin: ofertas formales de LinkedIn por Apify (opcional; vacío = no se usa: el buscador público ya las trae)
 apify:
-  actor_linkedin: ""          # se elige en el paso 6 comparando dos actores
+  actor_publicaciones: "harvestapi/linkedin-post-search"
+  publicaciones_por_dia: 72
+  actor_linkedin: ""
   actor_linkedin_respaldo: ""
   tope_por_corrida_usd: 3
 
@@ -23,9 +29,9 @@ brave:
 # Cuánto trabaja cada fuente por corrida. Más alto = más vacantes, pero más tiempo y más riesgo de bloqueo (LinkedIn).
 # Las fuentes corren en paralelo; cada una se detiene sola al llegar a minutos_por_fuente.
 presupuestos:
-  minutos_por_fuente: 40
+  minutos_por_fuente: 50
   linkedin_busquedas: 450      # páginas de resultados por noche (10 avisos cada una)
-  linkedin_fichas: 350         # avisos a los que se les lee la descripción completa
+  linkedin_fichas: 450         # avisos a los que se les lee la descripción completa
   pausa_linkedin: [1.0, 2.5]   # segundos entre peticiones a LinkedIn
   indeed_busquedas: 90
   apify_busquedas: 60          # solo con APIFY_TOKEN

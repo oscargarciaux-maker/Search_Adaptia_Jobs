@@ -17,7 +17,7 @@ from pathlib import Path
 import yaml
 
 from buscador import enlaces, familias, normalizar, paises, vacante
-from buscador.fuentes import ats, brave, getonbrd, indeed, linkedin_apify, linkedin_publico, remotos
+from buscador.fuentes import ats, brave, getonbrd, indeed, linkedin_apify, linkedin_publico, publicaciones_apify, remotos
 from buscador.http import Cliente
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -63,6 +63,9 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None):
     mapa = solo_mapa or familias.mapa()
     activos = _paises_activos(cfg)
     limite = p["minutos_por_fuente"] * 60
+    from buscador import entrega
+    cfg_entrega = entrega.config()
+    prioritarias = {f for r in cfg_entrega["roles"] for f in r["familias"]}
     salud = {}
     for clave in ("linkedin", "indeed", "apify", "ats_probadas", "remotos_cache"):
         estado.setdefault(clave, {})
@@ -81,17 +84,22 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None):
     def f_linkedin():
         return linkedin_publico.buscar(Cliente(pausa=tuple(p["pausa_linkedin"])), mapa, activos, estado["linkedin"],
                                        p["linkedin_busquedas"], hoy=hoy, max_fichas=p["linkedin_fichas"],
-                                       max_dias=cfg["dias_maximos"], limite_segundos=limite)
+                                       max_dias=cfg["dias_maximos"], limite_segundos=limite, prioritarias=prioritarias)
 
     def f_indeed():
         return indeed.buscar(mapa, [c for c, _ in activos], estado["indeed"], p["indeed_busquedas"], hoy=hoy,
-                             max_dias=cfg["dias_maximos"], limite_segundos=limite)
+                             max_dias=cfg["dias_maximos"], limite_segundos=limite, prioritarias=prioritarias)
 
     def f_apify():
         combos = linkedin_publico.combinaciones(mapa, activos)
         return linkedin_apify.buscar(Cliente(), cfg["apify"]["actor_linkedin"], combos, estado["apify"], hoy,
                                      presupuesto=p["apify_busquedas"], max_dias=cfg["dias_maximos"],
                                      limite_segundos=limite)
+
+    def f_publicaciones():
+        maximo = 6 if p.get("minutos_por_fuente", 50) <= 3 else cfg["apify"].get("publicaciones_por_dia", 72)
+        return publicaciones_apify.buscar(Cliente(), cfg["apify"].get("actor_publicaciones", ""),
+                                          cfg_entrega.get("consultas_publicaciones", []), prioritarias, hoy, maximo=maximo)
 
     def f_remotos():
         consultas = sorted({c for f in mapa for c in f["consultas"][:1]})
@@ -106,10 +114,11 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None):
     def f_ats():
         return ats.buscar(Cliente(pausa=(0.05, 0.2)), filas_ats)
 
-    with ThreadPoolExecutor(6) as ex:
+    with ThreadPoolExecutor(7) as ex:
         tareas = {n: ex.submit(correr, n, f) for n, f in [("LinkedIn", f_linkedin), ("Indeed", f_indeed),
                                                             ("LinkedIn (Apify)", f_apify), ("Tableros remotos", f_remotos),
-                                                            ("Get on Board", f_getonbrd), ("Portales de empresas", f_ats)]}
+                                                            ("Get on Board", f_getonbrd), ("Portales de empresas", f_ats),
+                                                            ("Publicaciones LinkedIn (Apify)", f_publicaciones)]}
         resultados = {n: t.result() for n, t in tareas.items()}
     crudas, empresas = [], set()
     for n, r in resultados.items():
@@ -123,7 +132,7 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None):
     empresas_leidas = ats_crudas[1] if len(ats_crudas) == 3 else set()
     # Empresas de LinkedIn e Indeed con cargos del mapa: candidatas a tener portal propio
     for c in crudas:
-        if c.get("fuente") in ("LinkedIn", "Indeed", "LinkedIn (Apify)") and c.get("empresa") and familias.clasificar(c["titulo"]):
+        if c.get("fuente") in ("LinkedIn", "Indeed", "LinkedIn (Apify)", publicaciones_apify.NOMBRE) and c.get("empresa") and familias.clasificar(c["titulo"]):
             empresas.add(c["empresa"])
     # Descubrir portales nuevos: nombres de empresas y tableros que encuentre Brave
     nuevos = []
@@ -222,6 +231,16 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
                                                consulta=consulta or "")
     _guardar_json(trabajo / "bodega.json.gz", vacantes, comprimido=True)
     _guardar_json(trabajo / "estado.json", estado)
+    # Entrega diaria en el formato del contrato (no en una búsqueda profunda; en una prueba no se marca nada ni se sube)
+    resumen_entrega = None
+    if not consulta:
+        from buscador import entrega, supabase
+        entregadas = _leer_json(trabajo / "entregadas.json", {})
+        capturada = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        resumen_entrega = entrega.correr(vacantes, entregadas if not prueba else dict(entregadas), hoy, capturada,
+                                         salida / "datos" / "entregas", subir=None if prueba else supabase.subir)
+        if not prueba:
+            _guardar_json(trabajo / "entregadas.json", entregadas)
     reporte = {
         "fecha": hoy, "hora_utc": datetime.now(timezone.utc).strftime("%H:%M"), "modo": modo,
         "consulta": consulta or "", "pais": pais or "",
@@ -232,6 +251,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         "por_familia": dict(Counter(f["familia"] for v in vacantes for f in v["familias"]).most_common()),
         "por_pais": dict(Counter(p for v in vacantes for p in v["paises"]).most_common()),
         "por_fuente": dict(Counter(fu for v in vacantes for fu in v["fuentes"]).most_common()),
+        "entrega": resumen_entrega,
     }
     from buscador import publicar
     publicar.publicar(salida, vacantes, reporte, sin_familia)

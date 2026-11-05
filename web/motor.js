@@ -157,10 +157,12 @@
   const MODALIDAD = { remoto: "Remoto", hibrido: "Híbrido", presencial: "Presencial", "sin dato": "Modalidad sin confirmar" };
   const INGLES = { basico: "Inglés básico", intermedio: "Inglés intermedio", avanzado: "Inglés avanzado", fluido: "Inglés fluido", nativo: "Inglés nativo" };
 
-  /** "Toda LATAM", "Colombia" o "Colombia, México y Perú" (con más de 3: "Colombia y 6 países más"). */
+  /** "LATAM y España", "Toda LATAM", "Colombia" o "Colombia, México y Perú" (con más de 3: "Colombia y 6 países más").
+   *  totalPaises cuenta España; LATAM son todos menos España. */
   function dondeAplica(v, nombres, totalPaises) {
     const p = v.paises || [];
-    if (totalPaises && p.length >= totalPaises) return "Toda LATAM";
+    if (totalPaises && p.length >= totalPaises) return "LATAM y España";
+    if (totalPaises && p.length >= totalPaises - 1 && !p.includes("ES")) return "Toda LATAM";
     const n = p.map(c => nombres[c] || c);
     if (n.length <= 1) return n[0] || "";
     if (n.length <= 3) return n.slice(0, -1).join(", ") + " y " + n[n.length - 1];

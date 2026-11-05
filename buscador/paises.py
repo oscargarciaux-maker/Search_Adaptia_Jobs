@@ -1,10 +1,11 @@
-"""Desde qué países de LATAM se puede aplicar a una vacante (sin IA).
+"""Desde qué países de LATAM y del mundo hispanohablante (España) se puede aplicar a una vacante (sin IA).
 
 Mira primero la ubicación y el título del aviso; la descripción solo cuenta para la modalidad remota y para frases que
 restringen dónde debe vivir la persona ("must be based in", "only candidates from"). Devuelve:
   {"paises": [códigos], "modalidad": "remoto|hibrido|presencial|sin dato", "confianza": "alta|media|baja",
    "nota": texto corto para la página}
-Si nadie de LATAM puede aplicar, "paises" queda vacío.
+Si nadie de esos países puede aplicar, "paises" queda vacío. Remoto para LATAM no incluye a España; remoto para el
+mundo sí; remoto para Europa es solo España.
 """
 import re
 from functools import lru_cache
@@ -17,7 +18,7 @@ from buscador import normalizar
 RUTA = Path(__file__).resolve().parent.parent / "datos" / "paises.yaml"
 
 _REMOTO = re.compile(r"\b(remote|remoto|remota|remotely|teletrabajo|home ?office|work from home|wfh|trabajo a distancia|"
-                     r"100% remoto|distributed|fully distributed|anywhere)\b")
+                     r"100% remoto|distributed|fully distributed|anywhere|desde casa|trabajo desde casa|remote work)\b")
 _REMOTO_DESC = re.compile(r"\b(fully remote|100% remote|100% remoto|trabajo remoto|remote[- ]first|remote position|"
                           r"remote role|remote job|this is a remote|posicion remota|modalidad remota|totalmente remoto|"
                           r"trabajo 100% remoto|home office)\b")
@@ -46,9 +47,13 @@ def datos():
     return {
         "paises": paises,
         "codigos": [p["codigo"] for p in paises],
+        "latam": [p["codigo"] for p in paises if p.get("region", "latam") == "latam"],
+        "europa": [p["codigo"] for p in paises if p.get("region") == "europa"],
         "utc": {p["codigo"]: p["utc"] for p in paises},
         "claves": claves,
         "toda_latam": sorted({normalizar.texto(x) for x in crudo["toda_latam"]}, key=len, reverse=True),
+        "mundo": sorted({normalizar.texto(x) for x in crudo["todo_el_mundo"]}, key=len, reverse=True),
+        "toda_europa": sorted({normalizar.texto(x) for x in crudo["toda_europa"]}, key=len, reverse=True),
         "fuera": sorted({normalizar.texto(x) for x in crudo["fuera_de_latam"]}, key=len, reverse=True),
     }
 
@@ -62,6 +67,12 @@ def _paises_nombrados(t):
                 hallados.append(codigo)
             usado = re.sub(r"(?<![a-z0-9])" + re.escape(frase) + r"(?![a-z0-9])", " ", usado)
     return hallados
+
+
+def _pais_por_nombre(t, codigos):
+    """Alguno de esos países aparece por su nombre o gentilicio (no solo por una ciudad: "Santa Ana, California")."""
+    return any(_nombra(t, [normalizar.texto(x) for x in p["nombres"] + p["gentilicios"]])
+               for p in datos()["paises"] if p["codigo"] in codigos)
 
 
 def _nombra(t, frases):
@@ -110,25 +121,28 @@ def modalidad(titulo, ubicacion, descripcion="", remoto=None):
 
 
 def elegibles(titulo, ubicacion, descripcion="", remoto=None):
-    """Países de LATAM desde los que se puede aplicar, con modalidad, confianza y una nota corta."""
-    todos = datos()["codigos"]
+    """Países desde los que se puede aplicar, con modalidad, confianza y una nota corta."""
+    d = datos()
+    todos, latam, europa = d["codigos"], d["latam"], d["europa"]
     lugar = normalizar.texto(f"{ubicacion} {titulo}")
     desc = normalizar.texto(descripcion)[:6000]
     mod = modalidad(titulo, ubicacion, descripcion, remoto)
     nombrados = _paises_nombrados(lugar)
-    latam = _nombra(lugar, datos()["toda_latam"])
-    fuera = _nombra(lugar, datos()["fuera"])
+    es_latam = _nombra(lugar, d["toda_latam"])
+    es_mundo = _nombra(lugar, d["mundo"])
+    es_europa = _nombra(lugar, d["toda_europa"])
+    fuera = _nombra(lugar, d["fuera"])
 
     def r(paises, confianza, nota):
         return {"paises": paises, "modalidad": mod, "confianza": confianza, "nota": nota}
 
     if mod != "remoto":
-        if nombrados:
+        if nombrados and not (fuera and not _pais_por_nombre(lugar, nombrados)):
             return r(nombrados, "alta", "")
-        if latam and not fuera:
-            return r(todos, "media", "región LATAM sin país")
-        if fuera:
-            return r([], "alta", "fuera de LATAM")
+        if (es_latam or es_mundo) and not fuera and not es_europa:
+            return r(latam, "media", "región LATAM sin país")
+        if fuera or es_europa:
+            return r([], "alta", "fuera de LATAM y España")
         return r(todos, "baja", "confirmar ubicación")
 
     # Remoto: primero las restricciones explícitas de la descripción
@@ -137,19 +151,27 @@ def elegibles(titulo, ubicacion, descripcion="", remoto=None):
         r_paises = _paises_nombrados(restringe)
         if r_paises:
             return r(r_paises, "alta", "solo " + ", ".join(r_paises))
-        if _nombra(restringe, datos()["toda_latam"]):
+        if _nombra(restringe, d["toda_latam"]):
+            return r(latam, "alta", "")
+        if _nombra(restringe, d["mundo"]):
             return r(todos, "alta", "")
-        if _nombra(restringe, datos()["fuera"]) or re.match(r"(us|usa|u\.s|uk|eu)\b", restringe):
-            return r([], "alta", "remoto fuera de LATAM")
-    if latam:
+        if _nombra(restringe, d["toda_europa"]):
+            return r(europa, "alta", "remoto para Europa")
+        if _nombra(restringe, d["fuera"]) or re.match(r"(us|usa|u\.s|uk)\b", restringe):
+            return r([], "alta", "remoto fuera de LATAM y España")
+    if es_mundo:
         return r(todos, "alta", "")
+    if es_latam:
+        return r(sorted(set(latam) | (set(europa) & set(nombrados))), "alta", "")
     if nombrados:
         return r(nombrados, "media" if len(nombrados) == 1 else "alta", "")
+    if es_europa:
+        return r(europa, "alta", "remoto para Europa")
     if fuera:
-        return r([], "alta", "remoto fuera de LATAM")
+        return r([], "alta", "remoto fuera de LATAM y España")
     zona = _por_zona_horaria(normalizar.sin_tildes(f"{ubicacion} {titulo} {descripcion[:6000]}").lower())
     if zona is not None:
         return r(zona, "media", "por zona horaria")
-    if _nombra(desc, datos()["toda_latam"]):
-        return r(todos, "media", "")
+    if _nombra(desc, d["toda_latam"]):
+        return r(latam, "media", "")
     return r(todos, "baja", "remoto: confirmar región")

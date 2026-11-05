@@ -1,7 +1,9 @@
-# Search Adaptia Jobs — buscador de vacantes LATAM
+# Search Adaptia Jobs — scraper de vacantes LATAM y España
 
-Página para buscar vacantes de cualquier cargo de tecnología y áreas creativas —con sus cargos parecidos (exactos,
-similares y cercanos) y de todos los niveles— abiertas en un país de LATAM o remotas para LATAM, de los últimos 30 días,
+Cada noche entrega **20 vacantes nuevas por rol** (Product designer, UX/UI designer, Product Owner, Product manager, AI
+Engineer, QA), variadas y nunca repetidas, con las columnas del contrato de datos (`docs/CONTRATO_DATOS_v1.md`), en
+Supabase y en Excel. Además, una página para buscar vacantes de cualquier cargo de tecnología y áreas creativas —con sus cargos parecidos (exactos,
+similares y cercanos) y de todos los niveles— abiertas en un país de LATAM o España, o remotas para ellos, de los últimos 30 días,
 y pasarlas a un grupo de WhatsApp o a Excel. Solo enlaces donde se postula de verdad (LinkedIn, Indeed, portales de las
 empresas), nunca agregadores. La búsqueda corre sola cada noche en GitHub Actions, sin IA y sin la cuenta de LinkedIn de
 nadie.

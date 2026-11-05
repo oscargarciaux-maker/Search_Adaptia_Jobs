@@ -1,0 +1,57 @@
+# Entrega diaria en el formato del «Contrato de datos de ofertas — Adaptia Jobs (v1)» (docs/CONTRATO_DATOS_v1.md).
+# Cada noche, después de la bodega, se eligen `por_rol` vacantes NUEVAS (nunca entregadas antes) de cada rol, lo más
+# variadas posible (idioma, nivel, país, modalidad, empresa y fuente), y se escriben en Supabase y en un CSV.
+# Se puede cambiar sin tocar código; `python -m pytest` revisa el formato.
+
+por_rol: 20
+
+# El contrato solo acepta ofertas escritas en español o inglés
+idiomas: [es, en]
+
+# Máximo de vacantes de una misma empresa por rol en un día
+max_por_empresa: 2
+
+# Solo se entregan vacantes vistas por primera vez en los últimos N días (las más nuevas primero)
+dias_frescura: 14
+
+# Cada rol junta familias del mapa de cargos (datos/mapa_cargos.yaml). Una vacante va a un solo rol: al que tenga la
+# coincidencia más fuerte (exacta > similar > cercana); si empatan, al primero de esta lista.
+# `titulo` (opcional): palabras que debe tener el título para contar como exacta en ese rol (separa Product designer de
+# UX/UI designer, que comparten familia).
+roles:
+  - id: product-designer
+    nombre: Product designer
+    familias: [diseno-producto-ux]
+    titulo: [product, producto, produto]
+  - id: ux-ui-designer
+    nombre: UX/UI designer
+    familias: [diseno-producto-ux, ux-research]
+  - id: product-owner
+    nombre: Product Owner
+    familias: [product-owner]
+  - id: product-manager
+    nombre: Product manager
+    familias: [product-manager]
+  - id: ai-engineer
+    nombre: AI Engineer
+    familias: [ia-ml]
+  - id: qa
+    nombre: QA
+    familias: [qa]
+
+# Publicaciones «contratando» de LinkedIn (Apify, fuentes/publicaciones_apify.py): consultas con la sintaxis del buscador
+# de LinkedIn (máximo 5 AND/OR/NOT por consulta). Cada publicación que trae el actor se paga: el tope diario está en
+# datos/config.yaml → apify.publicaciones_por_dia.
+consultas_publicaciones:
+  - 'hiring "product designer" (LATAM OR remote OR Spain)'
+  - '(contratando OR buscamos OR vacante) ("product designer" OR "diseñador de producto")'
+  - 'hiring ("UX designer" OR "UX/UI designer") (LATAM OR remote OR Spain)'
+  - '(contratando OR buscamos OR vacante) ("diseñador UX" OR "UX/UI")'
+  - 'hiring "product owner" (LATAM OR remote OR Spain)'
+  - '(contratando OR buscamos OR vacante) "product owner"'
+  - 'hiring "product manager" (LATAM OR remote OR Spain)'
+  - '(contratando OR buscamos OR vacante) "product manager"'
+  - 'hiring ("AI engineer" OR "machine learning engineer") (LATAM OR remote)'
+  - '(contratando OR buscamos OR vacante) ("AI engineer" OR "ingeniero de IA")'
+  - 'hiring ("QA engineer" OR "QA analyst") (LATAM OR remote OR Spain)'
+  - '(contratando OR buscamos OR vacante) ("QA" OR tester)'

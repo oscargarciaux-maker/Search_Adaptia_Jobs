@@ -50,13 +50,22 @@ def revisar():
     def apify():
         token = os.environ.get("APIFY_TOKEN", "")
         if not token:
-            return None, "sin APIFY_TOKEN: LinkedIn se busca solo con la vía pública (menos volumen)"
+            return None, "sin APIFY_TOKEN: no se buscan publicaciones «contratando» de LinkedIn"
         r = requests.get("https://api.apify.com/v2/users/me", params={"token": token}, timeout=20)
-        actor = cfg["apify"]["actor_linkedin"]
+        actor = cfg["apify"].get("actor_publicaciones", "")
         if r.status_code != 200:
             return False, f"la clave no funciona (Apify respondió {r.status_code})"
-        return (True, f"clave válida; actor: {actor}") if actor else (None, "clave válida, pero falta elegir el actor en datos/config.yaml")
-    chequeo("Apify (opcional)", apify)
+        plan = ((r.json().get("data") or {}).get("plan") or {}).get("id", "")
+        return (True, f"clave válida (plan {plan or 'sin dato'}); actor de publicaciones: {actor}") if actor else \
+            (None, "clave válida, pero falta actor_publicaciones en datos/config.yaml")
+    chequeo("Apify: publicaciones de LinkedIn", apify)
+
+    def supabase_():
+        from buscador import supabase
+        if not supabase.credenciales()[0]:
+            return None, "sin SUPABASE_URL / SUPABASE_SECRET_KEY: la entrega queda solo en Excel/CSV en la página"
+        return supabase.probar()
+    chequeo("Supabase (entrega diaria)", supabase_)
 
     def brave_():
         clave = os.environ.get("BRAVE_API_KEY", "")

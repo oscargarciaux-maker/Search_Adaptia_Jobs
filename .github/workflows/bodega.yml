@@ -1,6 +1,7 @@
 name: Bodega nocturna
 
-# Recoge vacantes de todas las fuentes, limpia, guarda 30 días y publica la página con los datos en la rama `publicado`.
+# Recoge vacantes de todas las fuentes, limpia, guarda 30 días, arma la entrega diaria (20 nuevas por rol, formato del
+# contrato de datos v1) y la guarda en Supabase, y publica la página con los datos en la rama `publicado`.
 # Cada noche a la 1:17 de Bogotá (6:17 UTC). A mano: Actions > Bodega nocturna > Run workflow.
 #   modo "inicial": olvida la rotación y pide 30 días a cada combinación (para la primera vez o tras un cambio grande)
 #   prueba: presupuestos mínimos (unos 5 minutos), para comprobar que todo funciona
@@ -29,7 +30,7 @@ concurrency:
 jobs:
   bodega:
     runs-on: ubuntu-latest
-    timeout-minutes: 80
+    timeout-minutes: 95
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -49,6 +50,8 @@ jobs:
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
           BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python -m buscador.bodega --salida salida --modo "${{ inputs.modo || 'diario' }}" ${{ inputs.prueba && '--prueba' || '' }}
       - name: Publicar en la rama publicado
@@ -67,4 +70,7 @@ jobs:
           test -f salida/datos/salud.json && python -c "
           import json; s=json.load(open('salida/datos/salud.json'))
           print(f\"Vacantes en la bodega: {s['vacantes_en_bodega']} · nuevas hoy: {s['nuevas_hoy']} · {s['minutos']} min\")
-          [print(f'  {k}: {v}') for k, v in s['fuentes'].items()]" >> "$GITHUB_STEP_SUMMARY" || true
+          [print(f'  {k}: {v}') for k, v in s['fuentes'].items()]
+          e = s.get('entrega') or {}
+          print(f\"Entrega del día: {e.get('vacantes', 0)} vacantes, {e.get('filas', 0)} filas · Supabase: {e.get('supabase')}\")
+          [print(f\"  {r['nombre']}: {r['entregadas']} (faltaron {r['faltan']})\") for r in (e.get('roles') or {}).values()]" >> "$GITHUB_STEP_SUMMARY" || true
