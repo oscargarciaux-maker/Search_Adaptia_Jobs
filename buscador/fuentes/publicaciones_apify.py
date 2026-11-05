@@ -6,15 +6,15 @@ de cada rol (datos/entrega.yaml → consultas_publicaciones). Nunca se le da una
 pida no se usa. Cada publicación se paga (≈ USD 2 por 1.000 en harvestapi/linkedin-post-search), así que la corrida
 tiene un tope de publicaciones por día.
 
-Una publicación se vuelve vacante solo si: anuncia una contratación (no es "open to work" ni un curso), nombra un cargo
+Una publicación se propone para revisión solo si: anuncia una contratación (no es "open to work" ni un curso), nombra un cargo
 del mapa, nombra un país de los activos o trabajo remoto, y se sabe la empresa (autor empresa, o el cargo del autor
-dice "at/en <Empresa>"). El título es el cargo nombrado; nada se inventa.
+dice "at/en <Empresa>"). El título es el cargo nombrado; nada se inventa. No se convierte automáticamente en oferta ni se envía a Supabase.
 """
 import os
 import re
 import time
 
-from buscador import familias, normalizar, paises
+from buscador import enlaces, familias, normalizar, paises
 
 NOMBRE = "LinkedIn (publicación)"
 API = "https://api.apify.com/v2/acts/{actor}/run-sync-get-dataset-items"
@@ -88,7 +88,8 @@ def a_vacante(item, familias_validas):
     """Vacante cruda (formato de las fuentes) o (None, motivo)."""
     texto = str(_campo(item, "content", "text", "postText"))
     enlace = str(_campo(item, "linkedinUrl", "postUrl", "url", "socialContent.shareUrl"))
-    if not texto or "linkedin.com" not in enlace:
+    h = enlaces.host(enlace)
+    if not texto or not enlaces.sirve(enlace) or not (h == "linkedin.com" or h.endswith(".linkedin.com")):
         return None, "sin texto o enlace"
     t = normalizar.texto(texto)
     if RUIDO.search(t) or not CONTRATA.search(t):
@@ -124,14 +125,20 @@ def buscar(cliente, actor, consultas, familias_validas, hoy, maximo=60, token=No
                               entrada(actor, consultas, por_consulta, hoy), timeout=900)
     if items is None:
         return [], {"error": "el actor no respondió o rechazó la entrada", "consultas": len(consultas)}
-    crudas, motivos = [], {}
+    if not isinstance(items, list):
+        return [], {"error": "el actor devolvió una estructura inesperada; no se aceptaron registros"}
+    crudas, motivos, revision = [], {}, []
     for item in items if isinstance(items, list) else []:
         if not isinstance(item, dict) or item.get("type") in ("comment", "reaction"):
             continue
         v, motivo = a_vacante(item, familias_validas)
         if v:
-            crudas.append(v)
+            # Una publicación de contratación es un indicio, no una oferta formal comprobada.
+            # No llenar cuotas ni enviar a Supabase hasta verificar su oferta original.
+            revision.append({"titulo": v["titulo"], "empresa": v["empresa"], "enlace": v["enlace"],
+                             "motivo": "publicación pendiente de verificar contra una oferta formal"})
         else:
             motivos[motivo] = motivos.get(motivo, 0) + 1
     return crudas, {"consultas": len(consultas), "publicaciones": len(items) if isinstance(items, list) else 0,
-                    "vacantes": len(crudas), "descartadas": motivos}
+                    "vacantes": 0, "pendientes_revision": len(revision), "muestras_revision": revision[:10],
+                    "descartadas": motivos}

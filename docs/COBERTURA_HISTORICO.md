@@ -73,10 +73,10 @@ La copia de trabajo está dentro del entorno de nube de este chat; «local» sig
 del usuario. Editar esa copia, subir una rama, abrir un PR, fusionarlo y desplegar son pasos diferentes. El PR permite
 revisar cambios antes de incorporarlos a `main`; no se fusiona ni se lanza el despliegue automáticamente desde este chat.
 
-Supabase sigue siendo la base de datos de la entrega. Los Excel/CSV son exportaciones complementarias de la misma selección,
-no otra base de datos. En la ejecución normal se generan en `datos/entregas/` de la rama `publicado`; la pantalla ofrece
-su descarga en Estado → Entrega del día. En pruebas existen únicamente en la carpeta temporal de salida. En el entorno
-de este chat no se han utilizado credenciales reales de Supabase; eso no indica que falten en los secretos de GitHub.
+Supabase es la base de datos obligatoria de la entrega. El Excel pertenecía a una versión anterior y su generación
+automática está desactivada (`exportar_archivos: false`). La utilidad opcional de exportación no sustituye la base.
+No se borran los históricos anteriores. Las publicaciones del feed de Apify no cuentan como ofertas hasta verificarse.
+Controles actuales de calidad y primera corrida: [`CALIDAD_ARRANQUE.md`](CALIDAD_ARRANQUE.md).
 
 ## Identidad, descripciones y sincronización
 
@@ -88,7 +88,7 @@ de este chat no se han utilizado credenciales reales de Supabase; eso no indica 
 - Las descripciones pueden conservar hasta 30.000 caracteres, según el contrato. Lever incorpora requisitos y beneficios;
   SmartRecruiters pagina su listado y, junto a Workable, intenta completar descripciones con consultas de detalle acotadas.
   Un fallo del detalle no equivale a una oferta cerrada. Un listado incompleto no se toma como evidencia de cierre.
-- El Excel y la sincronización tienen estados separados. Las filas locales entregadas quedan en una cola antes del envío
+- La selección y la sincronización tienen estados separados. Las filas seleccionadas quedan en una cola antes del envío
   y solo salen cuando Supabase confirma el lote. Los reintentos son idempotentes por `external_id` y conservan fechas.
   «Filas sincronizadas» incluye las que ya existían; no significa que todas fueran insertadas por primera vez.
 - Las pruebas cortas de Actions no actualizan la rama publicada. Una prueba local escribe solo su carpeta de salida.
@@ -103,7 +103,7 @@ Hay tres plazos distintos:
 | Datos | Conservación actual | Propósito |
 |---|---|---|
 | Bodega activa del buscador | 30 días; también retira cierres detectados | Mostrar oportunidades recientes |
-| Archivos diarios CSV/Excel | 60 días | Descargas operativas |
+| Archivos diarios CSV/Excel | Generación automática desactivada | Históricos anteriores conservados |
 | Memoria de entregas | 180 días | Evitar repetir entregas |
 | Ofertas guardadas en Supabase | Sin borrado automático por este código | Histórico persistente |
 | Cola pendiente de Supabase | Hasta confirmación; sin limpieza por antigüedad | Recuperar fallos de sincronización |

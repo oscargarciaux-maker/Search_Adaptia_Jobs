@@ -6,7 +6,7 @@ Un scraper de vacantes para LATAM y el mundo hispanohablante (España) que cada 
    Board, tableros remotos y publicaciones «contratando» de LinkedIn vía Apify);
 2. arma la **entrega diaria**: 20 vacantes nuevas (nunca entregadas) por rol —Product designer, UX/UI designer, Product
    Owner, Product manager, AI Engineer, QA—, variadas, con las columnas del **contrato de datos v1**
-   (`docs/CONTRATO_DATOS_v1.md`), y la guarda en **Supabase** y en Excel/CSV;
+   (`docs/CONTRATO_DATOS_v1.md`), y la guarda en **Supabase** (obligatorio; Excel automático desactivado);
 3. publica una página donde se busca cualquier cargo y país y se copia a WhatsApp o Excel.
 Es un proyecto vendido por Oscar: se entrega a otra persona cambiando solo los secretos (`docs/TRASPASO.md`). Más adelante
 un bot de WhatsApp tomará 5 vacantes de Supabase y las enviará.
@@ -18,6 +18,8 @@ Leer también `docs/COBERTURA_HISTORICO.md`: LATAM y España más remotas mundia
 rotación de cargos exactos/similares/cercanos, identidad por enlace y evidencia de contenido, cola de reintentos
 a Supabase y conservación sin borrado automático de ofertas de la base. No construir seguimiento de postulaciones
 en esta etapa. El horario de Bogotá solo programa la ejecución; no limita los países.
+Las publicaciones del feed de Apify son candidatas por verificar: no cuentan para las cuotas ni se envían a Supabase.
+La entrega normal comprueba Supabase antes de recoger; la validación final falla si hay déficit o sincronización pendiente.
 
 ## Reglas que no se cambian sin preguntarle a Oscar
 - **Volumen antes que filtros.** Solo filtran: el cargo (mapa de cargos), 30 días de antigüedad, que siga abierta, que no
@@ -64,13 +66,13 @@ en esta etapa. El horario de Bogotá solo programa la ejecución; no limita los 
   siguiente). Presupuestos de cada fuente en `datos/config.yaml`. Las familias de los roles de la entrega se buscan
   primero, todas las noches (LinkedIn e Indeed), y sus avisos reciben primero la descripción completa.
 - **Entrega diaria** (`entrega.py`, `contrato.py`, `supabase.py`; configuración en `datos/entrega.yaml`): al final de la
-  bodega elige las vacantes, escribe `datos/entregas/<fecha>.csv/.xlsx` y `ultima.*` en la rama publicada y las sube a la
+  bodega elige las vacantes, sube las filas a la
   tabla `ofertas` de Supabase (`supabase/esquema.sql`; secretos `SUPABASE_URL`, `SUPABASE_SECRET_KEY`; nunca
   sobrescribe: external_id repetido se ignora). En `--prueba` no marca entregadas ni sube.
 - **Publicaciones «contratando»** (`fuentes/publicaciones_apify.py`): actor `harvestapi/linkedin-post-search` (sin
   cookie, ≈ USD 2 por 1.000; tope `apify.publicaciones_por_dia` = 72 ≈ USD 4,3 al mes, plan gratis de Apify). Solo
-  entra una publicación que anuncia contratación, nombra un cargo del mapa, un país activo o remoto, y cuya empresa se
-  sabe (autor empresa o "at <Empresa>" en el cargo del autor).
+  se propone para revisión una publicación que anuncia contratación, nombra un cargo del mapa, un país activo o remoto, y cuya empresa se
+  sabe (autor empresa o "at <Empresa>" en el cargo del autor). No entra automáticamente en la entrega.
 - **Página** (`web/`): `motor.js` (lógica pura, con pruebas) y `app.js` (pantalla). Se sirve desde la rama `publicado`
   con GitHub Pages (básico) o Cloudflare Pages (privada, con `functions/api/enviadas.js` y `profunda.js`).
 - **Búsqueda profunda** (`profunda.yml`): un cargo a pedido, en vivo. **Diagnóstico** (`diagnostico.yml`).

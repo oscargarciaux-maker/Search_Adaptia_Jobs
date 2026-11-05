@@ -2,7 +2,7 @@
 import hashlib
 from datetime import date
 
-from buscador import enlaces, etiquetas, familias, normalizar, paises
+from buscador import calidad, enlaces, etiquetas, familias, normalizar, paises
 
 CAMPOS_PUBLICOS = ["id", "titulo", "empresa", "ubicacion", "familias", "paises", "confianza_pais", "modalidad",
                    "nota_pais", "idioma", "ingles", "nivel", "anos_min", "salario", "herramientas",
@@ -30,6 +30,8 @@ def crear(titulo, empresa, enlace, fuente, ubicacion="", descripcion="", fecha="
     candidatos = [u for u in (enlace, enlace_directo) if u]
     principal = next((u for u in candidatos if enlaces.es_linkedin(u)), "") or enlaces.mejor(candidatos)
     if not principal:
+        return None
+    if calidad.motivo(titulo, principal, fuente):
         return None
     directo = enlaces.mejor([u for u in candidatos if u != principal and not enlaces.es_linkedin(u)])
     fams = familias.clasificar(titulo, descripcion)

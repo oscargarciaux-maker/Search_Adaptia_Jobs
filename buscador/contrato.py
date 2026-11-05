@@ -7,7 +7,7 @@ import hashlib
 import re
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
-from buscador import enlaces, normalizar, paises
+from buscador import calidad, enlaces, normalizar, paises
 
 VERSION = "v1"
 COLUMNAS = [
@@ -251,6 +251,9 @@ def entregable(v, idiomas=("es", "en")):
     """Motivo por el que la vacante no puede ir en la entrega, o '' si puede."""
     if not v.get("titulo") or not v.get("empresa") or v.get("empresa") == EMPRESA_DESCONOCIDA:
         return "sin empresa"
+    motivo = calidad.motivo(v["titulo"], v.get("enlace", ""), v.get("fuente", ""))
+    if motivo:
+        return motivo
     if len(v.get("_descripcion", "")) < 200:
         return "sin descripción completa"   # sin texto no se sabe el idioma ni se detectan copias (contrato §2)
     if v.get("idioma") not in idiomas:

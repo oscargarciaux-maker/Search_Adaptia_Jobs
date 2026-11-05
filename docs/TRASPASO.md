@@ -39,6 +39,8 @@ construyó. Al cambiar los secretos, todo funciona igual con las cuentas nuevas.
 ## Qué revisar después
 
 - La página abre y la búsqueda de un cargo trae vacantes.
-- *Estado → Entrega del día*: fecha de hoy, 20 por rol (o cuántas faltaron) y "Supabase: N filas guardadas".
+- *Estado → Entrega del día*: fecha de hoy, 20 por rol (o cuántas faltaron) y "Supabase: N filas sincronizadas", cero pendientes y cuota completa.
 - En Supabase, *Table Editor → entrega_de_hoy* tiene filas con la fecha de hoy.
+- Las publicaciones del feed de Apify son indicios por verificar, no vacantes entregadas. Supabase es obligatorio;
+  el Excel automático de la entrega está desactivado.
 - Si algo falla, el *Diagnóstico* dice qué; con Claude, la skill `diagnostico` lo explica.

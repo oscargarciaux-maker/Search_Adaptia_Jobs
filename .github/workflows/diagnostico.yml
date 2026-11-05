@@ -3,7 +3,12 @@ name: Diagnóstico
 # Revisa la configuración, cada fuente, Supabase, las claves de Apify y Brave y la última bodega publicada.
 # A mano: Actions > Diagnóstico > Run workflow. El resultado queda en el resumen de la corrida.
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      solo_supabase:
+        description: "Comprobar solo conexión y esquema de Supabase, sin escribir ofertas"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -20,6 +25,7 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - name: Revisar
+        if: ${{ !inputs.solo_supabase }}
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
           BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
@@ -27,3 +33,9 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python -m buscador.diagnostico
+      - name: Comprobar Supabase sin escribir
+        if: ${{ inputs.solo_supabase }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python -c "from buscador.supabase import exigir_conexion; print(exigir_conexion())"

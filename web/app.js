@@ -422,18 +422,25 @@
             el("td", { text: r.nombre }), el("td", { class: "num", text: fmt.format(r.entregadas) }),
             el("td", { class: "num", text: r.faltan ? fmt.format(r.faltan) : "—" }),
             el("td", { text: Object.entries(r.idiomas || {}).map(([k, n]) => `${k === "es" ? "español" : "inglés"} ${n}`).join(" · ") })))))),
-        el("p", { class: "acciones-fila" },
+        ...(e.archivos ? [el("p", { class: "acciones-fila" },
           el("a", { class: "boton boton--secundario", href: "datos/entregas/ultima.xlsx", download: `entrega_${s.fecha}.xlsx`, text: "Descargar Excel" }),
-          el("a", { class: "boton boton--secundario", href: "datos/entregas/ultima.csv", download: `entrega_${s.fecha}.csv`, text: "Descargar CSV" })),
+          el("a", { class: "boton boton--secundario", href: "datos/entregas/ultima.csv", download: `entrega_${s.fecha}.csv`, text: "Descargar CSV" }))] : []),
         el("p", { class: "nota", text: sb.error || (sb.errores && sb.errores.length) ? `Supabase: no se pudo guardar (${(sb.errores || [sb.error]).join("; ")}).`
           : sb.omitida ? "Supabase: no está conectado todavía." : sb.enviadas !== undefined ? `Supabase: ${fmt.format(sb.enviadas)} filas sincronizadas (incluye existentes).` : "" }));
-      caja.append(el("p", { class: "nota", text: "Excel y CSV son copias descargables de la selección; el estado de sincronización con Supabase se muestra arriba." }));
+      caja.append(el("p", { class: "nota", text: "Destino de la entrega: Supabase. La generación automática del antiguo Excel está desactivada." }));
       if (e.meta_cumplida === false) caja.append(el("p", { class: "confirmar", text: `Meta diaria incompleta: se buscan ${e.meta_por_rol || 20} vacantes nuevas por cada rol.` }));
       Object.values(e.roles).filter(r => r.faltan && r.descartadas).forEach(r => caja.append(el("p", { class: "nota", text:
         `${r.nombre}: ${r.candidatas} candidatas válidas; capacidad de ${r.capacidad_con_tope_empresa} con el límite por empresa. ` +
         `Sin descripción suficiente: ${r.descartadas["sin descripción completa"] || 0}. Reserva sin entregar: ${r.reserva_sin_entregar || 0}.` })));
     }
     if (e && e.supabase && e.supabase.pendientes) caja.append(el("p", { class: "nota", text: `${fmt.format(e.supabase.pendientes)} filas pendientes de sincronizar; se reintentarán en la próxima corrida.` }));
+    const publicaciones = (s.fuentes || {})["Publicaciones LinkedIn (Apify)"];
+    if (publicaciones && publicaciones.pendientes_revision) {
+      caja.append(el("h3", { class: "area", text: `Apify: ${publicaciones.pendientes_revision} publicaciones por verificar` }),
+        el("p", { class: "nota", text: "Son indicios de contratación. No cuentan para la meta ni se envían a Supabase." }),
+        el("ul", {}, (publicaciones.muestras_revision || []).map(v => el("li", {},
+          el("a", { href: v.enlace, target: "_blank", rel: "noopener", text: `${v.titulo} — ${v.empresa}` })))));
+    }
     const filas = Object.entries(s.fuentes || {}).map(([nombre, d]) => el("tr", {},
       el("td", { text: nombre }),
       el("td", { text: d.error ? `Falló: ${d.error}` : d.omitida ? `No corrió: ${d.omitida}` : "Funcionó" }),

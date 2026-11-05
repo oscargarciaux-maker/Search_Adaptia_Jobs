@@ -16,7 +16,7 @@ from pathlib import Path
 
 import yaml
 
-from buscador import cobertura, enlaces, familias, normalizar, paises, vacante
+from buscador import calidad, cobertura, enlaces, familias, normalizar, paises, vacante
 from buscador.fuentes import ats, brave, getonbrd, indeed, linkedin_apify, linkedin_publico, publicaciones_apify, remotos
 from buscador.http import Cliente
 
@@ -39,12 +39,14 @@ def _leer_json(ruta, defecto):
 def _guardar_json(ruta, datos, comprimido=False):
     ruta = Path(ruta)
     ruta.parent.mkdir(parents=True, exist_ok=True)
+    temporal = ruta.with_name(ruta.name + ".tmp")
     if comprimido:
-        with gzip.open(ruta, "wt", encoding="utf-8") as f:
+        with gzip.open(temporal, "wt", encoding="utf-8") as f:
             json.dump(datos, f, ensure_ascii=False, separators=(",", ":"))
     else:
-        with open(ruta, "w", encoding="utf-8") as f:
+        with open(temporal, "w", encoding="utf-8") as f:
             json.dump(datos, f, ensure_ascii=False, indent=1)
+    temporal.replace(ruta)
 
 
 def _paises_activos(cfg):
@@ -180,7 +182,14 @@ def limpiar(previas, crudas, hoy, dias_maximos, enlaces_ats, empresas_leidas, co
         nuevas.append(v)
     limite = (date.fromisoformat(hoy) - timedelta(days=dias_maximos)).isoformat()
     vistas_hoy = {v["id"] for v in nuevas}
-    todas = vacante.juntar([vacante.reetiquetar(dict(v)) for v in previas] + nuevas)
+    previas_validas = []
+    for v in previas:
+        motivo = calidad.motivo(v["titulo"], v["enlace"], v.get("fuente", ""))
+        if motivo:
+            descartes[motivo] += 1
+        else:
+            previas_validas.append(vacante.reetiquetar(dict(v)))
+    todas = vacante.juntar(previas_validas + nuevas)
     salida = []
     for v in todas:
         if _fecha_de(v) and _fecha_de(v) < limite:
@@ -207,6 +216,9 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     if prueba:
         cfg["presupuestos"].update(PRUEBA)
     hoy = hoy or datetime.now(timezone(timedelta(hours=-5))).date().isoformat()
+    if not prueba and not consulta:
+        from buscador import supabase
+        supabase.exigir_conexion()
     salida = Path(salida)
     trabajo = salida / "trabajo"
     estado = _leer_json(trabajo / "estado.json", {})
@@ -244,6 +256,8 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
             vacantes, entregadas, hoy, entrega.config(), cfg["refuerzo"], familias.mapa(),
             lambda mapa, ronda: refuerzo.buscar(mapa, _paises_activos(cfg), estado, hoy, ronda,
                                                  cfg["refuerzo"], cfg["dias_maximos"]), incorporar)
+    if not prueba and not consulta and not vacantes:
+        raise RuntimeError("La búsqueda no produjo un catálogo válido; se conserva el estado anterior.")
     _guardar_json(trabajo / "bodega.json.gz", vacantes, comprimido=True)
     _guardar_json(trabajo / "estado.json", estado)
     # Entrega diaria en el formato del contrato (no en una búsqueda profunda; en una prueba no se marca nada ni se sube)
