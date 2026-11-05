@@ -10,6 +10,13 @@ dias_maximos: 30
 # Hora de la bodega nocturna en Bogotá (UTC−5). El horario real está en .github/workflows/bodega.yml (paso 7).
 hora_bodega_bogota: "01:17"
 
+# GET de fichas y enlaces de aplicación visibles. No consume Apify ni envía formularios.
+verificacion_enlaces:
+  vacantes_por_corrida: 300
+  segundos_corrida: 240
+  vacantes_por_captura: 40
+  segundos_captura: 90
+
 # Captura horaria gratuita, independiente de la entrega. Activación tras migración del catálogo v2.
 incremental:
   minutos_por_fuente: 2

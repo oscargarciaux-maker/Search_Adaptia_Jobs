@@ -20,6 +20,9 @@ def errores(reporte):
         fallos.append("La selección no quedó registrada en Supabase; conservar pendientes y reintentar.")
     if reporte.get("catalogo") is not None:
         fallos.extend(errores_catalogo(reporte))
+    revision = (reporte.get("verificacion_enlaces") or {}).get("seleccion_del_dia")
+    if revision and revision.get("vacantes") and revision.get("estados", {}).get("verificada", 0) != revision["vacantes"]:
+        fallos.append("La selección histórica tiene enlaces sin comprobación vigente o rechazados; revisar antes de compartir.")
     return fallos
 
 

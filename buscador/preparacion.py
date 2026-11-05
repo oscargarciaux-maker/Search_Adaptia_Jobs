@@ -25,13 +25,18 @@ def evaluar(reporte, ahora=None):
             requeridas = [(ultima - timedelta(days=i)).isoformat() for i in range(7)]
             continuidad = all(d in historial and historial[d].get("meta_cumplida") and
                                not historial[d].get("pendientes_supabase") and
-                               historial[d].get("registro_confirmado") for d in requeridas)
+                               historial[d].get("registro_confirmado") and historial[d].get("enlaces_comprobados")
+                               for d in requeridas)
             continuidad = continuidad and 0 <= (ahora.date() - ultima).days <= 1
         except ValueError:
             pass
     criterios["siete_dias_con_meta_y_registro"] = bool(continuidad)
     criterios["v2_activo"] = reporte.get("catalogo") is not None
     criterios["ofertas_observadas_recientemente"] = (reporte.get("frescura") or {}).get("observadas_2h", 0) > 0
+    seleccion = (reporte.get("verificacion_enlaces") or {}).get("seleccion_del_dia") or {}
+    n = (reporte.get("entrega") or {}).get("vacantes", 0)
+    criterios["seleccion_con_enlaces_comprobados"] = bool(n and seleccion.get("vacantes") == n and
+        seleccion.get("estados", {}).get("verificada") == n)
     return {"apto_para_piloto_whatsapp": all(criterios.values()), "criterios": criterios,
             "nota": "Esto no sustituye revisar enlaces ni definir consentimiento, destinatarios y confirmación de envíos."}
 

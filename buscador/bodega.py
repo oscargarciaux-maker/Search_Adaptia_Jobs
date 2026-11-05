@@ -288,6 +288,37 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     retiradas = []
     vacantes, sin_familia, descartes = limpiar(previas, crudas, hoy, cfg["dias_maximos"], enlaces_ats, leidas,
                                                consulta=consulta or "", retiradas=retiradas)
+    from buscador import verificar_enlaces
+    cache_enlaces = _leer_json(trabajo / "verificacion_enlaces.json", {})
+    entregadas_revision = _leer_json(trabajo / "entregadas.json", {})
+    entregadas_revision.update(memoria_db)
+    cfg_revision = dict(cfg.get("verificacion_enlaces", {}))
+    if prueba:
+        cfg_revision.update(vacantes_por_corrida=12, vacantes_por_captura=12, segundos_corrida=30, segundos_captura=30)
+    clave_n, clave_s = (("vacantes_por_captura", "segundos_captura") if modo == "incremental"
+                        else ("vacantes_por_corrida", "segundos_corrida"))
+    cfg_revision.setdefault(clave_n, 40 if modo == "incremental" else 300)
+    cfg_revision.setdefault(clave_s, 90 if modo == "incremental" else 240)
+    resumen_revision = {}
+    def comprobar_destinos(lista):
+        nonlocal resumen_revision
+        t0 = time.monotonic()
+        resumen_revision = verificar_enlaces.preparar(lista, entregadas_revision, hoy, cache_enlaces,
+            lote=lote_previo, incremental=modo == "incremental", cfg=cfg_revision)
+        cfg_revision[clave_n] = max(0, cfg_revision[clave_n] - resumen_revision["candidatas_programadas"])
+        cfg_revision[clave_s] = max(0, cfg_revision[clave_s] - (time.monotonic() - t0))
+        _guardar_json(trabajo / "verificacion_enlaces.json", cache_enlaces)
+        salida_verificada = []
+        for v in lista:
+            revision = v["verificacion"]
+            if revision["estado"] == "rechazada":
+                razon = revision["motivo"]
+                retiradas.append((v, "closed" if razon == "vacante cerrada" else "archived", razon))
+                descartes[razon] += 1
+            else:
+                salida_verificada.append(v)
+        return salida_verificada
+    vacantes = comprobar_destinos(vacantes)
     refuerzos = []
     if modo != "incremental" and not consulta and not prueba and cfg.get("refuerzo", {}).get("rondas", 0):
         from buscador import entrega, refuerzo
@@ -298,13 +329,13 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
                                                   retiradas=retiradas)
             sin_familia.update(sin_mapa)
             descartes.update(razones)
-            return resultado
+            return comprobar_destinos(resultado)
         vacantes, refuerzos = refuerzo.completar(
             vacantes, entregadas, hoy, entrega.config(), cfg["refuerzo"], familias.mapa(),
             lambda mapa, ronda: refuerzo.buscar(mapa, _paises_activos(cfg), estado, hoy, ronda,
                                                  cfg["refuerzo"], cfg["dias_maximos"]), incorporar,
             iniciales=lote_previo.get("elegidas", {}) if lote_previo.get("fecha") == hoy else None)
-    if not prueba and not consulta and not vacantes:
+    if not prueba and not consulta and not vacantes and not retiradas:
         raise RuntimeError("La búsqueda no produjo un catálogo válido; se conserva el estado anterior.")
     _guardar_json(trabajo / "bodega.json.gz", vacantes, comprimido=True)
     _guardar_json(trabajo / "estado.json", estado)
@@ -344,6 +375,17 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
             historico_entregas = entrega.registrar_medicion(historial, resumen_entrega, hoy)
             _guardar_json(trabajo / "metricas_entrega.json", historial)
         resumen_entrega["fecha"] = hoy
+    # El lote histórico conserva su snapshot; el estado actual se evalúa aparte con el catálogo y la caché.
+    lote_actual = _leer_json(trabajo / "lote_entrega.json", {})
+    if lote_actual.get("fecha") == hoy:
+        por_id_actual = {v["id"]: v for v in vacantes}
+        for v, _, _ in retiradas:
+            por_id_actual[v["id"]] = v
+        actuales = [dict(por_id_actual.get(v["id"], v)) for lista in lote_actual.get("elegidas", {}).values() for v, _ in lista]
+        for v in actuales:
+            verificar_enlaces.anotar(v, cache_enlaces)
+        resumen_revision["seleccion_del_dia"] = verificar_enlaces.resumen(actuales)
+    resumen_revision["rechazos_en_corrida"] = {m: n for m, n in descartes.items() if m in verificar_enlaces.RECHAZOS}
     reporte = {
         "fecha": hoy, "hora_utc": datetime.now(timezone.utc).strftime("%H:%M"), "modo": modo,
         "consulta": consulta or "", "pais": pais or "",
@@ -362,6 +404,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         "catalogo": resumen_catalogo,
         "capturada_en": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "frescura": tiempos.medir(vacantes),
+        "verificacion_enlaces": resumen_revision,
     }
     from buscador import publicar
     publicar.publicar(salida, vacantes, reporte, sin_familia)
@@ -381,6 +424,7 @@ def main():
                                               "descartes")}, ensure_ascii=False, indent=1))
     for n, s in reporte["fuentes"].items():
         print(f"  {n}: {s}")
+    print("Verificación de enlaces:", json.dumps(reporte["verificacion_enlaces"], ensure_ascii=False))
     e = reporte.get("entrega") or {}
     if not a.prueba and a.modo != "incremental" and e.get("meta_cumplida") is False:
         faltantes = ", ".join(f"{r['nombre']}: faltan {r['faltan']}" for r in e["roles"].values() if r["faltan"])

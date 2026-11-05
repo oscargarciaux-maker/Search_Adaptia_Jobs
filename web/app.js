@@ -95,6 +95,7 @@
       pais: $("pais").value, remotas: $("remotas").checked, presenciales: $("presenciales").checked,
       confianzaAlta: $("confianza").checked, dias: Number($("dias").value), hoy,
       horas: Number($("horas").value) || null, ahora: new Date().toISOString(),
+      soloVerificadas: $("solo-verificadas").checked,
       enviadas: estado.enviadas, ocultarEnviadas: $("ocultar-enviadas").checked,
       nivel: $("nivel").value, idioma: $("idioma").value, ingles: $("ingles").value,
     };
@@ -117,7 +118,7 @@
     }
     estado.resultados = M.ordenar(M.filtrar(estado.vacantes, opciones()), $("orden").value);
     estado.visibles = POR_PAGINA;
-    estado.seleccion = new Set([...estado.seleccion].filter(id => estado.resultados.some(v => v.id === id)));
+    estado.seleccion = new Set([...estado.seleccion].filter(id => estado.resultados.some(v => v.id === id && M.enlacesComprobados(v).length)));
     pintarPalabras();
     pintarResultados();
     escribirHash();
@@ -201,13 +202,16 @@
     const id = `sel-${v.id}`;
     const elegida = estado.seleccion.has(v.id);
     const enviada = estado.enviadas.has(v.id);
-    const check = el("input", { type: "checkbox", id, checked: elegida, "aria-label": `Elegir ${v.titulo} en ${v.empresa}`,
+    const comprobados = M.enlacesComprobados(v);
+    const check = el("input", { type: "checkbox", id, checked: elegida, disabled: !comprobados.length, "aria-label": `Elegir ${v.titulo} en ${v.empresa}`,
       onchange: (e) => { e.target.checked ? estado.seleccion.add(v.id) : estado.seleccion.delete(v.id);
         e.target.closest(".fila").classList.toggle("fila--elegida", e.target.checked); pintarBarra(); } });
     const datos = [
       el("span", {}, datoPais(v)),
       v.confianza_pais === "baja" ? el("span", { class: "confirmar" }, "Confirmar desde qué países") : null,
       el("span", {}, M.antiguedad(v, new Date().toISOString(), hoy)),
+      el("span", { class: comprobados.length ? "nota" : "confirmar", title: v.verificacion?.motivo || "Todavía no se ha comprobado el destino" },
+        comprobados.length ? `Enlace comprobado · ${new Date(v.verificacion.comprobada_en).toLocaleString("es-CO")}` : "Enlace por verificar"),
     ];
     const lado = [
       el("div", {}, [M.IDIOMA[v.idioma] ? `Aviso en ${M.IDIOMA[v.idioma].toLowerCase()}` : null,
@@ -215,12 +219,14 @@
       el("div", {}, [v.nivel ? `Nivel ${v.nivel}` : null, v.anos_min ? `${v.anos_min}+ años` : null, v.salario || null].filter(Boolean).join(" · ") || null),
       el("div", {}, `Fuente: ${(v.fuentes || [v.fuente]).join(", ")}`),
     ];
-    const enlaces = [el("a", { href: v.enlace, target: "_blank", rel: "noopener" }, v.enlace.includes("linkedin.com") ? "Ver en LinkedIn" : "Ver vacante")];
-    if (v.enlace_directo) enlaces.push(el("a", { href: v.enlace_directo, target: "_blank", rel: "noopener" }, "Postular en la empresa"));
+    const enlaces = [v.enlace, v.enlace_directo].filter(Boolean).filter(u =>
+      !(v.verificacion?.enlaces || []).some(r => r.url === u && r.estado === "rechazada")).map(u =>
+      el("a", { href: u, target: "_blank", rel: "noopener" }, comprobados.includes(u)
+        ? u === v.enlace_directo ? "Postular en la empresa" : "Ver vacante comprobada" : "Revisar enlace pendiente"));
     return el("article", { class: `fila${elegida ? " fila--elegida" : ""}${enviada ? " fila--enviada" : ""}`, role: "listitem" },
       el("label", { class: "fila__check", for: id }, check),
       el("div", { class: "fila__cuerpo" },
-        el("div", { class: "fila__titulo" }, el("a", { href: v.enlace, target: "_blank", rel: "noopener" }, v.titulo)),
+        el("div", { class: "fila__titulo" }, el("a", { href: comprobados[0] || enlaces[0]?.getAttribute("href"), target: "_blank", rel: "noopener" }, v.titulo)),
         el("div", { class: "fila__empresa" }, v.empresa),
         el("div", { class: "fila__datos" }, ETIQUETA_GRADO[v._grado] ? el("span", { class: `insignia insignia--${v._grado}` }, ETIQUETA_GRADO[v._grado]) : null,
           enviada ? el("span", { class: "insignia insignia--enviada" }, "Enviada") : null, datos),
@@ -288,7 +294,7 @@
   }
 
   function elegidas() {
-    return estado.resultados.filter(v => estado.seleccion.has(v.id));
+    return estado.resultados.filter(v => estado.seleccion.has(v.id) && M.enlacesComprobados(v).length);
   }
 
   // ───────── Acciones ─────────
@@ -303,6 +309,7 @@
 
   async function copiar() {
     const lista = elegidas();
+    if (!lista.length) { avisar("La selección necesita una comprobación vigente de sus enlaces."); return; }
     const mensajes = M.textoWhatsApp(lista, { titulo: nombreBusqueda(), lugar: lugarBusqueda(), fecha: fechaCorta(hoy), hoy,
       nombres: estado.nombres, totalPaises: estado.paises.length });
     const texto = mensajes.join("\n\n");
@@ -413,6 +420,12 @@
     if (s.catalogo) caja.append(el("p", { class: "nota", text: s.catalogo.pendientes || (s.catalogo.errores || []).length
       ? `Catálogo: ${s.catalogo.pendientes || 0} filas pendientes de sincronizar.`
       : `Catálogo: ${s.catalogo.enviadas || 0} filas confirmadas en Supabase.` }));
+    if (s.verificacion_enlaces) {
+      const r = s.verificacion_enlaces, e = r.estados || {}, d = r.seleccion_del_dia?.estados || {};
+      caja.append(el("p", { class: "nota", text: `Comprobación de enlaces: ${e.verificada || 0} con enlace comprobado, ${e.pendiente || 0} por verificar, ${e.rechazada || 0} retiradas. No certifica la autenticidad de la empresa.` }));
+      if (d.pendiente || d.rechazada) caja.append(el("p", { class: "confirmar", text:
+        `Estado actual de la selección del día: ${d.pendiente || 0} por verificar y ${d.rechazada || 0} rechazadas. El histórico se conserva; estos enlaces no deben compartirse automáticamente.` }));
+    }
     caja.append(el("div", { class: "metricas" },
       [["Vacantes abiertas", s.vacantes_en_bodega], ["Nuevas en esa búsqueda", s.nuevas_hoy], ["Leídas de las fuentes", s.crudas_hoy],
         ["Tipos de cargo con vacantes", Object.keys(s.por_familia || {}).length]]
@@ -534,7 +547,7 @@
     });
     cargo.addEventListener("blur", () => setTimeout(cerrarSugerencias, 150));
     $("form-busqueda").addEventListener("submit", (e) => e.preventDefault());
-    ["pais", "dias", "horas", "remotas", "presenciales", "ocultar-enviadas", "confianza", "nivel", "idioma", "ingles", "orden"]
+    ["pais", "dias", "horas", "remotas", "presenciales", "ocultar-enviadas", "confianza", "solo-verificadas", "nivel", "idioma", "ingles", "orden"]
       .forEach(id => $(id).addEventListener("change", buscar));
     let espera;
     ["palabras-extra", "palabras-excluir"].forEach(id => $(id).addEventListener("input", () => { clearTimeout(espera); espera = setTimeout(buscar, 300); }));
@@ -547,7 +560,7 @@
     });
     $("seleccionar").addEventListener("click", () => {
       if (estado.seleccion.size) estado.seleccion.clear();
-      else estado.resultados.filter(v => !estado.enviadas.has(v.id)).slice(0, SEL_RAPIDA).forEach(v => estado.seleccion.add(v.id));
+      else estado.resultados.filter(v => !estado.enviadas.has(v.id) && M.enlacesComprobados(v).length).slice(0, SEL_RAPIDA).forEach(v => estado.seleccion.add(v.id));
       pintarResultados();
     });
     $("copiar").addEventListener("click", copiar);

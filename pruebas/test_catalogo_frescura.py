@@ -163,6 +163,9 @@ def test_captura_incremental_no_crea_lotes_ni_usa_apify(monkeypatch, tmp_path):
     crudas = [{"titulo": "UX Designer", "empresa": "Empresa", "enlace": "https://jobs.lever.co/a/1",
                 "fuente": "Lever", "descripcion": TEXTO, "ubicacion": "Remote - LATAM"}]
     monkeypatch.setattr(incremental, "recoger", lambda *a: (crudas, set(), set(), {}))
+    cfg = bodega.config()
+    cfg["verificacion_enlaces"] = {"vacantes_por_captura": 0, "segundos_captura": 0}
+    monkeypatch.setattr(bodega, "config", lambda: cfg)
     monkeypatch.setattr(supabase, "subir_catalogo", lambda rows: {"filas": len(rows), "enviadas": len(rows),
                                                                "confirmadas": [r["id"] for r in rows]})
     trabajo = tmp_path / "trabajo"
@@ -201,10 +204,12 @@ def test_registro_recupera_snapshot_del_dia_sin_descargar_historico():
 def test_sin_siete_dias_reales_no_se_declara_listo_para_whatsapp():
     ahora = datetime(2026, 11, 4, 12, tzinfo=timezone.utc)
     r = {"capturada_en": AHORA, "catalogo": {"filas": 1, "enviadas": 1, "pendientes": 0}, "historico_entregas": [],
-         "frescura": {"observadas_2h": 1}}
+         "frescura": {"observadas_2h": 1}, "entrega": {"vacantes": 1},
+         "verificacion_enlaces": {"seleccion_del_dia": {"vacantes": 1, "estados": {"verificada": 1}}}}
     assert not preparacion.evaluar(r, ahora)["apto_para_piloto_whatsapp"]
     r["historico_entregas"] = [{"fecha": (ahora.date() - timedelta(days=i)).isoformat(), "meta_cumplida": True,
-                                 "pendientes_supabase": 0, "registro_confirmado": True} for i in range(7)]
+                                 "pendientes_supabase": 0, "registro_confirmado": True,
+                                 "enlaces_comprobados": True} for i in range(7)]
     assert preparacion.evaluar(r, ahora)["apto_para_piloto_whatsapp"]
     r["historico_entregas"][3]["registro_confirmado"] = False
     assert not preparacion.evaluar(r, ahora)["apto_para_piloto_whatsapp"]
