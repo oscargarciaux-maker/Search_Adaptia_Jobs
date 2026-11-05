@@ -10,6 +10,7 @@ import time
 from urllib.parse import urlencode
 
 from buscador import cobertura, enlaces
+from buscador.apify import Presupuesto, ejecutar
 from buscador.fuentes import linkedin_publico
 
 NOMBRE = "LinkedIn (Apify)"
@@ -21,66 +22,122 @@ def url_busqueda(consultas, params, dias):
     return "https://www.linkedin.com/jobs/search/?" + urlencode(q)
 
 
-def _primero(item, *claves):
-    for c in claves:
-        v = item.get(c)
-        if isinstance(v, dict):
-            v = v.get("name") or v.get("url") or ""
-        if v:
-            return str(v)
+def _valor(item, *claves):
+    for clave in claves:
+        valor = item
+        for parte in clave.split("."):
+            valor = valor.get(parte) if isinstance(valor, dict) else None
+        if valor not in (None, "", []):
+            return valor
     return ""
 
 
+def _primero(item, *claves):
+    valor = _valor(item, *claves)
+    if isinstance(valor, dict):
+        valor = valor.get("name") or valor.get("text") or ""
+    return str(valor) if valor not in (None, "") else ""
+
+
 def normalizar_item(item):
-    enlace = _primero(item, "link", "jobUrl", "url", "jobLink", "linkedinUrl")
-    if enlaces.host(enlace) in ("linkedin.com", "co.linkedin.com", "es.linkedin.com") and "/jobs/" in enlace and "/jobs/view/" not in enlace:
-        jid = _primero(item, "id", "jobId")
-        enlace = f"https://www.linkedin.com/jobs/view/{jid}" if jid else enlace
+    enlace = _primero(item, "linkedinUrl", "link", "jobUrl", "url", "jobLink")
+    # Nunca convertir posts/perfiles en un enlace de empleo inventado a partir de un id.
+    descripcion = _primero(item, "descriptionText", "description", "jobDescription")
+    if not descripcion:
+        descripcion = linkedin_publico.texto_html(_primero(item, "descriptionHtml"))
+    ubicacion = _primero(item, "location.parsed.text", "location.linkedinText", "location.name", "jobLocation", "place")
+    if not ubicacion and isinstance(item.get("location"), str):
+        ubicacion = item["location"]
+    modo = _primero(item, "workplaceType", "workType", "remote").lower()
     return {
         "titulo": _primero(item, "title", "jobTitle", "position"),
-        "empresa": _primero(item, "companyName", "company", "company_name"),
-        "ubicacion": _primero(item, "location", "jobLocation", "place"),
-        "descripcion": _primero(item, "descriptionText", "description", "jobDescription")[:30000],
-        "fecha": _primero(item, "postedAt", "publishedAt", "postedDate", "listedAt", "datePosted")[:10],
+        "empresa": _primero(item, "companyName", "company.name", "company_name", "company"),
+        "ubicacion": ubicacion,
+        "descripcion": descripcion[:30000],
+        "fecha": _primero(item, "postedDate", "postedAt", "publishedAt", "listedAt", "datePosted")[:10],
         "enlace": enlace,
-        "enlace_directo": _primero(item, "applyUrl", "applyLink", "externalApplyLink", "companyApplyUrl"),
-        "remoto": True if "remote" in _primero(item, "workplaceType", "workType", "remote").lower() else None,
+        "enlace_directo": _primero(item, "applyMethod.companyApplyUrl", "applyUrl", "applyLink", "externalApplyLink", "companyApplyUrl"),
+        "remoto": True if modo == "remote" or _valor(item, "workRemoteAllowed") is True else None,
         "fuente": NOMBRE,
     }
 
 
-def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=100, presupuesto=60, max_dias=30,
-           token=None, reloj=time.monotonic, limite_segundos=None):
-    """Corre el actor con las combinaciones menos recientes. Devuelve (vacantes crudas, estadísticas)."""
+def entrada(actor, consultas, params, dias, maximo):
+    if actor == "curious_coder/linkedin-jobs-scraper":
+        return {"urls": [url_busqueda(consultas, params, dias)], "limitPerSource": maximo,
+                "scrapeCompany": False, "autoConvertToAiSearch": False}
+    if actor != "harvestapi/linkedin-job-search":
+        raise ValueError("Actor sin adaptador de entrada verificado")
+    cuerpo = {"jobTitles": [linkedin_publico.consulta_or(consultas)], "maxItems": maximo,
+              "postedLimit": "24h" if dias <= 1 else "week" if dias <= 7 else "month", "sortBy": "date"}
+    if params.get("location") and params["location"] != "Worldwide":
+        cuerpo["locations"] = [params["location"]]
+    if params.get("f_WT") == "2":
+        cuerpo["workplaceType"] = ["remote"]
+    return cuerpo
+
+
+def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=20, presupuesto=60, max_dias=30,
+           token=None, reloj=time.monotonic, limite_segundos=None, prioritarias=(), control_gasto=None,
+           tope_consulta_usd=0.025, build="0.0.61"):
+    """Ofertas formales: reparto de consultas, esquema real del actor y crédito reservado antes de iniciar."""
     token = token or os.environ.get("APIFY_TOKEN", "")
     if not token or not actor:
         return [], {"omitida": "sin APIFY_TOKEN o sin actor en datos/config.yaml"}
     from datetime import datetime
     inicio = reloj()
-    pendientes = sorted(combinaciones, key=lambda c: estado.get(f"{c[0]}@{c[2]}", ""))[:presupuesto]
-    urls = []
+    control_gasto = control_gasto or Presupuesto({}, hoy)
+    pendientes = cobertura.repartir(combinaciones, estado, hoy, prioritarias)[:presupuesto]
+    crudas, ejecuciones, descartes = [], [], {}
+    por_familia, por_lugar = {}, {}
     for familia, consultas, lugar, params in pendientes:
-        terminos = cobertura.rotar(consultas, hoy, 4)
-        ultima = estado.get(cobertura.clave_consulta(f"{familia}@{lugar}", terminos))
-        dias = max_dias if not ultima else min(max_dias, max(1, (datetime.fromisoformat(hoy) - datetime.fromisoformat(ultima)).days + 1))
-        urls.append(url_busqueda(terminos, params, dias))
-    # Se mandan en tandas para que una falla no pierda todo
-    crudas, fallidas = [], 0
-    for i in range(0, len(urls), 10):
-        if limite_segundos and reloj() - inicio > limite_segundos:
+        restante = limite_segundos - (reloj() - inicio) if limite_segundos else 180
+        if restante <= 1:
             break
-        tanda = urls[i:i + 10]
-        cuerpo = {"urls": tanda, "startUrls": [{"url": u} for u in tanda], "count": max_por_busqueda,
-                  "maxItems": max_por_busqueda * len(tanda), "scrapeCompany": False}
-        items = cliente.post_json(API.format(actor=actor.replace("/", "~")) + f"?token={token}", cuerpo, timeout=600)
-        if items is None:
-            fallidas += 1
+        terminos = cobertura.rotar(consultas, hoy, 4)
+        clave = f"{familia}@{lugar}"
+        ultima = estado.get(cobertura.clave_consulta(clave, terminos))
+        dias = max_dias if not ultima else min(max_dias, max(1, (datetime.fromisoformat(hoy) - datetime.fromisoformat(ultima)).days + 1))
+        # Validar el adaptador antes de reservar dinero.
+        cuerpo = entrada(actor, terminos, params, dias, max_por_busqueda)
+        cargo = control_gasto.reservar(tope_consulta_usd)
+        if not cargo:
+            break
+        # Dejar margen para el inicio y no pedir más resultados que el crédito de esta ejecución.
+        precio = 0.002 if actor == "curious_coder/linkedin-jobs-scraper" else 0.001
+        maximo = min(max_por_busqueda, max(1, int((cargo - 0.002) / precio)))
+        cuerpo = entrada(actor, terminos, params, dias, maximo)
+        items, stats = ejecutar(cliente, actor, cuerpo, token, cargo, max_items=maximo,
+                                build=build, limite_segundos=min(180, restante))
+        ejecuciones.append(stats)
+        por_familia[familia] = por_familia.get(familia, 0) + 1
+        por_lugar[lugar] = por_lugar.get(lugar, 0) + 1
+        if stats.get("error"):
             continue
-        for item in items if isinstance(items, list) else []:
-            v = normalizar_item(item)
-            if v["titulo"] and enlaces.es_linkedin(v["enlace"]):
-                crudas.append(v)
-        for familia, consultas, lugar, params in pendientes[i:i + 10]:
-            estado[f"{familia}@{lugar}"] = hoy
-            estado[cobertura.clave_consulta(f"{familia}@{lugar}", cobertura.rotar(consultas, hoy, 4))] = hoy
-    return crudas, {"busquedas": len(urls), "tandas_fallidas": fallidas, "avisos": len(crudas)}
+        for item in items:
+            motivo = ""
+            if not isinstance(item, dict):
+                motivo = "registro malformado"
+            elif item.get("closedAt") or item.get("jobState", "LISTED") not in ("LISTED", "ACTIVE"):
+                motivo = "oferta cerrada o no publicada"
+            else:
+                v = normalizar_item(item)
+                if not v["titulo"] or not v["empresa"] or not enlaces.es_linkedin(v["enlace"]):
+                    motivo = "sin título, empresa o enlace formal"
+                elif len(v["descripcion"]) < 200:
+                    motivo = "sin descripción suficiente"
+                else:
+                    crudas.append(v)
+            if motivo:
+                descartes[motivo] = descartes.get(motivo, 0) + 1
+        estado[clave] = hoy
+        estado[cobertura.clave_consulta(clave, terminos)] = hoy
+    resumen = {"busquedas": len(ejecuciones), "avisos": len(crudas), "descartadas": descartes,
+                    "por_familia": por_familia, "por_lugar": por_lugar, "ejecuciones": ejecuciones,
+                    "reserva_corrida_usd": control_gasto.reservado,
+                    "tope_mes_usd": control_gasto.mensual, "tope_diario_usd": round(control_gasto.diario, 6)}
+    if not ejecuciones:
+        resumen["omitida"] = "presupuesto diario/mensual reservado o tiempo agotado"
+    elif any(e.get("error") for e in ejecuciones) and not crudas:
+        resumen["error"] = "Apify no produjo ofertas: revisar sus ejecuciones y crédito disponible"
+    return crudas, resumen

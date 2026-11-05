@@ -18,7 +18,8 @@ Leer también `docs/COBERTURA_HISTORICO.md`: LATAM y España más remotas mundia
 rotación de cargos exactos/similares/cercanos, identidad por enlace y evidencia de contenido, cola de reintentos
 a Supabase y conservación sin borrado automático de ofertas de la base. No construir seguimiento de postulaciones
 en esta etapa. El horario de Bogotá solo programa la ejecución; no limita los países.
-Las publicaciones del feed de Apify son candidatas por verificar: no cuentan para las cuotas ni se envían a Supabase.
+Apify usa curious_coder/linkedin-jobs-scraper con permisos limitados para fichas formales, sin cookies y con tope USD 5/mes. El feed pagado queda
+desactivado por defecto. Un post solo aporta una oferta si se recupera su ficha formal; sin ella sigue por verificar.
 La entrega normal comprueba Supabase antes de recoger; la validación final falla si hay déficit o sincronización pendiente.
 
 ## Reglas que no se cambian sin preguntarle a Oscar

@@ -17,7 +17,8 @@ nadie.
 Prioriza remotas para varios países, con cobertura de LATAM, España y remotas mundiales. Los títulos exactos,
 similares y cercanos rotan en las búsquedas; no se promete agotar todas las combinaciones cada noche.
 La limpieza de 30 días solo afecta al buscador activo; no borra ofertas de Supabase. La generación automática de Excel
-de la entrega anterior está desactivada. Las publicaciones de Apify quedan pendientes de verificación y no cuentan como vacantes.
+de la entrega anterior está desactivada. Apify busca fichas formales de LinkedIn con un tope de USD 5/mes; las publicaciones solo aportan una oferta si se verifica
+su ficha original. La búsqueda pagada del feed está desactivada para reservar el crédito a fichas formales.
 La meta es 20 por cada uno de seis roles (120 al día). Si un rol queda corto, hay búsquedas adicionales gratuitas
 acotadas y un reporte de los motivos. La continuidad se mide entre días distintos, conservando la memoria de entregas.
 Decisiones, límites y seguimiento futuro: [`docs/COBERTURA_HISTORICO.md`](docs/COBERTURA_HISTORICO.md).

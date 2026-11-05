@@ -15,6 +15,8 @@ import re
 import time
 
 from buscador import enlaces, familias, normalizar, paises
+from buscador.apify import Presupuesto, ejecutar
+from buscador.fuentes import linkedin_publico
 
 NOMBRE = "LinkedIn (publicación)"
 API = "https://api.apify.com/v2/acts/{actor}/run-sync-get-dataset-items"
@@ -113,26 +115,70 @@ def a_vacante(item, familias_validas):
     }, ""
 
 
-def buscar(cliente, actor, consultas, familias_validas, hoy, maximo=60, token=None, reloj=time.monotonic):
+def resolver_oferta(cliente, item, familias_validas):
+    """Un post puede descubrir una ficha; se entrega el contenido de la ficha, nunca se certifica el post."""
+    texto = str(_campo(item, "content", "text", "postText"))
+    urls = re.findall(r"https?://[^\s<>\"']+", texto)
+    urls += [str(_campo(item, "externalUrl", "article.url", "link.url"))]
+    for url in urls[:10]:
+        url = url.rstrip(".,;:!?)")
+        if not enlaces.es_linkedin(url):
+            continue
+        jid = re.search(r"(\d+)/?$", url.split("?")[0])
+        if not jid:
+            continue
+        respuesta = cliente.get(linkedin_publico.AVISO + jid.group(1))
+        if respuesta is None or respuesta.status_code != 200:
+            continue
+        desc, cerrada, _, _ = linkedin_publico.ficha(respuesta.text)
+        def campo(patron):
+            m = re.search(patron, respuesta.text)
+            return linkedin_publico.texto_html(m.group(1)) if m else ""
+        titulo = campo(r'<h1[^>]*>([\s\S]*?)</h1>')
+        empresa = campo(r'topcard__org-name-link[^>]*>([\s\S]*?)</a>')
+        lugar = campo(r'topcard__flavor--bullet[^>]*>([\s\S]*?)</span>')
+        if cerrada or len(desc) < 200 or not titulo or not empresa:
+            continue
+        if not any(f["familia"] in familias_validas for f in familias.clasificar(titulo, desc)):
+            continue
+        return {"titulo": titulo, "empresa": empresa, "descripcion": desc, "ubicacion": lugar,
+                "enlace": f"https://www.linkedin.com/jobs/view/{jid.group(1)}/", "fecha": "",
+                "fuente": "LinkedIn (oferta desde feed)", "remoto": None}
+    return None
+
+
+def buscar(cliente, actor, consultas, familias_validas, hoy, maximo=60, token=None, reloj=time.monotonic,
+           control_gasto=None):
     """Corre el actor una vez con todas las consultas. Devuelve (vacantes crudas, estadísticas)."""
+    inicio = reloj()
     token = token or os.environ.get("APIFY_TOKEN", "")
     if not token or not actor:
         return [], {"omitida": "sin APIFY_TOKEN o sin actor_publicaciones en datos/config.yaml"}
     if not consultas:
         return [], {"omitida": "sin consultas_publicaciones en datos/entrega.yaml"}
+    if maximo <= 0:
+        return [], {"omitida": "presupuesto reservado a ofertas formales"}
+    control_gasto = control_gasto or Presupuesto({}, hoy)
+    cargo = control_gasto.reservar(0.025)
+    if not cargo:
+        return [], {"omitida": "presupuesto de Apify agotado"}
     por_consulta = max(1, maximo // len(consultas))
-    items = cliente.post_json(API.format(actor=actor.replace("/", "~")) + f"?token={token}",
-                              entrada(actor, consultas, por_consulta, hoy), timeout=900)
-    if items is None:
-        return [], {"error": "el actor no respondió o rechazó la entrada", "consultas": len(consultas)}
-    if not isinstance(items, list):
-        return [], {"error": "el actor devolvió una estructura inesperada; no se aceptaron registros"}
+    items, ejecucion = ejecutar(cliente, actor, entrada(actor, consultas, por_consulta, hoy), token,
+                                cargo, max_items=maximo, limite_segundos=180)
+    if ejecucion.get("error"):
+        return [], ejecucion
     crudas, motivos, revision = [], {}, []
     for item in items if isinstance(items, list) else []:
+        if reloj() - inicio >= 180:
+            break
         if not isinstance(item, dict) or item.get("type") in ("comment", "reaction"):
             continue
         v, motivo = a_vacante(item, familias_validas)
         if v:
+            formal = resolver_oferta(cliente, item, familias_validas)
+            if formal:
+                crudas.append(formal)
+                continue
             # Una publicación de contratación es un indicio, no una oferta formal comprobada.
             # No llenar cuotas ni enviar a Supabase hasta verificar su oferta original.
             revision.append({"titulo": v["titulo"], "empresa": v["empresa"], "enlace": v["enlace"],
@@ -140,5 +186,6 @@ def buscar(cliente, actor, consultas, familias_validas, hoy, maximo=60, token=No
         else:
             motivos[motivo] = motivos.get(motivo, 0) + 1
     return crudas, {"consultas": len(consultas), "publicaciones": len(items) if isinstance(items, list) else 0,
-                    "vacantes": 0, "pendientes_revision": len(revision), "muestras_revision": revision[:10],
+                    "vacantes": len(crudas), "pendientes_revision": len(revision), "muestras_revision": revision[:10],
+                    "ejecucion": ejecucion,
                     "descartadas": motivos}

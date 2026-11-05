@@ -34,6 +34,8 @@ def test_publicacion_aunque_parezca_valida_no_cuenta_como_oferta_formal():
             "text": TEXTO, "author": {"type": "company", "name": "Empresa"}}
     class Cliente:
         def post_json(self, *args, **kwargs):
+            return {"data": {"id": "run", "status": "SUCCEEDED", "defaultDatasetId": "dataset"}}
+        def json(self, *args, **kwargs):
             return [item, dict(item, text="We are offering a UX course for remote designers.")]
     datos, salud = publicaciones_apify.buscar(Cliente(), "actor-ficticio", ["ux"], {"diseno-producto-ux"}, HOY,
                                               token="token-ficticio")

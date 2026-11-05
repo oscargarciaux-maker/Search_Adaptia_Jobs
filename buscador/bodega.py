@@ -68,6 +68,11 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None):
     from buscador import entrega
     cfg_entrega = entrega.config()
     prioritarias = {f for r in cfg_entrega["roles"] for f in r["familias"]}
+    from buscador.apify import Presupuesto
+    control_apify = Presupuesto(
+        _leer_json(trabajo / "apify_presupuesto.json", {}), hoy,
+        mensual=cfg["apify"].get("tope_mensual_usd", 5), corrida=cfg["apify"].get("tope_por_corrida_usd", 3),
+        guardar=lambda datos: _guardar_json(trabajo / "apify_presupuesto.json", datos))
     salud = {}
     for clave in ("linkedin", "indeed", "apify", "ats_probadas", "remotos_cache"):
         estado.setdefault(clave, {})
@@ -96,12 +101,18 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None):
         combos = linkedin_publico.combinaciones(mapa, activos)
         return linkedin_apify.buscar(Cliente(), cfg["apify"]["actor_linkedin"], combos, estado["apify"], hoy,
                                      presupuesto=p["apify_busquedas"], max_dias=cfg["dias_maximos"],
-                                     limite_segundos=limite)
+                                     limite_segundos=limite, prioritarias=prioritarias, control_gasto=control_apify,
+                                     max_por_busqueda=cfg["apify"].get("ofertas_por_busqueda", 20),
+                                     tope_consulta_usd=cfg["apify"].get("tope_consulta_usd", 0.025),
+                                     build=cfg["apify"].get("build_linkedin", "0.0.61"))
 
     def f_publicaciones():
         maximo = 6 if p.get("minutos_por_fuente", 50) <= 3 else cfg["apify"].get("publicaciones_por_dia", 72)
+        if cfg["apify"].get("publicaciones_por_dia", 0) <= 0:
+            return [], {"omitida": "crédito de Apify reservado a ofertas formales de LinkedIn"}
         return publicaciones_apify.buscar(Cliente(), cfg["apify"].get("actor_publicaciones", ""),
-                                          cfg_entrega.get("consultas_publicaciones", []), prioritarias, hoy, maximo=maximo)
+                                          cfg_entrega.get("consultas_publicaciones", []), prioritarias, hoy,
+                                          maximo=maximo, control_gasto=control_apify)
 
     def f_remotos():
         consultas = sorted({c for f in mapa for c in f["consultas"][:1]})
@@ -215,6 +226,8 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     cfg = config()
     if prueba:
         cfg["presupuestos"].update(PRUEBA)
+        cfg["apify"]["actor_linkedin"] = ""
+        cfg["apify"]["publicaciones_por_dia"] = 0
     hoy = hoy or datetime.now(timezone(timedelta(hours=-5))).date().isoformat()
     if not prueba and not consulta:
         from buscador import supabase
