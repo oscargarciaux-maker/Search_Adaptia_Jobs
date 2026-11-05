@@ -123,6 +123,9 @@ begin
             raise exception 'Snapshot o grado de selección inválido'; end if;
           id:=item->0->>'id';
           if id is null or id !~ '^[a-f0-9]{16}$' or id=any(ids) then raise exception 'Identidad de selección inválida/repetida'; end if;
+          if exists(select 1 from public.entregas_diarias d where d.vacante_id=id
+                    and (d.delivery_date<>v_identificador::date or d.role_id<>r.key)) then
+            raise exception 'Vacante ya seleccionada en otra fecha o rol'; end if;
           ids:=array_append(ids,id);
           if not exists(select 1 from public.entregas_diarias d where d.vacante_id=id
                         and d.delivery_date=v_identificador::date and d.role_id=r.key) then completas:=false; end if;

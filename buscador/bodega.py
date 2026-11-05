@@ -300,7 +300,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         lote_previo = lote_db
     if central:
         _guardar_json(trabajo / "lote_entrega.json", lote_previo)
-        central.recuperar_pendientes(pendientes_v1, guardar_v1, pendientes_registro, guardar_registro)
+        memoria_db.update(central.recuperar_pendientes(pendientes_v1, guardar_v1, pendientes_registro, guardar_registro))
     if modo == "inicial":
         estado = {k: v for k, v in estado.items() if k not in ("linkedin", "indeed", "apify")}
     solo = None

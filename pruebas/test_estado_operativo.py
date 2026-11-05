@@ -136,11 +136,12 @@ def test_lote_previo_reconstruye_colas_con_fecha_original(monkeypatch, presupues
     v = dict(oferta(), _capturada_entrega=AHORA)
     c.lote.valores = {HOY: {"fecha": HOY, "elegidas": {"ux-ui-designer": [[v, "exacto"]]}}}
     ofertas, registro, copias = {}, {}, []
-    c.recuperar_pendientes(ofertas, lambda p: copias.append(deepcopy(p)), registro,
-                          lambda p: copias.append(deepcopy(p)))
+    memoria = c.recuperar_pendientes(ofertas, lambda p: copias.append(deepcopy(p)), registro,
+                                    lambda p: copias.append(deepcopy(p)))
     assert ofertas and registro[v["id"]]["delivery_date"] == HOY
     assert registro[v["id"]]["selected_at"] == AHORA and len(copias) == 2
     assert all(f["delivery_date"] == HOY for f in ofertas.values())
+    assert memoria[v["id"]] == HOY and memoria[v["enlace"]] == HOY
 
 
 def test_leer_cola_pagina_por_clave_no_offset(monkeypatch, presupuesto):

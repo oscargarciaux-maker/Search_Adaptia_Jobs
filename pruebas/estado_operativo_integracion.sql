@@ -94,6 +94,13 @@ begin
   exception when raise_exception then
     if sqlerrm='Un proceso antiguo pudo reemplazar el canónico tras limpiar temporal' then raise; end if;
   end;
+  begin
+    perform public.estado_guardar('lote',jsonb_build_array(jsonb_build_object('identificador',((fila.identificador::date)+1)::text,
+      'revision',0,'payload',jsonb_set(fila.payload,'{fecha}',to_jsonb(((fila.identificador::date)+1)::text)))));
+    raise exception 'Se permitió repetir la vacante en otro día';
+  exception when raise_exception then
+    if sqlerrm='Se permitió repetir la vacante en otro día' then raise; end if;
+  end;
 end $$;
 reset role;
 rollback;

@@ -10,6 +10,10 @@ aprobados por haber fusionado otro PR. Instrucciones de uso: [GUIA_CLIENTE.md](G
 Se ensayaron concurrencia y restauración de cinco tablas/dos secuencias en PostgreSQL 17 ficticio, además de pruebas
 Python de cortes/recuperación. No se migró ni activó la base real durante el desarrollo. Para aceptarla falta seguir
 [la guía](ACTIVAR_ESTADO_OPERATIVO.md) y registrar importación real, siguiente reserva, entrega y página con su SHA.
+La rama del [PR #14](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/pull/14) pasó 479 pruebas Python y la
+suite JavaScript. Una captura pública `--prueba` terminó en 6,5 minutos: 1.594 vacantes en temporal y 11 enlaces
+comprobados de 12 programados; el resto siguió pendiente. No creó entrega productiva, escribió en Supabase ni usó
+Apify pagado. Es evidencia acotada de fuentes/integración, no de activación central ni calidad de todo el catálogo.
 
 Consulta del **5 de noviembre de 2026, 12:32 p. m. de Colombia**:
 

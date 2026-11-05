@@ -111,13 +111,18 @@ class Central:
     def recuperar_pendientes(self, ofertas, guardar_ofertas, registro, guardar_registro):
         """Reconstruir también días anteriores si se perdió el proceso antes de crear sus colas."""
         from buscador import catalogo, entrega
+        memoria = {}
         for lote in self.lote.valores.values():
             for fila in entrega.filas_de(lote["elegidas"], entrega.config()["roles"], lote["fecha"], ""):
                 ofertas.setdefault(fila["external_id"], fila)
             for fila in catalogo.filas_seleccion(lote):
                 registro.setdefault(fila["vacante_id"], fila)
+            for lista in lote["elegidas"].values():
+                for v, _ in lista:
+                    memoria.update({h: lote["fecha"] for h in entrega.huellas(v)})
         guardar_ofertas(ofertas)
         guardar_registro(registro)
+        return memoria
 
     def control_apify(self, hoy, mensual=5, corrida=3):
         return PresupuestoCentral(self, hoy, mensual, corrida)
