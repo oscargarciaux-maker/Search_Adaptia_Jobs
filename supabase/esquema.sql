@@ -66,3 +66,12 @@ create or replace view public.entrega_de_hoy with (security_invoker = true) as
   select * from public.ofertas
   where delivery_date = (select max(delivery_date) from public.ofertas)
   order by search_tag, id;
+
+-- Permisos para la clave secreta (rol service_role). Algunos proyectos nuevos de Supabase no dan permisos automáticos a
+-- las tablas creadas desde el SQL Editor: sin esto la API responde que la tabla no existe.
+grant usage on schema public to service_role;
+grant all on table public.ofertas to service_role;
+grant select on public.entrega_de_hoy to service_role;
+
+-- Que la API de Supabase vea la tabla nueva de inmediato
+notify pgrst, 'reload schema';
