@@ -28,9 +28,9 @@ refuerzo:
 apify:
   actor_publicaciones: "harvestapi/linkedin-post-search"
   publicaciones_por_dia: 0  # reservar el crédito gratuito para fichas de empleo
-  actor_linkedin: "harvestapi/linkedin-job-search"
-  build_linkedin: "0.0.61"
-  ofertas_por_busqueda: 20
+  actor_linkedin: "curious_coder/linkedin-jobs-scraper"
+  build_linkedin: "1.7.18"
+  ofertas_por_busqueda: 10
   tope_consulta_usd: 0.025
   tope_mensual_usd: 5
   actor_linkedin_respaldo: ""

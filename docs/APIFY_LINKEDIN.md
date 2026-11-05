@@ -1,19 +1,20 @@
 # Apify para ofertas formales de LinkedIn
 
 Oscar confirmó que desea aprovechar el crédito gratuito, con máximo USD 5 al mes. La integración anterior dejaba vacío
-`actor_linkedin` y solo buscaba publicaciones del feed. Ahora usa `harvestapi/linkedin-job-search`, build `0.0.61`.
+`actor_linkedin` y solo buscaba publicaciones del feed. Ahora usa `curious_coder/linkedin-jobs-scraper`, build `1.7.18`,
+con permisos limitados. Harvest se descartó como predeterminado porque exige aprobar acceso completo a la cuenta.
 
 Se comprobaron públicamente el esquema de entrada, el ejemplo de salida, la ausencia de cookies obligatorias y la tarifa
-publicada: aproximadamente USD 0,001 por oferta más USD 0,001 por inicio. La cuenta y condiciones de Apify prevalecen;
+publicada para el plan gratuito: aproximadamente USD 0,002 por oferta más un pequeño cargo por inicio. La cuenta y condiciones de Apify prevalecen;
 las reservas de este programa son límites conservadores, no facturas ni estimaciones de vacantes nuevas garantizadas.
 
 ## Qué busca y qué entrega
 
 - Términos exactos, similares y cercanos con consultas OR, por turnos entre familias.
 - LATAM, España y remotas mundiales, priorizando remoto; no filtra por seniority ni inglés.
-- Entrada real del actor: `jobTitles`, `locations`, `workplaceType`, `postedLimit`, `maxItems` y `sortBy`.
-- No se envía `cookie`, `li_at`, usuario ni sesión personal. El actor ofrece una opción de cookie, pero no la exige y el
-  programa no la utiliza. No se cambia de actor sin implementar y comprobar su adaptador.
+- Entrada real del actor: `urls` con filtros LinkedIn, `limitPerSource`, `scrapeCompany: false` y
+  `autoConvertToAiSearch: false`. No se activa búsqueda con IA ni enriquecimiento de empresas.
+- No se envía `cookie`, `li_at`, usuario ni sesión personal. El actor elegido no exige compartir la cuenta personal. No se cambia de actor sin implementar y comprobar su adaptador.
 - Se normalizan empresa, ubicación anidada, descripción, fecha y enlace de postulación. Los posts no se convierten en
   fichas inventadas. Se descartan avisos cerrados, incompletos o sin enlace formal antes de los filtros comunes.
 - Las fichas obtenidas entran a clasificación, elegibilidad, antigüedad, deduplicación y entrega Supabase igual que las
@@ -21,9 +22,9 @@ las reservas de este programa son límites conservadores, no facturas ni estimac
 
 ## Cómo se limita el crédito
 
-`datos/config.yaml`: máximo USD 5 por mes calendario, USD 3 por corrida, USD 0,025 por consulta y 20 resultados por consulta.
+`datos/config.yaml`: máximo USD 5 por mes calendario, USD 3 por corrida, USD 0,025 por consulta y 10 resultados por consulta.
 El mensual se reparte entre los días del mes: aproximadamente USD 0,16–0,18 diarios. El límite diario normalmente es el
-que restringe primero; con la tarifa consultada representa del orden de cien ofertas brutas al día, no cien entregables.
+que restringe primero; con la tarifa consultada representa del orden de 60–80 ofertas brutas al día, no 60–80 entregables.
 
 Antes de iniciar se guarda una reserva en `trabajo/apify_presupuesto.json`. Las reservas comparten un bloqueo entre hilos,
 se conservan al repetir corridas y no se reinician con modo inicial. Si el proveedor no confirma el inicio o falla la

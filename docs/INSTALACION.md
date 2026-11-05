@@ -62,11 +62,11 @@ no elimina filas de Supabase. Ver `COBERTURA_HISTORICO.md`.
 1. Crear una cuenta gratuita en https://console.apify.com/sign-up y comprobar el crédito vigente del plan.
 2. Copiar el token desde Settings → API & Integrations → Personal API tokens y guardarlo como secreto `APIFY_TOKEN`
    en GitHub. Nunca pegarlo en un chat ni en el código.
-3. El actor configurado es `harvestapi/linkedin-job-search`, versión `0.0.61`, sin sesión personal. Se envían consultas
+3. El actor configurado es `curious_coder/linkedin-jobs-scraper`, versión `1.7.18`, con permisos limitados y sin sesión personal. Se envían consultas
    de cargos exactos y afines, filtros de ubicación/remoto y límites de resultados y cargo. No se envían cookies.
 4. `tope_mensual_usd: 5` reparte reservas entre los días del mes; cada ejecución tiene su propio `maxTotalChargeUsd`.
-   Mantener el plan gratuito y los límites de la cuenta. La tarifa pública consultada es aproximadamente USD 1 por
-   1.000 ofertas más inicio; no significa que todas las ofertas obtenidas sean nuevas, elegibles o entregables.
+   Mantener el plan gratuito y los límites de la cuenta. La tarifa pública consultada es aproximadamente USD 2 por
+   1.000 ofertas en el plan gratuito más inicio; no significa que todas las ofertas obtenidas sean nuevas, elegibles o entregables.
 5. La búsqueda pagada del feed está desactivada (`publicaciones_por_dia: 0`) para dedicar este crédito a ofertas formales.
    Si se habilita, comparte el mismo presupuesto y solo aporta ofertas al poder recuperar sus fichas originales.
 6. Diagnóstico → `probar_apify: true` ejecuta una prueba explícita de una sola oferta, con tope USD 0,01 del crédito,

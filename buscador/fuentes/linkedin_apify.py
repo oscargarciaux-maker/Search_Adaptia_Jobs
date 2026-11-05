@@ -63,8 +63,11 @@ def normalizar_item(item):
 
 
 def entrada(actor, consultas, params, dias, maximo):
+    if actor == "curious_coder/linkedin-jobs-scraper":
+        return {"urls": [url_busqueda(consultas, params, dias)], "limitPerSource": maximo,
+                "scrapeCompany": False, "autoConvertToAiSearch": False}
     if actor != "harvestapi/linkedin-job-search":
-        raise ValueError("Actor sin adaptador de entrada verificado; configurar harvestapi/linkedin-job-search")
+        raise ValueError("Actor sin adaptador de entrada verificado")
     cuerpo = {"jobTitles": [linkedin_publico.consulta_or(consultas)], "maxItems": maximo,
               "postedLimit": "24h" if dias <= 1 else "week" if dias <= 7 else "month", "sortBy": "date"}
     if params.get("location") and params["location"] != "Worldwide":
@@ -101,8 +104,9 @@ def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=20, pres
         if not cargo:
             break
         # Dejar margen para el inicio y no pedir más resultados que el crédito de esta ejecución.
-        maximo = min(max_por_busqueda, max(1, int((cargo - 0.002) / 0.001)))
-        cuerpo["maxItems"] = maximo
+        precio = 0.002 if actor == "curious_coder/linkedin-jobs-scraper" else 0.001
+        maximo = min(max_por_busqueda, max(1, int((cargo - 0.002) / precio)))
+        cuerpo = entrada(actor, terminos, params, dias, maximo)
         items, stats = ejecutar(cliente, actor, cuerpo, token, cargo, max_items=maximo,
                                 build=build, limite_segundos=min(180, restante))
         ejecuciones.append(stats)

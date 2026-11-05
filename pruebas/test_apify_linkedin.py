@@ -61,6 +61,14 @@ def test_schema_harvest_sin_cookies_ni_filtros_de_nivel():
         linkedin_apify.entrada("actor-sin-adaptador", ["ux"], {}, 30, 20)
 
 
+def test_actor_limitado_usa_urls_sin_ia_ni_enriquecimiento():
+    cuerpo = linkedin_apify.entrada("curious_coder/linkedin-jobs-scraper", ["ux designer"],
+                                    {"location": "Latin America", "f_WT": "2"}, 1, 10)
+    assert cuerpo["limitPerSource"] == 10 and cuerpo["scrapeCompany"] is False
+    assert cuerpo["autoConvertToAiSearch"] is False and "f_WT=2" in cuerpo["urls"][0]
+    assert "cookie" not in cuerpo
+
+
 def test_api_limita_cargo_y_no_incluye_token_en_url():
     cliente = Cliente()
     items, stats = apify.ejecutar(cliente, "harvestapi/linkedin-job-search", {"maxItems": 1}, "ficticio", 0.01)
