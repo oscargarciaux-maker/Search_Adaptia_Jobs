@@ -6,6 +6,11 @@ aprobados por haber fusionado otro PR. Instrucciones de uso: [GUIA_CLIENTE.md](G
 
 ## 1. Corte de evidencia
 
+**Extensión preparada después de ese corte:** SQL 003 y `ESTADO_SUPABASE_ACTIVO` permiten reservas/pendientes duraderos.
+Se ensayaron concurrencia y restauración de cinco tablas/dos secuencias en PostgreSQL 17 ficticio, además de pruebas
+Python de cortes/recuperación. No se migró ni activó la base real durante el desarrollo. Para aceptarla falta seguir
+[la guía](ACTIVAR_ESTADO_OPERATIVO.md) y registrar importación real, siguiente reserva, entrega y página con su SHA.
+
 Consulta del **5 de noviembre de 2026, 12:32 p. m. de Colombia**:
 
 | Comprobación | Resultado observado | Límite de la evidencia |

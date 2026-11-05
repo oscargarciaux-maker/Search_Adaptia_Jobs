@@ -186,6 +186,11 @@ Todavía no hay agente WhatsApp, registro individual de destinatarios, clientes 
 Ver que una oferta cerró no permite conocer si una persona fue rechazada. Esa etapa requiere datos y autorizaciones
 propios; no está incluida como una función ya disponible.
 
+Para aprender qué guardan GitHub y Supabase, qué es un PR y cómo se conservan presupuesto y tareas ante un corte, leer
+[Estado operativo explicado](ACTIVAR_ESTADO_OPERATIVO.md). Al activarlo, **Estado** informa tareas/selecciones sin confirmar;
+el operador revisa y el administrador corrige la causa. No vaciar pendientes ni reiniciar saldo. La guía distingue
+código preparado de activación real; las cachés siguen en GitHub y aún hacen falta respaldos y supervisión externos.
+
 La información técnica, recuperación y pendientes comprobables están en [OPERACION_Y_RECUPERACION.md](OPERACION_Y_RECUPERACION.md)
 y [ACEPTACION_Y_ESTADO.md](ACEPTACION_Y_ESTADO.md). El [historial de cambios](HISTORIAL_CAMBIOS.md) explica las revisiones.
 Las decisiones para mantener el producto están en [REVISION_FIABILIDAD.md](REVISION_FIABILIDAD.md).

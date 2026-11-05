@@ -26,6 +26,7 @@ jobs:
           --health-retries 10
     env:
       PGPASSWORD: prueba-ci
+      ADAPTIA_PRUEBA_SQL: "true"
     steps:
       - uses: actions/checkout@v4
       - name: Probar migración, repetición e integridad sin Supabase
@@ -35,6 +36,10 @@ jobs:
           psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f supabase/migraciones/002_catalogo.sql
           psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f supabase/migraciones/002_catalogo.sql
           psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f pruebas/catalogo_integracion.sql
+          psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f supabase/migraciones/003_estado_operativo.sql
+          psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f supabase/migraciones/003_estado_operativo.sql
+          psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f pruebas/estado_operativo_integracion.sql
+          python pruebas/probar_concurrencia_estado.py
   pruebas:
     runs-on: ubuntu-latest
     timeout-minutes: 15

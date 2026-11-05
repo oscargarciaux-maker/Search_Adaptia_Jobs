@@ -58,7 +58,7 @@ def _fecha_de(v):
     return v.get("fecha_publicacion") or v.get("visto_primera_vez") or ""
 
 
-def recoger(cfg, estado, hoy, trabajo, solo_mapa=None):
+def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None):
     """Corre las fuentes en paralelo (cada una con su cliente y su parte del estado). Devuelve
     (crudas, empresas para probar, enlaces de portales leídos, empresas cuyos portales se leyeron, salud)."""
     p = cfg["presupuestos"]
@@ -69,7 +69,7 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None):
     cfg_entrega = entrega.config()
     prioritarias = {f for r in cfg_entrega["roles"] for f in r["familias"]}
     from buscador.apify import Presupuesto
-    control_apify = Presupuesto(
+    control_apify = control_apify or Presupuesto(
         _leer_json(trabajo / "apify_presupuesto.json", {}), hoy,
         mensual=cfg["apify"].get("tope_mensual_usd", 5), corrida=cfg["apify"].get("tope_por_corrida_usd", 3),
         guardar=lambda datos: _guardar_json(trabajo / "apify_presupuesto.json", datos))
@@ -246,17 +246,46 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     if not prueba and not consulta:
         from buscador import supabase
         supabase.exigir_conexion()
-    usar_catalogo = modo == "incremental" or os.environ.get("CATALOGO_ACTIVO", "").lower() == "true"
+    usar_central = not prueba and os.environ.get("ESTADO_SUPABASE_ACTIVO", "").lower() == "true"
+    usar_catalogo = usar_central or modo == "incremental" or os.environ.get("CATALOGO_ACTIVO", "").lower() == "true"
     if usar_catalogo and not prueba:
         from buscador import supabase
         supabase.exigir_catalogo()
     salida = Path(salida)
     trabajo = salida / "trabajo"
+    central = None
+    if usar_central:
+        from buscador.estado_operativo import Central
+        central = Central(_leer_json(trabajo / "apify_presupuesto.json", {}),
+                          lambda datos: _guardar_json(trabajo / "apify_presupuesto.json", datos))
+    def recuperar_cola(nombre, archivo):
+        local = _leer_json(trabajo / archivo, {})
+        guardar = lambda datos: _guardar_json(trabajo / archivo, datos)
+        return central.cola(nombre, local, guardar) if central else (local, guardar)
+    pendientes_catalogo, guardar_catalogo = recuperar_cola("catalogo", "pendientes_catalogo.json")
+    pendientes_v1, guardar_v1 = recuperar_cola("ofertas", "pendientes_supabase.json")
+    pendientes_registro, guardar_registro = recuperar_cola("registro", "pendientes_registro.json")
     estado = _leer_json(trabajo / "estado.json", {})
     previas = _leer_json(trabajo / "bodega.json.gz", [])
     salud_anterior = _leer_json(salida / "datos" / "salud.json", {})
     memoria_db = {}
     lote_previo = _leer_json(trabajo / "lote_entrega.json", {})
+    if central:
+        if modo == "incremental" or consulta:
+            from buscador import supabase
+            canonico = supabase.leer_lote(hoy)
+            for rol, lista in lote_previo.get("elegidas", {}).items() if lote_previo.get("fecha") == hoy else []:
+                ids = {v["id"] for filas in canonico["elegidas"].values() for v, _ in filas}
+                canonico["elegidas"].setdefault(rol, []).extend((v, g) for v, g in lista if v["id"] not in ids)
+            lote_previo = canonico
+        lote_previo = central.cargar_lote(hoy, lote_previo)
+    def guardar_lote(datos):
+        _guardar_json(trabajo / "lote_entrega.json", datos)
+        if central:
+            central.guardar_lote(datos)
+    control_central = central.control_apify(hoy, cfg["apify"].get("tope_mensual_usd", 5),
+        cfg["apify"].get("tope_por_corrida_usd", 3)) if central else None
+    argumentos_central = {"control_apify": control_central} if central else {}
     if usar_catalogo and not prueba and not consulta and modo != "incremental":
         from buscador import supabase
         memoria_db, lote_db = supabase.leer_entregas(hoy)
@@ -270,6 +299,9 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
                                "Recuperar el estado de trabajo/artefacto y completar el registro antes de continuar; "
                                "no se inició otra selección ni búsqueda.")
         lote_previo = lote_db
+    if central:
+        _guardar_json(trabajo / "lote_entrega.json", lote_previo)
+        central.recuperar_pendientes(pendientes_v1, guardar_v1, pendientes_registro, guardar_registro)
     if modo == "inicial":
         estado = {k: v for k, v in estado.items() if k not in ("linkedin", "indeed", "apify")}
     solo = None
@@ -288,9 +320,9 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         estado_busqueda = {}  # una búsqueda profunda no mueve la rotación de la noche
         crudas, enlaces_ats, leidas, salud = recoger(cfg, dict(estado_busqueda, ats_probadas=estado.get("ats_probadas", {}),
                                                                 remotos_cache=estado.get("remotos_cache", {})),
-                                                      hoy, trabajo, solo_mapa=solo)
+                                                      hoy, trabajo, solo_mapa=solo, **argumentos_central)
     else:
-        crudas, enlaces_ats, leidas, salud = recoger(cfg, estado, hoy, trabajo)
+        crudas, enlaces_ats, leidas, salud = recoger(cfg, estado, hoy, trabajo, **argumentos_central)
     retiradas = []
     vacantes, sin_familia, descartes = limpiar(previas, crudas, hoy, cfg["dias_maximos"], enlaces_ats, leidas,
                                                consulta=consulta or "", retiradas=retiradas)
@@ -348,9 +380,20 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     resumen_catalogo = None
     if usar_catalogo and not prueba:
         from buscador import catalogo, supabase
-        pendientes_catalogo = _leer_json(trabajo / "pendientes_catalogo.json", {})
         resumen_catalogo = catalogo.sincronizar(vacantes, retiradas, pendientes_catalogo, supabase.subir_catalogo,
-            lambda datos: _guardar_json(trabajo / "pendientes_catalogo.json", datos))
+                                               guardar_catalogo)
+    reintentos_centrales = {}
+    if central and (modo == "incremental" or consulta):
+        from buscador import supabase
+        for nombre, pendientes, subir, guardar in (
+            ("ofertas", pendientes_v1, supabase.subir, guardar_v1),
+            ("registro", pendientes_registro, lambda filas: supabase.subir_catalogo(filas, tabla="entregas_diarias"), guardar_registro)):
+            resultado = dict(subir(list(pendientes.values())))
+            for identificador in resultado.pop("confirmadas", []):
+                pendientes.pop(identificador, None)
+            guardar(pendientes)
+            reintentos_centrales[nombre] = dict(resultado, pendientes=len(pendientes))
+        central.limpiar_lotes_confirmados()
     # Entrega diaria en el formato del contrato (no en una búsqueda profunda; en una prueba no se marca nada ni se sube)
     resumen_entrega = salud_anterior.get("entrega") if modo == "incremental" else None
     historico_entregas = salud_anterior.get("historico_entregas", []) if modo == "incremental" else []
@@ -362,18 +405,20 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         registrar = None
         if usar_catalogo and not prueba:
             from buscador import catalogo
-            pendientes_registro = _leer_json(trabajo / "pendientes_registro.json", {})
-            registrar = lambda lote: catalogo.registrar_seleccion(lote, pendientes_registro,
-                lambda filas: supabase.subir_catalogo(filas, tabla="entregas_diarias"),
-                lambda datos: _guardar_json(trabajo / "pendientes_registro.json", datos))
+            def registrar(lote):
+                r = catalogo.registrar_seleccion(lote, pendientes_registro,
+                    lambda filas: supabase.subir_catalogo(filas, tabla="entregas_diarias"), guardar_registro)
+                if central:
+                    central.guardar_lote(lote)
+                return r
         resumen_entrega = entrega.correr(vacantes, entregadas if not prueba else dict(entregadas), hoy, capturada,
                                          salida / "datos" / "entregas", subir=None if prueba else supabase.subir,
-                                         pendientes=_leer_json(trabajo / "pendientes_supabase.json", {}),
+                                         pendientes=pendientes_v1,
                                          persistir=None if prueba else
-                                         lambda datos: _guardar_json(trabajo / "pendientes_supabase.json", datos),
+                                         guardar_v1,
                                          lote=lote_previo,
                                          persistir_lote=None if prueba else
-                                         lambda datos: _guardar_json(trabajo / "lote_entrega.json", datos),
+                                         guardar_lote,
                                          registrar_seleccion=registrar)
         if not prueba:
             _guardar_json(trabajo / "entregadas.json", entregadas)
@@ -412,6 +457,9 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         "capturada_en": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "frescura": tiempos.medir(vacantes),
         "verificacion_enlaces": resumen_revision,
+        "estado_operativo": {"activo": bool(central), "pendientes": {
+            "catalogo": len(pendientes_catalogo), "ofertas": len(pendientes_v1), "registro": len(pendientes_registro)},
+            "lotes_pendientes": len(central.lote.valores) if central else None, "reintentos": reintentos_centrales},
     }
     from buscador import publicar
     publicar.publicar(salida, vacantes, reporte, sin_familia)

@@ -41,6 +41,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          ESTADO_SUPABASE_ACTIVO: ${{ vars.ESTADO_SUPABASE_ACTIVO }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python -m buscador.bodega --salida salida --modo incremental ${{ inputs.prueba && '--prueba' || '' }}
       - name: Conservar estado de recuperación

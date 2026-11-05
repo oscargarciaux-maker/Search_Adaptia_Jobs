@@ -61,7 +61,7 @@ create index if not exists ofertas_entrega on public.ofertas (delivery_date desc
 -- Nadie entra sin la clave secreta: con RLS activo y sin políticas, la clave pública (anon/publishable) no ve nada.
 alter table public.ofertas enable row level security;
 
--- La entrega más reciente, lista para exportar a Excel (Table Editor > entrega_de_hoy > Export > CSV)
+-- La entrega más reciente para consultar en Supabase. No es el estado actual de los enlaces.
 create or replace view public.entrega_de_hoy with (security_invoker = true) as
   select * from public.ofertas
   where delivery_date = (select max(delivery_date) from public.ofertas)

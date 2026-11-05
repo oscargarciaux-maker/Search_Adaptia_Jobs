@@ -16,6 +16,9 @@ Es un proyecto vendido por Oscar: se entrega a otra persona cambiando solo los s
 un bot de WhatsApp tomará 5 vacantes de Supabase y las enviará.
 Leer antes de trabajar `docs/GUIA_CLIENTE.md`, `docs/OPERACION_Y_RECUPERACION.md` y `docs/ACEPTACION_Y_ESTADO.md`.
 Riesgos y prioridades de mantenimiento: `docs/REVISION_FIABILIDAD.md`.
+Para reservas y pendientes centrales, leer `docs/CONTRATO_ESTADO_OPERATIVO.md` y `docs/ACTIVAR_ESTADO_OPERATIVO.md`.
+SQL 003 + `ESTADO_SUPABASE_ACTIVO=true` activan el modo; no asumir que está desplegado. No volver al contador local
+como alternativa silenciosa ni vaciar reservas/colas para resolver errores. El arranque importa un corte coherente.
 `docs/PLAN.md` se conserva como diseño histórico: sus instrucciones antiguas no prevalecen sobre decisiones actuales.
 
 ## Decisiones vigentes de cobertura e integridad
@@ -95,6 +98,9 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
   el horario y el catálogo v2 nocturno. `ofertas` permanece v1; verificación pública v3 se almacena en JSON, sin SQL nuevo.
 - **Enlaces**: `verificar_enlaces.py`, presupuestos en `datos/config.yaml`, caché en `trabajo/`; no confundir datos
   antiguos con comprobación vigente. El control del lote actual no reescribe sus snapshots históricos.
+- **Estado operativo optativo**: SQL 003, `estado_operativo.py`, variable `ESTADO_SUPABASE_ACTIVO`; reservas/colas/lote
+  sin confirmar centrales, recuperación por snapshot, revisión contra confirmaciones atrasadas. Tras 003, respaldar
+  cinco tablas y dos secuencias. GitHub conserva inventario, rotaciones, verificación y métricas auxiliares.
 - **Página** (`web/`): `motor.js` (lógica pura, con pruebas) y `app.js` (pantalla). Se sirve desde la rama `publicado`
   con GitHub Pages por Actions (`PAGES_POR_ACTIONS=true`) o Cloudflare Pages/Access configurados, con Functions opcionales.
   Las Functions no corren en GitHub Pages; Access no hace privado un repositorio público.
@@ -106,7 +112,7 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
 - Versión 1 construida el 28 oct 2026 (pasos 1 a 11 del plan); corre cada noche desde el 29 oct.
 - 5 nov 2026: PR 6–11 fusionados; catálogo/horario/Supabase/Pages observados y control de enlaces probado/fusionado.
   La evidencia fechada y los pendientes están en `docs/ACEPTACION_Y_ESTADO.md`; no afirmar siete días ni activación
-  productiva de un cambio hasta comprobar sus ejecuciones. El traspaso exige tres tablas, memoria/colas y reservas,
+  productiva de un cambio hasta comprobar sus ejecuciones. El traspaso exige las tablas, memoria/colas y reservas,
   no solo reemplazar secretos o importar `ofertas`. Manuales y cambios: `docs/GUIA_CLIENTE.md` y `docs/HISTORIAL_CAMBIOS.md`.
 - Hallazgos de las pruebas en vivo: LinkedIn acepta consultas con OR; su página pública no muestra el enlace externo de
   postulación (sale de juntar con el portal de la empresa); Indeed bloquea la web (403) pero JobSpy funciona; Himalayas,

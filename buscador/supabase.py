@@ -223,6 +223,20 @@ def leer_entregas(hoy, sesion=None):
         if len(filas) < 1000:
             break
         offset += len(filas)
+    lote = leer_lote(hoy, sesion)
+    registradas = {contrato.url_limpia(u) for lista in lote["elegidas"].values() for v, _ in lista
+                   for u in (v.get("enlace"), v.get("enlace_directo"), *v.get("_enlaces", [])) if u}
+    lote["v1_sin_registro_hoy"] = sorted(v1_hoy - registradas)
+    return memoria, lote
+
+
+def leer_lote(hoy, sesion=None):
+    """Solo la selección del día, también recuperable por la captura horaria sin archivos Git."""
+    url, clave = credenciales()
+    cab = {"apikey": clave}
+    if clave and clave.startswith("eyJ"):
+        cab["Authorization"] = f"Bearer {clave}"
+    sesion = sesion or requests.Session()
     r = sesion.get(f"{url}/rest/v1/entregas_diarias", headers=cab, timeout=30,
                    params={"select": "role_id,match_grade,selected_at,snapshot", "delivery_date": "eq." + hoy, "limit": 500})
     if r.status_code != 200 or not isinstance(r.json(), list):
@@ -232,10 +246,7 @@ def leer_entregas(hoy, sesion=None):
     for f in r.json():
         v = dict(f["snapshot"], _capturada_entrega=f["selected_at"])
         lote["elegidas"].setdefault(f["role_id"], []).append((v, grados[f["match_grade"]]))
-    registradas = {contrato.url_limpia(u) for lista in lote["elegidas"].values() for v, _ in lista
-                   for u in (v.get("enlace"), v.get("enlace_directo"), *v.get("_enlaces", [])) if u}
-    lote["v1_sin_registro_hoy"] = sorted(v1_hoy - registradas)
-    return memoria, lote
+    return lote
 
 
 if __name__ == "__main__":

@@ -13,12 +13,15 @@ empieza en [GUIA_CLIENTE.md](GUIA_CLIENTE.md); los resultados observados están 
 | PR #11 — enlaces vigentes | GET acotado, redirecciones, cierres, cobro explícito, título, pendiente ante bloqueo, caché y enlaces compartibles | Las nuevas selecciones requieren evidencia; puede haber déficit; se conservan snapshots y se informa estado actual |
 | Revisión documental posterior | Manual del operador, instalación/traspaso actualizados, mantenimiento, recuperación y aceptación con evidencias | El cliente tiene una ruta de operación coherente; las instrucciones históricas quedan identificadas |
 | Revisión de producto y mantenimiento | Retirada de exportaciones de hojas de cálculo, guardia de recuperación parcial y trazabilidad de ejecución | Supabase como destino, inconsistencia sin lote detiene selección antes de gastar y riesgos priorizados en el manual |
+| Estado operativo duradero — preparado, activación separada | Reservas con bloqueo en Supabase, colas con revisión y recuperación de selecciones interrumpidas | SQL 003 + variable después de corte/importación; guía didáctica y ensayo de cinco tablas/dos secuencias |
 
 ## Datos y activación
 
 - `supabase/esquema.sql`: tabla/vista histórica v1 y permisos.
 - `supabase/migraciones/002_catalogo.sql`: catálogo y registro v2, aditivo y sin borrado histórico.
-- Contrato público v3: objeto de verificación en JSON, sin una migración 003 ni secretos/variables nuevos.
+- Contrato público v3: objeto de verificación en JSON; por sí solo no requiere SQL nuevo.
+- SQL 003 es la extensión de estado operativo, independiente de v3. `ESTADO_SUPABASE_ACTIVO=true` solo tras seguir su
+  [guía de activación](ACTIVAR_ESTADO_OPERATIVO.md); no se aplicó a producción al desarrollar el código.
 - `CAPTURA_HORARIA_ACTIVA=true`: horario y v2 de la nocturna, después del SQL.
 - `PAGES_POR_ACTIONS=true`: solo para GitHub Pages por Actions; con Cloudflare se usa su despliegue.
 
