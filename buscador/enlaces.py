@@ -23,7 +23,10 @@ def dominios():
 
 
 def host(url):
-    h = (urlparse(str(url or "")).hostname or "").lower()
+    try:
+        h = (urlparse(str(url or "")).hostname or "").lower()
+    except ValueError:
+        return ""
     return h[4:] if h.startswith("www.") else h
 
 
@@ -54,7 +57,10 @@ def tipo(url):
 
 def sirve(url):
     """true si se puede entregar: no es un agregador."""
-    return tipo(url) != "agregador"
+    try:
+        return urlparse(str(url or "")).scheme.lower() in ("http", "https") and tipo(url) != "agregador"
+    except ValueError:
+        return False
 
 
 def mejor(enlaces):
@@ -87,4 +93,6 @@ def original_en_html(html, url_pagina):
 
 
 def es_linkedin(url):
-    return host(url).endswith("linkedin.com") and "/jobs/view/" in str(url)
+    h = host(url)
+    return (h == "linkedin.com" or h.endswith(".linkedin.com")) and \
+        bool(re.match(r"^/jobs/view/(?:[^/?#]*?-)?\d+/?$", urlparse(str(url)).path)) and sirve(url)

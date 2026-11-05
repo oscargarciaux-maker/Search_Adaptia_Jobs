@@ -2,8 +2,8 @@
 
 Corre al final de la bodega. Elige de la bodega las vacantes que nunca se han entregado (trabajo/entregadas.json guarda
 su huella y sus enlaces), las reparte por rol (datos/entrega.yaml) y, dentro de cada rol, va tomando la que menos se
-parece a las ya elegidas: idioma, nivel, país, modalidad, fuente y empresa. Escribe datos/entregas/<fecha>.csv y .xlsx
-(columnas del contrato) y, si existen SUPABASE_URL y SUPABASE_SECRET_KEY, sube las filas a Supabase (supabase.py).
+parece a las ya elegidas: idioma, nivel, país, modalidad, fuente y empresa. Sube las filas a Supabase (supabase.py). La exportación automática CSV/Excel de la versión anterior queda desactivada
+por defecto; la utilidad de exportación se conserva para usos explícitos.
 """
 import csv
 from collections import Counter
@@ -199,13 +199,16 @@ def escribir(carpeta, hoy, filas, dias_guardados=60):
             archivo.unlink()
 
 
-def correr(vacantes, entregadas, hoy, capturada, carpeta, subir=None, pendientes=None, persistir=None):
+def correr(vacantes, entregadas, hoy, capturada, carpeta, subir=None, pendientes=None, persistir=None,
+           exportar=None):
     """Elige, escribe y sube. `entregadas` (dict huella → fecha) se actualiza con lo entregado hoy.
     Devuelve el resumen para salud.json."""
     cfg = config()
     elegidas, resumen = elegir(vacantes, entregadas, hoy, cfg)
     filas = filas_de(elegidas, cfg["roles"], hoy, capturada)
-    escribir(carpeta, hoy, filas)
+    generar_archivos = cfg.get("exportar_archivos", False) if exportar is None else exportar
+    if generar_archivos:
+        escribir(carpeta, hoy, filas)
     pendientes = pendientes if pendientes is not None else {}
     for fila in filas:
         pendientes.setdefault(fila["external_id"], fila)
@@ -221,6 +224,7 @@ def correr(vacantes, entregadas, hoy, capturada, carpeta, subir=None, pendientes
         del entregadas[h]
     resumen["vacantes"] = sum(len(x) for x in elegidas.values())
     resumen["filas"] = len(filas)
+    resumen["archivos"] = bool(generar_archivos)
     resumen["meta_por_rol"] = cfg["por_rol"]
     resumen["meta_cumplida"] = all(r["faltan"] == 0 for r in resumen["roles"].values())
     if subir is not None:

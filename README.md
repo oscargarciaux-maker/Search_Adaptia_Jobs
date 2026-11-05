@@ -2,7 +2,7 @@
 
 Cada noche entrega **hasta 20 vacantes nuevas por rol** (Product designer, UX/UI designer, Product Owner, Product manager, AI
 Engineer, QA), variadas y nunca repetidas, con las columnas del contrato de datos (`docs/CONTRATO_DATOS_v1.md`), en
-Supabase y en Excel. Además, una página para buscar vacantes de cualquier cargo de tecnología y áreas creativas —con sus cargos parecidos (exactos,
+Supabase como base de datos obligatoria. Además, una página para buscar vacantes de cualquier cargo de tecnología y áreas creativas —con sus cargos parecidos (exactos,
 similares y cercanos) y de todos los niveles— abiertas en un país de LATAM o España, o remotas para ellos, de los últimos 30 días,
 y pasarlas a un grupo de WhatsApp o a Excel. Solo enlaces donde se postula de verdad (LinkedIn, Indeed, portales de las
 empresas), nunca agregadores. La búsqueda corre sola cada noche en GitHub Actions, sin IA y sin la cuenta de LinkedIn de
@@ -16,7 +16,8 @@ nadie.
 
 Prioriza remotas para varios países, con cobertura de LATAM, España y remotas mundiales. Los títulos exactos,
 similares y cercanos rotan en las búsquedas; no se promete agotar todas las combinaciones cada noche.
-La limpieza de 30 días solo afecta al buscador activo; no borra ofertas de Supabase.
+La limpieza de 30 días solo afecta al buscador activo; no borra ofertas de Supabase. La generación automática de Excel
+de la entrega anterior está desactivada. Las publicaciones de Apify quedan pendientes de verificación y no cuentan como vacantes.
 La meta es 20 por cada uno de seis roles (120 al día). Si un rol queda corto, hay búsquedas adicionales gratuitas
 acotadas y un reporte de los motivos. La continuidad se mide entre días distintos, conservando la memoria de entregas.
 Decisiones, límites y seguimiento futuro: [`docs/COBERTURA_HISTORICO.md`](docs/COBERTURA_HISTORICO.md).

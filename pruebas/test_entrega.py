@@ -150,13 +150,13 @@ def test_variedad_y_tope_por_empresa():
 def test_nunca_repetidas(tmp_path):
     vac = _muchas(50)
     entregadas = {}
-    r1 = entrega.correr(vac, entregadas, HOY, "2026-11-05T07:00:00Z", tmp_path)
-    r2 = entrega.correr(vac, entregadas, "2026-11-06", "2026-11-06T07:00:00Z", tmp_path)
+    r1 = entrega.correr(vac, entregadas, HOY, "2026-11-05T07:00:00Z", tmp_path, exportar=True)
+    r2 = entrega.correr(vac, entregadas, "2026-11-06", "2026-11-06T07:00:00Z", tmp_path, exportar=True)
     dia1 = {f["external_id"] for f in csv.DictReader(open(tmp_path / f"{HOY}.csv", encoding="utf-8"))}
     dia2 = {f["external_id"] for f in csv.DictReader(open(tmp_path / "2026-11-06.csv", encoding="utf-8"))}
     assert r1["vacantes"] == 20 and r2["vacantes"] == 20 and not dia1 & dia2
     assert (tmp_path / f"{HOY}.xlsx").exists() and (tmp_path / "ultima.csv").exists()
-    r3 = entrega.correr(vac, entregadas, "2026-11-07", "2026-11-07T07:00:00Z", tmp_path)
+    r3 = entrega.correr(vac, entregadas, "2026-11-07", "2026-11-07T07:00:00Z", tmp_path, exportar=True)
     assert r3["vacantes"] == 10 and r3["roles"]["qa"]["faltan"] == 10
 
 
@@ -209,8 +209,7 @@ def test_publicaciones_de_apify():
     assert v["enlace"].endswith("-abcd")
     vac = vacante.crear(v["titulo"], v["empresa"], v["enlace"], v["fuente"], v["ubicacion"], descripcion=v["descripcion"],
                         fecha=v["fecha"], remoto=v["remoto"], hoy=HOY)
-    fila = contrato.filas(vac, "Product designer")[0]
-    assert fila["external_id"] == "lnkdpost-7391234567890123456" and fila["source_type"] == "publicacion"
+    assert vac is None  # indicio del feed pendiente de verificar; no se envía a Supabase
     open_to_work = dict(buena, content="#OpenToWork Soy Product Designer y estoy buscando trabajo en Colombia.")
     assert publicaciones_apify.a_vacante(open_to_work, validas)[1] == "no anuncia una contratación"
     sin_empresa = dict(buena, author={"name": "Ana", "info": "Diseñadora", "type": "profile"})

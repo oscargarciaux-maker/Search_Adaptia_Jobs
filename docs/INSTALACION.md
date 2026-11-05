@@ -7,7 +7,8 @@ Lo que hace el sistema cada noche (1:17, hora de Bogotá), solo, en GitHub:
 2. **Arma la entrega del día:** 20 vacantes **nuevas** (nunca entregadas antes) por cada rol —Product designer, UX/UI
    designer, Product Owner, Product manager, AI Engineer y QA—, variadas en idioma, nivel, país y modalidad, de LATAM y
    España, con las columnas del contrato de datos (`docs/CONTRATO_DATOS_v1.md`).
-3. **La guarda** en la base de datos (Supabase) y en un Excel que se descarga desde la página.
+3. **La guarda** en Supabase, la base de datos obligatoria. El Excel de la entrega anterior ya no se genera automáticamente.
+   Las publicaciones del feed de Apify son indicios pendientes de verificar y no se incluyen en la entrega.
 
 Ninguna clave se escribe en el repositorio ni en un chat: todas van en los **secretos** de GitHub
 (*Settings → Secrets and variables → Actions → New repository secret*).
@@ -28,7 +29,7 @@ Tiempo total de la instalación: unos 30 minutos. Costo: USD 0 (Supabase gratis,
 ## 2. Supabase: la base de datos de la entrega (gratis, 10 minutos)
 
 Supabase guarda cada día las vacantes entregadas en una tabla llamada `ofertas`, con las columnas del contrato. Desde ahí
-se exportan a Excel, y ahí las leerá después el bot de WhatsApp.
+se consultan las entregas, y ahí las leerá después el bot de WhatsApp. CSV/Excel ya no son la base de datos.
 
 1. **Crear la cuenta:** entra a https://supabase.com → *Start your project* → regístrate (con GitHub o con correo).
 2. **Crear el proyecto:** *New project*.
@@ -73,25 +74,30 @@ día un actor pide la cookie `li_at` o tu usuario, no se usa.
 5. **Gasto:** en el plan gratis Apify se detiene solo al llegar a los USD 5 del mes (no cobra más; esos días no entran
    publicaciones). Si algún día pasas a un plan pago, pon un límite mensual en *Billing → Limits*.
 
-Sin Apify todo lo demás funciona igual: solo no entran las publicaciones del feed.
+Sin Apify la entrega formal funciona igual. Las publicaciones del feed se muestran por separado, pendientes de verificar;
+no se insertan automáticamente en Supabase ni completan la cuota.
 
 ## 4. Primera corrida y revisión
 
-1. **Primera búsqueda completa** (para no esperar a la noche): *Actions → Bodega nocturna → Run workflow → modo
+1. **Antes de la primera corrida:** *Actions → Diagnóstico → Run workflow → solo_supabase: true*. Comprueba
+   credenciales y columnas mediante lectura; no crea ofertas de prueba. Esto no demuestra aún permisos de escritura.
+2. **Primera búsqueda completa** (para no esperar a la noche): *Actions → Bodega nocturna → Run workflow → modo
    `inicial`*. Tarda entre 40 y 60 minutos. Al terminar, el resumen de la corrida dice cuántas vacantes entregó por rol y
    cuántas filas guardó en Supabase.
-2. **Diagnóstico:** *Actions → Diagnóstico → Run workflow*. Debe salir ✅ en *Supabase (entrega diaria)* y en *Apify*.
+3. **Diagnóstico:** *Actions → Diagnóstico → Run workflow*. Debe salir ✅ en *Supabase (entrega diaria)* y en *Apify*.
    ➖ significa "opcional sin configurar"; ❌ dice qué arreglar (por ejemplo, "usa la clave secreta, no la pública").
-3. **Ver la entrega:**
-   - En la página: pestaña *Estado → Entrega del día* → *Descargar Excel* (o CSV). Ahí también dice cuántas faltaron por
-     rol si un día no hubo 20 nuevas.
+4. **Ver la entrega:**
+   - En la página: pestaña *Estado → Entrega del día*: selección por rol, déficits y estado de sincronización.
+     No hay descarga automática de Excel de la entrega con la configuración actual.
    - En Supabase: *Table Editor → entrega_de_hoy* (la más reciente) o *ofertas* (todas). Para Excel: botón *Export →
      Export to CSV*.
-   - En GitHub: rama `publicado`, carpeta `datos/entregas/` (un archivo por día, se guardan 60 días).
+   - En GitHub: el resumen debe confirmar la meta y cero pendientes. Un fallo de sincronización o cuota marca la corrida
+     como fallida; el estado se conserva para reintentos y en un artefacto de recuperación durante 14 días.
 
 ## Cómo funciona la entrega (y qué se puede ajustar sin tocar código)
 
 `datos/entrega.yaml`:
+- `exportar_archivos` (false): generación automática del antiguo Excel/CSV desactivada. No es alternativa a Supabase.
 - `preferir_remotas` (true): primero remotas de alcance amplio identificado, luego de un país, locales y dudosas.
 - `por_rol` (20), `idiomas` (`es` y `en`: el contrato no acepta otros), `max_por_empresa` (2 por rol y día),
   `dias_frescura` (14: solo vacantes vistas por primera vez en esos días).
@@ -101,7 +107,8 @@ Sin Apify todo lo demás funciona igual: solo no entran las publicaciones del fe
 
 Reglas fijas (`buscador/entrega.py`, `buscador/contrato.py`):
 - **Reintentos a Supabase:** `trabajo/pendientes_supabase.json` conserva las filas aún no confirmadas, incluso si
-  faltan credenciales. Se reintentan sin volver a incluirlas en el Excel de otro día y conservando su fecha original.
+  falló la conexión durante el envío. Se reintentan sin volver a seleccionarlas otro día y conservando su fecha original.
+  Si las credenciales faltan antes de empezar, la ejecución normal se detiene sin iniciar la entrega.
 - **Nunca repetidas:** `trabajo/entregadas.json` (en la rama `publicado`) guarda la huella y los enlaces de todo lo
   entregado en los últimos 180 días. Una vacante que ya salió no vuelve a salir aunque siga abierta.
 - **Variadas:** dentro de cada rol se toma una por una la que menos se parece a las ya elegidas (idioma, nivel, país,

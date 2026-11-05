@@ -63,8 +63,8 @@ def revisar():
     def supabase_():
         from buscador import supabase
         if not supabase.credenciales()[0]:
-            return None, "sin SUPABASE_URL / SUPABASE_SECRET_KEY: la entrega queda solo en Excel/CSV en la página"
-        return supabase.probar()
+            return False, "faltan SUPABASE_URL / SUPABASE_SECRET_KEY: Supabase es obligatorio; no iniciar la entrega"
+        return True, supabase.exigir_conexion()
     chequeo("Supabase (entrega diaria)", supabase_)
 
     def brave_():

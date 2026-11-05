@@ -1,7 +1,8 @@
 """Sube las filas de la entrega diaria a la tabla `ofertas` de Supabase (supabase/esquema.sql) por su API REST.
 
 Necesita dos secretos de GitHub: SUPABASE_URL (https://<proyecto>.supabase.co) y SUPABASE_SECRET_KEY (la clave secreta
-del proyecto: Project Settings > API Keys; también sirve la antigua service_role). Sin ellos no hace nada.
+del proyecto: Project Settings > API Keys; también sirve la antigua service_role). La entrega normal exige estos secretos
+antes de recoger. `subir` conserva un resultado explícito de omisión para pruebas y llamadas aisladas sin configurar.
 Como pide el contrato, una oferta que ya existe no se sobrescribe: las filas con un external_id repetido se ignoran.
 """
 import os
@@ -95,11 +96,12 @@ def probar(url=None, clave=None, sesion=None):
     if clave.startswith("eyJ"):
         cabeceras["Authorization"] = f"Bearer {clave}"
     try:
-        r = (sesion or requests).get(f"{url}/rest/v1/ofertas?select=id&limit=1", headers=cabeceras, timeout=30)
+        columnas = ",".join(["id"] + contrato.COLUMNAS + contrato.EXTRAS)
+        r = (sesion or requests).get(f"{url}/rest/v1/ofertas?select={columnas}&limit=1", headers=cabeceras, timeout=30)
     except requests.RequestException as e:
         return False, f"No se pudo conectar con {url}: {type(e).__name__}. Revisa SUPABASE_URL."
     if r.status_code == 200:
-        return True, f"Conexión correcta: la tabla «ofertas» existe y la clave funciona ({url})."
+        return True, f"Lectura y columnas de «ofertas» correctas ({url}); la escritura se comprueba al sincronizar."
     detalle = f"Supabase respondió {r.status_code}: {r.text[:300]}"
     if r.status_code == 401 or "Invalid API key" in r.text or "No API key" in r.text:
         return False, f"Supabase rechazó la clave: usa la clave SECRETA (sb_secret_… o service_role), no la pública. {detalle}"
@@ -112,6 +114,29 @@ def probar(url=None, clave=None, sesion=None):
                        "recarga la API); 3) en Project Settings → Data API, que la API esté activa y «public» esté en "
                        f"Exposed schemas. {detalle}")
     return False, f"Respuesta inesperada. {detalle}"
+
+
+def exigir_conexion():
+    """Producción requiere Supabase antes de recoger o marcar entregas; una prueba no escribe ni exige claves."""
+    url, clave = credenciales()
+    if not url or not clave:
+        raise RuntimeError("Supabase es obligatorio: faltan SUPABASE_URL o SUPABASE_SECRET_KEY. No se inició la entrega.")
+    if clave.startswith("sb_publishable_"):
+        raise RuntimeError("Supabase requiere la clave secreta, no la pública. No se inició la entrega.")
+    if not clave.startswith("sb_secret_"):
+        import base64
+        import json
+        try:
+            parte = clave.split(".")[1]
+            rol = json.loads(base64.urlsafe_b64decode(parte + "=" * (-len(parte) % 4)))["role"]
+        except (IndexError, KeyError, ValueError, TypeError):
+            rol = None
+        if rol != "service_role":
+            raise RuntimeError("La entrega requiere sb_secret_ o la clave service_role; no se inició la entrega.")
+    ok, mensaje = probar(url, clave)
+    if not ok:
+        raise RuntimeError("No se inició la entrega: " + mensaje)
+    return mensaje
 
 
 if __name__ == "__main__":

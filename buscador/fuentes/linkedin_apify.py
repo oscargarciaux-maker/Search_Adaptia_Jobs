@@ -9,7 +9,7 @@ import os
 import time
 from urllib.parse import urlencode
 
-from buscador import cobertura
+from buscador import cobertura, enlaces
 from buscador.fuentes import linkedin_publico
 
 NOMBRE = "LinkedIn (Apify)"
@@ -33,7 +33,7 @@ def _primero(item, *claves):
 
 def normalizar_item(item):
     enlace = _primero(item, "link", "jobUrl", "url", "jobLink", "linkedinUrl")
-    if "linkedin.com" in enlace and "/jobs/view/" not in enlace:
+    if enlaces.host(enlace) in ("linkedin.com", "co.linkedin.com", "es.linkedin.com") and "/jobs/" in enlace and "/jobs/view/" not in enlace:
         jid = _primero(item, "id", "jobId")
         enlace = f"https://www.linkedin.com/jobs/view/{jid}" if jid else enlace
     return {
@@ -78,7 +78,7 @@ def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=100, pre
             continue
         for item in items if isinstance(items, list) else []:
             v = normalizar_item(item)
-            if v["titulo"] and v["enlace"]:
+            if v["titulo"] and enlaces.es_linkedin(v["enlace"]):
                 crudas.append(v)
         for familia, consultas, lugar, params in pendientes[i:i + 10]:
             estado[f"{familia}@{lugar}"] = hoy
