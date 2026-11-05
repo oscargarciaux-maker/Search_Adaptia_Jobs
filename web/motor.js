@@ -108,7 +108,7 @@
       const remota = v.modalidad === "remoto";
       if (remota && op.remotas === false) continue;
       if (!remota && op.presenciales === false) continue;
-      if (op.confianzaAlta && v.confianza_pais === "baja") continue;
+      if (op.confianzaAlta && v.confianza_pais !== "alta") continue;
       if (op.dias && op.hoy && diasEntre(fechaDe(v), op.hoy) > op.dias) continue;
       if (op.ocultarEnviadas && op.enviadas && op.enviadas.has(v.id)) continue;
       if (op.nivel && (v.nivel || "sin dato") !== op.nivel) continue;
@@ -127,7 +127,8 @@
   function ordenar(lista, modo = "relevancia") {
     const porFecha = (a, b) => fechaDe(b).localeCompare(fechaDe(a));
     if (modo === "fecha") return [...lista].sort(porFecha);
-    const orden = [...lista].sort((a, b) => (RANGO_GRADO[a._grado] ?? 3) - (RANGO_GRADO[b._grado] ?? 3) || porFecha(a, b) ||
+    const remota = v => v.confianza_pais === "baja" ? 3 : v.modalidad === "remoto" ? (v.confianza_pais === "alta" && (v.paises || []).length > 1 ? 0 : 1) : 2;
+    const orden = [...lista].sort((a, b) => (modo === "remotas" ? remota(a) - remota(b) : 0) || (RANGO_GRADO[a._grado] ?? 3) - (RANGO_GRADO[b._grado] ?? 3) || porFecha(a, b) ||
       (RANGO_ENLACE[a.tipo_enlace] ?? 3) - (RANGO_ENLACE[b.tipo_enlace] ?? 3));
     const salida = [], pendientes = [...orden];
     while (pendientes.length) {
@@ -160,6 +161,7 @@
   /** "LATAM y España", "Toda LATAM", "Colombia" o "Colombia, México y Perú" (con más de 3: "Colombia y 6 países más").
    *  totalPaises cuenta España; LATAM son todos menos España. */
   function dondeAplica(v, nombres, totalPaises) {
+    if (v.confianza_pais === "baja") return "Región por confirmar";
     const p = v.paises || [];
     if (totalPaises && p.length >= totalPaises) return "LATAM y España";
     if (totalPaises && p.length >= totalPaises - 1 && !p.includes("ES")) return "Toda LATAM";

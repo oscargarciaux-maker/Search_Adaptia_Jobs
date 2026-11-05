@@ -36,7 +36,7 @@ def test_ficha_de_linkedin():
 def test_consulta_or_y_combinaciones():
     assert linkedin_publico.consulta_or(["product designer", "ux designer"]) == '"product designer" OR "ux designer"'
     combos = linkedin_publico.combinaciones([{"id": "x", "consultas": ["a"]}], [("CO", "Colombia"), ("VE", "Venezuela")])
-    assert [c[2] for c in combos] == ["CO", "VE", "LATAM", "REMOTO"]
+    assert [c[2] for c in combos] == ["CO", "VE", "LATAM", "REMOTO", "REMOTO_MUNDO", "REMOTO_ES"]
 
 
 class _Respuesta:
@@ -67,7 +67,8 @@ def test_linkedin_rota_combinaciones_y_respeta_el_presupuesto():
     estado = {"dev@CO": "2026-10-27"}
     crudas, stats = linkedin_publico.buscar(cliente, mapa, [("CO", "Colombia")], estado, presupuesto=2, hoy="2026-10-28")
     assert stats["busquedas"] == 2
-    assert estado["diseno@CO"] == "2026-10-28"           # la nunca revisada va primero
+    assert any(k.startswith("diseno@REMOTO") for k in estado)  # remotas y reparto entre familias
+    assert set(stats["por_familia"]) == {"diseno", "dev"}
     assert len(crudas) == 2 and all(c["fuente"] == "LinkedIn" for c in crudas)
 
 
@@ -80,7 +81,7 @@ def test_indeed_con_resultado_guardado():
                               "is_remote": False}])
     crudas, stats = indeed.buscar([{"id": "fullstack", "consultas": ["full stack developer"]}], ["VE", "BO"], {}, 5,
                                   hoy="2026-10-28", scrape=scrape)
-    assert stats["busquedas"] == 1                        # Bolivia no está en Indeed
+    assert stats["busquedas"] == 2  # remoto y general de Venezuela; Bolivia no está en Indeed
     assert crudas[0]["fecha"] == "2026-10-25" and crudas[0]["enlace_directo"] == "https://jobs.lever.co/acme/1"
 
 
@@ -142,7 +143,7 @@ def test_limpiar_junta_quita_viejas_y_cerradas():
                                    "Portales de empresas (greenhouse)", "Remote - LATAM", fecha="2026-10-20", hoy="2026-10-20")
     crudas = [
         {"titulo": "UX/UI Designer", "empresa": "Acme", "enlace": "https://www.linkedin.com/jobs/view/1", "fuente": "LinkedIn",
-         "ubicacion": "Lima, Peru", "fecha": "2026-10-27"},
+         "ubicacion": "Lima, Peru", "fecha": "2026-10-27", "enlace_directo": "https://jobs.lever.co/acme/1"},
         {"titulo": "UX/UI Designer", "empresa": "ACME S.A.", "enlace": "https://jobs.lever.co/acme/1",
          "fuente": "Portales de empresas (lever)", "ubicacion": "Remote - LATAM", "fecha": "2026-10-26"},
         {"titulo": "Cajero", "empresa": "Super", "enlace": "https://www.linkedin.com/jobs/view/2", "fuente": "LinkedIn"},

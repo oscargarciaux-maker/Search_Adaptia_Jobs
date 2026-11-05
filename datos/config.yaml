@@ -10,6 +10,16 @@ dias_maximos: 30
 # Hora de la bodega nocturna en Bogotá (UTC−5). El horario real está en .github/workflows/bodega.yml (paso 7).
 hora_bodega_bogota: "01:17"
 
+# Si un rol queda bajo 20, buscar variantes adicionales en fuentes gratuitas.
+# No se ejecuta en --prueba ni búsqueda profunda. No relaja requisitos ni repite ofertas.
+refuerzo:
+  rondas: 2
+  minutos_por_fuente: 3
+  linkedin_busquedas: 18
+  linkedin_fichas: 60
+  indeed_busquedas: 6
+  getonbrd_busquedas: 6
+
 # Apify (secreto APIFY_TOKEN). Nunca un actor que pida cookie o sesión de LinkedIn.
 #   actor_publicaciones: publicaciones «contratando» del feed (fuentes/publicaciones_apify.py). Se paga por publicación
 #     (≈ USD 2 por 1.000): con publicaciones_por_dia = 72 son ≈ USD 4,3 al mes, dentro de los USD 5 del plan gratis.

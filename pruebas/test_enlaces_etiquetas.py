@@ -131,7 +131,8 @@ def test_crear_calcula_familias_paises_y_etiquetas():
 
 
 def test_juntar_copias_del_mismo_aviso():
-    linkedin = _v(titulo="Diseñador UX/UI (Medellín)", ubicacion="Medellín, Colombia")
+    linkedin = _v(titulo="Diseñador UX/UI (Medellín)", ubicacion="Medellín, Colombia",
+                  enlace_directo="https://jobs.lever.co/acme/9")
     ats = _v(titulo="Diseñador UX/UI", empresa="ACME", enlace="https://jobs.lever.co/acme/9", fuente="Lever",
              ubicacion="Remote - Mexico", fecha="2026-10-18")
     otra = _v(titulo="Data Analyst", enlace="https://www.linkedin.com/jobs/view/2")
@@ -149,4 +150,4 @@ def test_juntar_misma_descripcion_con_otro_cargo():
     texto = "Buscamos una persona para diseñar flujos, prototipos y pruebas con usuarios en Figma. " * 5
     a = _v(titulo="Diseñador UX", descripcion=texto)
     b = _v(titulo="Diseñador de producto", descripcion=texto, enlace="https://www.linkedin.com/jobs/view/3")
-    assert len(vacante.juntar([a, b])) == 1
+    assert len(vacante.juntar([a, b])) == 2  # contenido común no basta si cambia el cargo

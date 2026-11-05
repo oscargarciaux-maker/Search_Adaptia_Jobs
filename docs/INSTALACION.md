@@ -51,8 +51,10 @@ se exportan a Excel, y ahí las leerá después el bot de WhatsApp.
 
 La tabla tiene la seguridad de filas activada y sin permisos públicos: solo entra quien tenga la clave secreta.
 
-**Plan gratis de Supabase:** 500 MB de base de datos (alcanza para años de entregas diarias: cada día son unas 150 filas)
-y pausa los proyectos que pasan 7 días sin actividad; como la entrega escribe todas las noches, no se pausa.
+**Capacidad de Supabase:** el plan gratuito anunciado incluye 500 MB; verifica las condiciones vigentes. No se puede
+prometer que alcance para años: las descripciones completas y una fila por enlace pueden ocupar bastante espacio.
+Revisa el tamaño real y configura copias de seguridad según el plan contratado. La limpieza de 30 días del buscador
+no elimina filas de Supabase. Ver `COBERTURA_HISTORICO.md`.
 
 ## 3. Apify: publicaciones «contratando» de LinkedIn (gratis hasta USD 5 al mes, 5 minutos)
 
@@ -90,6 +92,7 @@ Sin Apify todo lo demás funciona igual: solo no entran las publicaciones del fe
 ## Cómo funciona la entrega (y qué se puede ajustar sin tocar código)
 
 `datos/entrega.yaml`:
+- `preferir_remotas` (true): primero remotas de alcance amplio identificado, luego de un país, locales y dudosas.
 - `por_rol` (20), `idiomas` (`es` y `en`: el contrato no acepta otros), `max_por_empresa` (2 por rol y día),
   `dias_frescura` (14: solo vacantes vistas por primera vez en esos días).
 - `roles`: cada rol junta familias del mapa de cargos (`datos/mapa_cargos.yaml`), con sus cargos exactos, similares y
@@ -97,6 +100,8 @@ Sin Apify todo lo demás funciona igual: solo no entran las publicaciones del fe
 - `consultas_publicaciones`: búsquedas de Apify.
 
 Reglas fijas (`buscador/entrega.py`, `buscador/contrato.py`):
+- **Reintentos a Supabase:** `trabajo/pendientes_supabase.json` conserva las filas aún no confirmadas, incluso si
+  faltan credenciales. Se reintentan sin volver a incluirlas en el Excel de otro día y conservando su fecha original.
 - **Nunca repetidas:** `trabajo/entregadas.json` (en la rama `publicado`) guarda la huella y los enlaces de todo lo
   entregado en los últimos 180 días. Una vacante que ya salió no vuelve a salir aunque siga abierta.
 - **Variadas:** dentro de cada rol se toma una por una la que menos se parece a las ya elegidas (idioma, nivel, país,

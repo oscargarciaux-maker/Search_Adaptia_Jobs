@@ -7,10 +7,11 @@ portal quedan en la lista y se leen todas las noches.
 """
 import csv
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from buscador import normalizar
+from buscador import familias, normalizar
 
 NOMBRE = "Portales de empresas"
 RUTA = Path(__file__).resolve().parent.parent.parent / "datos" / "empresas_ats.csv"   # lista inicial (en main)
@@ -80,14 +81,18 @@ def vacantes_de(sistema, datos, empresa, slug):
         for j in datos.get("jobs") or []:
             salida.append(dict(base, titulo=j.get("title", ""), ubicacion=(j.get("location") or {}).get("name", ""),
                                enlace=j.get("absolute_url", ""), fecha=_dia(j.get("first_published") or j.get("updated_at")),
-                               descripcion=_texto(j.get("content"))[:8000], remoto=None))
+                               descripcion=_texto(j.get("content"))[:30000], remoto=None))
     elif sistema == "lever":
         for j in datos:
             cat = j.get("categories") or {}
+            contenido = [j.get("descriptionPlain") or _texto(j.get("description"))]
+            for lista in j.get("lists") or []:
+                contenido += [_texto(lista.get("text")), _texto(lista.get("content"))]
+            contenido += [_texto(j.get("additionalPlain") or j.get("additional"))]
             salida.append(dict(base, titulo=j.get("text", ""),
                                ubicacion=" ".join(x for x in [cat.get("location", ""), " ".join(cat.get("allLocations") or [])] if x),
                                enlace=j.get("hostedUrl", ""), fecha=_dia(j.get("createdAt")),
-                               descripcion=(j.get("descriptionPlain") or _texto(j.get("description")))[:8000],
+                               descripcion="\n".join(x for x in contenido if x)[:30000],
                                remoto=True if (j.get("workplaceType") == "remote") else None))
     elif sistema == "ashby":
         for j in datos.get("jobs") or []:
@@ -96,26 +101,27 @@ def vacantes_de(sistema, datos, empresa, slug):
             lugares = [j.get("location") or ""] + [x.get("location", "") for x in j.get("secondaryLocations") or []]
             salida.append(dict(base, titulo=j.get("title", ""), ubicacion=", ".join(x for x in lugares if x),
                                enlace=j.get("jobUrl", ""), fecha=_dia(j.get("publishedAt")),
-                               descripcion=(j.get("descriptionPlain") or _texto(j.get("descriptionHtml")))[:8000],
+                               descripcion=(j.get("descriptionPlain") or _texto(j.get("descriptionHtml")))[:30000],
                                remoto=True if j.get("isRemote") else None))
     elif sistema == "workable":
         for j in datos.get("jobs") or []:
             salida.append(dict(base, titulo=j.get("title", ""),
                                ubicacion=", ".join(x for x in [j.get("city"), j.get("state"), j.get("country")] if x),
                                enlace=j.get("url") or j.get("shortlink") or "", fecha=_dia(j.get("published_on") or j.get("created_at")),
-                               descripcion="", remoto=True if j.get("telecommuting") else None))
+                               descripcion="", _detalle=j.get("shortcode", ""),
+                               remoto=True if j.get("telecommuting") else None))
     elif sistema == "smartrecruiters":
         for j in datos.get("content") or []:
             loc = j.get("location") or {}
             salida.append(dict(base, titulo=j.get("name", ""),
                                ubicacion=", ".join(x for x in [loc.get("city"), loc.get("country")] if x),
                                enlace=f"https://jobs.smartrecruiters.com/{slug}/{j.get('id')}", fecha=_dia(j.get("releasedDate")),
-                               descripcion="", remoto=True if loc.get("remote") else None))
+                               descripcion="", _detalle=j.get("id", ""), remoto=True if loc.get("remote") else None))
     elif sistema == "recruitee":
         for j in datos.get("offers") or []:
             salida.append(dict(base, titulo=j.get("title", ""), ubicacion=j.get("location", ""),
                                enlace=j.get("careers_url", ""), fecha=_dia(j.get("published_at")),
-                               descripcion=_texto(j.get("description"))[:8000], remoto=True if j.get("remote") else None))
+                               descripcion=_texto(j.get("description"))[:30000], remoto=True if j.get("remote") else None))
     return [v for v in salida if v["titulo"] and v["enlace"]]
 
 
@@ -193,17 +199,82 @@ def descubrir(cliente, nombres, estado, maximo, hoy, conocidas_filas, origen="ot
     return nuevas, len(por_probar)
 
 
-def buscar(cliente, filas, max_tableros=None):
+def _tablero_completo(cliente, sistema, slug, plazo=None):
+    datos = cliente.json(url_api(sistema, slug), pausar=False)
+    if sistema != "smartrecruiters" or not isinstance(datos, dict):
+        return datos
+    # No declarar cerradas ofertas que simplemente están fuera de la primera página.
+    contenido = list(datos.get("content") or [])
+    total = datos.get("totalFound", len(contenido))
+    while len(contenido) < total:
+        if plazo and time.monotonic() >= plazo:
+            return None
+        pagina = cliente.json(url_api(sistema, slug) + f"&offset={len(contenido)}", pausar=False)
+        nuevos = (pagina or {}).get("content") or []
+        if not nuevos or {j.get("id") for j in nuevos} <= {j.get("id") for j in contenido}:
+            return None  # lectura parcial: no es evidencia de cierre
+        contenido.extend(nuevos)
+    return dict(datos, content=contenido)
+
+
+def _completar(cliente, sistema, slug, v):
+    identificador = v.get("_detalle")
+    if not identificador:
+        return False
+    if sistema == "smartrecruiters":
+        url = f"https://api.smartrecruiters.com/v1/companies/{slug}/postings/{identificador}"
+    else:
+        url = f"https://apply.workable.com/api/v2/accounts/{slug}/jobs/{identificador}"
+    detalle = cliente.json(url, pausar=False)
+    if not isinstance(detalle, dict):
+        return False
+    if sistema == "smartrecruiters":
+        secciones = (detalle.get("jobAd") or {}).get("sections") or {}
+        texto = "\n".join(_texto(s.get("text")) for s in secciones.values() if isinstance(s, dict))
+    else:
+        texto = "\n".join(_texto(detalle.get(k)) for k in ("description", "requirements", "benefits"))
+    if texto.strip():
+        v["descripcion"] = texto[:30000]
+    return len(v["descripcion"]) >= 200
+
+
+def buscar(cliente, filas, max_tableros=None, limite_segundos=None, max_detalles=450, prioritarias=()):
     """Lee todos los tableros conocidos. Devuelve (vacantes crudas, tableros leídos {(sistema, slug)}, estadísticas)."""
     crudas, fallidos, leidos = [], 0, set()
+    inicio = time.monotonic()
+    detalles = completadas = 0
+    prioritarias = set(prioritarias)
+    pendientes_por_empresa = {}
+    for fila in filas:
+        pendientes_por_empresa[fila["empresa"]] = pendientes_por_empresa.get(fila["empresa"], 0) + 1
     for fila in filas[:max_tableros] if max_tableros else filas:
-        datos = cliente.json(url_api(fila["sistema"], fila["slug"]), pausar=False)
-        if datos is None:
-            fallidos += 1
-            continue
+        if limite_segundos and time.monotonic() - inicio >= limite_segundos:
+            break
         try:
-            crudas.extend(vacantes_de(fila["sistema"], datos, fila["empresa"], fila["slug"]))
-            leidos.add(fila["empresa"])
+            datos = _tablero_completo(cliente, fila["sistema"], fila["slug"],
+                                      inicio + limite_segundos if limite_segundos else None)
+            if datos is None:
+                fallidos += 1
+                continue
+            nuevas = vacantes_de(fila["sistema"], datos, fila["empresa"], fila["slug"])
+            crudas.extend(nuevas)
+            pendientes_por_empresa[fila["empresa"]] -= 1
+            if pendientes_por_empresa[fila["empresa"]] == 0:
+                leidos.add(fila["empresa"])
         except (AttributeError, TypeError):
             fallidos += 1
-    return crudas, leidos, {"tableros": len(filas), "fallidos": fallidos, "avisos": len(crudas)}
+    candidatas = [v for v in crudas if v.get("_detalle")]
+    candidatas.sort(key=lambda v: (not bool(prioritarias & {f["familia"] for f in familias.clasificar(v["titulo"])}),
+                                    v.get("remoto") is not True))
+    for v in candidatas:
+        if detalles >= max_detalles or (limite_segundos and time.monotonic() - inicio >= limite_segundos):
+            break
+        # Detalles solo para cargos del mapa; la lista general se conserva para descubrir otros títulos.
+        if not familias.clasificar(v["titulo"]):
+            continue
+        sistema = "smartrecruiters" if "smartrecruiters.com" in v["enlace"] else "workable"
+        slug = next((f["slug"] for f in filas if f["empresa"] == v["empresa"] and f["sistema"] == sistema), "")
+        detalles += 1
+        completadas += bool(_completar(cliente, sistema, slug, v))
+    return crudas, leidos, {"tableros": len(filas), "fallidos": fallidos, "avisos": len(crudas),
+                            "detalles_consultados": detalles, "descripciones_completadas": completadas}

@@ -12,6 +12,13 @@ Es un proyecto vendido por Oscar: se entrega a otra persona cambiando solo los s
 un bot de WhatsApp tomará 5 vacantes de Supabase y las enviará.
 El plan completo, con el paso a paso, está en `docs/PLAN.md`: léelo antes de trabajar.
 
+## Decisiones vigentes de cobertura e integridad
+
+Leer también `docs/COBERTURA_HISTORICO.md`: LATAM y España más remotas mundiales, prioridad remota,
+rotación de cargos exactos/similares/cercanos, identidad por enlace y evidencia de contenido, cola de reintentos
+a Supabase y conservación sin borrado automático de ofertas de la base. No construir seguimiento de postulaciones
+en esta etapa. El horario de Bogotá solo programa la ejecución; no limita los países.
+
 ## Reglas que no se cambian sin preguntarle a Oscar
 - **Volumen antes que filtros.** Solo filtran: el cargo (mapa de cargos), 30 días de antigüedad, que siga abierta, que no
   esté repetida y que se pueda aplicar desde el país elegido. Inglés, nivel y años se muestran como columnas.

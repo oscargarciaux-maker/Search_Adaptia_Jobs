@@ -16,7 +16,7 @@ from pathlib import Path
 
 import yaml
 
-from buscador import enlaces, familias, normalizar, paises, vacante
+from buscador import cobertura, enlaces, familias, normalizar, paises, vacante
 from buscador.fuentes import ats, brave, getonbrd, indeed, linkedin_apify, linkedin_publico, publicaciones_apify, remotos
 from buscador.http import Cliente
 
@@ -107,12 +107,14 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None):
                               max_paginas=p["remotos_paginas"])
 
     def f_getonbrd():
-        return getonbrd.buscar(Cliente(pausa=(0.3, 0.8)), sorted({f["consultas"][0] for f in mapa})[:p["getonbrd_busquedas"]])
+        combinaciones = [(f["id"], cobertura.rotar(cobertura.consultas(f), hoy, 1)[0], "GLOBAL") for f in mapa]
+        turnos = cobertura.repartir(combinaciones, {}, hoy, prioritarias)
+        return getonbrd.buscar(Cliente(pausa=(0.3, 0.8)), [c[1] for c in turnos[:p["getonbrd_busquedas"]]])
 
     filas_ats = ats.leer_lista(ats.RUTA, trabajo / "empresas_ats.csv")
 
     def f_ats():
-        return ats.buscar(Cliente(pausa=(0.05, 0.2)), filas_ats)
+        return ats.buscar(Cliente(pausa=(0.05, 0.2)), filas_ats, limite_segundos=limite, prioritarias=prioritarias)
 
     with ThreadPoolExecutor(7) as ex:
         tareas = {n: ex.submit(correr, n, f) for n, f in [("LinkedIn", f_linkedin), ("Indeed", f_indeed),
@@ -229,18 +231,38 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         crudas, enlaces_ats, leidas, salud = recoger(cfg, estado, hoy, trabajo)
     vacantes, sin_familia, descartes = limpiar(previas, crudas, hoy, cfg["dias_maximos"], enlaces_ats, leidas,
                                                consulta=consulta or "")
+    refuerzos = []
+    if not consulta and not prueba and cfg.get("refuerzo", {}).get("rondas", 0):
+        from buscador import entrega, refuerzo
+        entregadas = _leer_json(trabajo / "entregadas.json", {})
+        def incorporar(anteriores, nuevas):
+            resultado, sin_mapa, razones = limpiar(anteriores, nuevas, hoy, cfg["dias_maximos"], set(), set())
+            sin_familia.update(sin_mapa)
+            descartes.update(razones)
+            return resultado
+        vacantes, refuerzos = refuerzo.completar(
+            vacantes, entregadas, hoy, entrega.config(), cfg["refuerzo"], familias.mapa(),
+            lambda mapa, ronda: refuerzo.buscar(mapa, _paises_activos(cfg), estado, hoy, ronda,
+                                                 cfg["refuerzo"], cfg["dias_maximos"]), incorporar)
     _guardar_json(trabajo / "bodega.json.gz", vacantes, comprimido=True)
     _guardar_json(trabajo / "estado.json", estado)
     # Entrega diaria en el formato del contrato (no en una búsqueda profunda; en una prueba no se marca nada ni se sube)
     resumen_entrega = None
+    historico_entregas = []
     if not consulta:
         from buscador import entrega, supabase
         entregadas = _leer_json(trabajo / "entregadas.json", {})
         capturada = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         resumen_entrega = entrega.correr(vacantes, entregadas if not prueba else dict(entregadas), hoy, capturada,
-                                         salida / "datos" / "entregas", subir=None if prueba else supabase.subir)
+                                         salida / "datos" / "entregas", subir=None if prueba else supabase.subir,
+                                         pendientes=_leer_json(trabajo / "pendientes_supabase.json", {}),
+                                         persistir=None if prueba else
+                                         lambda datos: _guardar_json(trabajo / "pendientes_supabase.json", datos))
         if not prueba:
             _guardar_json(trabajo / "entregadas.json", entregadas)
+            historial = _leer_json(trabajo / "metricas_entrega.json", {})
+            historico_entregas = entrega.registrar_medicion(historial, resumen_entrega, hoy)
+            _guardar_json(trabajo / "metricas_entrega.json", historial)
     reporte = {
         "fecha": hoy, "hora_utc": datetime.now(timezone.utc).strftime("%H:%M"), "modo": modo,
         "consulta": consulta or "", "pais": pais or "",
@@ -251,7 +273,11 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         "por_familia": dict(Counter(f["familia"] for v in vacantes for f in v["familias"]).most_common()),
         "por_pais": dict(Counter(p for v in vacantes for p in v["paises"]).most_common()),
         "por_fuente": dict(Counter(fu for v in vacantes for fu in v["fuentes"]).most_common()),
+        "por_modalidad": dict(Counter(v["modalidad"] for v in vacantes)),
+        "ubicacion_por_confirmar": sum(v["confianza_pais"] == "baja" for v in vacantes),
         "entrega": resumen_entrega,
+        "refuerzos": refuerzos,
+        "historico_entregas": historico_entregas,
     }
     from buscador import publicar
     publicar.publicar(salida, vacantes, reporte, sin_familia)
@@ -271,6 +297,10 @@ def main():
                                               "descartes")}, ensure_ascii=False, indent=1))
     for n, s in reporte["fuentes"].items():
         print(f"  {n}: {s}")
+    e = reporte.get("entrega") or {}
+    if not a.prueba and e.get("meta_cumplida") is False:
+        faltantes = ", ".join(f"{r['nombre']}: faltan {r['faltan']}" for r in e["roles"].values() if r["faltan"])
+        print(f"::warning::Meta diaria incompleta tras los refuerzos. {faltantes}")
 
 
 if __name__ == "__main__":

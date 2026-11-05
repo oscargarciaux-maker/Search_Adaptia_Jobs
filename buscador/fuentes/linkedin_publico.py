@@ -10,14 +10,16 @@ import re
 import time
 from datetime import datetime, timezone
 
-from buscador import enlaces
+from buscador import cobertura, enlaces
 
 NOMBRE = "LinkedIn"
 BUSQUEDA = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
 AVISO = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/"
 CERRADO = re.compile(r"No longer accepting applications|Ya no se aceptan solicitudes|closed-job", re.I)
 # Lugares de búsqueda además de cada país: remoto para toda la región
-LUGARES_EXTRA = [("LATAM", {"location": "Latin America"}), ("REMOTO", {"location": "Latin America", "f_WT": "2"})]
+LUGARES_EXTRA = [("LATAM", {"location": "Latin America"}), ("REMOTO", {"location": "Latin America", "f_WT": "2"}),
+                 ("REMOTO_MUNDO", {"location": "Worldwide", "f_WT": "2"}),
+                 ("REMOTO_ES", {"location": "Spain", "f_WT": "2"})]
 
 
 def texto_html(fragmento):
@@ -60,7 +62,7 @@ def ficha(pagina):
 def combinaciones(mapa, paises_activos):
     """Todas las combinaciones (familia, lugar) que se pueden buscar."""
     lugares = [(p, {"location": nombre}) for p, nombre in paises_activos] + LUGARES_EXTRA
-    return [(f["id"], f["consultas"], clave, params) for f in mapa for clave, params in lugares]
+    return [(f["id"], cobertura.consultas(f), clave, params) for f in mapa for clave, params in lugares]
 
 
 def consulta_or(consultas, maximo=4):
@@ -68,38 +70,35 @@ def consulta_or(consultas, maximo=4):
     return " OR ".join(f'"{c}"' for c in consultas[:maximo])
 
 
-def orden(estado, hoy, prioritarias):
-    """Primero las familias prioritarias (los roles de la entrega diaria) que aún no se revisaron hoy: así se buscan
-    todas las noches; después, las combinaciones que hace más tiempo no se revisan."""
-    def clave(c):
-        ultima = estado.get(f"{c[0]}@{c[2]}", "")
-        return (0 if c[0] in prioritarias and ultima < hoy else 1, ultima)
-    return clave
-
 
 def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fichas=250, max_dias=30,
-           reloj=time.monotonic, limite_segundos=None, prioritarias=()):
+           reloj=time.monotonic, limite_segundos=None, prioritarias=(), desfase_terminos=0):
     """Recorre las combinaciones menos recientes hasta gastar el presupuesto de búsquedas.
     estado: dict {clave_combinacion: fecha ISO de la última revisión}; se actualiza aquí.
     Devuelve (vacantes crudas, estadísticas)."""
     hoy = hoy or datetime.now(timezone.utc).date().isoformat()
     inicio = reloj()
     todas = combinaciones(mapa, paises_activos)
-    todas.sort(key=orden(estado, hoy, set(prioritarias)))
+    todas = cobertura.repartir(todas, estado, hoy, prioritarias)
     vistos, avisos = set(), []
     hechas = fallidas = seguidas = 0
+    por_familia, por_lugar = {}, {}
     for familia, consultas, lugar, params in todas:
         if hechas >= presupuesto or seguidas >= 4 or (limite_segundos and reloj() - inicio > limite_segundos):
             break
         clave = f"{familia}@{lugar}"
-        ultima = estado.get(clave)
+        terminos = cobertura.rotar(consultas, hoy, 4, desfase=desfase_terminos)
+        clave_terminos = cobertura.clave_consulta(clave, terminos)
+        ultima = estado.get(clave_terminos)
         dias = max_dias if not ultima else min(max_dias, max(1, (datetime.fromisoformat(hoy) - datetime.fromisoformat(ultima)).days + 1))
         for pagina in range(3):
             if hechas >= presupuesto:
                 break
-            r = cliente.get(BUSQUEDA, params=dict(params, keywords=consulta_or(consultas), f_TPR=f"r{dias * 86400}",
+            r = cliente.get(BUSQUEDA, params=dict(params, keywords=consulta_or(terminos), f_TPR=f"r{dias * 86400}",
                                                   start=str(pagina * 10)))
             hechas += 1
+            por_familia[familia] = por_familia.get(familia, 0) + 1
+            por_lugar[lugar] = por_lugar.get(lugar, 0) + 1
             if r is None or r.status_code != 200:
                 fallidas += 1
                 seguidas += 1
@@ -116,10 +115,11 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
                 break
         if seguidas == 0:
             estado[clave] = hoy
+            estado[clave_terminos] = hoy
     # Descripción completa y estado de los avisos: primero los de las familias prioritarias (la entrega diaria solo usa
     # avisos con descripción) y los remotos (ahí la descripción decide el país)
-    avisos.sort(key=lambda a: (a["familia"] not in prioritarias, a["lugar_busqueda"] not in ("LATAM", "REMOTO"),
-                               a["fecha"] or ""))
+    avisos.sort(key=lambda a: (a["familia"] not in prioritarias, "REMOTO" not in a["lugar_busqueda"],
+                               -(int((a["fecha"] or "0000-00-00").replace("-", "")))))
     crudas, con_ficha, cerradas = [], 0, 0
     for a in avisos:
         descripcion, cerrado, externo, remoto = "", False, "", None
@@ -134,7 +134,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
         if cerrado:
             cerradas += 1
             continue
-        if a["lugar_busqueda"] == "REMOTO":
+        if "REMOTO" in a["lugar_busqueda"]:
             remoto = True
         crudas.append({
             "titulo": a["titulo"], "empresa": a["empresa"], "ubicacion": a["ubicacion"], "descripcion": descripcion,
@@ -143,5 +143,5 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
         })
     stats = {"busquedas": hechas, "fallidas": fallidas, "avisos": len(avisos), "con_descripcion": con_ficha,
              "cerradas": cerradas, "combinaciones_revisadas": sum(1 for c in todas if estado.get(f"{c[0]}@{c[2]}") == hoy),
-             "combinaciones_total": len(todas)}
+             "combinaciones_total": len(todas), "por_familia": por_familia, "por_lugar": por_lugar}
     return crudas, stats

@@ -10,8 +10,9 @@ CAMPOS_PUBLICOS = ["id", "titulo", "empresa", "ubicacion", "familias", "paises",
                    "enlace", "enlace_directo", "tipo_enlace", "resumen"]
 
 
-def huella(empresa, titulo):
-    clave = normalizar.empresa(empresa) + "|" + normalizar.titulo_base(titulo)
+def huella(empresa, titulo, enlace=""):
+    from buscador.contrato import url_limpia
+    clave = normalizar.empresa(empresa) + "|" + (url_limpia(enlace) if enlace else normalizar.texto(titulo))
     return hashlib.sha1(clave.encode("utf-8")).hexdigest()[:16]
 
 
@@ -41,7 +42,7 @@ def crear(titulo, empresa, enlace, fuente, ubicacion="", descripcion="", fecha="
     lugar = paises.elegibles(titulo, ubicacion, descripcion, remoto)
     texto = f"{titulo}\n{descripcion}"
     return {
-        "id": huella(empresa, titulo),
+        "id": huella(empresa, titulo, principal),
         "titulo": titulo, "empresa": empresa, "ubicacion": " ".join(str(ubicacion or "").split()),
         "familias": fams,
         "paises": lugar["paises"], "confianza_pais": lugar["confianza"], "modalidad": lugar["modalidad"],
@@ -54,7 +55,7 @@ def crear(titulo, empresa, enlace, fuente, ubicacion="", descripcion="", fecha="
         "fuente": fuente, "fuentes": [fuente],
         "enlace": principal, "enlace_directo": directo, "tipo_enlace": enlaces.tipo(directo or principal),
         "resumen": " ".join(str(descripcion or "").split())[:300],
-        "_descripcion": str(descripcion or "")[:8000],
+        "_descripcion": str(descripcion or "")[:30000],
     }
 
 
@@ -76,13 +77,17 @@ def unir(a, b):
     la fecha más antigua conocida y la descripción más larga."""
     larga, corta = (a, b) if len(a.get("_descripcion", "")) >= len(b.get("_descripcion", "")) else (b, a)
     v = dict(larga)
+    v["id"] = a["id"]  # conserva referencias existentes al completar una oferta
     todos = [x for x in (a["enlace"], a["enlace_directo"], b["enlace"], b["enlace_directo"]) if x]
     v["enlace"] = next((u for u in todos if enlaces.es_linkedin(u)), "") or enlaces.mejor(todos)
     v["enlace_directo"] = enlaces.mejor([u for u in todos if u != v["enlace"] and not enlaces.es_linkedin(u)])
     v["tipo_enlace"] = enlaces.tipo(v["enlace_directo"] or v["enlace"])
     v["paises"] = sorted(set(a["paises"]) | set(b["paises"]))
     confianzas = ["alta", "media", "baja"]
-    v["confianza_pais"] = min(a["confianza_pais"], b["confianza_pais"], key=confianzas.index)
+    v["confianza_pais"] = max(a["confianza_pais"], b["confianza_pais"], key=confianzas.index)
+    if v["confianza_pais"] == "baja":
+        v["nota_pais"] = "confirmar países: fuentes con ubicación incierta"
+    v["_enlaces"] = sorted(set(todos + a.get("_enlaces", []) + b.get("_enlaces", [])))
     fechas = [x["fecha_publicacion"] for x in (a, b) if x["fecha_publicacion"] and not x.get("fecha_estimada")]
     if fechas:
         v["fecha_publicacion"], v["fecha_estimada"] = min(fechas), False
@@ -105,17 +110,35 @@ def unir(a, b):
 
 
 def juntar(vacantes):
-    """Junta copias: mismo id (empresa + cargo sin ciudad ni nivel), o misma empresa y la misma descripción completa."""
+    """Une por enlace compartido o contenido + empresa + título + ubicación iguales.
+
+    Un nombre de cargo parecido no identifica una oferta. No recupera registros que el código anterior ya fusionó.
+    """
+    from buscador.contrato import url_limpia
     por_id = {}
     por_desc = {}
+    por_url = {}
     for v in vacantes:
         if not v:
             continue
         clave_desc = None
         desc = normalizar.texto(v.get("_descripcion", ""))
         if len(desc) >= 200:
-            clave_desc = normalizar.empresa(v["empresa"]) + "#" + hashlib.sha1(desc.encode()).hexdigest()
-        destino = v["id"] if v["id"] in por_id else por_desc.get(clave_desc) if clave_desc else None
+            clave_desc = (normalizar.empresa(v["empresa"]), normalizar.texto(v["titulo"]),
+                          normalizar.texto(v.get("ubicacion", "")), hashlib.sha256(desc.encode()).hexdigest())
+        urls = {url_limpia(u) for u in [v.get("enlace"), v.get("enlace_directo"), *v.get("_enlaces", [])] if u}
+        coincidencias = {por_url[u] for u in urls if u in por_url}
+        if clave_desc and clave_desc in por_desc:
+            coincidencias.add(por_desc[clave_desc])
+        destino = next(iter(coincidencias), None)
+        if len(coincidencias) > 1:
+            # Una tercera fuente puede demostrar que dos grupos anteriores eran la misma oferta.
+            destino = next(k for k in por_id if k in coincidencias)
+            for otro in coincidencias - {destino}:
+                por_id[destino] = unir(por_id[destino], por_id.pop(otro))
+                for indice in (por_url, por_desc):
+                    for k in [k for k, identificador in indice.items() if identificador == otro]:
+                        indice[k] = destino
         if destino and destino in por_id:
             por_id[destino] = unir(por_id[destino], v)
         else:
@@ -123,6 +146,8 @@ def juntar(vacantes):
             por_id[destino] = v
         if clave_desc:
             por_desc.setdefault(clave_desc, destino)
+        for u in urls:
+            por_url[u] = destino
     return list(por_id.values())
 
 

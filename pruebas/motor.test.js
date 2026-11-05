@@ -29,6 +29,15 @@ const VACANTES = [
   V({ id: "6", titulo: "Diseñador Webflow", familias: [] }),
 ];
 
+test("prioriza remotas amplias sin ocultar cargos similares ni presentar países dudosos como confirmados", () => {
+  const lista = M.filtrar(VACANTES, { familias: ["diseno-producto-ux"], hoy: "2026-10-28", dias: 30 });
+  assert.deepEqual(M.ordenar(lista, "remotas").map(v => v.id), ["3", "1", "2"]);
+  const dudosa = V({ id: "incierta", titulo: "UX Designer", modalidad: "remoto", confianza: "baja", paises: ["CO", "ES"] });
+  assert.equal(M.dondeAplica(dudosa, { CO: "Colombia", ES: "España" }, 2), "Región por confirmar");
+  const media = V({ id: "media", titulo: "UX Designer", confianza: "media" });
+  assert.equal(M.filtrar([dudosa, media], { confianzaAlta: true }).length, 0);
+});
+
 test("normaliza como el Python: sin tildes, sin nivel", () => {
   assert.equal(M.base("Diseñador(a) UX/UI Senior"), "disenador a ux/ui");
   assert.equal(M.base("Lead Product Designer - Remote"), "product designer");
