@@ -204,3 +204,26 @@ def test_operacion_pendiente_no_se_declara_sincronizada():
     r = {"catalogo": {"filas": 1, "enviadas": 1}, "estado_operativo": {
         "activo": True, "pendientes": {"registro": 1}, "lotes_pendientes": 1}}
     assert validacion.errores_catalogo(r)
+
+
+def test_diaria_recupera_canonico_antes_de_importar_archivo_atrasado(monkeypatch, tmp_path, presupuesto):
+    c, _, _ = central(monkeypatch, presupuesto)
+    monkeypatch.setenv("ESTADO_SUPABASE_ACTIVO", "true")
+    monkeypatch.setattr(supabase, "exigir_conexion", lambda: None)
+    monkeypatch.setattr(supabase, "exigir_catalogo", lambda: None)
+    monkeypatch.setattr(Central, "__init__", lambda self, *a: self.__dict__.update(c.__dict__))
+    monkeypatch.setattr(Central, "cola", lambda self, n, p, g: (p, g))
+    vs = [dict(oferta(i), _capturada_entrega=AHORA) for i in (1, 2)]
+    completo = {"fecha": HOY, "elegidas": {"ux-ui-designer": [[v, "exacto"] for v in vs]}}
+    trabajo = tmp_path / "trabajo"
+    trabajo.mkdir()
+    (trabajo / "lote_entrega.json").write_text(json.dumps({"fecha": HOY,
+        "elegidas": {"ux-ui-designer": [[vs[0], "exacto"]]}}))
+    monkeypatch.setattr(supabase, "leer_lote", lambda hoy: deepcopy(completo))
+    def comprobar(self, hoy, local):
+        assert local == completo
+        raise RuntimeError("Canónico recuperado antes de importar el temporal")
+    monkeypatch.setattr(Central, "cargar_lote", comprobar)
+    monkeypatch.setattr(bodega, "recoger", lambda *a, **k: pytest.fail("No iniciar fuentes en este ensayo"))
+    with pytest.raises(RuntimeError, match="Canónico recuperado"):
+        bodega.correr(tmp_path, hoy=HOY)

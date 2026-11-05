@@ -271,13 +271,12 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     memoria_db = {}
     lote_previo = _leer_json(trabajo / "lote_entrega.json", {})
     if central:
-        if modo == "incremental" or consulta:
-            from buscador import supabase
-            canonico = supabase.leer_lote(hoy)
-            for rol, lista in lote_previo.get("elegidas", {}).items() if lote_previo.get("fecha") == hoy else []:
-                ids = {v["id"] for filas in canonico["elegidas"].values() for v, _ in filas}
-                canonico["elegidas"].setdefault(rol, []).extend((v, g) for v, g in lista if v["id"] not in ids)
-            lote_previo = canonico
+        from buscador import supabase
+        canonico = supabase.leer_lote(hoy)
+        for rol, lista in lote_previo.get("elegidas", {}).items() if lote_previo.get("fecha") == hoy else []:
+            ids = {v["id"] for filas in canonico["elegidas"].values() for v, _ in filas}
+            canonico["elegidas"].setdefault(rol, []).extend((v, g) for v, g in lista if v["id"] not in ids)
+        lote_previo = canonico
         lote_previo = central.cargar_lote(hoy, lote_previo)
     def guardar_lote(datos):
         _guardar_json(trabajo / "lote_entrega.json", datos)
