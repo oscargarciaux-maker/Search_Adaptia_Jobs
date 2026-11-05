@@ -1,4 +1,4 @@
-"""LinkedIn: buscador público de empleos (sin sesión, sin cookie). Adaptado de tools/jobspy_buscar.py de ux_job_agent.
+"""LinkedIn: buscador público de empleos (sin sesión, sin cookie).
 
 Cada familia del mapa se busca en cada país y en remoto para LATAM, con sus consultas unidas por OR (LinkedIn lo acepta:
 probado el 28 oct 2026). Hay más combinaciones que las que caben en una noche sin que LinkedIn bloquee, así que cada
