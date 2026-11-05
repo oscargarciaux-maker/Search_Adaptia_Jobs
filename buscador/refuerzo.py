@@ -40,12 +40,12 @@ def buscar(mapa, activos, estado, hoy, ronda, cfg, dias_maximos=30):
     return crudas, salud
 
 
-def completar(vacantes, entregadas, hoy, cfg_entrega, cfg_refuerzo, mapa, recoger, incorporar):
+def completar(vacantes, entregadas, hoy, cfg_entrega, cfg_refuerzo, mapa, recoger, incorporar, iniciales=None):
     """Reevalúa después de cada ronda; nunca marca entregadas ni cambia restricciones para cumplir una cifra."""
     from buscador import entrega
     rondas = []
     for numero in range(1, cfg_refuerzo.get("rondas", 2) + 1):
-        _, evaluacion = entrega.elegir(vacantes, entregadas, hoy, cfg_entrega)
+        _, evaluacion = entrega.elegir(vacantes, entregadas, hoy, cfg_entrega, iniciales=iniciales)
         faltantes = {rid: r["faltan"] for rid, r in evaluacion["roles"].items() if r["faltan"]}
         if not faltantes:
             break

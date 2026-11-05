@@ -2,12 +2,12 @@
 import hashlib
 from datetime import date
 
-from buscador import calidad, enlaces, etiquetas, familias, normalizar, paises
+from buscador import calidad, enlaces, etiquetas, familias, normalizar, paises, tiempos
 
 CAMPOS_PUBLICOS = ["id", "titulo", "empresa", "ubicacion", "familias", "paises", "confianza_pais", "modalidad",
                    "nota_pais", "idioma", "ingles", "nivel", "anos_min", "salario", "herramientas",
                    "fecha_publicacion", "fecha_estimada", "visto_primera_vez", "visto_ultima_vez", "fuente", "fuentes",
-                   "enlace", "enlace_directo", "tipo_enlace", "resumen"]
+                   "enlace", "enlace_directo", "tipo_enlace", "resumen", "publicada_en", "detectada_en", "vista_en"]
 
 
 def huella(empresa, titulo, enlace=""):
@@ -17,11 +17,12 @@ def huella(empresa, titulo, enlace=""):
 
 
 def crear(titulo, empresa, enlace, fuente, ubicacion="", descripcion="", fecha="", remoto=None, enlace_directo="",
-          hoy=None, consulta=""):
+          hoy=None, consulta="", publicada_en="", capturada=None, fecha_origen=""):
     """Vacante en el formato común, con familias, países y etiquetas calculadas. Devuelve None si no sirve:
     sin título, sin enlace entregable o sin ninguna familia del mapa. En una búsqueda profunda de un cargo que no está
     en el mapa (`consulta`), también entra si su título contiene esas palabras."""
     hoy = hoy or date.today().isoformat()
+    capturada = tiempos.instante(capturada) or tiempos.ahora()
     titulo = " ".join(str(titulo or "").split())
     empresa = " ".join(str(empresa or "").split()) or "Empresa confidencial"
     if not titulo:
@@ -53,6 +54,9 @@ def crear(titulo, empresa, enlace, fuente, ubicacion="", descripcion="", fecha="
         "anos_min": etiquetas.anos_min(descripcion), "salario": etiquetas.salario(descripcion),
         "herramientas": familias.herramientas_en(descripcion, [f["familia"] for f in fams]) if descripcion else [],
         "fecha_publicacion": (fecha or "")[:10], "fecha_estimada": not fecha,
+        "publicada_en": tiempos.instante(publicada_en or fecha),
+        "detectada_en": capturada, "vista_en": capturada,
+        "_fecha_publicacion_origen": fecha_origen,
         "visto_primera_vez": hoy, "visto_ultima_vez": hoy,
         "fuente": fuente, "fuentes": [fuente],
         "enlace": principal, "enlace_directo": directo, "tipo_enlace": enlaces.tipo(directo or principal),
@@ -67,6 +71,12 @@ def reetiquetar(v):
     desc = v.get("_descripcion", "")
     if desc:
         v["ingles"], v["anos_min"], v["salario"] = etiquetas.ingles(desc), etiquetas.anos_min(desc), etiquetas.salario(desc)
+    if "greenhouse" in v.get("fuente", "").lower() and not v.get("_fecha_publicacion_origen"):
+        # Las versiones anteriores confundían updated_at con publicación. No certificar esa fecha histórica.
+        v["fecha_publicacion"], v["publicada_en"], v["fecha_estimada"] = "", "", True
+    lugar = paises.elegibles(v["titulo"], v.get("ubicacion", ""), desc,
+                             True if v.get("modalidad") == "remoto" else None)
+    v.update(paises=lugar["paises"], modalidad=lugar["modalidad"], confianza_pais=lugar["confianza"], nota_pais=lugar["nota"])
     return v
 
 
@@ -97,6 +107,13 @@ def unir(a, b):
         v["fecha_publicacion"] = min(x["fecha_publicacion"] or "9999" for x in (a, b)).replace("9999", "")
     v["visto_primera_vez"] = min(a["visto_primera_vez"], b["visto_primera_vez"])
     v["visto_ultima_vez"] = max(a["visto_ultima_vez"], b["visto_ultima_vez"])
+    v["detectada_en"] = min((x.get("detectada_en") for x in (a, b) if x.get("detectada_en")), default="")
+    if not a.get("detectada_en") and a.get("visto_primera_vez", "") <= b.get("visto_primera_vez", ""):
+        v["detectada_en"] = ""  # primera detección histórica sin hora: no inventarla al volver a ver el aviso
+    v["vista_en"] = max(a.get("vista_en", ""), b.get("vista_en", ""))
+    horas = [x.get("publicada_en") for x in (a, b) if x.get("publicada_en") and
+             x.get("fecha_publicacion") == v.get("fecha_publicacion")]
+    v["publicada_en"] = min(horas, default="")
     v["fuentes"] = sorted(set(a["fuentes"]) | set(b["fuentes"]))
     grados = {}
     for f in a["familias"] + b["familias"]:

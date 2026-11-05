@@ -15,15 +15,28 @@ def errores(reporte):
         fallos.append("La sincronización con Supabase no está confirmada o tiene filas pendientes.")
     if not reporte.get("vacantes_en_bodega"):
         fallos.append("No hay catálogo válido.")
+    registro = e.get("registro_seleccion")
+    if registro is not None and (registro.get("errores") or registro.get("pendientes") or registro.get("omitida")):
+        fallos.append("La selección no quedó registrada en Supabase; conservar pendientes y reintentar.")
+    if reporte.get("catalogo") is not None:
+        fallos.extend(errores_catalogo(reporte))
     return fallos
+
+
+def errores_catalogo(reporte):
+    c = reporte.get("catalogo") or {}
+    if not c or c.get("omitida") or c.get("errores") or c.get("pendientes") or c.get("enviadas") != c.get("filas"):
+        return ["El catálogo no está sincronizado; se conserva la cola para reintentar."]
+    return []
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--salida", required=True)
+    ap.add_argument("--catalogo", action="store_true")
     args = ap.parse_args()
     reporte = json.loads((Path(args.salida) / "datos/salud.json").read_text(encoding="utf-8"))
-    fallos = errores(reporte)
+    fallos = errores_catalogo(reporte) if args.catalogo else errores(reporte)
     for mensaje in fallos:
         print("::error::" + mensaje)
     if fallos:

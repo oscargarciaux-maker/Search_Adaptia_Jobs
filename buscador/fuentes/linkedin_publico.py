@@ -72,7 +72,7 @@ def consulta_or(consultas, maximo=4):
 
 
 def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fichas=250, max_dias=30,
-           reloj=time.monotonic, limite_segundos=None, prioritarias=(), desfase_terminos=0):
+           reloj=time.monotonic, limite_segundos=None, prioritarias=(), desfase_terminos=0, max_paginas=3):
     """Recorre las combinaciones menos recientes hasta gastar el presupuesto de búsquedas.
     estado: dict {clave_combinacion: fecha ISO de la última revisión}; se actualiza aquí.
     Devuelve (vacantes crudas, estadísticas)."""
@@ -91,7 +91,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
         clave_terminos = cobertura.clave_consulta(clave, terminos)
         ultima = estado.get(clave_terminos)
         dias = max_dias if not ultima else min(max_dias, max(1, (datetime.fromisoformat(hoy) - datetime.fromisoformat(ultima)).days + 1))
-        for pagina in range(3):
+        for pagina in range(max_paginas):
             if hechas >= presupuesto:
                 break
             r = cliente.get(BUSQUEDA, params=dict(params, keywords=consulta_or(terminos), f_TPR=f"r{dias * 86400}",

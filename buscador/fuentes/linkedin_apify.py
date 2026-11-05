@@ -55,6 +55,7 @@ def normalizar_item(item):
         "ubicacion": ubicacion,
         "descripcion": descripcion[:30000],
         "fecha": _primero(item, "postedDate", "postedAt", "publishedAt", "listedAt", "datePosted")[:10],
+        "publicada_en": _primero(item, "postedDate", "postedAt", "publishedAt", "listedAt", "datePosted"),
         "enlace": enlace,
         "enlace_directo": _primero(item, "applyMethod.companyApplyUrl", "applyUrl", "applyLink", "externalApplyLink", "companyApplyUrl"),
         "remoto": True if modo == "remote" or _valor(item, "workRemoteAllowed") is True else None,

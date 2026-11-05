@@ -10,6 +10,15 @@ dias_maximos: 30
 # Hora de la bodega nocturna en Bogotá (UTC−5). El horario real está en .github/workflows/bodega.yml (paso 7).
 hora_bodega_bogota: "01:17"
 
+# Captura horaria gratuita, independiente de la entrega. Activación tras migración del catálogo v2.
+incremental:
+  minutos_por_fuente: 2
+  linkedin_busquedas: 24
+  linkedin_fichas: 48
+  indeed_busquedas: 6
+  ats_detalles: 20
+  rotacion_empresas: 30
+
 # Si un rol queda bajo 20, buscar variantes adicionales en fuentes gratuitas.
 # No se ejecuta en --prueba ni búsqueda profunda. No relaja requisitos ni repite ofertas.
 refuerzo:

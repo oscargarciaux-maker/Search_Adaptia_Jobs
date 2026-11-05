@@ -9,6 +9,8 @@ empresas), nunca agregadores. La búsqueda corre sola cada noche en GitHub Actio
 nadie.
 
 - Instalar y usar: [`docs/INSTALACION.md`](docs/INSTALACION.md)
+- Revisión de alternativas y mejoras: [`docs/REVISION_PRODUCTO.md`](docs/REVISION_PRODUCTO.md)
+- Activar captura horaria y catálogo Supabase: [`docs/ACTIVAR_CAPTURA_HORARIA.md`](docs/ACTIVAR_CAPTURA_HORARIA.md)
 - Pasar el proyecto a otra persona: [`docs/TRASPASO.md`](docs/TRASPASO.md)
 - Plan y decisiones: [`docs/PLAN.md`](docs/PLAN.md) · Reglas para quien trabaje en el código: [`CLAUDE.md`](CLAUDE.md)
 
@@ -22,6 +24,11 @@ su ficha original. La búsqueda pagada del feed está desactivada para reservar 
 La meta es 20 por cada uno de seis roles (120 al día). Si un rol queda corto, hay búsquedas adicionales gratuitas
 acotadas y un reporte de los motivos. La continuidad se mide entre días distintos, conservando la memoria de entregas.
 Decisiones, límites y seguimiento futuro: [`docs/COBERTURA_HISTORICO.md`](docs/COBERTURA_HISTORICO.md).
+
+El catálogo v2 permite actualizar durante el día sin crear otra entrega diaria. Conserva publicación, detección y
+última observación por separado y archiva sin borrar historial en Supabase. Requiere la migración aditiva y la variable
+de activación; la captura horaria queda desactivada hasta entonces. Repetir una entrega completa solo reintenta el lote.
+WhatsApp sigue pendiente de validar continuidad y definir destinatarios/confirmaciones; no hay envíos automáticos.
 
 ## Pruebas
 

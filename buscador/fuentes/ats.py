@@ -41,6 +41,13 @@ def tiene_forma(sistema, datos):
     return isinstance(datos, dict) and len(datos.get("jobs") or []) > 0
 
 
+def respuesta_valida(sistema, datos):
+    if sistema == "lever":
+        return isinstance(datos, list)
+    campo = {"smartrecruiters": "content", "recruitee": "offers"}.get(sistema, "jobs")
+    return isinstance(datos, dict) and isinstance(datos.get(campo), list)
+
+
 def slugs_para(nombre):
     """Nombres de tablero a probar para una empresa: 'Mercado Libre' → mercadolibre, mercado-libre."""
     base = normalizar.empresa(nombre)
@@ -80,7 +87,8 @@ def vacantes_de(sistema, datos, empresa, slug):
     if sistema == "greenhouse":
         for j in datos.get("jobs") or []:
             salida.append(dict(base, titulo=j.get("title", ""), ubicacion=(j.get("location") or {}).get("name", ""),
-                               enlace=j.get("absolute_url", ""), fecha=_dia(j.get("first_published") or j.get("updated_at")),
+                               enlace=j.get("absolute_url", ""), fecha=_dia(j.get("first_published")),
+                               publicada_en=j.get("first_published", ""), fecha_origen="first_published",
                                descripcion=_texto(j.get("content"))[:30000], remoto=None))
     elif sistema == "lever":
         for j in datos:
@@ -92,6 +100,7 @@ def vacantes_de(sistema, datos, empresa, slug):
             salida.append(dict(base, titulo=j.get("text", ""),
                                ubicacion=" ".join(x for x in [cat.get("location", ""), " ".join(cat.get("allLocations") or [])] if x),
                                enlace=j.get("hostedUrl", ""), fecha=_dia(j.get("createdAt")),
+                               publicada_en=j.get("createdAt", ""),
                                descripcion="\n".join(x for x in contenido if x)[:30000],
                                remoto=True if (j.get("workplaceType") == "remote") else None))
     elif sistema == "ashby":
@@ -101,6 +110,7 @@ def vacantes_de(sistema, datos, empresa, slug):
             lugares = [j.get("location") or ""] + [x.get("location", "") for x in j.get("secondaryLocations") or []]
             salida.append(dict(base, titulo=j.get("title", ""), ubicacion=", ".join(x for x in lugares if x),
                                enlace=j.get("jobUrl", ""), fecha=_dia(j.get("publishedAt")),
+                               publicada_en=j.get("publishedAt", ""),
                                descripcion=(j.get("descriptionPlain") or _texto(j.get("descriptionHtml")))[:30000],
                                remoto=True if j.get("isRemote") else None))
     elif sistema == "workable":
@@ -108,6 +118,7 @@ def vacantes_de(sistema, datos, empresa, slug):
             salida.append(dict(base, titulo=j.get("title", ""),
                                ubicacion=", ".join(x for x in [j.get("city"), j.get("state"), j.get("country")] if x),
                                enlace=j.get("url") or j.get("shortlink") or "", fecha=_dia(j.get("published_on") or j.get("created_at")),
+                               publicada_en=j.get("published_on") or j.get("created_at", ""),
                                descripcion="", _detalle=j.get("shortcode", ""),
                                remoto=True if j.get("telecommuting") else None))
     elif sistema == "smartrecruiters":
@@ -116,11 +127,13 @@ def vacantes_de(sistema, datos, empresa, slug):
             salida.append(dict(base, titulo=j.get("name", ""),
                                ubicacion=", ".join(x for x in [loc.get("city"), loc.get("country")] if x),
                                enlace=f"https://jobs.smartrecruiters.com/{slug}/{j.get('id')}", fecha=_dia(j.get("releasedDate")),
+                               publicada_en=j.get("releasedDate", ""),
                                descripcion="", _detalle=j.get("id", ""), remoto=True if loc.get("remote") else None))
     elif sistema == "recruitee":
         for j in datos.get("offers") or []:
             salida.append(dict(base, titulo=j.get("title", ""), ubicacion=j.get("location", ""),
                                enlace=j.get("careers_url", ""), fecha=_dia(j.get("published_at")),
+                               publicada_en=j.get("published_at", ""),
                                descripcion=_texto(j.get("description"))[:30000], remoto=True if j.get("remote") else None))
     return [v for v in salida if v["titulo"] and v["enlace"]]
 
@@ -253,7 +266,7 @@ def buscar(cliente, filas, max_tableros=None, limite_segundos=None, max_detalles
         try:
             datos = _tablero_completo(cliente, fila["sistema"], fila["slug"],
                                       inicio + limite_segundos if limite_segundos else None)
-            if datos is None:
+            if not respuesta_valida(fila["sistema"], datos):
                 fallidos += 1
                 continue
             nuevas = vacantes_de(fila["sistema"], datos, fila["empresa"], fila["slug"])

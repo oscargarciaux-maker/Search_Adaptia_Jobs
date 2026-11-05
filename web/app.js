@@ -6,7 +6,7 @@
   const $ = (id) => document.getElementById(id);
   const POR_PAGINA = 50;
   const SEL_RAPIDA = 20;
-  const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+  let hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
   const fmt = new Intl.NumberFormat("es-CO");
   const fechaCorta = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("es-CO", { day: "numeric", month: "short" }).replace(".", "");
 
@@ -71,7 +71,7 @@
       const sel = $("pais");
       paises.slice().sort((a, b) => a.nombre.localeCompare(b.nombre, "es")).forEach(p => sel.add(new Option(p.nombre, p.codigo)));
       $("estado-datos").textContent = salud
-        ? `${fmt.format(vacantes.length)} vacantes abiertas · actualizado el ${fechaCorta(salud.fecha)}`
+        ? `${fmt.format(vacantes.length)} vacantes · actualizado ${salud.capturada_en ? new Date(salud.capturada_en).toLocaleString("es-CO") : fechaCorta(salud.fecha)}`
         : `${fmt.format(vacantes.length)} vacantes abiertas`;
       leerHash();
       buscar();
@@ -94,6 +94,7 @@
       familias: estado.familia ? [estado.familia] : [], grados: [...estado.grados], palabras, excluir: lista("palabras-excluir"),
       pais: $("pais").value, remotas: $("remotas").checked, presenciales: $("presenciales").checked,
       confianzaAlta: $("confianza").checked, dias: Number($("dias").value), hoy,
+      horas: Number($("horas").value) || null, ahora: new Date().toISOString(),
       enviadas: estado.enviadas, ocultarEnviadas: $("ocultar-enviadas").checked,
       nivel: $("nivel").value, idioma: $("idioma").value, ingles: $("ingles").value,
     };
@@ -206,7 +207,7 @@
     const datos = [
       el("span", {}, datoPais(v)),
       v.confianza_pais === "baja" ? el("span", { class: "confirmar" }, "Confirmar desde qué países") : null,
-      el("span", {}, M.fechaRelativa(M.fechaDe(v), hoy)),
+      el("span", {}, M.antiguedad(v, new Date().toISOString(), hoy)),
     ];
     const lado = [
       el("div", {}, [M.IDIOMA[v.idioma] ? `Aviso en ${M.IDIOMA[v.idioma].toLowerCase()}` : null,
@@ -391,12 +392,14 @@
     if (estado.familia) p.set("cargo", estado.familia); else if (estado.texto) p.set("texto", estado.texto);
     if ($("pais").value) p.set("pais", $("pais").value);
     if ($("dias").value !== "30") p.set("dias", $("dias").value);
+    if ($("horas").value) p.set("horas", $("horas").value);
     history.replaceState(null, "", "#" + p.toString());
   }
   function leerHash() {
     const p = new URLSearchParams(location.hash.slice(1));
     if (p.get("pais")) $("pais").value = p.get("pais");
     if (p.get("dias")) $("dias").value = p.get("dias");
+    if (p.get("horas")) $("horas").value = p.get("horas");
     if (p.get("cargo") && estado.mapaPorId[p.get("cargo")]) { estado.familia = p.get("cargo"); $("cargo").value = estado.mapaPorId[estado.familia].nombre; }
     else if (p.get("texto")) { estado.texto = p.get("texto"); $("cargo").value = estado.texto; }
   }
@@ -406,7 +409,10 @@
     const s = estado.salud, caja = $("salud");
     caja.innerHTML = "";
     if (!s) { caja.append(el("p", { text: "Todavía no hay reporte de la búsqueda nocturna." })); return; }
-    caja.append(el("h2", { text: `Última búsqueda: ${fechaCorta(s.fecha)} (${s.minutos} min)` }));
+    caja.append(el("h2", { text: `Última búsqueda: ${s.capturada_en ? new Date(s.capturada_en).toLocaleString("es-CO") : fechaCorta(s.fecha)} (${s.minutos} min)` }));
+    if (s.catalogo) caja.append(el("p", { class: "nota", text: s.catalogo.pendientes || (s.catalogo.errores || []).length
+      ? `Catálogo: ${s.catalogo.pendientes || 0} filas pendientes de sincronizar.`
+      : `Catálogo: ${s.catalogo.enviadas || 0} filas confirmadas en Supabase.` }));
     caja.append(el("div", { class: "metricas" },
       [["Vacantes abiertas", s.vacantes_en_bodega], ["Nuevas en esa búsqueda", s.nuevas_hoy], ["Leídas de las fuentes", s.crudas_hoy],
         ["Tipos de cargo con vacantes", Object.keys(s.por_familia || {}).length]]
@@ -414,7 +420,7 @@
     const e = s.entrega;
     if (e && e.roles) {
       const sb = e.supabase || {};
-      caja.append(el("h3", { class: "area", text: `Entrega del día: ${fmt.format(e.vacantes || 0)} vacantes seleccionadas` }),
+      caja.append(el("h3", { class: "area", text: `Entrega del ${fechaCorta(e.fecha || s.fecha)}: ${fmt.format(e.vacantes || 0)} vacantes seleccionadas` }),
         el("div", { class: "tabla-scroll" }, el("table", { class: "tabla" },
           el("thead", {}, el("tr", {}, el("th", { text: "Rol" }), el("th", { class: "num", text: "Seleccionadas" }),
             el("th", { class: "num", text: "Faltaron" }), el("th", { text: "Idiomas" }))),
@@ -528,7 +534,7 @@
     });
     cargo.addEventListener("blur", () => setTimeout(cerrarSugerencias, 150));
     $("form-busqueda").addEventListener("submit", (e) => e.preventDefault());
-    ["pais", "dias", "remotas", "presenciales", "ocultar-enviadas", "confianza", "nivel", "idioma", "ingles", "orden"]
+    ["pais", "dias", "horas", "remotas", "presenciales", "ocultar-enviadas", "confianza", "nivel", "idioma", "ingles", "orden"]
       .forEach(id => $(id).addEventListener("change", buscar));
     let espera;
     ["palabras-extra", "palabras-excluir"].forEach(id => $(id).addEventListener("input", () => { clearTimeout(espera); espera = setTimeout(buscar, 300); }));
@@ -575,6 +581,28 @@
   }
 
   estado.enviadas = leerLocal();
+  let refrescando = false;
+  async function refrescarNovedades() {
+    if (document.hidden || refrescando || !estado.salud) return;
+    refrescando = true;
+    try {
+      hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+      const r = await fetch("datos/salud.json", { cache: "no-cache" });
+      if (!r.ok) return;
+      const salud = await r.json();
+      if (salud.capturada_en && salud.capturada_en !== estado.salud.capturada_en) {
+        estado.vacantes = await leerJsonComprimido("datos/vacantes.json.gz");
+        estado.salud = salud;
+        $("estado-datos").textContent = `${fmt.format(estado.vacantes.length)} vacantes · actualizado ${new Date(salud.capturada_en).toLocaleString("es-CO")}`;
+        buscar();
+        pintarSalud();
+        avisar("El catálogo se actualizó con la última captura.");
+      }
+    } catch (e) { /* conservar resultados si falla la red; no reemplazarlos por una lista vacía */ }
+    finally { refrescando = false; }
+  }
+  setInterval(refrescarNovedades, 60000);
+  document.addEventListener("visibilitychange", refrescarNovedades);
   pestanas();
   eventos();
   cargarEnviadasRemotas().finally(cargar);

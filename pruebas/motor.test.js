@@ -29,6 +29,17 @@ const VACANTES = [
   V({ id: "6", titulo: "Diseñador Webflow", familias: [] }),
 ];
 
+test("frescura horaria exige hora real, no primera detección ni fecha sin hora", () => {
+  const exacta = { ...VACANTES[0], publicada_en: "2026-10-28T10:00:00Z" };
+  const sinHora = { ...VACANTES[0], id: "sin-hora", fecha_publicacion: "2026-10-28" };
+  const detectada = { ...VACANTES[0], id: "detectada", fecha_publicacion: "", fecha_estimada: true, detectada_en: "2026-10-28T11:45:00Z" };
+  const op = { horas: 6, ahora: "2026-10-28T12:00:00Z" };
+  assert.deepEqual(M.filtrar([exacta, sinHora, detectada], op).map(v => v.id), [exacta.id]);
+  assert.equal(M.antiguedad(exacta, op.ahora, "2026-10-28"), "Publicada hace 2 h");
+  assert.equal(M.antiguedad(detectada, op.ahora, "2026-10-28"), "Detectada hace 15 min");
+  assert.ok(M.antiguedad(sinHora, op.ahora, "2026-10-28").includes("sin hora"));
+});
+
 test("prioriza remotas amplias sin ocultar cargos similares ni presentar países dudosos como confirmados", () => {
   const lista = M.filtrar(VACANTES, { familias: ["diseno-producto-ux"], hoy: "2026-10-28", dias: 30 });
   assert.deepEqual(M.ordenar(lista, "remotas").map(v => v.id), ["3", "1", "2"]);

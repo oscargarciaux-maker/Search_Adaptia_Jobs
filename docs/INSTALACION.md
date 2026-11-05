@@ -1,5 +1,9 @@
 # Instalación
 
+Si Supabase y Apify ya están configurados, no repetir su instalación: para actualizar al catálogo persistente y captura
+horaria ver [ACTIVAR_CAPTURA_HORARIA.md](ACTIVAR_CAPTURA_HORARIA.md). La revisión de producto y los criterios previos
+a WhatsApp están en [REVISION_PRODUCTO.md](REVISION_PRODUCTO.md).
+
 Lo que hace el sistema cada noche (1:17, hora de Bogotá), solo, en GitHub:
 
 1. **Busca** vacantes en LinkedIn (buscador público, sin cuenta), Indeed, los portales de empleo de cientos de empresas,

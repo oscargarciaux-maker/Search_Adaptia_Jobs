@@ -136,11 +136,16 @@ paises:
     utc: 1
 
 # Palabras que abren una vacante remota a toda LATAM
-toda_latam: [latam, latin america, latinoamerica, america latina, south america, sudamerica, suramerica, americas,
-             the americas, central america, centroamerica]
+toda_latam: [latam, latin america, latinoamerica, america latina, americas, the americas]
+
+subregiones:
+  - nombres: [south america, sudamerica, suramerica]
+    paises: [AR, BO, BR, CL, CO, EC, PE, PY, UY, VE]
+  - nombres: [central america, centroamerica]
+    paises: [CR, GT, HN, NI, PA, SV]
 
 # Palabras que la abren a cualquier país (LATAM y España)
-todo_el_mundo: [worldwide, anywhere, global, globally, any country, cualquier pais, todo el mundo, international,
+todo_el_mundo: [worldwide, anywhere, global, globally, any country, cualquier pais, todo el mundo,
                 cualquier parte del mundo]
 
 # Palabras que abren una vacante remota a Europa: desde el mundo hispanohablante, solo España

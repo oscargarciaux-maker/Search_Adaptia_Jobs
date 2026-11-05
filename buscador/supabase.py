@@ -139,6 +139,99 @@ def exigir_conexion():
     return mensaje
 
 
+def exigir_catalogo(sesion=None):
+    url, clave = credenciales()
+    if not url or not clave:
+        raise RuntimeError("Faltan credenciales de Supabase para el catálogo.")
+    cabeceras = {"apikey": clave}
+    if clave.startswith("eyJ"):
+        cabeceras["Authorization"] = f"Bearer {clave}"
+    columnas = "id,contract_version,datos,description_full,published_at,first_seen_at,last_seen_at,observed_at,status,closed_at,reason"
+    r = (sesion or requests).get(f"{url}/rest/v1/catalogo_vacantes?select={columnas}&limit=1",
+                                 headers=cabeceras, timeout=30)
+    if r.status_code != 200:
+        raise RuntimeError("Falta el catálogo v2 o no hay permisos. Aplicar supabase/migraciones/002_catalogo.sql.")
+    r = (sesion or requests).get(f"{url}/rest/v1/entregas_diarias?select=vacante_id,delivery_date,role_id,match_grade,selected_at,snapshot&limit=1",
+                                 headers=cabeceras, timeout=30)
+    if r.status_code != 200:
+        raise RuntimeError("Falta el registro de entregas v2. Aplicar supabase/migraciones/002_catalogo.sql.")
+
+
+def subir_catalogo(filas, sesion=None, tabla="catalogo_vacantes"):
+    url, clave = credenciales()
+    if not url or not clave:
+        return {"omitida": "sin credenciales de Supabase", "confirmadas": []}
+    clave_id = "id" if tabla == "catalogo_vacantes" else "vacante_id"
+    modo = "merge-duplicates" if tabla == "catalogo_vacantes" else "ignore-duplicates"
+    cabeceras = {"apikey": clave, "Prefer": f"resolution={modo},return=minimal"}
+    if clave.startswith("eyJ"):
+        cabeceras["Authorization"] = f"Bearer {clave}"
+    sesion = sesion or requests.Session()
+    confirmadas, errores = [], []
+    for inicio in range(0, len(filas), 100):
+        lote = filas[inicio:inicio + 100]
+        try:
+            r = sesion.post(f"{url}/rest/v1/{tabla}?on_conflict={clave_id}", json=lote,
+                             headers=cabeceras, timeout=60)
+        except requests.RequestException as e:
+            errores.append(type(e).__name__)
+            continue
+        if 200 <= r.status_code < 300:
+            confirmadas.extend(f[clave_id] for f in lote)
+        else:
+            errores.append(f"HTTP {r.status_code}: catálogo no sincronizado")
+    return {"filas": len(filas), "enviadas": len(confirmadas), "confirmadas": confirmadas, "errores": errores}
+
+
+def leer_entregas(hoy, sesion=None):
+    """Recuperar identidades sin cargar todo el histórico de descripciones; solo snapshots de hoy."""
+    url, clave = credenciales()
+    cab = {"apikey": clave}
+    if clave and clave.startswith("eyJ"):
+        cab["Authorization"] = f"Bearer {clave}"
+    sesion = sesion or requests.Session()
+    memoria = {}
+    offset = 0
+    while True:
+        r = sesion.get(f"{url}/rest/v1/entregas_diarias", headers=cab, timeout=30,
+                       params={"select": "vacante_id,delivery_date,enlace:snapshot->>enlace,enlace_directo:snapshot->>enlace_directo,aliases:snapshot->_enlaces",
+                               "order": "vacante_id", "limit": 1000, "offset": offset})
+        if r.status_code != 200 or not isinstance(r.json(), list):
+            raise RuntimeError("No se pudo recuperar la memoria de entregas desde Supabase.")
+        filas = r.json()
+        memoria.update({f["vacante_id"]: f["delivery_date"] for f in filas})
+        for f in filas:
+            for enlace in [f.get("enlace"), f.get("enlace_directo"), *(f.get("aliases") or [])]:
+                if enlace:
+                    memoria[contrato.url_limpia(enlace)] = f["delivery_date"]
+        if len(filas) < 1000:
+            break
+        offset += len(filas)
+    offset = 0
+    while True:
+        r = sesion.get(f"{url}/rest/v1/ofertas", headers=cab, timeout=30,
+                       params={"select": "offer_url,delivery_date", "order": "id", "limit": 1000, "offset": offset})
+        if r.status_code != 200 or not isinstance(r.json(), list):
+            raise RuntimeError("No se pudo recuperar la memoria histórica v1 desde Supabase.")
+        filas = r.json()
+        for f in filas:
+            if f.get("offer_url"):
+                memoria[contrato.url_limpia(f["offer_url"])] = f.get("delivery_date") or hoy
+        if len(filas) < 1000:
+            break
+        offset += len(filas)
+    r = sesion.get(f"{url}/rest/v1/entregas_diarias", headers=cab, timeout=30,
+                   params={"select": "role_id,match_grade,selected_at,snapshot", "delivery_date": "eq." + hoy, "limit": 500})
+    if r.status_code != 200 or not isinstance(r.json(), list):
+        raise RuntimeError("No se pudo recuperar el lote diario desde Supabase.")
+    grados = {"exact": "exacto", "similar": "similar", "close": "cercano"}
+    lote = {"fecha": hoy, "elegidas": {}}
+    for f in r.json():
+        v = dict(f["snapshot"], _capturada_entrega=f["selected_at"])
+        lote["elegidas"].setdefault(f["role_id"], []).append((v, grados[f["match_grade"]]))
+    return memoria, lote
+
+
 if __name__ == "__main__":
     import sys
     ok, mensaje = probar()

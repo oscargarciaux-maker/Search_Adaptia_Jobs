@@ -14,6 +14,12 @@ El plan completo, con el paso a paso, está en `docs/PLAN.md`: léelo antes de t
 
 ## Decisiones vigentes de cobertura e integridad
 
+Leer `docs/REVISION_PRODUCTO.md`, `docs/CONTRATO_DATOS_v2.md` y `docs/ACTIVAR_CAPTURA_HORARIA.md`.
+El catálogo v2 es aditivo; no cambiar las columnas de `ofertas` v1. La captura horaria gratuita no consume Apify ni
+crea entregas. Repetir el día solo completa/reintenta el mismo lote. No confundir publicación con actualización o
+detección, ni selección con envío WhatsApp. La activación requiere migración y variable; no afirmar que esté activa
+solo porque el código existe. Las notas de instalación pendiente del estado histórico no prueban el estado actual.
+
 Leer también `docs/COBERTURA_HISTORICO.md`: LATAM y España más remotas mundiales, prioridad remota,
 rotación de cargos exactos/similares/cercanos, identidad por enlace y evidencia de contenido, cola de reintentos
 a Supabase y conservación sin borrado automático de ofertas de la base. No construir seguimiento de postulaciones
