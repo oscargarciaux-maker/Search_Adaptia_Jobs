@@ -39,7 +39,8 @@ jobs:
           psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f supabase/migraciones/003_estado_operativo.sql
           psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f supabase/migraciones/003_estado_operativo.sql
           psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f pruebas/estado_operativo_integracion.sql
-          python pruebas/probar_concurrencia_estado.py
+          # Usar pg_dump/pg_restore 17 del mismo contenedor, sin depender de la versión del runner.
+          python3 pruebas/probar_concurrencia_estado.py --docker "${{ job.services.postgres.id }}"
   pruebas:
     runs-on: ubuntu-latest
     timeout-minutes: 15
