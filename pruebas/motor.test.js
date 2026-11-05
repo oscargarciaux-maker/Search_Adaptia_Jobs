@@ -29,6 +29,28 @@ const VACANTES = [
   V({ id: "6", titulo: "Diseñador Webflow", familias: [] }),
 ];
 
+test("solo comparte el enlace comprobado y vigente, aunque el principal falle", () => {
+  const ahora = "2026-11-05T12:00:00Z", bueno = "https://jobs.lever.co/acme/1";
+  const v = { ...VACANTES[0], enlace_directo: bueno, verificacion: { estado: "verificada", enlaces: [
+    { url: VACANTES[0].enlace, estado: "rechazada", comprobada_en: ahora },
+    { url: bueno, estado: "verificada", comprobada_en: ahora }] } };
+  assert.deepEqual(M.enlacesComprobados(v, ahora), [bueno]);
+  const mensajes = M.textoWhatsApp([v], { titulo: "UX", hoy: "2026-11-05", ahora });
+  assert.ok(mensajes[0].includes(bueno));
+  assert.ok(!mensajes[0].includes(v.enlace));
+  assert.deepEqual(M.enlacesComprobados(v, "2026-11-05T18:00:00Z"), []);
+  assert.deepEqual(M.textoWhatsApp([v], { ahora: "2026-11-05T18:00:00Z" }), []);
+});
+
+test("pendientes no se exportan como enlaces comprobados y rechazadas no aparecen", () => {
+  const pendiente = { ...VACANTES[0], verificacion: { estado: "pendiente", enlaces: [] } };
+  assert.deepEqual(M.enlacesComprobados(VACANTES[0]), []);
+  assert.deepEqual(M.textoWhatsApp([pendiente], {}), []);
+  assert.equal(M.filasExcel([pendiente], {}, 21).length, 1);
+  assert.equal(M.filtrar([pendiente], { soloVerificadas: true }).length, 0);
+  assert.equal(M.filtrar([{ ...pendiente, verificacion: { estado: "rechazada" } }], {}).length, 0);
+});
+
 test("frescura horaria exige hora real, no primera detección ni fecha sin hora", () => {
   const exacta = { ...VACANTES[0], publicada_en: "2026-10-28T10:00:00Z" };
   const sinHora = { ...VACANTES[0], id: "sin-hora", fecha_publicacion: "2026-10-28" };

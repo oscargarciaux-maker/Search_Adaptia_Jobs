@@ -86,5 +86,6 @@ jobs:
           print(f\"Vacantes en la bodega: {s['vacantes_en_bodega']} · nuevas hoy: {s['nuevas_hoy']} · {s['minutos']} min\")
           [print(f'  {k}: {v}') for k, v in s['fuentes'].items()]
           e = s.get('entrega') or {}
+          print(f\"Verificación de enlaces: {s.get('verificacion_enlaces', {})}\")
           print(f\"Entrega del día: {e.get('vacantes', 0)} vacantes, {e.get('filas', 0)} filas · Supabase: {e.get('supabase')}\")
           [print(f\"  {r['nombre']}: {r['entregadas']} (faltaron {r['faltan']})\") for r in (e.get('roles') or {}).values()]" >> "$GITHUB_STEP_SUMMARY" || true

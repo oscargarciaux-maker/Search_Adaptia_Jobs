@@ -264,10 +264,12 @@ def entregable(v, idiomas=("es", "en")):
         return "idioma fuera del contrato"
     if not v.get("paises"):
         return "no se puede aplicar desde los países"
+    if (v.get("verificacion") or {}).get("estado") == "rechazada":
+        return "enlaces rechazados: " + v["verificacion"].get("motivo", "sin destino válido")
     return ""
 
 
-def filas(v, rol="", grado="", fecha_entrega="", capturada=""):
+def filas(v, rol="", grado="", fecha_entrega="", capturada="", solo_comprobados=True):
     """Filas del contrato para una vacante: una por enlace (LinkedIn y el directo de la empresa), con el mismo contenido
     (el contrato las une). `capturada`: fecha y hora ISO de la corrida."""
     mod, ciudad, pais_oficina, alcance, hire_paises, regiones = ubicacion(v)
@@ -295,9 +297,11 @@ def filas(v, rol="", grado="", fecha_entrega="", capturada=""):
         "source_type": "publicacion" if any("publicación" in f for f in v.get("fuentes") or [v.get("fuente", "")]) else "oferta", "match_grade": grado,
     }
     salida, vistos = [], set()
+    revision = v.get("verificacion")
+    comprobados = {url_limpia(r["url"]) for r in (revision or {}).get("enlaces", []) if r["estado"] == "verificada"}
     for url in (v.get("enlace"), v.get("enlace_directo")):
         url = url_limpia(url)
-        if not url or url in vistos:
+        if not url or url in vistos or solo_comprobados and revision is not None and url not in comprobados:
             continue
         vistos.add(url)
         fila = dict(base, external_id=external_id(url), offer_url=url, source_portal=portal(url))

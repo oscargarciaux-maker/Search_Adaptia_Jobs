@@ -7,7 +7,8 @@ from buscador import calidad, enlaces, etiquetas, familias, normalizar, paises, 
 CAMPOS_PUBLICOS = ["id", "titulo", "empresa", "ubicacion", "familias", "paises", "confianza_pais", "modalidad",
                    "nota_pais", "idioma", "ingles", "nivel", "anos_min", "salario", "herramientas",
                    "fecha_publicacion", "fecha_estimada", "visto_primera_vez", "visto_ultima_vez", "fuente", "fuentes",
-                   "enlace", "enlace_directo", "tipo_enlace", "resumen", "publicada_en", "detectada_en", "vista_en"]
+                   "enlace", "enlace_directo", "tipo_enlace", "resumen", "publicada_en", "detectada_en", "vista_en",
+                   "verificacion"]
 
 
 def huella(empresa, titulo, enlace=""):

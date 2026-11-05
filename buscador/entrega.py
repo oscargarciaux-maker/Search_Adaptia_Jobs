@@ -48,7 +48,8 @@ def rol_de(v, roles):
 
 
 def _rasgos(v):
-    fila = contrato.filas(v)[0] if v.get("enlace") or v.get("enlace_directo") else {}
+    # Calcular diversidad no certifica ni exporta un enlace.
+    fila = contrato.filas(v, solo_comprobados=False)[0] if v.get("enlace") or v.get("enlace_directo") else {}
     return {
         "idioma": v.get("idioma", ""),
         "nivel": fila.get("seniority") or "sin nivel",
@@ -98,7 +99,7 @@ def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False, 
     return elegidas
 
 
-def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None):
+def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificacion=False):
     """{rol_id: [(vacante, grado)]} con las vacantes nuevas de cada rol, y un resumen por rol."""
     cfg = cfg or config()
     roles = cfg["roles"]
@@ -120,6 +121,11 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None):
         if (v.get("visto_primera_vez") or "") < desde:
             motivos["vista hace más de %d días" % cfg.get("dias_frescura", 14)] += 1
             descartes_rol[rol["id"]]["fuera de frescura"] += 1
+            continue
+        revision = v.get("verificacion")
+        if not omitir_verificacion and revision is not None and revision.get("estado") != "verificada":
+            motivos["enlaces sin comprobar o rechazados"] += 1
+            descartes_rol[rol["id"]]["enlaces sin comprobar o rechazados"] += 1
             continue
         motivo = contrato.entregable(v, tuple(cfg.get("idiomas", ["es", "en"])))
         if motivo:
@@ -172,6 +178,7 @@ def registrar_medicion(historial, resumen, hoy, dias=30):
         "pendientes_supabase": (resumen.get("supabase") or {}).get("pendientes", 0),
         "registro_confirmado": bool(resumen.get("registro_seleccion")) and not any(
             resumen["registro_seleccion"].get(k) for k in ("errores", "pendientes", "omitida")),
+        "enlaces_comprobados": bool(resumen.get("enlaces_comprobados")),
         "roles": {rid: {k: r[k] for k in ("candidatas", "entregadas", "faltan", "reserva_sin_entregar")}
                   for rid, r in resumen["roles"].items()},
     }
@@ -239,6 +246,8 @@ def correr(vacantes, entregadas, hoy, capturada, carpeta, subir=None, pendientes
     for h in [h for h, f in entregadas.items() if f < limite]:
         del entregadas[h]
     resumen["vacantes"] = sum(len(x) for x in elegidas.values())
+    resumen["enlaces_comprobados"] = bool(resumen["vacantes"]) and all(
+        (v.get("verificacion") or {}).get("estado") == "verificada" for lista in elegidas.values() for v, _ in lista)
     resumen["filas"] = len(filas)
     resumen["archivos"] = bool(generar_archivos)
     resumen["meta_por_rol"] = cfg["por_rol"]

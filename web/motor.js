@@ -78,6 +78,20 @@
 
   function fechaDe(v) { return v.fecha_publicacion || v.visto_primera_vez || ""; }
 
+  function enlacesComprobados(v, ahora = new Date().toISOString()) {
+    if (v.verificacion?.estado !== "verificada") return [];
+    return (v.verificacion.enlaces || []).filter(r => {
+      const edad = Date.parse(ahora) - Date.parse(r.comprobada_en || "");
+      return r.estado === "verificada" && Number.isFinite(edad) && edad >= 0 && edad < 21600000 &&
+        [v.enlace, v.enlace_directo].includes(r.url) && /^https?:\/\//i.test(r.url);
+    }).map(r => r.url);
+  }
+
+  function enlaceCompartible(v, ahora) {
+    // Compatibilidad con utilidades offline v1/v2. La interfaz exige siempre comprobación.
+    return v.verificacion ? enlacesComprobados(v, ahora)[0] || "" : v.enlace;
+  }
+
   function antiguedad(v, ahora, hoy) {
     const texto = (instante, prefijo) => {
       const minutos = Math.max(0, Math.floor((Date.parse(ahora) - Date.parse(instante)) / 60000));
@@ -105,6 +119,8 @@
     const excluir = (op.excluir || []).map(base).filter(Boolean);
     const salida = [];
     for (const v of vacantes) {
+      if (v.verificacion?.estado === "rechazada") continue;
+      if (op.soloVerificadas && !enlacesComprobados(v, op.ahora).length) continue;
       const titulo = base(v.titulo);
       let grado = null;
       if (familias.size) {
@@ -189,12 +205,12 @@
   }
 
   /** Mensajes listos para pegar en WhatsApp (uno cada `porMensaje` vacantes). */
-  function textoWhatsApp(lista, { titulo, lugar, fecha, hoy, nombres, totalPaises }, porMensaje = 15) {
-    const bloques = lista.map(v => {
+  function textoWhatsApp(lista, { titulo, lugar, fecha, hoy, nombres, totalPaises, ahora }, porMensaje = 15) {
+    const bloques = lista.filter(v => enlaceCompartible(v, ahora)).map(v => {
       const linea2 = [v.modalidad === "remoto" ? `Remoto · ${dondeAplica(v, nombres || {}, totalPaises)}` :
         `${MODALIDAD[v.modalidad] || ""} · ${v.ubicacion || dondeAplica(v, nombres || {}, totalPaises)}`,
       INGLES[v.ingles], v.fecha_estimada ? "publicación sin confirmar" : fechaRelativa(fechaDe(v), hoy)].filter(Boolean).join(" · ");
-      return `*${v.titulo}* — ${v.empresa}\n${linea2}\n${v.enlace}`;
+      return `*${v.titulo}* — ${v.empresa}\n${linea2}\n${enlaceCompartible(v, ahora)}`;
     });
     const mensajes = [];
     for (let i = 0; i < bloques.length; i += porMensaje) {
@@ -211,15 +227,15 @@
   const GRADO_TEXTO = { exacto: "Exacta", similar: "Similar", cercano: "Cercana", palabra: "Por palabra", todas: "" };
 
   function filasExcel(lista, nombres, totalPaises) {
-    return [COLUMNAS_EXCEL].concat(lista.map(v => [v.titulo, GRADO_TEXTO[v._grado] || "", v.empresa,
+    return [COLUMNAS_EXCEL].concat(lista.filter(v => enlaceCompartible(v)).map(v => [v.titulo, GRADO_TEXTO[v._grado] || "", v.empresa,
       dondeAplica(v, nombres || {}, totalPaises) + (v.confianza_pais === "baja" ? " (confirmar)" : ""),
       MODALIDAD[v.modalidad] || "", v.ubicacion || "", IDIOMA[v.idioma] || "", (INGLES[v.ingles] || "No lo dice").replace("Inglés ", ""),
-      v.nivel || "", v.anos_min ?? "", v.salario || "", fechaDe(v), (v.fuentes || [v.fuente]).join(", "), v.enlace,
-      v.enlace_directo || "", v.resumen || ""]));
+      v.nivel || "", v.anos_min ?? "", v.salario || "", fechaDe(v), (v.fuentes || [v.fuente]).join(", "), enlaceCompartible(v),
+      v.verificacion ? (enlacesComprobados(v).includes(v.enlace_directo) ? v.enlace_directo : "") : v.enlace_directo || "", v.resumen || ""]));
   }
 
   const Motor = { GRADOS, NIVELES, normalizar, base, contieneFrase, prepararMapa, sugerir, filtrar, ordenar, conteos,
-    fechaRelativa, antiguedad, dondeAplica, textoWhatsApp, filasExcel, diasEntre, fechaDe, MODALIDAD, INGLES, IDIOMA, GRADO_TEXTO };
+    fechaRelativa, antiguedad, enlacesComprobados, dondeAplica, textoWhatsApp, filasExcel, diasEntre, fechaDe, MODALIDAD, INGLES, IDIOMA, GRADO_TEXTO };
   if (typeof module !== "undefined" && module.exports) module.exports = Motor;
   else raiz.Motor = Motor;
 })(typeof window !== "undefined" ? window : globalThis);

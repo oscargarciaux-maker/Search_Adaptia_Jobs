@@ -117,6 +117,8 @@ def test_corrida_vacia_no_reescribe_estado_previo(tmp_path, monkeypatch):
 
 
 def test_prueba_de_integracion_no_exige_claves_ni_genera_excel(tmp_path, monkeypatch):
+    from buscador import verificar_enlaces
+    monkeypatch.setattr(verificar_enlaces, "comprobar", lambda *a, **k: None)
     def prohibido():
         raise AssertionError("Una prueba no debe exigir Supabase")
     monkeypatch.setattr(supabase, "exigir_conexion", prohibido)

@@ -14,6 +14,11 @@ El plan completo, con el paso a paso, está en `docs/PLAN.md`: léelo antes de t
 
 ## Decisiones vigentes de cobertura e integridad
 
+Leer `docs/CONTRATO_DATOS_v3.md` y `docs/CONTROL_CALIDAD_ENLACES.md`: comprobar enlaces antes de nuevas entregas,
+no confundir HTTP 200 con ficha vigente ni 403 con cierre. La verificación tiene caducidad y presupuesto, no usa Apify
+ni envía formularios. Los snapshots históricos no se reescriben; un futuro bot debe consultar el catálogo y sus enlaces
+con comprobación vigente, no deducir disponibilidad del `status=active` inmutable de `ofertas` v1.
+
 Leer `docs/REVISION_PRODUCTO.md`, `docs/CONTRATO_DATOS_v2.md` y `docs/ACTIVAR_CAPTURA_HORARIA.md`.
 El catálogo v2 es aditivo; no cambiar las columnas de `ofertas` v1. La captura horaria gratuita no consume Apify ni
 crea entregas. Repetir el día solo completa/reintenta el mismo lote. No confundir publicación con actualización o

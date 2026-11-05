@@ -11,6 +11,7 @@ nadie.
 - Instalar y usar: [`docs/INSTALACION.md`](docs/INSTALACION.md)
 - Revisión de alternativas y mejoras: [`docs/REVISION_PRODUCTO.md`](docs/REVISION_PRODUCTO.md)
 - Activar captura horaria y catálogo Supabase: [`docs/ACTIVAR_CAPTURA_HORARIA.md`](docs/ACTIVAR_CAPTURA_HORARIA.md)
+- Integridad de enlaces y resultados de auditoría: [`docs/CONTROL_CALIDAD_ENLACES.md`](docs/CONTROL_CALIDAD_ENLACES.md)
 - Pasar el proyecto a otra persona: [`docs/TRASPASO.md`](docs/TRASPASO.md)
 - Plan y decisiones: [`docs/PLAN.md`](docs/PLAN.md) · Reglas para quien trabaje en el código: [`CLAUDE.md`](CLAUDE.md)
 
