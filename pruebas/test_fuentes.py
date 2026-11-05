@@ -102,6 +102,44 @@ def test_portales_de_empresas():
     assert ats.slugs_para("Mercado Libre Colombia S.A.S.") == ["mercadolibre", "mercado-libre"]
 
 
+def test_descubrimiento_respeta_limite_dns_sin_truncar_rutas_validas(monkeypatch):
+    from urllib.parse import urlparse
+    monkeypatch.setattr(ats, "SISTEMAS", ["greenhouse", "recruitee"])
+    class Cliente:
+        def __init__(self):
+            self.urls = []
+        def get(self, url, **op):
+            self.urls.append(url)
+            if urlparse(url).hostname.endswith(".recruitee.com"):
+                assert len(urlparse(url).hostname.split(".")[0]) <= 63
+            return _Respuesta("", 404)
+    cliente = Cliente()
+    for longitud in (63, 64):
+        slug = "a" * longitud
+        assert ats.probar(cliente, slug, set()) is None
+        assert ats.url_api("greenhouse", slug) in cliente.urls
+        assert (ats.url_api("recruitee", slug) in cliente.urls) == (longitud == 63)
+
+
+def test_una_url_invalida_no_pierde_los_otros_portales_descubiertos(monkeypatch, caplog):
+    from urllib3.exceptions import LocationParseError
+    monkeypatch.setattr(ats, "SISTEMAS", ["greenhouse"])
+    class Respuesta:
+        status_code = 200
+        def json(self):
+            return {"jobs": [{"id": 1}]}
+    class Cliente:
+        def get(self, url, **op):
+            if "/fallida/" in url:
+                raise LocationParseError(url)
+            return Respuesta()
+    estado = {}
+    nuevas, probadas = ats.descubrir(Cliente(), ["Fallida", "Valida"], estado, 2, "2026-11-05", [])
+    assert probadas == 2 and [fila["empresa"] for fila in nuevas] == ["Valida"]
+    assert estado["valida"] == "2026-11-05"
+    assert "LocationParseError" in caplog.text
+
+
 def test_tableros_remotos_resuelven_el_original():
     cliente = _ClienteFalso({"remotive.com/remote-jobs/design/1": _Respuesta(
         '<a href="https://jobs.lever.co/acme/1">Apply for this position</a>', url="https://remotive.com/remote-jobs/design/1")})
