@@ -47,6 +47,9 @@ def ejecutar(cliente, actor, entrada, token, max_usd, max_items=20, build=None, 
     run = (respuesta or {}).get("data") if isinstance(respuesta, dict) else None
     stats = {"tope_reservado_usd": max_usd}
     if not isinstance(run, dict) or not run.get("id"):
+        detalle = getattr(cliente, "ultimo_error", None)
+        if detalle:
+            stats["detalle"] = {k: v.replace(token, "[oculto]") if isinstance(v, str) else v for k, v in detalle.items()}
         return [], dict(stats, error="Apify no confirmó el inicio; se conserva la reserva para evitar doble gasto")
     stats["run_id"] = run["id"]
     while run.get("status") in ("READY", "RUNNING", "TIMING-OUT", "ABORTING"):

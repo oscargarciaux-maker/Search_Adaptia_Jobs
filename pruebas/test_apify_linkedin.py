@@ -78,6 +78,15 @@ def test_no_relanzar_si_inicio_no_confirmado():
     assert items == [] and stats["error"] and stats["tope_reservado_usd"] == 0.01
 
 
+def test_error_del_proveedor_es_visible_y_oculta_token():
+    class Roto(Cliente):
+        ultimo_error = {"http": 403, "mensaje": "denegado ficticio"}
+        def post_json(self, *args, **kwargs):
+            return None
+    _, stats = apify.ejecutar(Roto(), "actor", {}, "ficticio", 0.01)
+    assert stats["detalle"]["http"] == 403 and "ficticio" not in str(stats)
+
+
 def test_normalizar_salida_harvest_y_entrega():
     cruda = linkedin_apify.normalizar_item(ITEM)
     assert cruda["ubicacion"] == "Remote - LATAM" and cruda["empresa"] == "Empresa"

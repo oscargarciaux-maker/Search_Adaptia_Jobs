@@ -19,6 +19,7 @@ class Cliente:
         self.pausa, self.espera_429, self.timeout = pausa, espera_429, timeout
         self.peticiones = 0
         self.bloqueos = 0
+        self.ultimo_error = None
 
     def get(self, url, params=None, headers=None, reintentar_429=True, pausar=True):
         """Respuesta (requests.Response) o None si falló la conexión."""
@@ -50,11 +51,20 @@ class Cliente:
 
     def post_json(self, url, cuerpo, headers=None, timeout=None):
         self.peticiones += 1
+        self.ultimo_error = None
         try:
             r = self.sesion.post(url, json=cuerpo, headers=headers, timeout=timeout or self.timeout)
-        except requests.RequestException:
+        except requests.RequestException as e:
+            self.ultimo_error = {"tipo": type(e).__name__}
             return None
         try:
-            return r.json() if r.status_code < 300 else None
+            datos = r.json()
+            if r.status_code < 300:
+                return datos
+            error = datos.get("error", {}) if isinstance(datos, dict) else {}
+            self.ultimo_error = {"http": r.status_code, "tipo": str(error.get("type", ""))[:100],
+                                 "mensaje": str(error.get("message", ""))[:400]}
+            return None
         except ValueError:
+            self.ultimo_error = {"http": r.status_code, "tipo": "respuesta no JSON"}
             return None
