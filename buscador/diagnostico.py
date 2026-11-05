@@ -50,15 +50,15 @@ def revisar():
     def apify():
         token = os.environ.get("APIFY_TOKEN", "")
         if not token:
-            return None, "sin APIFY_TOKEN: no se buscan publicaciones «contratando» de LinkedIn"
-        r = requests.get("https://api.apify.com/v2/users/me", params={"token": token}, timeout=20)
-        actor = cfg["apify"].get("actor_publicaciones", "")
+            return None, "sin APIFY_TOKEN: LinkedIn usa la vía pública; falta habilitar el refuerzo Apify"
+        r = requests.get("https://api.apify.com/v2/users/me", headers={"Authorization": f"Bearer {token}"}, timeout=20)
+        actor = cfg["apify"].get("actor_linkedin", "")
         if r.status_code != 200:
             return False, f"la clave no funciona (Apify respondió {r.status_code})"
         plan = ((r.json().get("data") or {}).get("plan") or {}).get("id", "")
-        return (True, f"clave válida (plan {plan or 'sin dato'}); actor de publicaciones: {actor}") if actor else \
-            (None, "clave válida, pero falta actor_publicaciones en datos/config.yaml")
-    chequeo("Apify: publicaciones de LinkedIn", apify)
+        return (True, f"clave válida (plan {plan or 'sin dato'}); actor de ofertas formales: {actor}; tope USD 5/mes") if actor else \
+            (None, "clave válida, pero falta actor_linkedin en datos/config.yaml")
+    chequeo("Apify: ofertas formales de LinkedIn", apify)
 
     def supabase_():
         from buscador import supabase

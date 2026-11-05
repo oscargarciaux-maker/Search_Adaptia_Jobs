@@ -20,15 +20,19 @@ refuerzo:
   indeed_busquedas: 6
   getonbrd_busquedas: 6
 
-# Apify (secreto APIFY_TOKEN). Nunca un actor que pida cookie o sesión de LinkedIn.
-#   actor_publicaciones: publicaciones «contratando» del feed (fuentes/publicaciones_apify.py). Se paga por publicación
-#     (≈ USD 2 por 1.000): con publicaciones_por_dia = 72 son ≈ USD 4,3 al mes, dentro de los USD 5 del plan gratis.
-#     Alternativa si el plan gratis no lo deja correr: "lofomachines/linkedin-post-search-scraper" (10 por corrida).
-#   actor_linkedin: ofertas formales de LinkedIn por Apify (opcional; vacío = no se usa: el buscador público ya las trae)
+# Apify: crédito gratuito de hasta USD 5 por mes calendario para ofertas formales de LinkedIn.
+# Actor comprobado contra su esquema público; no se envían cookies ni sesión personal.
+# Las reservas conservadoras de cargo se guardan en trabajo/apify_presupuesto.json antes de cada ejecución.
+# Se reparte el tope mensual entre los días del mes, además del límite por consulta y corrida.
+# La búsqueda pagada del feed queda desactivada para priorizar las fichas formales con este crédito.
 apify:
   actor_publicaciones: "harvestapi/linkedin-post-search"
-  publicaciones_por_dia: 72
-  actor_linkedin: ""
+  publicaciones_por_dia: 0  # reservar el crédito gratuito para fichas de empleo
+  actor_linkedin: "harvestapi/linkedin-job-search"
+  build_linkedin: "0.0.61"
+  ofertas_por_busqueda: 20
+  tope_consulta_usd: 0.025
+  tope_mensual_usd: 5
   actor_linkedin_respaldo: ""
   tope_por_corrida_usd: 3
 

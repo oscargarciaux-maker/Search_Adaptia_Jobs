@@ -57,25 +57,23 @@ prometer que alcance para años: las descripciones completas y una fila por enla
 Revisa el tamaño real y configura copias de seguridad según el plan contratado. La limpieza de 30 días del buscador
 no elimina filas de Supabase. Ver `COBERTURA_HISTORICO.md`.
 
-## 3. Apify: publicaciones «contratando» de LinkedIn (gratis hasta USD 5 al mes, 5 minutos)
+## 3. Apify: fichas formales de LinkedIn, hasta USD 5 al mes
 
-Apify corre un "actor" que busca publicaciones del feed de LinkedIn (reclutadores que escriben "estamos contratando un
-Product Designer"). **Nunca** con una cuenta de LinkedIn: el actor elegido no pide cookie ni inicio de sesión. Si algún
-día un actor pide la cookie `li_at` o tu usuario, no se usa.
+1. Crear una cuenta gratuita en https://console.apify.com/sign-up y comprobar el crédito vigente del plan.
+2. Copiar el token desde Settings → API & Integrations → Personal API tokens y guardarlo como secreto `APIFY_TOKEN`
+   en GitHub. Nunca pegarlo en un chat ni en el código.
+3. El actor configurado es `harvestapi/linkedin-job-search`, versión `0.0.61`, sin sesión personal. Se envían consultas
+   de cargos exactos y afines, filtros de ubicación/remoto y límites de resultados y cargo. No se envían cookies.
+4. `tope_mensual_usd: 5` reparte reservas entre los días del mes; cada ejecución tiene su propio `maxTotalChargeUsd`.
+   Mantener el plan gratuito y los límites de la cuenta. La tarifa pública consultada es aproximadamente USD 1 por
+   1.000 ofertas más inicio; no significa que todas las ofertas obtenidas sean nuevas, elegibles o entregables.
+5. La búsqueda pagada del feed está desactivada (`publicaciones_por_dia: 0`) para dedicar este crédito a ofertas formales.
+   Si se habilita, comparte el mismo presupuesto y solo aporta ofertas al poder recuperar sus fichas originales.
+6. Diagnóstico → `probar_apify: true` ejecuta una prueba explícita de una sola oferta, con tope USD 0,01 del crédito,
+   sin guardar en Supabase. No repetirla innecesariamente: también consume crédito de la cuenta.
 
-1. **Crear la cuenta:** https://console.apify.com/sign-up (plan *Free*: USD 5 de uso al mes, sin tarjeta).
-2. **Copiar el token:** *Settings → API & Integrations → Personal API tokens* → copia el token (`apify_api_…`).
-3. **Guardarlo en GitHub:** secreto `APIFY_TOKEN`.
-4. **Actor:** ya viene elegido en `datos/config.yaml` → `apify.actor_publicaciones: "harvestapi/linkedin-post-search"`
-   (sin cookies; cobra por publicación, ≈ USD 2 por 1.000). Con `publicaciones_por_dia: 72` el gasto es ≈ USD 4,3 al mes.
-   - Si el *Diagnóstico* dice que el actor no corre en el plan gratis, cambia a
-     `"lofomachines/linkedin-post-search-scraper"` (funciona en el plan gratis con 10 publicaciones por corrida).
-   - Las búsquedas que hace están en `datos/entrega.yaml` → `consultas_publicaciones`.
-5. **Gasto:** en el plan gratis Apify se detiene solo al llegar a los USD 5 del mes (no cobra más; esos días no entran
-   publicaciones). Si algún día pasas a un plan pago, pon un límite mensual en *Billing → Limits*.
-
-Sin Apify la entrega formal funciona igual. Las publicaciones del feed se muestran por separado, pendientes de verificar;
-no se insertan automáticamente en Supabase ni completan la cuota.
+Sin token, las otras fuentes continúan; el reporte indica que Apify no pudo usarse. Los detalles del control de gasto
+están en `APIFY_LINKEDIN.md`. El presupuesto interno cubre este proyecto, no otros actores ejecutados por fuera.
 
 ## 4. Primera corrida y revisión
 

@@ -10,7 +10,8 @@ Apify es un proveedor, no una certificación de que el contenido sea una vacante
 autopromoción o búsquedas de trabajo. Las reglas anteriores de palabras («contratando», cargo, empresa, país) no eran
 suficientes para garantizarlo. Ahora sus coincidencias quedan pendientes de revisión: no completan la cuota ni se
 insertan en Supabase. Estado muestra un conteo y hasta diez enlaces para revisión, sin afirmar que sean ofertas aprobadas.
-Todavía no existe un flujo de aprobación que convierta esas publicaciones en ofertas automáticamente.
+Si una publicación contiene un enlace a una ficha LinkedIn, se intenta recuperar la ficha: solo su título, empresa
+y descripción reales pueden entrar automáticamente. El texto del post nunca sustituye esa ficha.
 
 Las publicaciones antiguas sin enlace formal se retiran del catálogo activo, sin borrar filas históricas de Supabase.
 Los avisos formales siguen procediendo de fichas LinkedIn/Indeed y APIs de portales o ATS. Se rechazan títulos de cursos,
