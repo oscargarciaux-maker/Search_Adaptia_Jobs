@@ -6,10 +6,14 @@ empresas que trajeron las demás fuentes (LinkedIn, Indeed, tableros remotos) y 
 portal quedan en la lista y se leen todas las noches.
 """
 import csv
+import logging
 import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+from requests import RequestException
+from urllib3.exceptions import HTTPError
 
 from buscador import familias, normalizar
 
@@ -169,7 +173,16 @@ def probar(cliente, nombre, bloqueados):
         for sistema in SISTEMAS:
             if sistema in bloqueados:
                 continue
-            r = cliente.get(url_api(sistema, slug), reintentar_429=False, pausar=False)
+            # Recruitee usa el identificador como etiqueta DNS; los demás lo llevan en la ruta.
+            # No truncar: se consultaría el tablero de una empresa distinta.
+            if sistema == "recruitee" and not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", slug, re.I):
+                continue
+            try:
+                r = cliente.get(url_api(sistema, slug), reintentar_429=False, pausar=False)
+            except (RequestException, HTTPError, ValueError) as e:
+                logging.getLogger(__name__).warning("Candidato de %s omitido por %s; se continúa el descubrimiento",
+                                                    sistema, type(e).__name__)
+                continue
             if r is None:
                 continue
             if r.status_code == 429:
