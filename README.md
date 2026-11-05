@@ -1,19 +1,36 @@
 # Search Adaptia Jobs — scraper de vacantes LATAM y España
 
-Cada noche entrega **hasta 20 vacantes nuevas por rol** (Product designer, UX/UI designer, Product Owner, Product manager, AI
-Engineer, QA), variadas y nunca repetidas, con las columnas del contrato de datos (`docs/CONTRATO_DATOS_v1.md`), en
-Supabase como base de datos obligatoria. Además, una página para buscar vacantes de cualquier cargo de tecnología y áreas creativas —con sus cargos parecidos (exactos,
-similares y cercanos) y de todos los niveles— abiertas en un país de LATAM o España, o remotas para ellos, de los últimos 30 días,
-y pasarlas a un grupo de WhatsApp o a Excel. Solo enlaces donde se postula de verdad (LinkedIn, Indeed, portales de las
-empresas), nunca agregadores. La búsqueda corre sola cada noche en GitHub Actions, sin IA y sin la cuenta de LinkedIn de
-nadie.
+Busca y clasifica ofertas para LATAM, España y remotas mundiales, con cargos exactos, similares y cercanos. Cada noche
+intenta seleccionar **20 nuevas por cada uno de seis roles** (Product Designer, UX/UI Designer, Product Owner, Product
+Manager, AI Engineer y QA), variadas y sin repetir, en **Supabase**. La captura horaria gratuita actualiza el catálogo
+sin crear otra entrega. Se comprueban enlaces antes de nuevas selecciones; cierres, páginas generales y cobros detectados
+se apartan y lo que no puede comprobarse queda pendiente. La cobertura/volumen no se garantizan por completo.
 
-- Instalar y usar: [`docs/INSTALACION.md`](docs/INSTALACION.md)
+La página permite buscar dentro de la ventana activa de 30 días, elegir ofertas comprobadas y copiar para WhatsApp
+o descargar Excel/CSV manualmente. La búsqueda diaria no usa IA ni sesión personal de LinkedIn. Todavía no hay agente
+WhatsApp ni seguimiento individual de candidaturas.
+
+## Documentación de entrega
+
+| Para quién / tarea | Documento vigente |
+|---|---|
+| Operador y cliente: aprender a usar e interpretar resultados | [Manual del cliente](docs/GUIA_CLIENTE.md) |
+| Administrador: instalar o actualizar sin perder datos | [Instalación](docs/INSTALACION.md) |
+| Cambiar propietario/cuentas conservando historial y presupuesto | [Traspaso](docs/TRASPASO.md) |
+| Operar, resolver incidentes, respaldar y restaurar | [Operación y recuperación](docs/OPERACION_Y_RECUPERACION.md) |
+| Decidir qué está comprobado y qué falta antes de aceptar/automatizar | [Aceptación y estado](docs/ACEPTACION_Y_ESTADO.md) |
+| Entender lo que cambió en las revisiones | [Historial de cambios](docs/HISTORIAL_CAMBIOS.md) |
+
+Los manuales anteriores prevalecen para uso/instalación. `docs/PLAN.md` conserva el diseño histórico; sus costos,
+casillas y actores originales no describen por sí solos la operación vigente.
+
+Referencias técnicas y antecedentes:
+
 - Revisión de alternativas y mejoras: [`docs/REVISION_PRODUCTO.md`](docs/REVISION_PRODUCTO.md)
 - Activar captura horaria y catálogo Supabase: [`docs/ACTIVAR_CAPTURA_HORARIA.md`](docs/ACTIVAR_CAPTURA_HORARIA.md)
 - Integridad de enlaces y resultados de auditoría: [`docs/CONTROL_CALIDAD_ENLACES.md`](docs/CONTROL_CALIDAD_ENLACES.md)
-- Pasar el proyecto a otra persona: [`docs/TRASPASO.md`](docs/TRASPASO.md)
-- Plan y decisiones: [`docs/PLAN.md`](docs/PLAN.md) · Reglas para quien trabaje en el código: [`CLAUDE.md`](CLAUDE.md)
+- Contratos: [v1 histórico](docs/CONTRATO_DATOS_v1.md), [catálogo v2](docs/CONTRATO_DATOS_v2.md),
+  [verificación pública v3](docs/CONTRATO_DATOS_v3.md) · Reglas para desarrollo: [CLAUDE.md](CLAUDE.md)
 
 ## Cobertura y conservación
 
@@ -30,6 +47,8 @@ El catálogo v2 permite actualizar durante el día sin crear otra entrega diaria
 última observación por separado y archiva sin borrar historial en Supabase. Requiere la migración aditiva y la variable
 de activación; la captura horaria queda desactivada hasta entonces. Repetir una entrega completa solo reintenta el lote.
 WhatsApp sigue pendiente de validar continuidad y definir destinatarios/confirmaciones; no hay envíos automáticos.
+La programación solicita 1:17 a. m. Colombia para la nocturna y minuto 23 de cada hora para la captura; GitHub puede
+retrasar/saltar ejecuciones. El límite de USD 5 es Apify, no un precio total garantizado de todos los proveedores.
 
 ## Pruebas
 

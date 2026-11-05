@@ -1,16 +1,19 @@
 # CLAUDE.md — Buscador de vacantes LATAM
 
 ## Qué es
-Un scraper de vacantes para LATAM y el mundo hispanohablante (España) que cada noche:
+Un buscador de vacantes para LATAM, España y remotas mundiales que:
 1. llena una bodega con todas las vacantes abiertas de 30 días (LinkedIn público, Indeed, portales de empresas, Get on
-   Board, tableros remotos y publicaciones «contratando» de LinkedIn vía Apify);
+   Board, tableros remotos y ofertas formales LinkedIn vía Apify);
 2. arma la **entrega diaria**: 20 vacantes nuevas (nunca entregadas) por rol —Product designer, UX/UI designer, Product
    Owner, Product manager, AI Engineer, QA—, variadas, con las columnas del **contrato de datos v1**
    (`docs/CONTRATO_DATOS_v1.md`), y la guarda en **Supabase** (obligatorio; Excel automático desactivado);
 3. publica una página donde se busca cualquier cargo y país y se copia a WhatsApp o Excel.
+La captura horaria gratuita actualiza catálogo y verificación sin crear otra entrega ni usar Apify. Los nuevos enlaces
+para entregar se comprueban con presupuesto y caducidad; los pendientes no se dan por válidos.
 Es un proyecto vendido por Oscar: se entrega a otra persona cambiando solo los secretos (`docs/TRASPASO.md`). Más adelante
 un bot de WhatsApp tomará 5 vacantes de Supabase y las enviará.
-El plan completo, con el paso a paso, está en `docs/PLAN.md`: léelo antes de trabajar.
+Leer antes de trabajar `docs/GUIA_CLIENTE.md`, `docs/OPERACION_Y_RECUPERACION.md` y `docs/ACEPTACION_Y_ESTADO.md`.
+`docs/PLAN.md` se conserva como diseño histórico: sus instrucciones antiguas no prevalecen sobre decisiones actuales.
 
 ## Decisiones vigentes de cobertura e integridad
 
@@ -35,7 +38,8 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
 
 ## Reglas que no se cambian sin preguntarle a Oscar
 - **Volumen antes que filtros.** Solo filtran: el cargo (mapa de cargos), 30 días de antigüedad, que siga abierta, que no
-  esté repetida y que se pueda aplicar desde el país elegido. Inglés, nivel y años se muestran como columnas.
+  esté repetida, que tenga un enlace comprobado para nuevas entregas y que se pueda aplicar desde el país elegido.
+  Inglés, nivel y años se muestran como columnas.
 - **Contrato de datos v1 manda** en la entrega: mismos nombres y valores; lo que el aviso no dice queda vacío (nunca se
   inventa: ni la moneda de un "$" solo, ni la modalidad que el aviso no dice). Un campo nuevo se agrega primero al
   contrato (versión nueva) y después al código. Solo ofertas en español o inglés.
@@ -67,7 +71,7 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
   familias, paises, enlaces, etiquetas, bodega, publicar, diagnostico) · `web/` la página · `functions/api/` funciones de
   Cloudflare · `pruebas/` · `reportes/` (los escribe la bodega) · `.claude/skills/` · `.github/workflows/`.
 
-## Cómo funciona (versión 1)
+## Cómo funciona (estado vigente)
 - **Bodega nocturna** (`.github/workflows/bodega.yml`, 1:17 Bogotá): `buscador/bodega.py` corre en paralelo las fuentes
   de `buscador/fuentes/` —LinkedIn público (rotación familia × país, consultas con OR), Indeed (JobSpy, 11 países),
   portales de empresas (`ats.py`: Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Recruitee; la lista crece sola
@@ -81,21 +85,26 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
   bodega elige las vacantes, sube las filas a la
   tabla `ofertas` de Supabase (`supabase/esquema.sql`; secretos `SUPABASE_URL`, `SUPABASE_SECRET_KEY`; nunca
   sobrescribe: external_id repetido se ignora). En `--prueba` no marca entregadas ni sube.
-- **Publicaciones «contratando»** (`fuentes/publicaciones_apify.py`): actor `harvestapi/linkedin-post-search` (sin
-  cookie, ≈ USD 2 por 1.000; tope `apify.publicaciones_por_dia` = 72 ≈ USD 4,3 al mes, plan gratis de Apify). Solo
-  se propone para revisión una publicación que anuncia contratación, nombra un cargo del mapa, un país activo o remoto, y cuya empresa se
-  sabe (autor empresa o "at <Empresa>" en el cargo del autor). No entra automáticamente en la entrega.
+- **Apify formal**: `curious_coder/linkedin-jobs-scraper`, build `1.7.18`, USD 5/mes de reservas durables compartidas
+  entre nocturna/búsquedas profundas. El feed `harvestapi/linkedin-post-search` sigue implementado pero desactivado
+  (`publicaciones_por_dia=0`); solo una ficha formal recuperada puede aportar una oferta, no un post por sí mismo.
+- **Catálogo/horario**: SQL 002 aditivo, `catalogo_vacantes` y `entregas_diarias`; `CAPTURA_HORARIA_ACTIVA=true` activa
+  el horario y el catálogo v2 nocturno. `ofertas` permanece v1; verificación pública v3 se almacena en JSON, sin SQL nuevo.
+- **Enlaces**: `verificar_enlaces.py`, presupuestos en `datos/config.yaml`, caché en `trabajo/`; no confundir datos
+  antiguos con comprobación vigente. El control del lote actual no reescribe sus snapshots históricos.
 - **Página** (`web/`): `motor.js` (lógica pura, con pruebas) y `app.js` (pantalla). Se sirve desde la rama `publicado`
-  con GitHub Pages (básico) o Cloudflare Pages (privada, con `functions/api/enviadas.js` y `profunda.js`).
+  con GitHub Pages por Actions (`PAGES_POR_ACTIONS=true`) o Cloudflare Pages/Access configurados, con Functions opcionales.
+  Las Functions no corren en GitHub Pages; Access no hace privado un repositorio público.
 - **Búsqueda profunda** (`profunda.yml`): un cargo a pedido, en vivo. **Diagnóstico** (`diagnostico.yml`).
 - Skills del proyecto: `nueva-familia`, `ampliar-mapa`, `diagnostico`, `nueva-fuente` (leen archivos cortos, no la bodega).
 - Instalación y traspaso: `docs/INSTALACION.md`, `docs/TRASPASO.md`.
 
 ## Estado
 - Versión 1 construida el 28 oct 2026 (pasos 1 a 11 del plan); corre cada noche desde el 29 oct.
-- 5 nov 2026: entrega diaria con el contrato de datos v1, Supabase, publicaciones de Apify y España. Falta que Oscar cree
-  Supabase y Apify y ponga los secretos (`docs/INSTALACION.md`), y medir cuántas nuevas por rol llegan cada día (antes
-  de priorizar los roles, diseño traía 1 a 13 nuevas por día).
+- 5 nov 2026: PR 6–11 fusionados; catálogo/horario/Supabase/Pages observados y control de enlaces probado/fusionado.
+  La evidencia fechada y los pendientes están en `docs/ACEPTACION_Y_ESTADO.md`; no afirmar siete días ni activación
+  productiva de un cambio hasta comprobar sus ejecuciones. El traspaso exige tres tablas, memoria/colas y reservas,
+  no solo reemplazar secretos o importar `ofertas`. Manuales y cambios: `docs/GUIA_CLIENTE.md` y `docs/HISTORIAL_CAMBIOS.md`.
 - Hallazgos de las pruebas en vivo: LinkedIn acepta consultas con OR; su página pública no muestra el enlace externo de
   postulación (sale de juntar con el portal de la empresa); Indeed bloquea la web (403) pero JobSpy funciona; Himalayas,
   We Work Remotely, RemoteOK y Jobicy no dejan ver el original (aportan nombres de empresas); Workable responde 429 si se

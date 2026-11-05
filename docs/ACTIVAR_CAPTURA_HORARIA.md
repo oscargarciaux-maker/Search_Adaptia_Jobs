@@ -2,6 +2,8 @@
 
 El código debe estar fusionado en `main`. La automatización horaria permanece desactivada hasta completar estos pasos.
 No hace falta volver a crear el proyecto de Supabase ni cambiar sus claves existentes.
+Para una cuenta nueva seguir [INSTALACION.md](INSTALACION.md); para operar o transferir, [GUIA_CLIENTE.md](GUIA_CLIENTE.md)
+y [TRASPASO.md](TRASPASO.md). No repetir la activación si ya está comprobada en esa instancia.
 
 1. En **Supabase → SQL Editor → New query**, ejecutar todo
    [`supabase/migraciones/002_catalogo.sql`](../supabase/migraciones/002_catalogo.sql). Se crean
@@ -20,8 +22,9 @@ No hace falta volver a crear el proyecto de Supabase ni cambiar sus claves exist
    `Estado`, filas privadas en las tablas nuevas y actualización de la página que usan los clientes.
 
 La captura automática intenta ejecutarse cada hora al minuto 23, todos los días. La selección nocturna se conserva:
-la captura horaria actualiza el catálogo, no elige otras 120 ni envía mensajes. Solo la nocturna usa Apify con el tope
-mensual existente de USD 5. GitHub puede retrasar ejecuciones; no equivale a recepción inmediata desde LinkedIn.
+la captura horaria actualiza el catálogo, no elige otras 120 ni envía mensajes. La nocturna y las búsquedas profundas
+pueden usar Apify con el tope mensual compartido de USD 5. GitHub puede retrasar ejecuciones; no equivale a recepción
+inmediata desde LinkedIn.
 
 La página consulta si hay una nueva captura cada minuto cuando está abierta. Comprobar que **Actualizar página**
 termina y que la URL real muestra la misma hora que `publicado/datos/salud.json`. Un push hecho por `GITHUB_TOKEN` no

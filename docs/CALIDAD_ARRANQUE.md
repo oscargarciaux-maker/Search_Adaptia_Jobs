@@ -1,5 +1,9 @@
 # Calidad de ofertas, Supabase y primera corrida
 
+Antecedente de los controles iniciales. Para operar/instalar prevalecen [GUIA_CLIENTE.md](GUIA_CLIENTE.md),
+[INSTALACION.md](INSTALACION.md), [CONTROL_CALIDAD_ENLACES.md](CONTROL_CALIDAD_ENLACES.md) y
+[OPERACION_Y_RECUPERACION.md](OPERACION_Y_RECUPERACION.md). La captura actual añade catálogo/selección v2 y verificación v3.
+
 Actualización posterior al PR #6, a partir de las aclaraciones de Oscar. Supabase es obligatorio para la entrega normal;
 el Excel era parte de la versión anterior y ya no se genera automáticamente. Se conservan históricos y una utilidad de
 exportación opcional, que no sustituyen la base.
@@ -25,15 +29,17 @@ cada aviso en este instante. No se promete precisión absoluta a partir de coinc
 
 1. Antes de recoger, una entrega normal exige credenciales secretas y lectura de todas las columnas del contrato en
    Supabase. Rechaza claves públicas y formatos ajenos a una clave secreta/service_role. `--prueba` no exige secretos.
-2. Una corrida sin catálogo válido no reemplaza el estado anterior. Las escrituras JSON usan reemplazo atómico para
-   evitar truncar un archivo válido si la escritura se interrumpe.
+2. Una corrida vacía sin evidencia de retiradas no reemplaza el estado anterior. Si hay cierres/archivos explícitos,
+   puede quedar un catálogo activo vacío conservando sus registros históricos. Las escrituras JSON usan reemplazo
+   atómico para evitar truncar un archivo válido si la escritura se interrumpe.
 3. Los envíos aceptados se confirman por lote; las filas fallidas siguen en la cola. La lectura previa no demuestra permiso
    de INSERT: la escritura queda comprobada al aceptar la carga real, sin crear ofertas ficticias para probarlo.
 4. Se conserva el estado y la cola en la rama publicada para reintentos. Actions guarda además un artefacto de recuperación
    durante 14 días. La recuperación desde ese artefacto es manual si falla la publicación, no automática. No sustituye
    copias de seguridad permanentes de Supabase.
 5. Después de conservar el estado, la validación final marca la corrida como fallida si la meta queda incompleta, hay
-   errores/pendientes o no se confirma la sincronización. Se puede conservar una entrega parcial con su reporte; no se
+   errores/pendientes, no se confirma la sincronización o el estado actual del lote exige revisar enlaces. Se puede
+   conservar una entrega parcial con su reporte; no se
    presenta como una cuota cumplida. El artefacto de estado tampoco afirma que se sincronizaron todas las ofertas.
 
 `Actions → Diagnóstico → solo_supabase: true` comprueba únicamente conexión y columnas, sin insertar nada. Las pruebas

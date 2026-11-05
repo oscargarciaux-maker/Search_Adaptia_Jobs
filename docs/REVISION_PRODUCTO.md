@@ -1,5 +1,9 @@
 # Revisión de producto y preparación operativa
 
+Esta revisión explica antecedentes y pruebas puntuales. Manuales vigentes para entrega al cliente:
+[GUIA_CLIENTE.md](GUIA_CLIENTE.md) y [ACEPTACION_Y_ESTADO.md](ACEPTACION_Y_ESTADO.md). La revisión de enlaces
+posterior está en [CONTROL_CALIDAD_ENLACES.md](CONTROL_CALIDAD_ENLACES.md); sus conclusiones no certifican el día actual.
+
 Revisión del 5 de noviembre de 2026. Fuentes públicas oficiales; observaciones de funciones visibles, no una auditoría
 de los algoritmos internos de otros productos. La cobertura y los precios comerciales pueden cambiar.
 

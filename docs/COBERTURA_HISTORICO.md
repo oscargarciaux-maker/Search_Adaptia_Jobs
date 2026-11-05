@@ -1,5 +1,8 @@
 # Cobertura, remotas e histórico
 
+Uso vigente: [GUIA_CLIENTE.md](GUIA_CLIENTE.md). Persistencia actual: contratos [v2](CONTRATO_DATOS_v2.md) y
+[v3](CONTRATO_DATOS_v3.md). Las cifras de pruebas al final son antecedentes, no certificación operativa actual.
+
 Decisiones confirmadas por Oscar durante la revisión del repositorio. Estos ajustes están en el código;
 no implican un despliegue ni una modificación de servicios externos.
 
@@ -98,26 +101,28 @@ protege nuevas capturas; recuperar contenido o separar ofertas antiguas exige vo
 
 ## Conservación y futuro seguimiento de postulaciones
 
-Hay tres plazos distintos:
+Hay plazos distintos para la vista activa, la memoria y el histórico:
 
 | Datos | Conservación actual | Propósito |
 |---|---|---|
 | Bodega activa del buscador | 30 días; también retira cierres detectados | Mostrar oportunidades recientes |
 | Archivos diarios CSV/Excel | Generación automática desactivada | Históricos anteriores conservados |
-| Memoria de entregas | 180 días | Evitar repetir entregas |
+| Memoria local de entregas | 180 días; complementada por recuperación Supabase con v2 activo | Evitar repetir entregas |
 | Ofertas guardadas en Supabase | Sin borrado automático por este código | Histórico persistente |
 | Cola pendiente de Supabase | Hasta confirmación; sin limpieza por antigüedad | Recuperar fallos de sincronización |
 
-Supabase almacena las ofertas seleccionadas para la entrega, no toda la bodega. La selección puede generar dos filas
-por oferta (LinkedIn y enlace directo). No existe todavía un catálogo canónico completo para clientes.
+`ofertas` almacena filas seleccionadas, hasta dos enlaces por vacante. `catalogo_vacantes` conserva vacantes y retiros
+normalizados; `entregas_diarias` conserva la selección canónica con referencia y snapshot. No se guardan todos los avisos
+crudos ajenos al mapa/países/ventana. Las tablas no se eliminan por la limpieza de la bodega.
 
-La retirada de la bodega por antigüedad no prueba que una vacante haya cerrado. Actualmente no se sincronizan todos los
-cierres a Supabase: `active` en esa tabla no garantiza disponibilidad actual. No se debe usar como señal de progreso
-de una postulación. La vista `entrega_de_hoy` muestra la fecha más reciente disponible, que podría ser anterior a hoy.
+La retirada por antigüedad no prueba cierre. V2 sincroniza cierres/archivos observados del catálogo; v3 incorpora evidencia
+de enlaces. No implica que todas las ofertas se hayan revisado recientemente. `ofertas.status=active` es histórico e
+inmutable: consultar el estado actual del catálogo y la caducidad de su verificación. Ninguno informa el progreso privado
+de una candidatura. La vista `entrega_de_hoy` muestra la fecha máxima disponible, que podría ser anterior a hoy.
 
 Para la futura etapa se recomienda:
 
-1. Una oferta canónica persistente con sus enlaces y evidencia de vigencia; archivar en lugar de borrar.
+1. Utilizar el catálogo canónico ya implementado y sus evidencias vigentes; no duplicarlo ni borrar ofertas referenciadas.
 2. Postulaciones separadas por cliente y oferta, con historial de eventos: aplicada, entrevista, rechazada, etc.
 3. Relaciones que impidan eliminar una oferta referenciada y una copia de su contenido al postular.
 4. Políticas de acceso por cliente, copias de seguridad, restauración comprobada y supervisión de tamaño de la base.

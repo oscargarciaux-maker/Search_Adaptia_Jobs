@@ -1,6 +1,7 @@
 # Entrega diaria en el formato del «Contrato de datos de ofertas — Adaptia Jobs (v1)» (docs/CONTRATO_DATOS_v1.md).
 # Cada noche, después de la bodega, se eligen `por_rol` vacantes NUEVAS (nunca entregadas antes) de cada rol, lo más
-# variadas posible (idioma, nivel, país, modalidad, empresa y fuente), y se escriben en Supabase y en un CSV.
+# variadas posible (idioma, nivel, país, modalidad, empresa y fuente), y se escriben en Supabase.
+# La descarga manual Excel/CSV es opcional; la exportación automática anterior está desactivada.
 # Se puede cambiar sin tocar código; `python -m pytest` revisa el formato.
 
 por_rol: 20

@@ -48,7 +48,8 @@ programa puede no coincidir con el ciclo de crédito del proveedor.
 Si se habilita el feed, una publicación con enlace LinkedIn puede descubrir una oferta: el programa recupera la ficha,
 comprueba que no esté cerrada y exige título, empresa y descripción reales de esa ficha. Las demás siguen pendientes.
 
-El horario nocturno todavía no cambia. Para reducir retrasos se recomienda una captura incremental cada hora, independiente
-de la selección diaria y con marcas de tiempo de publicación y detección. Con USD 5 no se garantiza búsqueda completa de
-LinkedIn cada hora: las fuentes gratuitas deben aportar frecuencia y Apify un refuerzo acotado. Implementar ese cambio
-requiere un flujo incremental y ampliar primero el contrato para conservar horas; no basta con multiplicar el cron actual.
+La captura incremental horaria ya está implementada, independiente de la selección diaria y con marcas de publicación,
+detección y observación. Usa fuentes gratuitas sin Apify. La nocturna y las búsquedas profundas sí pueden ejecutar el
+actor dentro del presupuesto compartido del proyecto. No se consigue búsqueda completa de LinkedIn cada hora con USD 5.
+La activación exige el SQL v2 y la variable documentados en [INSTALACION.md](INSTALACION.md). La comprobación de enlaces
+v3 no utiliza crédito Apify. El estado real de activación se acredita con ejecuciones, no con este documento.

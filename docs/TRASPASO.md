@@ -1,46 +1,142 @@
-# Traspaso a otra persona
+# Traspaso al cliente sin perder continuidad
 
-Todo vive en este repositorio y en cuentas que la otra persona crea a su nombre: GitHub, Supabase y Apify (y, si los usa,
-Brave y Cloudflare). No hay nada que dependa del Google, el Drive, el Apps Script ni otros repositorios de quien lo
-construyó. Al cambiar los secretos, todo funciona igual con las cuentas nuevas.
+Versión vigente: 5 de noviembre de 2026. Acompaña [GUIA_CLIENTE.md](GUIA_CLIENTE.md), [INSTALACION.md](INSTALACION.md),
+[OPERACION_Y_RECUPERACION.md](OPERACION_Y_RECUPERACION.md) y [ACEPTACION_Y_ESTADO.md](ACEPTACION_Y_ESTADO.md).
 
-## Lo que la otra persona necesita
+## 1. Acordar qué se transfiere
 
-| Cuenta | Para qué | Costo |
+Antes de actuar, elegir entre **continuar el servicio existente** o **instalar una instancia nueva e independiente**.
+No tienen el mismo resultado. La continuidad conserva lo ya seleccionado, los pendientes y el presupuesto reservado.
+Una instancia nueva con memoria vacía puede volver a ofrecer vacantes antiguas y reservar nuevamente crédito.
+
+Acordar por escrito, fuera del repositorio, responsable y recuperación de acceso de cada servicio; fecha de corte;
+URL final; historial que se entrega; presupuesto; canal de soporte y quién resuelve un bloqueo de las fuentes.
+No transferir cuentas personales ni compartir contraseñas para simular el cambio de propietario.
+
+| Elemento | Qué se entrega o configura | Evidencia |
 |---|---|---|
-| GitHub | El código, la búsqueda nocturna y la página | Gratis (repositorio público; privado también sirve, pero GitHub Pages en privado pide plan pago: usar Cloudflare) |
-| Supabase | La base de datos con la entrega diaria | Gratis |
-| Apify | Publicaciones «contratando» de LinkedIn | Gratis hasta USD 5 al mes |
-| Brave, Cloudflare | Opcionales (ver `docs/INSTALACION.md`) | Gratis o casi |
+| GitHub | Código `main`, flujos, rama `publicado`, permisos y ramas protegidas | Cliente entra con su cuenta y ve las ejecuciones |
+| Supabase | Proyecto conservado o restauración de tres tablas y permisos | Conteos, referencias y lectura/escritura reales |
+| Apify | Cuenta/organización del cliente, actor y límite | Token nuevo validado, saldo y reservas contrastados |
+| Alojamiento | Pages por Actions o Cloudflare; URL y acceso | Página real coincide con datos publicados |
+| Estado de trabajo | Toda la carpeta `trabajo/` de un mismo corte | Lote, colas y presupuesto respaldados juntos |
+| Marcas del navegador | Exportación opcional del historial de enviadas | Importación probada en el navegador del nuevo operador |
+| Manuales y soporte | Versiones vigentes, incidencias conocidas y responsables | Cliente completa una búsqueda/selección sin ayuda |
 
-## Pasos
+GitHub aloja código y procesos; no mueve automáticamente los proyectos de Supabase, Apify o Cloudflare.
 
-1. **Pasar el repositorio.** Dos opciones:
-   - *Transferir* (conserva historial y flujos; el enlace de la página cambia de usuario): *Settings → General → Danger
-     Zone → Transfer ownership* → usuario de la otra persona. Ella acepta desde el correo de GitHub.
-   - *Copiar como plantilla* (cada uno conserva el suyo): *Settings → General → Template repository*; la otra persona toca
-     *Use this template → Create a new repository*. Con esta opción la rama `publicado` no viaja: la primera búsqueda
-     empieza de cero (y la memoria de "ya entregadas" también; ver el paso 6).
-2. **La otra persona crea su Supabase y su Apify** siguiendo `docs/INSTALACION.md` (secciones 2 y 3). Su base de datos
-   empieza vacía; si quiere el histórico, quien entrega exporta la tabla `ofertas` a CSV (*Table Editor → ofertas →
-   Export → Export to CSV*) y ella la importa en la suya (*Table Editor → ofertas → Insert → Import data from CSV*).
-3. **Poner los secretos nuevos** en *Settings → Secrets and variables → Actions*: `SUPABASE_URL`, `SUPABASE_SECRET_KEY`,
-   `APIFY_TOKEN` (y `BRAVE_API_KEY` si lo usa). Los secretos **no** viajan con el repositorio: si se transfirió, borra los
-   viejos y crea los nuevos con los mismos nombres.
-4. **Activar Actions** si GitHub lo pide (*Actions → I understand my workflows, enable them*) y **la página** (GitHub
-   Pages con la rama `publicado`, o Cloudflare), igual que en `docs/INSTALACION.md`.
-5. **Diagnóstico:** *Actions → Diagnóstico → Run workflow*. Debe salir ✅ en Supabase y Apify con las cuentas nuevas.
-6. **Primera búsqueda:** *Actions → Bodega nocturna → Run workflow → modo `inicial`* (40–60 minutos). Si el repositorio
-   se transfirió, sigue sin repetir lo ya entregado; si se copió como plantilla, empieza una memoria nueva.
-7. **Cerrar lo viejo (quien entrega):** revoca sus claves —Supabase (*Project Settings → API Keys → borrar la clave
-   secreta* o pausar/borrar su proyecto), Apify (*Settings → API & Integrations → borrar el token*), Brave y Cloudflare—
-   y sale como colaborador del repositorio. Desde ese momento nada usa sus cuentas.
+## 2. Preparar un corte consistente
 
-## Qué revisar después
+1. Elegir una ventana en que no se esté enviando una selección a clientes.
+2. En Actions, deshabilitar temporalmente los flujos que escriben: **Bodega nocturna**, **Captura horaria** y
+   **Búsqueda profunda**. Esperar a que las ejecuciones en curso terminen. Si se usa la función Cloudflare, evitar
+   despachos desde la página durante el corte.
+3. Guardar URL, identificador de la última ejecución, commit `main` y commit `publicado` del corte, sin registrar secretos.
+4. Respaldar las tres tablas y la carpeta de trabajo siguiendo el manual de operación. Conservar los respaldos fuera
+   del repositorio y con acceso restringido. Los artefactos de Actions caducan; no son una copia permanente.
+5. Guardar los reportes de salud y sus pendientes. No vaciar las colas ni modificar fechas para que el corte parezca limpio.
+6. Registrar el saldo/uso de Apify y las reservas del archivo `apify_presupuesto.json` del mismo corte.
 
-- La página abre y la búsqueda de un cargo trae vacantes.
-- *Estado → Entrega del día*: fecha de hoy, 20 por rol (o cuántas faltaron) y "Supabase: N filas sincronizadas", cero pendientes y cuota completa.
-- En Supabase, *Table Editor → entrega_de_hoy* tiene filas con la fecha de hoy.
-- Las publicaciones del feed de Apify son indicios por verificar, no vacantes entregadas. Supabase es obligatorio;
-  el Excel automático de la entrega está desactivado.
-- Si algo falla, el *Diagnóstico* dice qué; con Claude, la skill `diagnostico` lo explica.
+Para detener operaciones no basta con cambiar `CAPTURA_HORARIA_ACTIVA=false`: la nocturna seguiría y además volvería
+al camino v1. Utilizar la deshabilitación de flujos cuando se requiere una pausa completa de mantenimiento.
+
+## 3. Transferir o copiar el repositorio
+
+### Transferir propiedad y continuar la misma instancia
+
+En GitHub: **Settings → General → Danger Zone → Transfer ownership**. El destinatario acepta la transferencia.
+Comprobar después ramas, permisos, Actions, secretos, variables, entornos, protección y páginas: las condiciones pueden
+variar entre organizaciones y planes. La URL o dominio puede requerir cambios.
+
+No afirmar que todos los secretos desaparecen al transferir: una transferencia puede conservar configuración del
+repositorio. Revisar y sustituir las credenciales por las del cliente según el plan de continuidad. Eliminar accesos
+que ya no correspondan solo después de verificar el relevo.
+
+### Copiar como plantilla o a otro repositorio
+
+Comprobar la opción de incluir ramas; no asumir que la copia contiene `publicado` ni el estado de trabajo.
+Los secretos no deben copiarse como archivos ni se leen desde GitHub para compartirlos. Crear configuración y secretos
+con los nombres previstos en [INSTALACION.md](INSTALACION.md).
+
+Si se desea continuidad, restaurar explícitamente el estado `trabajo/` y los datos. Los identificadores y referencias
+no se regeneran. Una copia de código con `modo=inicial` no es una migración completa de negocio.
+
+## 4. Conservar o mover Supabase
+
+Hay dos caminos; no ejecutarlos ambos a ciegas:
+
+- **Conservar el proyecto:** utilizar la transferencia/propiedad de organización que permita Supabase, con accesos propios
+  del cliente. Comprobar permisos y facturación y rotar la clave de servicio coordinadamente.
+- **Crear otro proyecto:** preparar su esquema con `esquema.sql` y `002_catalogo.sql`; restaurar los datos en destino
+  vacío y validar conteos, identidades, permisos y referencias antes de cambiar la conexión de producción.
+
+Las tablas necesarias son:
+
+1. `catalogo_vacantes`: identidad, contenido, estados, tiempos y verificación de enlaces.
+2. `entregas_diarias`: registro de selección y snapshot; depende del catálogo mediante clave foránea.
+3. `ofertas`: filas históricas compatibles con v1, potencialmente varias por vacante.
+
+La vista `entrega_de_hoy` se crea con el esquema y no sustituye las tablas. Exportar/importar únicamente `ofertas` no
+conserva el catálogo, el registro inmutable ni toda la capacidad de recuperación. No limitar la copia a registros activos:
+los cerrados y archivados también forman parte del historial.
+
+El procedimiento técnico de respaldo/restauración está en [OPERACION_Y_RECUPERACION.md](OPERACION_Y_RECUPERACION.md).
+No usar una exportación CSV simple como prueba suficiente de restauración: puede cambiar tipos, JSON, identidades o
+relaciones. Probar la recuperación antes del corte definitivo.
+
+## 5. Conservar el estado de la automatización
+
+Restaurar **toda** la carpeta `trabajo/` de un corte coherente. Sus piezas principales son:
+
+| Archivo | Función y motivo para conservarlo |
+|---|---|
+| `bodega.json.gz` | Inventario/descripcion para continuar la captura y deduplicación |
+| `estado.json` | Rotación de consultas y estado de fuentes |
+| `empresas_ats.csv` | Portales descubiertos además de la lista inicial |
+| `entregadas.json` | Huellas/URLs ya seleccionadas; no es el historial manual del navegador |
+| `lote_entrega.json` | Lote del día para repetir/reintentar sin escoger otro completo |
+| `pendientes_supabase.json` | Filas históricas no confirmadas, con fecha original |
+| `pendientes_catalogo.json` | Cambios de catálogo no confirmados |
+| `pendientes_registro.json` | Selecciones no confirmadas en el registro v2 |
+| `apify_presupuesto.json` | Reservas de crédito; perderlo puede habilitar nuevas reservas |
+| `verificacion_enlaces.json` | Caché de evidencias; caduca y no debe rejuvenecerse al copiar |
+| `metricas_entrega.json` | Serie de días distintos para continuidad y preparación |
+
+No editar las fechas de estos archivos, regenerar IDs ni mezclar colas de una base con otro catálogo independiente.
+La memoria v2 puede reconstruir lote y no repetición desde Supabase, pero no reconstruye por sí sola presupuesto Apify,
+consultas, pendientes locales aún no confirmados o marcas del navegador. Esa recuperación no reemplaza el respaldo.
+
+Para mover **Enviadas** del operador, exportar el JSON desde **Estado → Historial de enviadas** e importarlo en el
+nuevo navegador. Si se utiliza Cloudflare KV, incluir el traspaso/exportación de ese namespace por separado; no vive en
+Supabase ni en el JSON del navegador como garantía de copia completa.
+
+## 6. Reconfigurar cuentas y alojamiento
+
+1. Crear claves del cliente y actualizar los secretos `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `APIFY_TOKEN` y los opcionales.
+2. Confirmar las variables `CAPTURA_HORARIA_ACTIVA=true` y `PAGES_POR_ACTIONS` según el alojamiento.
+3. Si cambia el repositorio/propietario, revisar Pages, entorno `github-pages`, dominios y enlaces a Actions. La siguiente
+   captura regenera `config.js` con el repositorio de ejecución; una copia antigua puede contener el anterior.
+4. En Cloudflare, actualizar conexión Git, Access, KV y `GITHUB_REPO`/`GITHUB_TOKEN_FLUJOS`. Verificar acceso autorizado y
+   denegado; no confiar en que proteger el dominio haga privado el repositorio.
+5. Comprobar presupuesto global Apify. Si otro proyecto sigue usando la cuenta de origen, no atribuir su gasto a esta copia.
+
+Los secretos antiguos se revocan en el proveedor cuando ya no hagan falta. Cambiar solo el valor en GitHub no invalida
+un token que siga existiendo en Apify/Supabase. No borrar o pausar el proyecto de origen antes de validar destino y respaldo.
+
+## 7. Validar el relevo y reanudar
+
+1. Mantener la instancia antigua detenida: no operar dos copias como si fueran una sola memoria/presupuesto.
+2. Ejecutar diagnóstico de Supabase de lectura con la conexión nueva. Después comprobar catálogo y permisos con la
+   captura real y las consultas del manual; el diagnóstico de v1 por sí solo no acredita v2.
+3. Habilitar solo el flujo que se va a probar y realizar una prueba acotada sin escritura.
+4. Ejecutar una captura real con memoria restaurada. Si se repite el mismo día, debe reintentar/completar el lote,
+   no crear otros veinte por rol. Verificar catálogo/registro/colas y que el presupuesto no reinició sus reservas.
+5. Confirmar la página real, una selección y la conservación de una oferta cerrada/archivada. Las comprobaciones de
+   enlaces caducadas se vuelven a revisar; no forzarlas a positivas para aprobar el traspaso.
+6. Si se verifica continuidad en el mismo día, comparar IDs de `entregas_diarias`, no solo el número de filas de `ofertas`.
+7. Rehabilitar la programación y retirar la posibilidad de ejecutar la instancia antigua.
+8. Completar la lista de aceptación, registrar limitaciones pendientes y entregar responsables/canales de soporte.
+9. Solo después, revocar credenciales/accesos anteriores, cerrar los recursos acordados y confirmar cargos pendientes.
+
+La fecha y los resultados de una instalación de demostración no sustituyen la aceptación con las cuentas del cliente.
+El manual no autoriza a borrar datos ni a superar el presupuesto para lograr una captura de 120 a cualquier costo.
