@@ -1,0 +1,70 @@
+name: Preparar Supabase
+description: Respaldo cifrado confirmado antes de migraciones; activar automáticamente sin variables nuevas.
+inputs:
+  conexion:
+    description: Conexión administrativa privada
+    required: false
+  clave_respaldo:
+    description: Clave de cifrado privada
+    required: false
+  url:
+    description: URL de API del mismo proyecto
+    required: false
+  clave_rest:
+    description: Clave REST de servicio
+    required: false
+  modo:
+    description: diario, incremental, profunda o instalar
+    default: instalar
+  prueba:
+    description: No migrar ni activar
+    default: 'false'
+  manual:
+    description: Despacho manual de captura
+    default: 'false'
+  instancia_nueva:
+    description: Inicializar expresamente una base sin historial
+    default: 'false'
+  captura:
+    description: Variable de captura en instalaciones manuales anteriores
+    default: 'false'
+  central:
+    description: Variable central en instalaciones manuales anteriores
+    default: 'false'
+outputs:
+  ejecutar:
+    description: La captura está habilitada
+    value: ${{ steps.aplicar.outputs.ejecutar }}
+runs:
+  using: composite
+  steps:
+    - name: Preparar copia cifrada y plan
+      id: respaldo
+      shell: bash
+      env:
+        SUPABASE_DB_URL: ${{ inputs.conexion }}
+        SUPABASE_BACKUP_KEY: ${{ inputs.clave_respaldo }}
+        SUPABASE_URL: ${{ inputs.url }}
+        SUPABASE_SECRET_KEY: ${{ inputs.clave_rest }}
+        CAPTURA_HORARIA_ACTIVA: ${{ inputs.captura }}
+        ESTADO_SUPABASE_ACTIVO: ${{ inputs.central }}
+      run: python -m buscador.preparar --fase respaldo --modo "${{ inputs.modo }}" ${{ inputs.prueba == 'true' && '--prueba' || '' }} ${{ inputs.manual == 'true' && '--manual' || '' }}
+    - name: Conservar respaldo antes de cambiar SQL
+      if: ${{ always() && hashFiles('privado/respaldos/*.enc') != '' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: respaldo-instalacion-${{ github.run_id }}-${{ github.job }}-${{ github.run_attempt }}
+        path: privado/respaldos/*.enc
+        if-no-files-found: error
+        retention-days: 14
+    - name: Aplicar y comprobar preparación
+      id: aplicar
+      shell: bash
+      env:
+        SUPABASE_DB_URL: ${{ inputs.conexion }}
+        SUPABASE_BACKUP_KEY: ${{ inputs.clave_respaldo }}
+        SUPABASE_URL: ${{ inputs.url }}
+        SUPABASE_SECRET_KEY: ${{ inputs.clave_rest }}
+        CAPTURA_HORARIA_ACTIVA: ${{ inputs.captura }}
+        ESTADO_SUPABASE_ACTIVO: ${{ inputs.central }}
+      run: python -m buscador.preparar --fase aplicar --modo "${{ inputs.modo }}" ${{ inputs.prueba == 'true' && '--prueba' || '' }} ${{ inputs.manual == 'true' && '--manual' || '' }} ${{ inputs.instancia_nueva == 'true' && '--instancia-nueva' || '' }}

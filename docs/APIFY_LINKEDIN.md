@@ -26,7 +26,7 @@ las reservas de este programa son límites conservadores, no facturas ni estimac
 El mensual se reparte entre los días del mes: aproximadamente USD 0,16–0,18 diarios. El límite diario normalmente es el
 que restringe primero; con la tarifa consultada representa del orden de 60–80 ofertas brutas al día, no 60–80 entregables.
 
-Con SQL 003 y `ESTADO_SUPABASE_ACTIVO=true`, antes de iniciar se confirma una reserva en `apify_reservas` de Supabase,
+Con preparación automática confirmada (o SQL 003 y variable manual), antes de iniciar se confirma una reserva en `apify_reservas` de Supabase,
 con bloqueo por mes entre procesos y control diario/mensual/por corrida. El archivo pasa a ser copia auxiliar.
 La importación del contador antiguo preserva el mayor total conocido, sin sumar de nuevo reservas centrales reflejadas.
 Un fallo no habilita un contador local alternativo. Activación: [ACTIVAR_ESTADO_OPERATIVO.md](ACTIVAR_ESTADO_OPERATIVO.md).

@@ -1,6 +1,6 @@
 # Instalación y configuración del administrador
 
-Actualizado el 5 de noviembre de 2026. Este procedimiento corresponde al catálogo v2 y la verificación pública v3.
+Actualizado el 5 de noviembre de 2026. Este procedimiento incluye catálogo v2, verificación pública v3 e instalación automática.
 Para utilizar una instalación ya operativa, empezar en [GUIA_CLIENTE.md](GUIA_CLIENTE.md): no reemplazar cuentas,
 recrear tablas ni repetir la primera carga solo por recibir este manual.
 
@@ -9,10 +9,10 @@ recrear tablas ni repetir la primera carga solo por recibir este manual.
 - **Instalación nueva:** cuentas/base vacías, nueva memoria de selección y presupuesto propio. Seguir este documento.
 - **Continuidad de un negocio existente:** conservar historial, lote, reintentos, memoria de no repetición y reservas Apify.
   Seguir primero [TRASPASO.md](TRASPASO.md). Copiar solo el código no conserva esos datos.
-- **Actualización desde la versión anterior:** aplicar `002_catalogo.sql` si falta y revisar
-  [ACTIVAR_CAPTURA_HORARIA.md](ACTIVAR_CAPTURA_HORARIA.md). La verificación v3 no añade SQL ni secretos nuevos.
-- **Estado operativo duradero:** SQL 003 es una extensión separada de v3. Seguir
-  [ACTIVAR_ESTADO_OPERATIVO.md](ACTIVAR_ESTADO_OPERATIVO.md) para conservar reservas/pendientes en Supabase.
+- **Instalación o actualización automática (preferida):** seguir [INSTALACION_AUTOMATICA.md](INSTALACION_AUTOMATICA.md).
+  El propietario configura accesos una vez; el programa aplica 001/002/003 y activa catálogo/estado central.
+- **Instalación manual anterior:** se conserva como alternativa técnica en las guías de activación. No mezclarla
+  con el camino automático ni repetir SQL por recibir este manual.
 
 No se promete una instalación de treinta minutos ni costo total cero. Los tiempos dependen de las cuentas y permisos;
 los límites gratuitos y precios se comprueban en cada proveedor.
@@ -44,29 +44,33 @@ según las opciones de las cuentas. No poner claves en archivos, tickets, captur
 5. No cambiar permisos generales a escritura si un flujo ya declara sus permisos. Si existe una restricción de
    organización que bloquea `contents`, `pages` o Actions, el administrador debe resolverla explícitamente.
 
-## 4. Crear o preparar Supabase
+## 4. Crear o preparar Supabase automáticamente
 
-1. Entrar en [Supabase](https://supabase.com/), con la cuenta del cliente, y crear un proyecto si no existe.
-2. Guardar la contraseña administrativa en un gestor seguro. Es distinta de la clave REST del scraper y se necesita
-   para ciertas tareas de respaldo/restauración. No se guarda en GitHub como parte de este programa.
-3. En **SQL Editor → New query**, ejecutar completo [supabase/esquema.sql](../supabase/esquema.sql).
-4. Después ejecutar completo [supabase/migraciones/002_catalogo.sql](../supabase/migraciones/002_catalogo.sql).
-5. Comprobar en **Table Editor** las tablas `ofertas`, `catalogo_vacantes`, `entregas_diarias` y la vista `entrega_de_hoy`.
-6. En la configuración de API obtener **Project URL** y una **secret key** `sb_secret_…`, o la clave antigua
-   `service_role` si es lo disponible. No utilizar `anon`/publishable para estos procesos.
-7. En **GitHub → Settings → Secrets and variables → Actions → Secrets**, crear:
+1. Crear o conservar el proyecto del cliente y guardar su contraseña administrativa en su gestor seguro.
+2. En GitHub → **Settings → Secrets and variables → Actions → Secrets**, configurar una vez:
 
    | Nombre exacto | Contenido |
    |---|---|
-   | `SUPABASE_URL` | Project URL del proyecto que acaba de prepararse |
-   | `SUPABASE_SECRET_KEY` | Secret key o service_role de ese mismo proyecto |
+   | `SUPABASE_URL` | Project URL de la API |
+   | `SUPABASE_SECRET_KEY` | Secret key o service_role del mismo proyecto; nunca anon/publishable |
+   | `SUPABASE_DB_URL` | URI PostgreSQL de **Connect → Session pooler**, con contraseña, puerto 5432 |
+   | `SUPABASE_BACKUP_KEY` | Clave aleatoria de 32 bytes/base64 URL segura para cifrar los cortes; conservarla fuera de GitHub |
 
-Los scripts SQL son aditivos e idempotentes para el esquema previsto; no son un mecanismo para convertir cualquier
-base ajena. Ante tablas preexistentes con columnas diferentes, respaldar y revisar con un técnico antes de ejecutar.
-Las tablas quedan con RLS y acceso de servicio, sin acceso público de lectura/escritura para anon/authenticated.
+3. Seguir los pasos de [instalación automática](INSTALACION_AUTOMATICA.md), incluido el generador de clave. Ejecutar
+   **Actions → Preparar Supabase → main**. Solo para una base genuinamente nueva marcar **Instancia nueva** una vez.
+   En continuidad dejarla apagada: importa el contador vigente de `publicado/trabajo/` sin reiniciar crédito.
+4. Comprobar el resultado: respaldo cifrado subido, migraciones vigentes y preparación confirmada. El proceso crea las
+   tablas privadas, importa reservas y activa catálogo/estado central para las capturas. No copiar SQL al editor.
+5. La siguiente captura confirma uso real. El corte incluye seis tablas de proyecto y dos secuencias tras el instalador;
+   `adaptia_migraciones` registra versiones y hashes. No incluye Auth/Storage de Supabase.
 
-La clave REST no permite ejecutar migraciones SQL arbitrarias. Tenerla configurada no sustituye los pasos del SQL Editor.
-La versión pública v3 guarda `verificacion` dentro de `catalogo_vacantes.datos`; su sobre SQL sigue siendo v2.
+La conexión administrativa y la clave de cifrado solo se entregan a los pasos de preparación. La captura sigue usando
+la clave REST. TLS comprueba certificado y nombre del servidor. Los SQL aplicados no se editan: cada cambio nuevo añade
+una migración. Si falla el respaldo, el SQL no se ejecuta; si falla el lote de SQL, se revierte con su registro.
+
+Quien conserve una instalación manual puede seguir [ACTIVAR_CAPTURA_HORARIA.md](ACTIVAR_CAPTURA_HORARIA.md) y
+[ACTIVAR_ESTADO_OPERATIVO.md](ACTIVAR_ESTADO_OPERATIVO.md), en sus apartados manuales. No son pasos del camino preferido.
+La API REST por sí sola no instala SQL: `SUPABASE_DB_URL` es el acceso que permite automatizarlo.
 
 ## 5. Configurar Apify sin superar el presupuesto acordado
 
@@ -88,7 +92,10 @@ USD 0,01 y no forma parte de las reservas normales. No repetir esa prueba sin ne
 El máximo de USD 5 corresponde a Apify de este proyecto; no es un precio total garantizado de GitHub, base, alojamiento,
 Brave o futuro WhatsApp. Tarifas, reservas y límites: [APIFY_LINKEDIN.md](APIFY_LINKEDIN.md).
 
-## 6. Variables de activación: no son secretos
+## 6. Variables del modo manual y alojamiento
+
+Con preparación automática confirmada no se necesitan las variables de captura ni estado central. Solo configurar
+`PAGES_POR_ACTIONS` según el alojamiento. Las dos primeras filas siguientes se conservan para instalaciones manuales.
 
 En **Settings → Secrets and variables → Actions → Variables**, utilizar estos nombres y valores literales:
 
@@ -98,13 +105,13 @@ En **Settings → Secrets and variables → Actions → Variables**, utilizar es
 | `ESTADO_SUPABASE_ACTIVO` | `true`, solo tras SQL 003 y corte/importación | Centraliza presupuesto, pendientes y lote sin confirmar; ver guía específica |
 | `PAGES_POR_ACTIONS` | `true` para GitHub Pages; `false` o ausente para Cloudflare | Habilita el despliegue explícito de Pages |
 
-Crear `CAPTURA_HORARIA_ACTIVA=true` solo después del SQL. Para el primer arranque mantener el flujo **Captura horaria**
+Solo en modo manual: crear `CAPTURA_HORARIA_ACTIVA=true` después del SQL. Para el primer arranque mantener el flujo **Captura horaria**
 deshabilitado hasta completar la primera carga: así la nocturna puede usar v2 sin intercalar otra captura a medias.
 Dejar inicialmente `PAGES_POR_ACTIONS=false` mientras todavía no existe `publicado`; se activa al configurar la página.
 `CATALOGO_ACTIVO` es un parámetro interno que la nocturna recibe de la primera variable, no una tercera variable que
 el cliente deba crear.
 La variable de estado central permanece ausente/apagada hasta seguir su guía. Fusionar su código no migra la base.
-Para una instalación nueva que lo use, aplicar también 003 e inicializar expresamente como indica esa guía.
+En modo automático esos pasos los realiza Preparar Supabase; su ejecución exitosa acredita la activación técnica.
 
 ## 7. Diagnóstico y primera captura
 
@@ -121,7 +128,7 @@ Para una instalación nueva que lo use, aplicar también 003 e inicializar expre
    no es una duración fija. No lanzar varias por impaciencia: pueden ponerse en cola, consumir presupuesto y complicar el diagnóstico.
 7. En el resumen comprobar cantidades por rol, faltantes, calidad de enlaces y sincronización. En v2 debe confirmarse
    también el catálogo y `entregas_diarias`, no solo `ofertas`. Si no alcanza la meta, conservar el reporte y revisar motivos.
-8. En Supabase, comprobar filas reales en las tres tablas. `entrega_de_hoy` muestra la fecha máxima disponible,
+8. En Supabase, comprobar filas reales en las tres tablas de vacantes y, con instalador, estado/reservas/diario de migraciones. `entrega_de_hoy` muestra la fecha máxima disponible,
    que puede ser de un día anterior: mirar la fecha, no solo el nombre de la vista.
 
 `modo=inicial` amplía la recolección/reinicia rotación; no es una autorización para borrar presupuesto, no repetición

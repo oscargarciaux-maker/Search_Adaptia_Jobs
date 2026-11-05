@@ -41,13 +41,21 @@ jobs:
           else
             mkdir -p salida
           fi
+      - name: Preparar base y presupuesto automáticamente
+        uses: ./.github/actions/preparar-supabase
+        with:
+          conexion: ${{ secrets.SUPABASE_DB_URL }}
+          clave_respaldo: ${{ secrets.SUPABASE_BACKUP_KEY }}
+          url: ${{ secrets.SUPABASE_URL }}
+          clave_rest: ${{ secrets.SUPABASE_SECRET_KEY }}
+          modo: profunda
+          central: ${{ vars.ESTADO_SUPABASE_ACTIVO }}
       - name: Buscar
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
           BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-          ESTADO_SUPABASE_ACTIVO: ${{ vars.ESTADO_SUPABASE_ACTIVO }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           CONSULTA: ${{ inputs.consulta }}
           PAIS: ${{ inputs.pais }}
@@ -70,5 +78,5 @@ jobs:
           git commit -qm "Búsqueda profunda $(date -u +%Y-%m-%dT%H:%MZ)"
           git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" publicado
       - name: Comprobar estado central y catálogo
-        if: ${{ vars.ESTADO_SUPABASE_ACTIVO == 'true' }}
+        if: ${{ env.ESTADO_SUPABASE_ACTIVO == 'true' }}
         run: python -m buscador.validacion --salida salida --catalogo

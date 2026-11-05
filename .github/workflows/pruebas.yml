@@ -29,6 +29,11 @@ jobs:
       ADAPTIA_PRUEBA_SQL: "true"
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
       - name: Probar migración, repetición e integridad sin Supabase
         run: |
           psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -c 'create role anon; create role authenticated; create role service_role bypassrls;'
@@ -41,6 +46,7 @@ jobs:
           psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f pruebas/estado_operativo_integracion.sql
           # Usar pg_dump/pg_restore 17 del mismo contenedor, sin depender de la versión del runner.
           python3 pruebas/probar_concurrencia_estado.py --docker "${{ job.services.postgres.id }}"
+          python -m pruebas.probar_migraciones
   pruebas:
     runs-on: ubuntu-latest
     timeout-minutes: 15

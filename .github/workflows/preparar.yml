@@ -1,0 +1,54 @@
+name: Preparar Supabase
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/**'
+      - 'buscador/migraciones.py'
+      - 'buscador/preparar.py'
+      - 'buscador/respaldo.py'
+      - '.github/actions/preparar-supabase/**'
+      - '.github/workflows/preparar.yml'
+      - 'requirements.txt'
+  workflow_dispatch:
+    inputs:
+      instancia_nueva:
+        description: 'Solo base nueva sin historial ni reservas; dejar apagado para continuar este proyecto'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publicar
+  cancel-in-progress: false
+
+jobs:
+  preparar:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Recuperar el corte publicado
+        run: |
+          if git ls-remote --exit-code --heads origin publicado; then
+            git clone --depth 1 --branch publicado "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" salida
+            rm -rf salida/.git
+          else
+            mkdir -p salida
+          fi
+      - uses: ./.github/actions/preparar-supabase
+        with:
+          conexion: ${{ secrets.SUPABASE_DB_URL }}
+          clave_respaldo: ${{ secrets.SUPABASE_BACKUP_KEY }}
+          url: ${{ secrets.SUPABASE_URL }}
+          clave_rest: ${{ secrets.SUPABASE_SECRET_KEY }}
+          instancia_nueva: ${{ inputs.instancia_nueva || false }}

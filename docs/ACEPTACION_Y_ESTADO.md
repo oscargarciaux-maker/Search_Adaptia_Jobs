@@ -6,6 +6,12 @@ aprobados por haber fusionado otro PR. Instrucciones de uso: [GUIA_CLIENTE.md](G
 
 ## 1. Corte de evidencia
 
+**Automatización de instalación preparada posteriormente:** se ensayaron en PostgreSQL 17 aislado la instalación nueva
+con autorización explícita, paso de una base manual a automática conservando historia y reservas, rechazo de SQL
+reescrito, rollback del lote y dos migradores concurrentes. El respaldo cifrado se debe subir antes de aplicar en Actions.
+Se restauraron seis tablas/dos secuencias y trabajo, con decimales exactos, y se rechazó una copia alterada. Estas pruebas
+no configuran secretos, migran Supabase real ni acreditan continuidad productiva. Ver [la guía](INSTALACION_AUTOMATICA.md).
+
 **Extensión preparada después de ese corte:** SQL 003 y `ESTADO_SUPABASE_ACTIVO` permiten reservas/pendientes duraderos.
 Se ensayaron concurrencia y restauración de cinco tablas/dos secuencias en PostgreSQL 17 ficticio, además de pruebas
 Python de cortes/recuperación. No se migró ni activó la base real durante el desarrollo. Para aceptarla falta seguir

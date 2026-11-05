@@ -17,6 +17,11 @@ un bot de WhatsApp tomará 5 vacantes de Supabase y las enviará.
 Leer antes de trabajar `docs/GUIA_CLIENTE.md`, `docs/OPERACION_Y_RECUPERACION.md` y `docs/ACEPTACION_Y_ESTADO.md`.
 Riesgos y prioridades de mantenimiento: `docs/REVISION_FIABILIDAD.md`.
 Para reservas y pendientes centrales, leer `docs/CONTRATO_ESTADO_OPERATIVO.md` y `docs/ACTIVAR_ESTADO_OPERATIVO.md`.
+Camino preferido de instalación: `docs/INSTALACION_AUTOMATICA.md`. `SUPABASE_DB_URL` y `SUPABASE_BACKUP_KEY` se configuran
+una vez como Secrets. Preparar Supabase sube respaldo cifrado antes de SQL, registra hashes en `adaptia_migraciones`
+y activa por marca privada; no pedir copiar 002/003 ni variables manuales para este camino. No modificar SQL ya registrado:
+añadir migración. Clave administrativa limitada a preparación; no se entrega a fuentes, navegador ni logs. Tras el
+instalador los cortes contienen seis tablas y dos secuencias. Probar `python -m pruebas.probar_migraciones` solo en PG aislado.
 SQL 003 + `ESTADO_SUPABASE_ACTIVO=true` activan el modo; no asumir que está desplegado. No volver al contador local
 como alternativa silenciosa ni vaciar reservas/colas para resolver errores. El arranque importa un corte coherente.
 `docs/PLAN.md` se conserva como diseño histórico: sus instrucciones antiguas no prevalecen sobre decisiones actuales.
@@ -101,6 +106,9 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
 - **Estado operativo optativo**: SQL 003, `estado_operativo.py`, variable `ESTADO_SUPABASE_ACTIVO`; reservas/colas/lote
   sin confirmar centrales, recuperación por snapshot, revisión contra confirmaciones atrasadas. Tras 003, respaldar
   cinco tablas y dos secuencias. GitHub conserva inventario, rotaciones, verificación y métricas auxiliares.
+- **Instalación automática**: `migraciones.py`, `preparar.py`, `respaldo.py` y acción compartida: claves iniciales,
+  plan/corte cifrado confirmado, migraciones transaccionales, versiones y activación sin variables. El horario consulta
+  la marca incluso si no existe la variable antigua. Respaldo previo a cambios no equivale a backups periódicos.
 - **Página** (`web/`): `motor.js` (lógica pura, con pruebas) y `app.js` (pantalla). Se sirve desde la rama `publicado`
   con GitHub Pages por Actions (`PAGES_POR_ACTIONS=true`) o Cloudflare Pages/Access configurados, con Functions opcionales.
   Las Functions no corren en GitHub Pages; Access no hace privado un repositorio público.

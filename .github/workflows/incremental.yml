@@ -19,9 +19,8 @@ concurrency:
 
 jobs:
   captura:
-    if: ${{ vars.CAPTURA_HORARIA_ACTIVA == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -37,22 +36,35 @@ jobs:
           else
             mkdir -p salida
           fi
+      - name: Preparar base y comprobar habilitación
+        id: preparar
+        uses: ./.github/actions/preparar-supabase
+        with:
+          conexion: ${{ secrets.SUPABASE_DB_URL }}
+          clave_respaldo: ${{ secrets.SUPABASE_BACKUP_KEY }}
+          url: ${{ secrets.SUPABASE_URL }}
+          clave_rest: ${{ secrets.SUPABASE_SECRET_KEY }}
+          modo: incremental
+          prueba: ${{ inputs.prueba || false }}
+          manual: ${{ github.event_name == 'workflow_dispatch' }}
+          captura: ${{ vars.CAPTURA_HORARIA_ACTIVA }}
+          central: ${{ vars.ESTADO_SUPABASE_ACTIVO }}
       - name: Capturar sin crear entrega diaria ni consumir Apify
+        if: steps.preparar.outputs.ejecutar == 'true'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-          ESTADO_SUPABASE_ACTIVO: ${{ vars.ESTADO_SUPABASE_ACTIVO }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python -m buscador.bodega --salida salida --modo incremental ${{ inputs.prueba && '--prueba' || '' }}
       - name: Conservar estado de recuperación
-        if: ${{ always() && !inputs.prueba && hashFiles('salida/trabajo/estado.json') != '' }}
+        if: ${{ always() && !inputs.prueba && steps.preparar.outputs.ejecutar == 'true' && hashFiles('salida/trabajo/estado.json') != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: estado-captura-${{ github.run_id }}
           path: salida/trabajo/
           retention-days: 14
       - name: Actualizar catálogo publicado
-        if: ${{ !inputs.prueba }}
+        if: ${{ !inputs.prueba && steps.preparar.outputs.ejecutar == 'true' }}
         working-directory: salida
         run: |
           git init -q
@@ -63,5 +75,5 @@ jobs:
           git commit -qm "Captura $(date -u +%Y-%m-%dT%H:%MZ)"
           git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" publicado
       - name: Comprobar sincronización del catálogo
-        if: ${{ !inputs.prueba }}
+        if: ${{ !inputs.prueba && steps.preparar.outputs.ejecutar == 'true' }}
         run: python -m buscador.validacion --salida salida --catalogo
