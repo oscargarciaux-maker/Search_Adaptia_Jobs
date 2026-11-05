@@ -88,11 +88,18 @@ def probar(url=None, clave=None, sesion=None):
         return False, f"No se pudo conectar con {url}: {type(e).__name__}. Revisa SUPABASE_URL."
     if r.status_code == 200:
         return True, f"Conexión correcta: la tabla «ofertas» existe y la clave funciona ({url})."
-    if r.status_code in (401, 403):
-        return False, "Supabase rechazó la clave: usa la clave SECRETA (sb_secret_… o service_role), no la pública."
-    if r.status_code == 404 or "does not exist" in r.text or "Could not find" in r.text:
-        return False, "La tabla «ofertas» no existe: corre supabase/esquema.sql en el SQL Editor de Supabase."
-    return False, f"Respuesta inesperada de Supabase ({r.status_code}): {r.text[:200]}"
+    detalle = f"Supabase respondió {r.status_code}: {r.text[:300]}"
+    if r.status_code == 401 or "Invalid API key" in r.text or "No API key" in r.text:
+        return False, f"Supabase rechazó la clave: usa la clave SECRETA (sb_secret_… o service_role), no la pública. {detalle}"
+    if "42501" in r.text or "permission denied" in r.text:
+        return False, ("La clave no tiene permiso sobre la tabla: vuelve a correr supabase/esquema.sql completo (al final "
+                       f"da los permisos). {detalle}")
+    if r.status_code == 404 or "PGRST205" in r.text or "does not exist" in r.text or "Could not find" in r.text:
+        return False, ("La API de Supabase no ve la tabla «ofertas». Revisa: 1) que SUPABASE_URL sea la del mismo proyecto "
+                       "donde creaste la tabla; 2) vuelve a correr supabase/esquema.sql completo (al final da permisos y "
+                       "recarga la API); 3) en Project Settings → Data API, que la API esté activa y «public» esté en "
+                       f"Exposed schemas. {detalle}")
+    return False, f"Respuesta inesperada. {detalle}"
 
 
 if __name__ == "__main__":
