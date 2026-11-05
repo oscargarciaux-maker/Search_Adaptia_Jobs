@@ -42,6 +42,12 @@ En la consulta de las **12:49 p. m. de Colombia**:
 La auditoría previa de 120 seleccionadas encontró 108 con enlace comprobable, cinco pendientes y siete apartadas. Es
 evidencia de que hay que mirar calidad después de una carga exitosa; no afirma que los enlaces conserven ese estado hoy.
 
+**Actualización durante la revisión, 1:10 p. m. Colombia:** la captura
+[42080482444](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42080482444) ya terminó con éxito,
+confirmó catálogo y publicó v3. La página coincidía con datos de 1:09:43 p. m.; la revisión acotada de 40 dejó el lote de
+120 en 32 comprobadas, 86 pendientes (80 aún no revisadas) y dos cerradas. El primer ciclo v3 queda acreditado; faltan
+continuidad y el resto de la aceptación. No significa que todo el inventario tenga comprobación vigente.
+
 ## 3. Prioridades basadas en el código
 
 P0: resolver/acreditar antes de automatizar WhatsApp. P1: siguiente trabajo de estabilidad/capacidad. P2: evolución.
@@ -117,6 +123,12 @@ más cron al mismo sistema no resuelve una cola atrasada ni garantiza alertas de
 El reporte ahora registra `codigo_commit` y `ejecucion_id`, tomados de Actions. Permite distinguir el código fusionado
 del que generó los datos visibles. Fuera de Actions quedan vacíos; no son credenciales ni prueba de calidad por sí solos.
 No se ha configurado ni enviado ninguna alerta externa en esta revisión.
+
+La captura observada emitió avisos concretos de GitHub: acciones que apuntan a Node 20 se ejecutan forzadas en Node 24 y
+`ubuntu-latest` está en una migración de imagen. El trabajo pasó, pero confirma que la plataforma cambia debajo del
+programa. Planificar actualización de Actions y una imagen validada por PR; no asumir que fijar Python por sí solo fija
+todo el entorno ni cambiar todas las versiones sin revisar compatibilidad. Conviene registrar progreso/tiempos por fase
+sin secretos: el reporte final ayuda, pero un trabajo largo también necesita diagnóstico mientras se ejecuta.
 
 ## 6. Seguridad y mantenimiento de cambios asistidos por IA
 

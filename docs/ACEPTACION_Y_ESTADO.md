@@ -28,6 +28,21 @@ El [informe de los doce casos](../reportes/auditoria_enlaces_2026-11-05.md) y el
 
 Este estado fechado es histórico; utilizar los pasos siguientes para evaluar la situación actual.
 
+### Actualización observada el 5 de noviembre, 1:10 p. m. Colombia
+
+La [captura 42080482444](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42080482444) terminó
+correctamente con `7a131022e02410639f6896e4e0ca81cd73e01482`: ya se acreditó la primera captura productiva con v3.
+Su catálogo confirmó 13.959 filas, sin errores ni pendientes; la página coincidía con el dato de **1:09:43 p. m.** después
+del [despliegue 42081595465](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42081595465).
+
+La comprobación programó 40 ofertas. Del lote histórico de 120: **32 comprobadas, 86 pendientes y 2 rechazadas por cierre**.
+De las 86 pendientes, 80 no habían sido revisadas por el límite del ciclo y seis quedaron sin confirmar. Es la revisión
+gradual prevista, no una prueba de que las 120 estén listas para compartir ni de siete días de continuidad. Las dos
+cerradas se retiraron del catálogo activo sin reescribir la selección histórica.
+
+Esta actualización resuelve el pendiente del primer ciclo v3 del corte anterior; permanecen las pruebas de continuidad,
+respaldo real/capacidad de las cuentas del cliente, alertas y aceptación con sus propios accesos.
+
 ## 2. Condiciones para una entrega operativa
 
 Registrar resultado, fecha, responsable y enlace de evidencia para cada fila. «No probado» no equivale a «aprobado».
