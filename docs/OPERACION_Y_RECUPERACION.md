@@ -4,6 +4,9 @@ Manual del administrador, actualizado el 5 de noviembre de 2026. Complementa la 
 No modifica la instalación por leerlo. Registrar incidentes y respaldos fuera del repositorio, sin incluir secretos.
 La extensión de [estado operativo](ACTIVAR_ESTADO_OPERATIVO.md) centraliza reservas/pendientes solo tras SQL 003 y
 `ESTADO_SUPABASE_ACTIVO=true`. Los procedimientos distinguen modo legado y central; no asumir activación por tener código.
+El camino preferido es [instalación automática](INSTALACION_AUTOMATICA.md): aplica SQL e importa/activa mediante una
+marca privada, sin esa variable manual. Incluye respaldo cifrado subido antes de cambios y diario `adaptia_migraciones`.
+La preparación comparte la exclusión de las capturas; en este camino no hay que pausar y copiar SQL en cada actualización.
 
 ## 1. Qué comprobar cada día
 
@@ -33,6 +36,7 @@ no una garantía contractual del proveedor. Abrir una incidencia si hay retrasos
 | `entrega_de_hoy` | Vista de la fecha máxima existente en `ofertas` | Puede mostrar un día anterior; no tiene almacenamiento propio |
 | `publicado/trabajo/` | Estado de búsqueda, memoria, colas, presupuesto y caché | Continuar ejecuciones y recuperar pendientes |
 | Supabase con SQL 003 | `estado_operativo` y `apify_reservas` privados | Autoridad de pendientes/reservas en modo central; archivos de trabajo auxiliares |
+| `adaptia_migraciones` | Versión, nombre, hash y fecha; acceso administrativo | Evita repetir o modificar migraciones ya aplicadas; incluir en respaldos automáticos |
 | `publicado/datos/` | Datos públicos de la página y reporte de salud | Consulta de la interfaz; no sustituye a Supabase |
 | Navegador o Cloudflare KV | Marcas manuales de enviadas | Historial del operador, sin destinatario ni comprobante WhatsApp |
 
@@ -183,6 +187,16 @@ para evaluar: copia diaria y antes de cambios, con recuperación probada; el adm
 
 ## 8. Respaldo completo y restauración comprobable
 
+El instalador produce antes de cambios un corte cifrado de las tablas del proyecto, secuencias y `trabajo/`; la acción
+debe subirlo correctamente antes de aplicar SQL. Esos artefactos duran 14 días. Descargar cortes a almacenamiento privado
+duradero según la política acordada, guardando la clave de cifrado fuera de GitHub. No incluye Auth, Storage ni otros
+esquemas de Supabase. No sustituye una copia periódica ni la supervisión independiente del servicio.
+
+El módulo `buscador.respaldo.restaurar` verifica AES-GCM antes de insertar; solo acepta tablas de negocio vacías y una
+carpeta de trabajo nueva. Se prepara el esquema de la versión del corte antes de llamarlo. Se ensaya en CI con seis
+tablas, dos secuencias, decimales exactos, permisos y trabajo; rechaza un cifrado alterado. El rescate real sigue siendo
+una operación administrativa en destino aislado, con posterior contraste del consumo Apify.
+
 Un respaldo de `trabajo/` no contiene la base. Una exportación de `ofertas` no contiene catálogo/selecciones ni reservas.
 Necesita **ambas piezas del mismo corte** y, si se usa, KV/historial del operador. Consultar también las opciones vigentes
 [de respaldo de Supabase](https://supabase.com/docs/guides/platform/backups); no asumir que el plan gratis conserva una
@@ -199,6 +213,9 @@ copia recuperable para el cliente.
    Un técnico puede usar la receta siguiente, con cliente
    PostgreSQL compatible y acceso administrativo. Los servicios son perfiles de conexión seguros propios; no pegar
    contraseñas en argumentos ni en este manual. Ver [pg_service](https://www.postgresql.org/docs/current/libpq-pgservice.html).
+   Si se usó el instalador, hay seis tablas: añadir `--table=public.adaptia_migraciones` a esa receta. Conservar sus
+   hashes/fechas; no reinicializar el diario durante una restauración. La receta pg_dump es una alternativa técnica
+   al corte cifrado, no una tarea diaria del operador.
 
 ```bash
 # Directorio privado fuera del repositorio. Crear uno nuevo por corte y proteger sus archivos.
@@ -220,6 +237,8 @@ tras restaurar. El respaldo puede contener descripciones/URLs; almacenarlo con a
 4. Crear un destino aislado **vacío**, que no reciba clientes ni automatizaciones. Aplicar `esquema.sql` y
    `002_catalogo.sql` con sus permisos y `003_estado_operativo.sql` si el corte incluye esa extensión.
    No inicializar un marcador/presupuesto vacío antes de restaurar. No crear roles nuevos en Supabase: son roles del proveedor.
+   Para un corte con diario de migraciones, preparar también esa tabla mediante `buscador.migraciones.DIARIO`, con
+   conexión administrativa, sin ejecutar el paso de activación. El esquema debe corresponder a los SQL del corte.
 5. Restaurar sin apuntar jamás al proyecto productivo por accidente:
 
 ```bash

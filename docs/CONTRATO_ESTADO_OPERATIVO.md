@@ -42,6 +42,11 @@ dependencia de `publicado`, pero no sustituye respaldos de Supabase ni hace ató
 
 ## Activación controlada
 
+El camino preferido está en [INSTALACION_AUTOMATICA.md](INSTALACION_AUTOMATICA.md): respaldo cifrado subido antes del SQL,
+versiones/hashes privados en `adaptia_migraciones` y marca `control/instalacion_automatica` con las versiones esperadas.
+Las capturas la detectan sin crear variables GitHub. El esquema y las reservas se preparan con conexión administrativa;
+la captura conserva clave REST. Los pasos siguientes se mantienen como alternativa manual.
+
 1. Fusionar código y pausar flujos que escriben; esperar los que estén en curso. Guardar corte/respaldos y reservas.
 2. Aplicar `supabase/migraciones/003_estado_operativo.sql` con SQL Editor administrativo, después de esquema y 002.
 3. Asegurar que el corte contiene `apify_presupuesto.json`, lote y colas actuales. La primera lectura importa ese

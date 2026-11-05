@@ -16,6 +16,9 @@ Hay dos resultados distintos:
 
 El cliente no necesita instalar Python ni dejar encendido su computador para el uso habitual. GitHub ejecuta las búsquedas;
 Supabase conserva los datos; el navegador muestra la página. Las cuentas y sus permisos sí deben mantenerse activos.
+El administrador configura los accesos una vez siguiendo [Instalación automática](INSTALACION_AUTOMATICA.md). Las
+actualizaciones aprobadas preparan la base sin que el operador copie SQL 002/003 ni active variables. Si falla la
+preparación, se muestra el motivo y se conserva la copia cifrada disponible; no reiniciar reservas para desbloquearla.
 
 | Situación | Documento y acción |
 |---|---|

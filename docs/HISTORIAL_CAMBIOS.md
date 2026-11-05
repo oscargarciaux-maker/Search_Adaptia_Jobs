@@ -14,6 +14,7 @@ empieza en [GUIA_CLIENTE.md](GUIA_CLIENTE.md); los resultados observados están 
 | Revisión documental posterior | Manual del operador, instalación/traspaso actualizados, mantenimiento, recuperación y aceptación con evidencias | El cliente tiene una ruta de operación coherente; las instrucciones históricas quedan identificadas |
 | Revisión de producto y mantenimiento | Retirada de exportaciones de hojas de cálculo, guardia de recuperación parcial y trazabilidad de ejecución | Supabase como destino, inconsistencia sin lote detiene selección antes de gastar y riesgos priorizados en el manual |
 | Estado operativo duradero — preparado, activación separada | Reservas con bloqueo en Supabase, colas con revisión y recuperación de selecciones interrumpidas | SQL 003 + variable después de corte/importación; guía didáctica y ensayo de cinco tablas/dos secuencias |
+| Instalación automática — nueva evolución | Secretos iniciales, respaldo cifrado confirmado antes de SQL, migraciones atómicas con hashes y activación privada | No copiar SQL 002/003 ni activar variables manuales; diario adicional, seis tablas en cortes y ensayo de fallos/restauración |
 
 ## Datos y activación
 
@@ -24,6 +25,9 @@ empieza en [GUIA_CLIENTE.md](GUIA_CLIENTE.md); los resultados observados están 
   [guía de activación](ACTIVAR_ESTADO_OPERATIVO.md); no se aplicó a producción al desarrollar el código.
 - `CAPTURA_HORARIA_ACTIVA=true`: horario y v2 de la nocturna, después del SQL.
 - `PAGES_POR_ACTIONS=true`: solo para GitHub Pages por Actions; con Cloudflare se usa su despliegue.
+- Con instalación automática confirmada no se requieren las variables de captura/estado anteriores: Preparar Supabase
+  aplica e importa desde el corte y deja una marca privada. Requiere configurar una vez `SUPABASE_DB_URL` y
+  `SUPABASE_BACKUP_KEY`. Las alternativas manuales se conservan para instalaciones existentes.
 
 Una fusión aprueba código para las próximas ejecuciones; la evidencia de activación es una captura real con ese commit,
 su persistencia y su página actualizada. No se restauran ofertas recortadas/fusionadas por versiones antiguas de forma

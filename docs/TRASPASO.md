@@ -2,6 +2,8 @@
 
 Versión vigente: 5 de noviembre de 2026. Acompaña [GUIA_CLIENTE.md](GUIA_CLIENTE.md), [INSTALACION.md](INSTALACION.md),
 [OPERACION_Y_RECUPERACION.md](OPERACION_Y_RECUPERACION.md) y [ACEPTACION_Y_ESTADO.md](ACEPTACION_Y_ESTADO.md).
+La preparación preferida del destino está en [INSTALACION_AUTOMATICA.md](INSTALACION_AUTOMATICA.md): el cliente configura
+accesos una vez y no copia SQL 002/003 ni crea variables de captura. Continuidad sigue requiriendo un corte coherente.
 
 ## 1. Acordar qué se transfiere
 
@@ -79,6 +81,7 @@ Las tablas necesarias son:
 3. `ofertas`: filas históricas compatibles con v1, potencialmente varias por vacante.
 4. Si se aplicó 003, `estado_operativo`: marcador, colas con revisiones y selecciones sin confirmar.
 5. Si se aplicó 003, `apify_reservas`: reservas de crédito anteriores y centrales; nunca reiniciarlas al traspasar.
+6. Si se usó el instalador, `adaptia_migraciones`: versiones y hashes de SQL ya aplicado. No omitirlo ni borrar su historia.
 
 Conservar las secuencias `ofertas_id_seq` y, tras 003, `estado_operativo_revision_seq`. La segunda evita reutilizar revisiones.
 
@@ -122,8 +125,12 @@ Supabase ni en el JSON del navegador como garantía de copia completa.
 ## 6. Reconfigurar cuentas y alojamiento
 
 1. Crear claves del cliente y actualizar los secretos `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `APIFY_TOKEN` y los opcionales.
+   En modo automático, incluir `SUPABASE_DB_URL` del destino y `SUPABASE_BACKUP_KEY`. Conservar también, en su gestor,
+   las claves de cifrado anteriores mientras se retengan copias; cambiar el secreto no vuelve legibles los cortes viejos.
 2. Confirmar las variables `CAPTURA_HORARIA_ACTIVA=true` y `PAGES_POR_ACTIONS` según el alojamiento.
    Conservar además `ESTADO_SUPABASE_ACTIVO=true` si se traspasa una instancia central con SQL 003 restaurado.
+   Las variables de captura/estado anteriores son del camino manual; el automático usa su marca privada. El alojamiento
+   sí conserva configuración propia. Ejecutar Preparar Supabase tras restaurar en destino, dejando Instancia nueva apagada.
 3. Si cambia el repositorio/propietario, revisar Pages, entorno `github-pages`, dominios y enlaces a Actions. La siguiente
    captura regenera `config.js` con el repositorio de ejecución; una copia antigua puede contener el anterior.
 4. En Cloudflare, actualizar conexión Git, Access, KV y `GITHUB_REPO`/`GITHUB_TOKEN_FLUJOS`. Verificar acceso autorizado y

@@ -48,6 +48,17 @@ jobs:
           fi
           # No mostrar el reporte viejo como resultado de una primera corrida fallida.
           rm -f salida/datos/salud.json
+      - name: Preparar base y estado automáticamente
+        uses: ./.github/actions/preparar-supabase
+        with:
+          conexion: ${{ secrets.SUPABASE_DB_URL }}
+          clave_respaldo: ${{ secrets.SUPABASE_BACKUP_KEY }}
+          url: ${{ secrets.SUPABASE_URL }}
+          clave_rest: ${{ secrets.SUPABASE_SECRET_KEY }}
+          modo: diario
+          prueba: ${{ inputs.prueba || false }}
+          captura: ${{ vars.CAPTURA_HORARIA_ACTIVA }}
+          central: ${{ vars.ESTADO_SUPABASE_ACTIVO }}
       - name: Buscar y limpiar
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
@@ -55,8 +66,6 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          CATALOGO_ACTIVO: ${{ vars.CAPTURA_HORARIA_ACTIVA }}
-          ESTADO_SUPABASE_ACTIVO: ${{ vars.ESTADO_SUPABASE_ACTIVO }}
         run: python -m buscador.bodega --salida salida --modo "${{ inputs.modo || 'diario' }}" ${{ inputs.prueba && '--prueba' || '' }}
       - name: Publicar en la rama publicado
         if: ${{ !inputs.prueba }}

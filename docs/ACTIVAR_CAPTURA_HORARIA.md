@@ -1,5 +1,10 @@
 # Activar el catálogo y la captura horaria
 
+**Preferido:** seguir [INSTALACION_AUTOMATICA.md](INSTALACION_AUTOMATICA.md). El instalador aplica 002 y 003 y habilita
+catálogo/captura central mediante una marca privada; no requiere copiar SQL ni variables de captura. Lo siguiente es
+la alternativa manual, conservada para instalaciones anteriores. En modo automático, para pausar usar **Disable workflow**;
+apagar `CAPTURA_HORARIA_ACTIVA` no detiene una instalación automática confirmada.
+
 El código debe estar fusionado en `main`. La automatización horaria permanece desactivada hasta completar estos pasos.
 No hace falta volver a crear el proyecto de Supabase ni cambiar sus claves existentes.
 Para una cuenta nueva seguir [INSTALACION.md](INSTALACION.md); para operar o transferir, [GUIA_CLIENTE.md](GUIA_CLIENTE.md)

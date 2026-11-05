@@ -74,6 +74,9 @@ colas y selección sin confirmar en Supabase, con SQL 003, bloqueo/CAS y recuper
 concurrencia y respaldo/restauración de cinco tablas/dos secuencias. Requiere activación y evidencia reales; no está
 activada por esta revisión. Los párrafos siguientes describen el riesgo del modo legado que motivó el cambio.
 Registro completo de ejecuciones, optimización del catálogo, backups programados y monitor independiente siguen pendientes.
+La evolución posterior de [instalación automática](INSTALACION_AUTOMATICA.md) resuelve copiar SQL/activar variables por
+versión: acceso administrativo inicial, copia cifrada subible antes de SQL, hashes y rollback del lote. Añade un diario
+privado (seis tablas en cortes). No acredita todavía instalación real del cliente ni sustituye backups periódicos/monitor.
 
 ### Supabase como estado duradero
 
