@@ -48,7 +48,7 @@ CASOS = [
     ("Video Editor", "Remote - Worldwide", "", None, TODOS, "alta"),
     ("Frontend Developer", "Anywhere", "", None, TODOS, "alta"),
     ("QA Engineer", "Remote (Americas)", "", None, LATAM, "alta"),
-    ("Designer", "Remote - South America", "", None, LATAM, "alta"),
+    ("Designer", "Remote - South America", "", None, ["AR", "BO", "BR", "CL", "CO", "EC", "PE", "PY", "UY", "VE"], "alta"),
     # Remoto fuera de LATAM
     ("Product Designer", "Remote - US", "", None, [], "alta"),
     ("UX Designer", "United States (Remote)", "", None, [], "alta"),

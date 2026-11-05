@@ -16,7 +16,7 @@ from pathlib import Path
 
 import yaml
 
-from buscador import calidad, cobertura, enlaces, familias, normalizar, paises, vacante
+from buscador import calidad, cobertura, enlaces, familias, normalizar, paises, tiempos, vacante
 from buscador.fuentes import ats, brave, getonbrd, indeed, linkedin_apify, linkedin_publico, publicaciones_apify, remotos
 from buscador.http import Cliente
 
@@ -171,15 +171,19 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None):
     return crudas, enlaces_ats, empresas_leidas, salud
 
 
-def limpiar(previas, crudas, hoy, dias_maximos, enlaces_ats, empresas_leidas, consulta=""):
+def limpiar(previas, crudas, hoy, dias_maximos, enlaces_ats, empresas_leidas, consulta="", retiradas=None):
     """Convierte, junta con lo anterior, quita viejas y cerradas. Devuelve (vacantes, títulos sin familia, conteos)."""
     sin_familia = Counter()
     nuevas, descartes = [], Counter()
+    def retirar(v, estado, razon):
+        if retiradas is not None:
+            retiradas.append((v, estado, razon))
     for c in crudas:
         v = vacante.crear(c.get("titulo"), c.get("empresa"), c.get("enlace"), c.get("fuente", ""),
                           ubicacion=c.get("ubicacion", ""), descripcion=c.get("descripcion", ""), fecha=c.get("fecha", ""),
                           remoto=c.get("remoto"), enlace_directo=c.get("enlace_directo", ""), hoy=hoy,
-                          consulta=consulta)
+                          consulta=consulta, publicada_en=c.get("publicada_en", ""),
+                          fecha_origen=c.get("fecha_origen", ""))
         if v is None:
             if c.get("titulo") and enlaces.sirve(c.get("enlace", "")) and not familias.clasificar(c["titulo"]):
                 sin_familia[normalizar.titulo_base(c["titulo"])] += 1
@@ -198,19 +202,29 @@ def limpiar(previas, crudas, hoy, dias_maximos, enlaces_ats, empresas_leidas, co
         motivo = calidad.motivo(v["titulo"], v["enlace"], v.get("fuente", ""))
         if motivo:
             descartes[motivo] += 1
+            retirar(v, "archived", motivo)
         else:
             previas_validas.append(vacante.reetiquetar(dict(v)))
     todas = vacante.juntar(previas_validas + nuevas)
+    ids_unidos = {v["id"] for v in todas}
+    for v in previas_validas:
+        if v["id"] not in ids_unidos:
+            retirar(v, "archived", "fusionada con otra fuente")
     salida = []
     for v in todas:
         if _fecha_de(v) and _fecha_de(v) < limite:
             descartes["más de %d días" % dias_maximos] += 1
+            retirar(v, "archived", "fuera de la ventana de búsqueda")
             continue
         # Portal de la empresa leído hoy y el aviso ya no está: se cerró
         de_portal = any(enlaces.tipo(u) == "original" for u in (v["enlace"], v["enlace_directo"]))
         if de_portal and v["empresa"] in empresas_leidas and v["id"] not in vistas_hoy and \
                 not ({v["enlace"], v["enlace_directo"]} & enlaces_ats):
             descartes["cerrada en el portal de la empresa"] += 1
+            retirar(v, "closed", "ausente de un listado completo de la empresa")
+            continue
+        if not v.get("paises"):
+            retirar(v, "archived", "sin elegibilidad regional")
             continue
         salida.append(v)
     return salida, sin_familia, descartes
@@ -232,14 +246,31 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     if not prueba and not consulta:
         from buscador import supabase
         supabase.exigir_conexion()
+    usar_catalogo = modo == "incremental" or os.environ.get("CATALOGO_ACTIVO", "").lower() == "true"
+    if usar_catalogo and not prueba:
+        from buscador import supabase
+        supabase.exigir_catalogo()
     salida = Path(salida)
     trabajo = salida / "trabajo"
     estado = _leer_json(trabajo / "estado.json", {})
     previas = _leer_json(trabajo / "bodega.json.gz", [])
+    salud_anterior = _leer_json(salida / "datos" / "salud.json", {})
+    memoria_db = {}
+    lote_previo = _leer_json(trabajo / "lote_entrega.json", {})
+    if usar_catalogo and not prueba and not consulta and modo != "incremental":
+        from buscador import supabase
+        memoria_db, lote_db = supabase.leer_entregas(hoy)
+        for rol, lista in lote_previo.get("elegidas", {}).items() if lote_previo.get("fecha") == hoy else []:
+            existentes = {v["id"] for v, _ in lote_db["elegidas"].get(rol, [])}
+            lote_db["elegidas"].setdefault(rol, []).extend((v, g) for v, g in lista if v["id"] not in existentes)
+        lote_previo = lote_db
     if modo == "inicial":
         estado = {k: v for k, v in estado.items() if k not in ("linkedin", "indeed", "apify")}
     solo = None
-    if consulta:
+    if modo == "incremental":
+        from buscador import incremental
+        crudas, enlaces_ats, leidas, salud = incremental.recoger(cfg, estado, hoy, trabajo)
+    elif consulta:
         # Búsqueda profunda: las familias que coinciden con el texto, o una familia temporal con el texto tal cual
         base = normalizar.titulo_base(consulta)
         solo = [f for f in familias.mapa() if base in f["_titulos"]["exacto"] or base in f["_titulos"]["similar"]
@@ -254,42 +285,65 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
                                                       hoy, trabajo, solo_mapa=solo)
     else:
         crudas, enlaces_ats, leidas, salud = recoger(cfg, estado, hoy, trabajo)
+    retiradas = []
     vacantes, sin_familia, descartes = limpiar(previas, crudas, hoy, cfg["dias_maximos"], enlaces_ats, leidas,
-                                               consulta=consulta or "")
+                                               consulta=consulta or "", retiradas=retiradas)
     refuerzos = []
-    if not consulta and not prueba and cfg.get("refuerzo", {}).get("rondas", 0):
+    if modo != "incremental" and not consulta and not prueba and cfg.get("refuerzo", {}).get("rondas", 0):
         from buscador import entrega, refuerzo
         entregadas = _leer_json(trabajo / "entregadas.json", {})
+        entregadas.update(memoria_db)
         def incorporar(anteriores, nuevas):
-            resultado, sin_mapa, razones = limpiar(anteriores, nuevas, hoy, cfg["dias_maximos"], set(), set())
+            resultado, sin_mapa, razones = limpiar(anteriores, nuevas, hoy, cfg["dias_maximos"], set(), set(),
+                                                  retiradas=retiradas)
             sin_familia.update(sin_mapa)
             descartes.update(razones)
             return resultado
         vacantes, refuerzos = refuerzo.completar(
             vacantes, entregadas, hoy, entrega.config(), cfg["refuerzo"], familias.mapa(),
             lambda mapa, ronda: refuerzo.buscar(mapa, _paises_activos(cfg), estado, hoy, ronda,
-                                                 cfg["refuerzo"], cfg["dias_maximos"]), incorporar)
+                                                 cfg["refuerzo"], cfg["dias_maximos"]), incorporar,
+            iniciales=lote_previo.get("elegidas", {}) if lote_previo.get("fecha") == hoy else None)
     if not prueba and not consulta and not vacantes:
         raise RuntimeError("La búsqueda no produjo un catálogo válido; se conserva el estado anterior.")
     _guardar_json(trabajo / "bodega.json.gz", vacantes, comprimido=True)
     _guardar_json(trabajo / "estado.json", estado)
+    resumen_catalogo = None
+    if usar_catalogo and not prueba:
+        from buscador import catalogo, supabase
+        pendientes_catalogo = _leer_json(trabajo / "pendientes_catalogo.json", {})
+        resumen_catalogo = catalogo.sincronizar(vacantes, retiradas, pendientes_catalogo, supabase.subir_catalogo,
+            lambda datos: _guardar_json(trabajo / "pendientes_catalogo.json", datos))
     # Entrega diaria en el formato del contrato (no en una búsqueda profunda; en una prueba no se marca nada ni se sube)
-    resumen_entrega = None
-    historico_entregas = []
-    if not consulta:
+    resumen_entrega = salud_anterior.get("entrega") if modo == "incremental" else None
+    historico_entregas = salud_anterior.get("historico_entregas", []) if modo == "incremental" else []
+    if not consulta and modo != "incremental":
         from buscador import entrega, supabase
         entregadas = _leer_json(trabajo / "entregadas.json", {})
+        entregadas.update(memoria_db)
         capturada = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        registrar = None
+        if usar_catalogo and not prueba:
+            from buscador import catalogo
+            pendientes_registro = _leer_json(trabajo / "pendientes_registro.json", {})
+            registrar = lambda lote: catalogo.registrar_seleccion(lote, pendientes_registro,
+                lambda filas: supabase.subir_catalogo(filas, tabla="entregas_diarias"),
+                lambda datos: _guardar_json(trabajo / "pendientes_registro.json", datos))
         resumen_entrega = entrega.correr(vacantes, entregadas if not prueba else dict(entregadas), hoy, capturada,
                                          salida / "datos" / "entregas", subir=None if prueba else supabase.subir,
                                          pendientes=_leer_json(trabajo / "pendientes_supabase.json", {}),
                                          persistir=None if prueba else
-                                         lambda datos: _guardar_json(trabajo / "pendientes_supabase.json", datos))
+                                         lambda datos: _guardar_json(trabajo / "pendientes_supabase.json", datos),
+                                         lote=lote_previo,
+                                         persistir_lote=None if prueba else
+                                         lambda datos: _guardar_json(trabajo / "lote_entrega.json", datos),
+                                         registrar_seleccion=registrar)
         if not prueba:
             _guardar_json(trabajo / "entregadas.json", entregadas)
             historial = _leer_json(trabajo / "metricas_entrega.json", {})
             historico_entregas = entrega.registrar_medicion(historial, resumen_entrega, hoy)
             _guardar_json(trabajo / "metricas_entrega.json", historial)
+        resumen_entrega["fecha"] = hoy
     reporte = {
         "fecha": hoy, "hora_utc": datetime.now(timezone.utc).strftime("%H:%M"), "modo": modo,
         "consulta": consulta or "", "pais": pais or "",
@@ -305,6 +359,9 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         "entrega": resumen_entrega,
         "refuerzos": refuerzos,
         "historico_entregas": historico_entregas,
+        "catalogo": resumen_catalogo,
+        "capturada_en": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "frescura": tiempos.medir(vacantes),
     }
     from buscador import publicar
     publicar.publicar(salida, vacantes, reporte, sin_familia)
@@ -314,7 +371,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
 def main():
     ap = argparse.ArgumentParser(description="Bodega nocturna de vacantes")
     ap.add_argument("--salida", required=True)
-    ap.add_argument("--modo", default="diario", choices=["diario", "inicial"])
+    ap.add_argument("--modo", default="diario", choices=["diario", "inicial", "incremental"])
     ap.add_argument("--consulta", default="")
     ap.add_argument("--pais", default="")
     ap.add_argument("--prueba", action="store_true", help="presupuestos mínimos, para probar que todo funciona")
@@ -325,7 +382,7 @@ def main():
     for n, s in reporte["fuentes"].items():
         print(f"  {n}: {s}")
     e = reporte.get("entrega") or {}
-    if not a.prueba and e.get("meta_cumplida") is False:
+    if not a.prueba and a.modo != "incremental" and e.get("meta_cumplida") is False:
         faltantes = ", ".join(f"{r['nombre']}: faltan {r['faltan']}" for r in e["roles"].values() if r["faltan"])
         print(f"::warning::Meta diaria incompleta tras los refuerzos. {faltantes}")
 

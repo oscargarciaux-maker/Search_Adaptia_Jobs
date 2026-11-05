@@ -5,6 +5,11 @@ Nota: el plan llamaba al repositorio `buscador-vacantes-latam`; el repositorio r
 
 ## Actualización de cobertura e integridad
 
+La revisión actual de alternativas, frescura, presupuesto y preparación está en
+[`REVISION_PRODUCTO.md`](REVISION_PRODUCTO.md); el catálogo persistente y captura horaria en
+[`CONTRATO_DATOS_v2.md`](CONTRATO_DATOS_v2.md). Prevalecen sobre el diseño nocturno y costos históricos de este plan.
+Apify tiene un tope actual de USD 5/mes; la captura horaria gratuita requiere activación posterior a su migración.
+
 Las decisiones vigentes sobre remotas, aliases, duplicados y conservación están en
 [`COBERTURA_HISTORICO.md`](COBERTURA_HISTORICO.md). Prevalecen sobre las descripciones anteriores de deduplicación
 por empresa y cargo. Las casillas históricas de este plan no certifican la operación real; faltan mediciones

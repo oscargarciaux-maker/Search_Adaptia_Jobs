@@ -55,6 +55,7 @@ def datos():
         "mundo": sorted({normalizar.texto(x) for x in crudo["todo_el_mundo"]}, key=len, reverse=True),
         "toda_europa": sorted({normalizar.texto(x) for x in crudo["toda_europa"]}, key=len, reverse=True),
         "fuera": sorted({normalizar.texto(x) for x in crudo["fuera_de_latam"]}, key=len, reverse=True),
+        "subregiones": crudo.get("subregiones", []),
     }
 
 
@@ -125,13 +126,16 @@ def elegibles(titulo, ubicacion, descripcion="", remoto=None):
     d = datos()
     todos, latam, europa = d["codigos"], d["latam"], d["europa"]
     lugar = normalizar.texto(f"{ubicacion} {titulo}")
-    desc = normalizar.texto(descripcion)[:6000]
+    ambito = normalizar.texto(ubicacion) or lugar
+    desc = normalizar.texto(descripcion)[:30000]
     mod = modalidad(titulo, ubicacion, descripcion, remoto)
     nombrados = _paises_nombrados(lugar)
-    es_latam = _nombra(lugar, d["toda_latam"])
-    es_mundo = _nombra(lugar, d["mundo"])
-    es_europa = _nombra(lugar, d["toda_europa"])
-    fuera = _nombra(lugar, d["fuera"])
+    es_latam = _nombra(ambito, d["toda_latam"])
+    es_mundo = _nombra(ambito, d["mundo"])
+    es_europa = _nombra(ambito, d["toda_europa"])
+    fuera = _nombra(ambito, d["fuera"])
+    def subregion(texto):
+        return next((r["paises"] for r in d["subregiones"] if _nombra(texto, r["nombres"])), None)
 
     def r(paises, confianza, nota):
         return {"paises": paises, "modalidad": mod, "confianza": confianza, "nota": nota}
@@ -151,6 +155,9 @@ def elegibles(titulo, ubicacion, descripcion="", remoto=None):
         r_paises = _paises_nombrados(restringe)
         if r_paises:
             return r(r_paises, "alta", "solo " + ", ".join(r_paises))
+        region = subregion(restringe)
+        if region:
+            return r(region, "alta", "restricción regional")
         if _nombra(restringe, d["toda_latam"]):
             return r(latam, "alta", "")
         if _nombra(restringe, d["mundo"]):
@@ -161,6 +168,9 @@ def elegibles(titulo, ubicacion, descripcion="", remoto=None):
             return r([], "alta", "remoto fuera de LATAM y España")
     if es_mundo:
         return r(todos, "alta", "")
+    region = subregion(ambito)
+    if region:
+        return r(region, "alta", "restricción regional")
     if es_latam:
         return r(sorted(set(latam) | (set(europa) & set(nombrados))), "alta", "")
     if nombrados:

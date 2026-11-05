@@ -68,10 +68,14 @@ def prioridad_remota(v):
     return 2
 
 
-def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False):
+def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False, iniciales=()):
     """Toma `cuantas` candidatas [(vacante, grado)] una por una: en cada paso la de menor costo, donde el costo sube con
     lo que ya se repite (idioma, nivel, país, modalidad, fuente), con un grado más débil, sin descripción o más vieja."""
-    elegidas, conteo = [], {k: Counter() for k in ("idioma", "nivel", "pais", "modo", "fuente", "empresa")}
+    elegidas, conteo = list(iniciales), {k: Counter() for k in ("idioma", "nivel", "pais", "modo", "fuente", "empresa")}
+    for v, _ in iniciales:
+        rasgos = _rasgos(v)
+        for k in conteo:
+            conteo[k][rasgos[k]] += 1
     resto = [(v, g, _rasgos(v)) for v, g in candidatas]
     hoy_d = date.fromisoformat(hoy)
     while resto and len(elegidas) < cuantas:
@@ -94,14 +98,18 @@ def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False):
     return elegidas
 
 
-def elegir(vacantes, entregadas, hoy, cfg=None):
+def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None):
     """{rol_id: [(vacante, grado)]} con las vacantes nuevas de cada rol, y un resumen por rol."""
     cfg = cfg or config()
     roles = cfg["roles"]
+    iniciales = iniciales or {}
+    incluidas = {h for lista in iniciales.values() for v, _ in lista for h in huellas(v)}
     desde = (date.fromisoformat(hoy) - timedelta(days=cfg.get("dias_frescura", 14))).isoformat()
     por_rol, motivos = {r["id"]: [] for r in roles}, Counter()
     descartes_rol = {r["id"]: Counter() for r in roles}
     for v in vacantes:
+        if any(h in incluidas for h in huellas(v)):
+            continue
         rol, grado = rol_de(v, roles)
         if not rol:
             continue
@@ -123,12 +131,12 @@ def elegir(vacantes, entregadas, hoy, cfg=None):
     for rol in roles:
         candidatas = por_rol[rol["id"]]
         salida[rol["id"]] = variadas(candidatas, cfg["por_rol"], cfg.get("max_por_empresa", 2), hoy,
-                                      cfg.get("preferir_remotas", False))
+                                      cfg.get("preferir_remotas", False), iniciales.get(rol["id"], []))
         elegidas = [v for v, _ in salida[rol["id"]]]
-        empresas = Counter(normalizar.empresa(v["empresa"]) for v, _ in candidatas)
+        empresas = Counter(normalizar.empresa(v["empresa"]) for v, _ in candidatas + list(iniciales.get(rol["id"], [])))
         capacidad = sum(min(n, cfg.get("max_por_empresa", 2)) for n in empresas.values())
         resumen[rol["id"]] = {
-            "nombre": rol["nombre"], "candidatas": len(candidatas), "entregadas": len(elegidas),
+            "nombre": rol["nombre"], "candidatas": len(candidatas) + len(iniciales.get(rol["id"], [])), "entregadas": len(elegidas),
             "faltan": max(0, cfg["por_rol"] - len(elegidas)),
             "idiomas": dict(Counter(v["idioma"] for v in elegidas)),
             "niveles": dict(Counter(contrato.seniority(v["titulo"]) or "sin nivel" for v in elegidas)),
@@ -138,8 +146,8 @@ def elegir(vacantes, entregadas, hoy, cfg=None):
             "descartadas": dict(descartes_rol[rol["id"]]),
             "empresas_disponibles": len(empresas),
             "capacidad_con_tope_empresa": capacidad,
-            "limitadas_por_empresa": len(candidatas) - capacidad,
-            "reserva_sin_entregar": len(candidatas) - len(elegidas),
+            "limitadas_por_empresa": sum(empresas.values()) - capacidad,
+            "reserva_sin_entregar": len(candidatas) + len(iniciales.get(rol["id"], [])) - len(elegidas),
         }
     return salida, {"roles": resumen, "descartadas": dict(motivos)}
 
@@ -149,7 +157,8 @@ def filas_de(elegidas, roles, hoy, capturada):
     filas, ids = [], set()
     for rol_id, lista in elegidas.items():
         for v, grado in lista:
-            for fila in contrato.filas(v, nombres[rol_id], GRADO_CONTRATO.get(grado, grado), hoy, capturada):
+            for fila in contrato.filas(v, nombres[rol_id], GRADO_CONTRATO.get(grado, grado), hoy,
+                                       v.get("_capturada_entrega", capturada)):
                 if fila["external_id"] not in ids:   # dos vacantes con el mismo enlace directo: una sola fila
                     ids.add(fila["external_id"])
                     filas.append(fila)
@@ -161,6 +170,8 @@ def registrar_medicion(historial, resumen, hoy, dias=30):
     historial[hoy] = {
         "fecha": hoy, "meta_cumplida": resumen["meta_cumplida"],
         "pendientes_supabase": (resumen.get("supabase") or {}).get("pendientes", 0),
+        "registro_confirmado": bool(resumen.get("registro_seleccion")) and not any(
+            resumen["registro_seleccion"].get(k) for k in ("errores", "pendientes", "omitida")),
         "roles": {rid: {k: r[k] for k in ("candidatas", "entregadas", "faltan", "reserva_sin_entregar")}
                   for rid, r in resumen["roles"].items()},
     }
@@ -200,11 +211,16 @@ def escribir(carpeta, hoy, filas, dias_guardados=60):
 
 
 def correr(vacantes, entregadas, hoy, capturada, carpeta, subir=None, pendientes=None, persistir=None,
-           exportar=None):
+           exportar=None, lote=None, persistir_lote=None, registrar_seleccion=None):
     """Elige, escribe y sube. `entregadas` (dict huella → fecha) se actualiza con lo entregado hoy.
     Devuelve el resumen para salud.json."""
     cfg = config()
-    elegidas, resumen = elegir(vacantes, entregadas, hoy, cfg)
+    iniciales = (lote or {}).get("elegidas", {}) if (lote or {}).get("fecha") == hoy else {}
+    elegidas, resumen = elegir(vacantes, entregadas, hoy, cfg, iniciales=iniciales)
+    elegidas = {rol: [(dict(v, _capturada_entrega=v.get("_capturada_entrega", capturada)), g) for v, g in lista]
+                for rol, lista in elegidas.items()}
+    if persistir_lote:
+        persistir_lote({"fecha": hoy, "elegidas": elegidas})  # permite reconstruir cola si se interrumpe el siguiente paso
     filas = filas_de(elegidas, cfg["roles"], hoy, capturada)
     generar_archivos = cfg.get("exportar_archivos", False) if exportar is None else exportar
     if generar_archivos:
@@ -235,4 +251,6 @@ def correr(vacantes, entregadas, hoy, capturada, carpeta, subir=None, pendientes
         resumen["supabase"] = resultado
         if persistir:
             persistir(pendientes)
+    if registrar_seleccion:
+        resumen["registro_seleccion"] = registrar_seleccion({"fecha": hoy, "elegidas": elegidas})
     return resumen

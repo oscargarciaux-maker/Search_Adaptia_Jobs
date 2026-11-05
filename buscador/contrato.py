@@ -35,12 +35,16 @@ _PORTALES = [("linkedin.com", "LinkedIn"), ("indeed.", "Indeed"), ("getonbrd.com
              ("workingnomads.com", "Working Nomads"), ("remotive.com", "Remotive")]
 
 
+def _es_dominio(host, dominio):
+    return dominio[:-1] in host.split(".") if dominio.endswith(".") else host == dominio or host.endswith("." + dominio)
+
+
 # ── Identidad ──────────────────────────────────────────────────────────────────────────────────────────────────────
 def url_limpia(url):
     """Sin parámetros de seguimiento; en LinkedIn, la forma canónica con solo el número del aviso."""
     url = str(url or "").strip()
     m = re.search(r"linkedin\.com/jobs/view/(?:[^/?#]*?-)?(\d{6,})", url)
-    if m:
+    if m and enlaces.es_linkedin(url):
         return f"https://www.linkedin.com/jobs/view/{m.group(1)}/"
     p = urlparse(url)
     if not p.scheme:
@@ -54,19 +58,19 @@ def external_id(url):
     <portal>-<huella del enlace limpio>."""
     url = url_limpia(url)
     m = re.search(r"linkedin\.com/jobs/view/(\d+)", url)
-    if m:
+    if m and enlaces.es_linkedin(url):
         return "lnkd-" + m.group(1)
     m = re.search(r"linkedin\.com/.*?(?:activity[:-]|urn:li:activity:|ugcPost[:-]|share[:-])(\d{15,})", url)
-    if m:
+    if m and _es_dominio(enlaces.host(url), "linkedin.com"):
         return "lnkdpost-" + m.group(1)
     h = enlaces.host(url)
-    etiqueta = next((n for d, n in _PORTALES if d in h), h.split(".")[0] if h else "web")
+    etiqueta = next((n for d, n in _PORTALES if _es_dominio(h, d)), h.split(".")[0] if h else "web")
     return re.sub(r"[^a-z0-9]+", "", etiqueta.lower())[:20] + "-" + hashlib.sha1(url.encode("utf-8")).hexdigest()[:12]
 
 
 def portal(url):
     h = enlaces.host(url)
-    return next((n for d, n in _PORTALES if d in h), h)
+    return next((n for d, n in _PORTALES if _es_dominio(h, d)), h)
 
 
 # ── Ubicación ──────────────────────────────────────────────────────────────────────────────────────────────────────
