@@ -40,7 +40,7 @@ Registrar resultado, fecha, responsable y enlace de evidencia para cada fila. «
 | Persistencia v2 | Catálogo, ofertas y registro sin errores/colas pendientes | Reporte y conteos por rol/fecha en Supabase |
 | Web actualizada | Hora del dato en web coincide con rama y despliegue esperado | URL, horas y ejecución; captura de pantalla sin claves si hace falta |
 | Calidad por caso | Una URL 200 genérica no se aprueba; cierres/404/ciclos/pagos se apartan; 403 queda pendiente | Tests + revisión por muestra en la instalación |
-| Enlace alternativo | Si falla el principal y hay uno bueno, se comparte/exporta el comprobado | Caso revisado y texto/exportación resultante |
+| Enlace alternativo | Si falla el principal y hay uno bueno, se comparte el comprobado | Caso revisado y texto resultante |
 | País y afinidad | UX/UI incluye afines pertinentes; remoto restringido no se anuncia mundial | Muestra LATAM/España/mundial y casos restringidos |
 | Frescura | 2/6/24 horas solo incluyen publicación con hora confirmada | Ejemplos con hora, solo fecha y primera detección |
 | Selección y repetición | Máximo configurado por rol; completar/reintentar el mismo lote no escoge otro completo | IDs/fechas antes y después de repetición controlada |
@@ -51,7 +51,7 @@ Registrar resultado, fecha, responsable y enlace de evidencia para cada fila. «
 | Respaldo y recuperación | Cliente puede restaurar un corte aislado conservando tipos, IDs, FK, secuencia y memoria | Acta del ensayo en cuentas/entorno acordado |
 | Acceso de página | Se cumple la decisión pública/privada y, si corresponde, APIs/dominios Access | Prueba autorizada e incógnita; configuración revisada |
 | Alertas y soporte | Responsable recibe avisos y sabe leer/atender un fallo | Incidencia de prueba y procedimiento acordado |
-| Uso sin asistencia | Cliente busca, interpreta estados, copia, marca y exporta sin ayuda del desarrollador | Recorrido de aceptación |
+| Uso sin asistencia | Cliente busca, interpreta estados, copia y marca sin ayuda del desarrollador | Recorrido de aceptación |
 
 No provocar pagos, cierres ni fallos de la base productiva para ensayar. Los casos artificiales se prueban en fixtures
 y destinos aislados. Las escrituras reales de aceptación se coordinan para no repetir selección ni consumir crédito extra

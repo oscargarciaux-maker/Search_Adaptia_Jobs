@@ -263,6 +263,12 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         for rol, lista in lote_previo.get("elegidas", {}).items() if lote_previo.get("fecha") == hoy else []:
             existentes = {v["id"] for v, _ in lote_db["elegidas"].get(rol, [])}
             lote_db["elegidas"].setdefault(rol, []).extend((v, g) for v, g in lista if v["id"] not in existentes)
+        from buscador import entrega
+        recuperables = {h for lista in lote_db["elegidas"].values() for v, _ in lista for h in entrega.huellas(v)}
+        if any(u not in recuperables for u in lote_db.pop("v1_sin_registro_hoy", [])):
+            raise RuntimeError("Hay filas históricas de hoy sin registro de selección ni lote recuperable. "
+                               "Recuperar el estado de trabajo/artefacto y completar el registro antes de continuar; "
+                               "no se inició otra selección ni búsqueda.")
         lote_previo = lote_db
     if modo == "inicial":
         estado = {k: v for k, v in estado.items() if k not in ("linkedin", "indeed", "apify")}
@@ -388,6 +394,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     resumen_revision["rechazos_en_corrida"] = {m: n for m, n in descartes.items() if m in verificar_enlaces.RECHAZOS}
     reporte = {
         "fecha": hoy, "hora_utc": datetime.now(timezone.utc).strftime("%H:%M"), "modo": modo,
+        "codigo_commit": os.environ.get("GITHUB_SHA", ""), "ejecucion_id": os.environ.get("GITHUB_RUN_ID", ""),
         "consulta": consulta or "", "pais": pais or "",
         "minutos": round((time.monotonic() - inicio) / 60, 1),
         "vacantes_en_bodega": len(vacantes), "crudas_hoy": len(crudas),

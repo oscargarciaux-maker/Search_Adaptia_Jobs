@@ -5,6 +5,7 @@ actores y casillas de este plan pueden corresponder a decisiones anteriores. Par
 [GUIA_CLIENTE.md](GUIA_CLIENTE.md), [INSTALACION.md](INSTALACION.md), [TRASPASO.md](TRASPASO.md),
 [OPERACION_Y_RECUPERACION.md](OPERACION_Y_RECUPERACION.md) y [ACEPTACION_Y_ESTADO.md](ACEPTACION_Y_ESTADO.md).
 El presupuesto Apify actual es máximo USD 5/mes; el total de proveedores depende de los planes. El WhatsApp sigue pendiente.
+Excel se retiró del producto por decisión posterior del usuario; las menciones que siguen describen diseño histórico.
 
 28 de octubre de 2026. Copia del documento de planeación (Claude Docs). Si cambia una decisión, se actualiza aquí.
 Nota: el plan llamaba al repositorio `buscador-vacantes-latam`; el repositorio real es `search_adaptia_jobs`.

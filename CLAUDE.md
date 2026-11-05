@@ -6,13 +6,16 @@ Un buscador de vacantes para LATAM, España y remotas mundiales que:
    Board, tableros remotos y ofertas formales LinkedIn vía Apify);
 2. arma la **entrega diaria**: 20 vacantes nuevas (nunca entregadas) por rol —Product designer, UX/UI designer, Product
    Owner, Product manager, AI Engineer, QA—, variadas, con las columnas del **contrato de datos v1**
-   (`docs/CONTRATO_DATOS_v1.md`), y la guarda en **Supabase** (obligatorio; Excel automático desactivado);
-3. publica una página donde se busca cualquier cargo y país y se copia a WhatsApp o Excel.
+   (`docs/CONTRATO_DATOS_v1.md`), y la guarda en **Supabase** (obligatorio);
+3. publica una página donde se busca cualquier cargo y país y se copia a WhatsApp manualmente.
+Por decisión vigente del usuario, Excel no se usa: no reintroducir botón, exportador ni dependencia de hojas de cálculo.
+Los CSV de configuración de empresas y reportes técnicos no son una base de datos alternativa.
 La captura horaria gratuita actualiza catálogo y verificación sin crear otra entrega ni usar Apify. Los nuevos enlaces
 para entregar se comprueban con presupuesto y caducidad; los pendientes no se dan por válidos.
 Es un proyecto vendido por Oscar: se entrega a otra persona cambiando solo los secretos (`docs/TRASPASO.md`). Más adelante
 un bot de WhatsApp tomará 5 vacantes de Supabase y las enviará.
 Leer antes de trabajar `docs/GUIA_CLIENTE.md`, `docs/OPERACION_Y_RECUPERACION.md` y `docs/ACEPTACION_Y_ESTADO.md`.
+Riesgos y prioridades de mantenimiento: `docs/REVISION_FIABILIDAD.md`.
 `docs/PLAN.md` se conserva como diseño histórico: sus instrucciones antiguas no prevalecen sobre decisiones actuales.
 
 ## Decisiones vigentes de cobertura e integridad

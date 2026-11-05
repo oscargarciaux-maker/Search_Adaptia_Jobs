@@ -76,8 +76,8 @@ La copia de trabajo está dentro del entorno de nube de este chat; «local» sig
 del usuario. Editar esa copia, subir una rama, abrir un PR, fusionarlo y desplegar son pasos diferentes. El PR permite
 revisar cambios antes de incorporarlos a `main`; no se fusiona ni se lanza el despliegue automáticamente desde este chat.
 
-Supabase es la base de datos obligatoria de la entrega. El Excel pertenecía a una versión anterior y su generación
-automática está desactivada (`exportar_archivos: false`). La utilidad opcional de exportación no sustituye la base.
+Supabase es la base de datos obligatoria de la entrega. Excel pertenecía a una versión anterior; se retiraron tanto
+la generación como la descarga opcional por decisión del usuario. No reintroducirlas desde el plan histórico.
 No se borran los históricos anteriores. Las publicaciones del feed de Apify no cuentan como ofertas hasta verificarse.
 Controles actuales de calidad y primera corrida: [`CALIDAD_ARRANQUE.md`](CALIDAD_ARRANQUE.md).
 
@@ -106,7 +106,7 @@ Hay plazos distintos para la vista activa, la memoria y el histórico:
 | Datos | Conservación actual | Propósito |
 |---|---|---|
 | Bodega activa del buscador | 30 días; también retira cierres detectados | Mostrar oportunidades recientes |
-| Archivos diarios CSV/Excel | Generación automática desactivada | Históricos anteriores conservados |
+| Archivos antiguos CSV/Excel | No se generan; funcionalidad retirada | Históricos anteriores conservados |
 | Memoria local de entregas | 180 días; complementada por recuperación Supabase con v2 activo | Evitar repetir entregas |
 | Ofertas guardadas en Supabase | Sin borrado automático por este código | Histórico persistente |
 | Cola pendiente de Supabase | Hasta confirmación; sin limpieza por antigüedad | Recuperar fallos de sincronización |

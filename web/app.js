@@ -288,7 +288,7 @@
     const n = estado.seleccion.size;
     const total = `${fmt.format(estado.resultados.length)} ${estado.resultados.length === 1 ? "vacante" : "vacantes"}`;
     $("cuenta-seleccion").textContent = n ? `${total} · ${fmt.format(n)} ${n === 1 ? "elegida" : "elegidas"}` : `${total} · elige las que vas a mandar`;
-    ["copiar", "excel", "marcar"].forEach(id => { $(id).disabled = !n; });
+    ["copiar", "marcar"].forEach(id => { $(id).disabled = !n; });
     $("seleccionar").disabled = !estado.resultados.length;
     $("seleccionar").textContent = n ? "Quitar selección" : `Elegir las ${SEL_RAPIDA} primeras`;
   }
@@ -324,28 +324,6 @@
       area.remove();
     }
     avisar(`Copiadas ${lista.length} vacantes${mensajes.length > 1 ? ` en ${mensajes.length} bloques` : ""}. Pégalas en WhatsApp y luego toca «Marcar enviadas».`, 6000);
-  }
-
-  function cargarScript(src) {
-    return new Promise((ok, mal) => { const s = el("script", { src, onload: ok, onerror: mal }); document.head.append(s); });
-  }
-
-  async function excel() {
-    const filas = M.filasExcel(elegidas(), estado.nombres, estado.paises.length);
-    const nombre = `vacantes_${M.base(nombreBusqueda()).replace(/[^a-z0-9]+/g, "-")}_${$("pais").value || "latam"}_${hoy}`;
-    try {
-      if (!window.XLSX) await cargarScript("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js");
-      const hoja = window.XLSX.utils.aoa_to_sheet(filas);
-      hoja["!cols"] = filas[0].map((_, i) => ({ wch: [40, 12, 26, 28, 14, 28, 12, 14, 12, 10, 18, 12, 18, 45, 45, 60][i] || 16 }));
-      const libro = window.XLSX.utils.book_new();
-      window.XLSX.utils.book_append_sheet(libro, hoja, "Vacantes");
-      window.XLSX.writeFile(libro, nombre + ".xlsx");
-    } catch (e) {
-      const csv = filas.map(f => f.map(c => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
-      const a = el("a", { href: URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv" })), download: nombre + ".csv" });
-      a.click();
-      avisar("Se descargó en CSV (se abre en Excel).");
-    }
   }
 
   async function marcar() {
@@ -441,12 +419,9 @@
             el("td", { text: r.nombre }), el("td", { class: "num", text: fmt.format(r.entregadas) }),
             el("td", { class: "num", text: r.faltan ? fmt.format(r.faltan) : "—" }),
             el("td", { text: Object.entries(r.idiomas || {}).map(([k, n]) => `${k === "es" ? "español" : "inglés"} ${n}`).join(" · ") })))))),
-        ...(e.archivos ? [el("p", { class: "acciones-fila" },
-          el("a", { class: "boton boton--secundario", href: "datos/entregas/ultima.xlsx", download: `entrega_${s.fecha}.xlsx`, text: "Descargar Excel" }),
-          el("a", { class: "boton boton--secundario", href: "datos/entregas/ultima.csv", download: `entrega_${s.fecha}.csv`, text: "Descargar CSV" }))] : []),
         el("p", { class: "nota", text: sb.error || (sb.errores && sb.errores.length) ? `Supabase: no se pudo guardar (${(sb.errores || [sb.error]).join("; ")}).`
           : sb.omitida ? "Supabase: no está conectado todavía." : sb.enviadas !== undefined ? `Supabase: ${fmt.format(sb.enviadas)} filas sincronizadas (incluye existentes).` : "" }));
-      caja.append(el("p", { class: "nota", text: "Destino de la entrega: Supabase. La generación automática del antiguo Excel está desactivada." }));
+      caja.append(el("p", { class: "nota", text: "Destino de la entrega: Supabase." }));
       if (e.meta_cumplida === false) caja.append(el("p", { class: "confirmar", text: `Meta diaria incompleta: se buscan ${e.meta_por_rol || 20} vacantes nuevas por cada rol.` }));
       Object.values(e.roles).filter(r => r.faltan && r.descartadas).forEach(r => caja.append(el("p", { class: "nota", text:
         `${r.nombre}: ${r.candidatas} candidatas válidas; capacidad de ${r.capacidad_con_tope_empresa} con el límite por empresa. ` +
@@ -564,7 +539,6 @@
       pintarResultados();
     });
     $("copiar").addEventListener("click", copiar);
-    $("excel").addEventListener("click", excel);
     $("marcar").addEventListener("click", marcar);
     $("exportar-enviadas").addEventListener("click", () => {
       const a = el("a", { href: URL.createObjectURL(new Blob([JSON.stringify([...estado.enviadas])], { type: "application/json" })),

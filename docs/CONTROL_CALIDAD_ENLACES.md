@@ -48,7 +48,7 @@ Páginas que cargan por JavaScript y rutas de registro pueden ser legítimas. No
   operando cuando hay déficit. El presupuesto se comparte entre las rondas: no se multiplican los límites.
 - La captura horaria prioriza revisar la selección del día y luego ofertas recientes. No promete revisar las diez mil
   ofertas cada hora. Los límites se ajustan en `datos/config.yaml`, sección `verificacion_enlaces`.
-- La página muestra estado/hora y permite filtrar comprobadas. La selección para compartir, WhatsApp manual y exportación
+- La página muestra estado/hora y permite filtrar comprobadas. La selección para compartir y WhatsApp manual
   usan enlaces vigentes; la interfaz deshabilita la selección de pendientes. Los históricos sin metadatos no se certifican.
 
 ## Persistencia y puesta en marcha

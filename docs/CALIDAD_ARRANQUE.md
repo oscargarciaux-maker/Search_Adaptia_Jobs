@@ -5,8 +5,8 @@ Antecedente de los controles iniciales. Para operar/instalar prevalecen [GUIA_CL
 [OPERACION_Y_RECUPERACION.md](OPERACION_Y_RECUPERACION.md). La captura actual añade catálogo/selección v2 y verificación v3.
 
 Actualización posterior al PR #6, a partir de las aclaraciones de Oscar. Supabase es obligatorio para la entrega normal;
-el Excel era parte de la versión anterior y ya no se genera automáticamente. Se conservan históricos y una utilidad de
-exportación opcional, que no sustituyen la base.
+Excel era parte de la versión anterior; la revisión de producto retiró también su descarga opcional. Se conservan
+los históricos en Supabase y no se usa una hoja de cálculo como destino alternativo.
 
 ## Vacantes e indicios de contratación
 

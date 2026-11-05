@@ -42,7 +42,7 @@ def _idiomas(texto):
 
 
 def fila_db(fila):
-    """Fila del CSV del contrato → objeto para la tabla (listas como arreglos, vacíos como NULL)."""
+    """Fila normalizada del contrato → objeto para la tabla (listas como arreglos, vacíos como NULL)."""
     salida = {}
     for c in contrato.COLUMNAS + contrato.EXTRAS:
         v = fila.get(c, "")
@@ -207,6 +207,7 @@ def leer_entregas(hoy, sesion=None):
         if len(filas) < 1000:
             break
         offset += len(filas)
+    v1_hoy = set()
     offset = 0
     while True:
         r = sesion.get(f"{url}/rest/v1/ofertas", headers=cab, timeout=30,
@@ -217,6 +218,8 @@ def leer_entregas(hoy, sesion=None):
         for f in filas:
             if f.get("offer_url"):
                 memoria[contrato.url_limpia(f["offer_url"])] = f.get("delivery_date") or hoy
+                if f.get("delivery_date") == hoy:
+                    v1_hoy.add(contrato.url_limpia(f["offer_url"]))
         if len(filas) < 1000:
             break
         offset += len(filas)
@@ -229,6 +232,9 @@ def leer_entregas(hoy, sesion=None):
     for f in r.json():
         v = dict(f["snapshot"], _capturada_entrega=f["selected_at"])
         lote["elegidas"].setdefault(f["role_id"], []).append((v, grados[f["match_grade"]]))
+    registradas = {contrato.url_limpia(u) for lista in lote["elegidas"].values() for v, _ in lista
+                   for u in (v.get("enlace"), v.get("enlace_directo"), *v.get("_enlaces", [])) if u}
+    lote["v1_sin_registro_hoy"] = sorted(v1_hoy - registradas)
     return memoria, lote
 
 

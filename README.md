@@ -7,7 +7,8 @@ sin crear otra entrega. Se comprueban enlaces antes de nuevas selecciones; cierr
 se apartan y lo que no puede comprobarse queda pendiente. La cobertura/volumen no se garantizan por completo.
 
 La página permite buscar dentro de la ventana activa de 30 días, elegir ofertas comprobadas y copiar para WhatsApp
-o descargar Excel/CSV manualmente. La búsqueda diaria no usa IA ni sesión personal de LinkedIn. Todavía no hay agente
+para compartir por WhatsApp manualmente. Supabase es el destino de las vacantes; se retiró la exportación a hojas de
+cálculo. La búsqueda diaria no usa IA ni sesión personal de LinkedIn. Todavía no hay agente
 WhatsApp ni seguimiento individual de candidaturas.
 
 ## Documentación de entrega
@@ -20,6 +21,7 @@ WhatsApp ni seguimiento individual de candidaturas.
 | Operar, resolver incidentes, respaldar y restaurar | [Operación y recuperación](docs/OPERACION_Y_RECUPERACION.md) |
 | Decidir qué está comprobado y qué falta antes de aceptar/automatizar | [Aceptación y estado](docs/ACEPTACION_Y_ESTADO.md) |
 | Entender lo que cambió en las revisiones | [Historial de cambios](docs/HISTORIAL_CAMBIOS.md) |
+| Priorizar riesgos de producto, arquitectura, operación e IA | [Revisión de fiabilidad](docs/REVISION_FIABILIDAD.md) |
 
 Los manuales anteriores prevalecen para uso/instalación. `docs/PLAN.md` conserva el diseño histórico; sus costos,
 casillas y actores originales no describen por sí solos la operación vigente.
@@ -36,8 +38,8 @@ Referencias técnicas y antecedentes:
 
 Prioriza remotas para varios países, con cobertura de LATAM, España y remotas mundiales. Los títulos exactos,
 similares y cercanos rotan en las búsquedas; no se promete agotar todas las combinaciones cada noche.
-La limpieza de 30 días solo afecta al buscador activo; no borra ofertas de Supabase. La generación automática de Excel
-de la entrega anterior está desactivada. Apify busca fichas formales de LinkedIn con un tope de USD 5/mes; las publicaciones solo aportan una oferta si se verifica
+La limpieza de 30 días solo afecta al buscador activo; no borra ofertas de Supabase. Apify busca fichas formales de
+LinkedIn con un tope de USD 5/mes; las publicaciones solo aportan una oferta si se verifica
 su ficha original. La búsqueda pagada del feed está desactivada para reservar el crédito a fichas formales.
 La meta es 20 por cada uno de seis roles (120 al día). Si un rol queda corto, hay búsquedas adicionales gratuitas
 acotadas y un reporte de los motivos. La continuidad se mide entre días distintos, conservando la memoria de entregas.
