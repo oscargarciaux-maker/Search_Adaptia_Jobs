@@ -78,6 +78,19 @@
 
   function fechaDe(v) { return v.fecha_publicacion || v.visto_primera_vez || ""; }
 
+  function antiguedad(v, ahora, hoy) {
+    const texto = (instante, prefijo) => {
+      const minutos = Math.max(0, Math.floor((Date.parse(ahora) - Date.parse(instante)) / 60000));
+      if (minutos < 60) return `${prefijo} hace ${minutos} min`;
+      if (minutos < 1440) return `${prefijo} hace ${Math.floor(minutos / 60)} h`;
+      return `${prefijo} ${fechaRelativa(instante.slice(0, 10), hoy)}`;
+    };
+    if (v.publicada_en && ahora) return texto(v.publicada_en, "Publicada");
+    if (v.fecha_publicacion && !v.fecha_estimada) return `Publicada ${fechaRelativa(v.fecha_publicacion, hoy)} · sin hora`;
+    if (v.detectada_en && ahora) return texto(v.detectada_en, "Detectada");
+    return "Publicación sin confirmar";
+  }
+
   /**
    * Vacantes que cumplen la búsqueda. op:
    *  familias: ids elegidos · grados: grados activos · palabras: frases extra (el título contiene alguna)
@@ -110,6 +123,10 @@
       if (!remota && op.presenciales === false) continue;
       if (op.confianzaAlta && v.confianza_pais !== "alta") continue;
       if (op.dias && op.hoy && diasEntre(fechaDe(v), op.hoy) > op.dias) continue;
+      if (op.horas && op.ahora) {
+        const transcurridas = (Date.parse(op.ahora) - Date.parse(v.publicada_en || "")) / 36e5;
+        if (!Number.isFinite(transcurridas) || transcurridas < 0 || transcurridas > op.horas) continue;
+      }
       if (op.ocultarEnviadas && op.enviadas && op.enviadas.has(v.id)) continue;
       if (op.nivel && (v.nivel || "sin dato") !== op.nivel) continue;
       if (op.idioma && v.idioma !== op.idioma) continue;
@@ -125,7 +142,7 @@
 
   /** Orden: por relevancia (coincidencia, fecha, tipo de enlace, sin más de 3 seguidas de una empresa) o por fecha. */
   function ordenar(lista, modo = "relevancia") {
-    const porFecha = (a, b) => fechaDe(b).localeCompare(fechaDe(a));
+    const porFecha = (a, b) => (b.publicada_en || fechaDe(b)).localeCompare(a.publicada_en || fechaDe(a));
     if (modo === "fecha") return [...lista].sort(porFecha);
     const remota = v => v.confianza_pais === "baja" ? 3 : v.modalidad === "remoto" ? (v.confianza_pais === "alta" && (v.paises || []).length > 1 ? 0 : 1) : 2;
     const orden = [...lista].sort((a, b) => (modo === "remotas" ? remota(a) - remota(b) : 0) || (RANGO_GRADO[a._grado] ?? 3) - (RANGO_GRADO[b._grado] ?? 3) || porFecha(a, b) ||
@@ -176,7 +193,7 @@
     const bloques = lista.map(v => {
       const linea2 = [v.modalidad === "remoto" ? `Remoto · ${dondeAplica(v, nombres || {}, totalPaises)}` :
         `${MODALIDAD[v.modalidad] || ""} · ${v.ubicacion || dondeAplica(v, nombres || {}, totalPaises)}`,
-      INGLES[v.ingles], fechaRelativa(fechaDe(v), hoy)].filter(Boolean).join(" · ");
+      INGLES[v.ingles], v.fecha_estimada ? "publicación sin confirmar" : fechaRelativa(fechaDe(v), hoy)].filter(Boolean).join(" · ");
       return `*${v.titulo}* — ${v.empresa}\n${linea2}\n${v.enlace}`;
     });
     const mensajes = [];
@@ -202,7 +219,7 @@
   }
 
   const Motor = { GRADOS, NIVELES, normalizar, base, contieneFrase, prepararMapa, sugerir, filtrar, ordenar, conteos,
-    fechaRelativa, dondeAplica, textoWhatsApp, filasExcel, diasEntre, fechaDe, MODALIDAD, INGLES, IDIOMA, GRADO_TEXTO };
+    fechaRelativa, antiguedad, dondeAplica, textoWhatsApp, filasExcel, diasEntre, fechaDe, MODALIDAD, INGLES, IDIOMA, GRADO_TEXTO };
   if (typeof module !== "undefined" && module.exports) module.exports = Motor;
   else raiz.Motor = Motor;
 })(typeof window !== "undefined" ? window : globalThis);
