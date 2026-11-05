@@ -1,6 +1,5 @@
 """Entrega diaria en el formato del contrato de datos v1: filas, roles, variedad, nunca repetidas, Supabase y
 publicaciones de Apify."""
-import csv
 
 from buscador import contrato, entrega, familias, supabase, vacante
 from buscador.fuentes import publicaciones_apify
@@ -149,15 +148,17 @@ def test_variedad_y_tope_por_empresa():
 
 def test_nunca_repetidas(tmp_path):
     vac = _muchas(50)
-    entregadas = {}
-    r1 = entrega.correr(vac, entregadas, HOY, "2026-11-05T07:00:00Z", tmp_path, exportar=True)
-    r2 = entrega.correr(vac, entregadas, "2026-11-06", "2026-11-06T07:00:00Z", tmp_path, exportar=True)
-    dia1 = {f["external_id"] for f in csv.DictReader(open(tmp_path / f"{HOY}.csv", encoding="utf-8"))}
-    dia2 = {f["external_id"] for f in csv.DictReader(open(tmp_path / "2026-11-06.csv", encoding="utf-8"))}
-    assert r1["vacantes"] == 20 and r2["vacantes"] == 20 and not dia1 & dia2
-    assert (tmp_path / f"{HOY}.xlsx").exists() and (tmp_path / "ultima.csv").exists()
-    r3 = entrega.correr(vac, entregadas, "2026-11-07", "2026-11-07T07:00:00Z", tmp_path, exportar=True)
+    entregadas, recibidas = {}, []
+    def subir(filas):
+        ids = {f["external_id"] for f in filas}
+        recibidas.append(ids)
+        return {"filas": len(filas), "enviadas": len(filas), "confirmadas": list(ids)}
+    r1 = entrega.correr(vac, entregadas, HOY, "2026-11-05T07:00:00Z", tmp_path, subir=subir)
+    r2 = entrega.correr(vac, entregadas, "2026-11-06", "2026-11-06T07:00:00Z", tmp_path, subir=subir)
+    assert r1["vacantes"] == 20 and r2["vacantes"] == 20 and not recibidas[0] & recibidas[1]
+    r3 = entrega.correr(vac, entregadas, "2026-11-07", "2026-11-07T07:00:00Z", tmp_path, subir=subir)
     assert r3["vacantes"] == 10 and r3["roles"]["qa"]["faltan"] == 10
+    assert not list(tmp_path.iterdir())
 
 
 def test_fila_para_supabase():

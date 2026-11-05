@@ -2,10 +2,8 @@
 
 Corre al final de la bodega. Elige de la bodega las vacantes que nunca se han entregado (trabajo/entregadas.json guarda
 su huella y sus enlaces), las reparte por rol (datos/entrega.yaml) y, dentro de cada rol, va tomando la que menos se
-parece a las ya elegidas: idioma, nivel, país, modalidad, fuente y empresa. Sube las filas a Supabase (supabase.py). La exportación automática CSV/Excel de la versión anterior queda desactivada
-por defecto; la utilidad de exportación se conserva para usos explícitos.
+parece a las ya elegidas: idioma, nivel, país, modalidad, fuente y empresa. Sube las filas a Supabase (supabase.py).
 """
-import csv
 from collections import Counter
 from datetime import date, timedelta
 from pathlib import Path
@@ -188,38 +186,10 @@ def registrar_medicion(historial, resumen, hoy, dias=30):
     return [historial[dia] for dia in sorted(historial) if dia <= hoy][-7:]
 
 
-def escribir(carpeta, hoy, filas, dias_guardados=60):
-    """datos/entregas/<hoy>.csv y .xlsx, y ultima.csv/.xlsx; borra las de más de `dias_guardados` días."""
-    carpeta = Path(carpeta)
-    carpeta.mkdir(parents=True, exist_ok=True)
-    columnas = contrato.COLUMNAS + contrato.EXTRAS
-    for nombre in (f"{hoy}.csv", "ultima.csv"):
-        with open(carpeta / nombre, "w", encoding="utf-8", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=columnas)
-            w.writeheader()
-            w.writerows(filas)
-    try:
-        from openpyxl import Workbook
-        libro = Workbook()
-        hoja = libro.active
-        hoja.title = "ofertas"
-        hoja.append(columnas)
-        for fila in filas:
-            hoja.append([fila[c] if c != "description_full" else fila[c][:32000] for c in columnas])
-        hoja.freeze_panes = "A2"
-        for nombre in (f"{hoy}.xlsx", "ultima.xlsx"):
-            libro.save(carpeta / nombre)
-    except ImportError:
-        pass
-    limite = (date.fromisoformat(hoy) - timedelta(days=dias_guardados)).isoformat()
-    for archivo in carpeta.glob("20*-*-*.*"):
-        if archivo.stem < limite:
-            archivo.unlink()
-
-
 def correr(vacantes, entregadas, hoy, capturada, carpeta, subir=None, pendientes=None, persistir=None,
-           exportar=None, lote=None, persistir_lote=None, registrar_seleccion=None):
-    """Elige, escribe y sube. `entregadas` (dict huella → fecha) se actualiza con lo entregado hoy.
+           lote=None, persistir_lote=None, registrar_seleccion=None):
+    """Elige y sube a Supabase. `carpeta` conserva compatibilidad de llamadas, sin generar archivos.
+    `entregadas` (dict huella → fecha) se actualiza con lo entregado hoy.
     Devuelve el resumen para salud.json."""
     cfg = config()
     iniciales = (lote or {}).get("elegidas", {}) if (lote or {}).get("fecha") == hoy else {}
@@ -229,9 +199,6 @@ def correr(vacantes, entregadas, hoy, capturada, carpeta, subir=None, pendientes
     if persistir_lote:
         persistir_lote({"fecha": hoy, "elegidas": elegidas})  # permite reconstruir cola si se interrumpe el siguiente paso
     filas = filas_de(elegidas, cfg["roles"], hoy, capturada)
-    generar_archivos = cfg.get("exportar_archivos", False) if exportar is None else exportar
-    if generar_archivos:
-        escribir(carpeta, hoy, filas)
     pendientes = pendientes if pendientes is not None else {}
     for fila in filas:
         pendientes.setdefault(fila["external_id"], fila)
@@ -249,7 +216,7 @@ def correr(vacantes, entregadas, hoy, capturada, carpeta, subir=None, pendientes
     resumen["enlaces_comprobados"] = bool(resumen["vacantes"]) and all(
         (v.get("verificacion") or {}).get("estado") == "verificada" for lista in elegidas.values() for v, _ in lista)
     resumen["filas"] = len(filas)
-    resumen["archivos"] = bool(generar_archivos)
+    resumen["archivos"] = False  # compatibilidad con reportes históricos; Supabase es el destino operativo
     resumen["meta_por_rol"] = cfg["por_rol"]
     resumen["meta_cumplida"] = all(r["faltan"] == 0 for r in resumen["roles"].values())
     if subir is not None:

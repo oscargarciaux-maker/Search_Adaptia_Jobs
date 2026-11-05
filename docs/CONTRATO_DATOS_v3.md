@@ -36,6 +36,16 @@ comprobarse queda pendiente, no aprobado. La captura horaria rota comprobaciones
 la nocturna comprueba candidatas y puede completar con otras verificadas, conservando las reglas de variedad.
 
 El reporte de salud incluye cantidades comprobadas, pendientes/rechazadas y motivos; la página muestra estado y hora.
+`codigo_commit` y `ejecucion_id` identifican el código y ejecución que generaron ese reporte. Son metadatos opcionales
+de salud, vacíos fuera de Actions; no exponen claves ni sustituyen las comprobaciones del dato y del despliegue.
 Las vacantes históricas sin este objeto se muestran sin comprobar. No se interpretan automáticamente como verificadas.
 La verificación se aplica antes de nuevas selecciones en el flujo de producción; utilidades offline compatibles v1/v2
 pueden seguir operando sin acceso a red. No se usa crédito de Apify para estas comprobaciones.
+
+## Recuperación conservadora de una selección parcial
+
+Si existen filas v1 de la fecha de negocio actual sin correspondencia en el registro canónico ni en un lote local
+recuperable, el arranque normal se detiene antes de recoger o consumir Apify. La memoria de URLs evita duplicar una
+oferta, pero por sí sola no reconstruye cuántas plazas ya ocupaba el lote perdido. Se debe recuperar el estado del
+corte/artefacto y completar el registro; no crear otras veinte para aparentar una reanudación correcta. Las filas y
+los snapshots se conservan. Este control no convierte las escrituras de tablas y GitHub en una única transacción.

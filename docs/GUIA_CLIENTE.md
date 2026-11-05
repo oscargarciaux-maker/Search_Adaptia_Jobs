@@ -34,7 +34,7 @@ Supabase conserva los datos; el navegador muestra la página. Las cuentas y sus 
 - **Actualizar página:** despliegue que hace visible el resultado en GitHub Pages. En Cloudflare se usa su propio despliegue.
 - **Entorno de trabajo:** máquina de nube donde se prepara y prueba código. «Local» puede referirse a esa máquina;
   no significa que las búsquedas productivas dependan del computador del operador ni del plan de este chat.
-- **Supabase:** base de datos operativa e histórica. Excel es una descarga opcional, no la base de datos.
+- **Supabase:** base de datos operativa e histórica. El producto ya no ofrece hojas de cálculo como destino o descarga.
 - **Apify:** refuerzo de ofertas formales de LinkedIn con presupuesto acotado. También se utiliza LinkedIn público sin cuenta.
 
 El circuito es: cambio aprobado → siguiente captura con ese código → guardado y reporte → despliegue → página actualizada.
@@ -129,7 +129,7 @@ Para reportar un problema al responsable: copiar el cargo, empresa, URL, fecha/h
 credenciales ni datos de formularios. La página no incluye todavía un sistema de incidencias ni una aprobación manual
 que convierta un enlace pendiente en verificado.
 
-## 7. Compartir por WhatsApp y usar Excel
+## 7. Compartir por WhatsApp y conservar el historial del operador
 
 1. Revisar condiciones y marcar ofertas con comprobación vigente. **Elegir las 20 primeras** selecciona hasta 20
    resultados aptos de la búsqueda actual; no es la selección automática de los seis roles.
@@ -143,9 +143,8 @@ navegador puede mostrar un historial distinto. En **Estado → Historial de envi
 **Importar historial** para trasladarlo. Esto no reemplaza el registro diario guardado en Supabase ni registra destinatarios.
 Cloudflare con KV puede compartir marcas entre dispositivos de los operadores; no es seguimiento individual por cliente.
 
-**Excel** descarga la selección de la página. Si no puede cargarse la librería de Excel, se ofrece CSV. La generación
-automática del Excel antiguo está desactivada. Una descarga queda congelada: revisar los enlaces nuevamente si se usa
-varios días después. Supabase sigue siendo la base principal.
+Las ofertas y las selecciones diarias se conservan en Supabase. La exportación/importación de **Historial de enviadas**
+es un JSON con marcas del navegador; no es una exportación de vacantes, una hoja de cálculo ni un respaldo de Supabase.
 
 ## 8. Horarios y búsquedas a pedido
 
@@ -189,3 +188,4 @@ propios; no está incluida como una función ya disponible.
 
 La información técnica, recuperación y pendientes comprobables están en [OPERACION_Y_RECUPERACION.md](OPERACION_Y_RECUPERACION.md)
 y [ACEPTACION_Y_ESTADO.md](ACEPTACION_Y_ESTADO.md). El [historial de cambios](HISTORIAL_CAMBIOS.md) explica las revisiones.
+Las decisiones para mantener el producto están en [REVISION_FIABILIDAD.md](REVISION_FIABILIDAD.md).

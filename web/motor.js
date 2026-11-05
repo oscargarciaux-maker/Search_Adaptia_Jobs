@@ -1,4 +1,4 @@
-/* Motor de la página: búsqueda, filtros, orden, texto para WhatsApp y filas del Excel.
+/* Motor de la página: búsqueda, filtros, orden y texto para WhatsApp.
  * Funciones puras (sin DOM): se usan en el navegador (window.Motor) y en las pruebas (node --test pruebas/). */
 (function (raiz) {
   "use strict";
@@ -220,22 +220,11 @@
     return mensajes;
   }
 
-  const COLUMNAS_EXCEL = ["Cargo", "Coincidencia", "Empresa", "Dónde se puede aplicar", "Modalidad", "Ubicación del aviso",
-    "Idioma del aviso", "Inglés que pide", "Nivel", "Años mínimos", "Salario", "Publicada", "Fuente", "Enlace",
-    "Enlace directo de la empresa", "Resumen"];
   const IDIOMA = { es: "Español", en: "Inglés", pt: "Portugués" };
   const GRADO_TEXTO = { exacto: "Exacta", similar: "Similar", cercano: "Cercana", palabra: "Por palabra", todas: "" };
 
-  function filasExcel(lista, nombres, totalPaises) {
-    return [COLUMNAS_EXCEL].concat(lista.filter(v => enlaceCompartible(v)).map(v => [v.titulo, GRADO_TEXTO[v._grado] || "", v.empresa,
-      dondeAplica(v, nombres || {}, totalPaises) + (v.confianza_pais === "baja" ? " (confirmar)" : ""),
-      MODALIDAD[v.modalidad] || "", v.ubicacion || "", IDIOMA[v.idioma] || "", (INGLES[v.ingles] || "No lo dice").replace("Inglés ", ""),
-      v.nivel || "", v.anos_min ?? "", v.salario || "", fechaDe(v), (v.fuentes || [v.fuente]).join(", "), enlaceCompartible(v),
-      v.verificacion ? (enlacesComprobados(v).includes(v.enlace_directo) ? v.enlace_directo : "") : v.enlace_directo || "", v.resumen || ""]));
-  }
-
   const Motor = { GRADOS, NIVELES, normalizar, base, contieneFrase, prepararMapa, sugerir, filtrar, ordenar, conteos,
-    fechaRelativa, antiguedad, enlacesComprobados, dondeAplica, textoWhatsApp, filasExcel, diasEntre, fechaDe, MODALIDAD, INGLES, IDIOMA, GRADO_TEXTO };
+    fechaRelativa, antiguedad, enlacesComprobados, dondeAplica, textoWhatsApp, diasEntre, fechaDe, MODALIDAD, INGLES, IDIOMA, GRADO_TEXTO };
   if (typeof module !== "undefined" && module.exports) module.exports = Motor;
   else raiz.Motor = Motor;
 })(typeof window !== "undefined" ? window : globalThis);

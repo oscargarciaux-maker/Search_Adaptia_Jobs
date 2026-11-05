@@ -119,6 +119,8 @@ def test_corrida_vacia_no_reescribe_estado_previo(tmp_path, monkeypatch):
 def test_prueba_de_integracion_no_exige_claves_ni_genera_excel(tmp_path, monkeypatch):
     from buscador import verificar_enlaces
     monkeypatch.setattr(verificar_enlaces, "comprobar", lambda *a, **k: None)
+    monkeypatch.setenv("GITHUB_SHA", "1" * 40)
+    monkeypatch.setenv("GITHUB_RUN_ID", "123")
     def prohibido():
         raise AssertionError("Una prueba no debe exigir Supabase")
     monkeypatch.setattr(supabase, "exigir_conexion", prohibido)
@@ -126,6 +128,7 @@ def test_prueba_de_integracion_no_exige_claves_ni_genera_excel(tmp_path, monkeyp
         "titulo": "UX Designer", "empresa": "Empresa", "enlace": "https://jobs.lever.co/a/1", "fuente": "Lever",
         "ubicacion": "Remote - LATAM", "descripcion": TEXTO}], set(), set(), {}))
     r = bodega.correr(tmp_path, hoy=HOY, prueba=True)
+    assert r["codigo_commit"] == "1" * 40 and r["ejecucion_id"] == "123"
     assert r["entrega"]["archivos"] is False
     assert not (tmp_path / "trabajo/entregadas.json").exists()
     assert not (tmp_path / "trabajo/pendientes_supabase.json").exists()

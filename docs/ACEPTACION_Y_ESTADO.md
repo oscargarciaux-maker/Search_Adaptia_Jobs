@@ -28,6 +28,21 @@ El [informe de los doce casos](../reportes/auditoria_enlaces_2026-11-05.md) y el
 
 Este estado fechado es histórico; utilizar los pasos siguientes para evaluar la situación actual.
 
+### Actualización observada el 5 de noviembre, 1:10 p. m. Colombia
+
+La [captura 42080482444](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42080482444) terminó
+correctamente con `7a131022e02410639f6896e4e0ca81cd73e01482`: ya se acreditó la primera captura productiva con v3.
+Su catálogo confirmó 13.959 filas, sin errores ni pendientes; la página coincidía con el dato de **1:09:43 p. m.** después
+del [despliegue 42081595465](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42081595465).
+
+La comprobación programó 40 ofertas. Del lote histórico de 120: **32 comprobadas, 86 pendientes y 2 rechazadas por cierre**.
+De las 86 pendientes, 80 no habían sido revisadas por el límite del ciclo y seis quedaron sin confirmar. Es la revisión
+gradual prevista, no una prueba de que las 120 estén listas para compartir ni de siete días de continuidad. Las dos
+cerradas se retiraron del catálogo activo sin reescribir la selección histórica.
+
+Esta actualización resuelve el pendiente del primer ciclo v3 del corte anterior; permanecen las pruebas de continuidad,
+respaldo real/capacidad de las cuentas del cliente, alertas y aceptación con sus propios accesos.
+
 ## 2. Condiciones para una entrega operativa
 
 Registrar resultado, fecha, responsable y enlace de evidencia para cada fila. «No probado» no equivale a «aprobado».
@@ -40,7 +55,7 @@ Registrar resultado, fecha, responsable y enlace de evidencia para cada fila. «
 | Persistencia v2 | Catálogo, ofertas y registro sin errores/colas pendientes | Reporte y conteos por rol/fecha en Supabase |
 | Web actualizada | Hora del dato en web coincide con rama y despliegue esperado | URL, horas y ejecución; captura de pantalla sin claves si hace falta |
 | Calidad por caso | Una URL 200 genérica no se aprueba; cierres/404/ciclos/pagos se apartan; 403 queda pendiente | Tests + revisión por muestra en la instalación |
-| Enlace alternativo | Si falla el principal y hay uno bueno, se comparte/exporta el comprobado | Caso revisado y texto/exportación resultante |
+| Enlace alternativo | Si falla el principal y hay uno bueno, se comparte el comprobado | Caso revisado y texto resultante |
 | País y afinidad | UX/UI incluye afines pertinentes; remoto restringido no se anuncia mundial | Muestra LATAM/España/mundial y casos restringidos |
 | Frescura | 2/6/24 horas solo incluyen publicación con hora confirmada | Ejemplos con hora, solo fecha y primera detección |
 | Selección y repetición | Máximo configurado por rol; completar/reintentar el mismo lote no escoge otro completo | IDs/fechas antes y después de repetición controlada |
@@ -51,7 +66,7 @@ Registrar resultado, fecha, responsable y enlace de evidencia para cada fila. «
 | Respaldo y recuperación | Cliente puede restaurar un corte aislado conservando tipos, IDs, FK, secuencia y memoria | Acta del ensayo en cuentas/entorno acordado |
 | Acceso de página | Se cumple la decisión pública/privada y, si corresponde, APIs/dominios Access | Prueba autorizada e incógnita; configuración revisada |
 | Alertas y soporte | Responsable recibe avisos y sabe leer/atender un fallo | Incidencia de prueba y procedimiento acordado |
-| Uso sin asistencia | Cliente busca, interpreta estados, copia, marca y exporta sin ayuda del desarrollador | Recorrido de aceptación |
+| Uso sin asistencia | Cliente busca, interpreta estados, copia y marca sin ayuda del desarrollador | Recorrido de aceptación |
 
 No provocar pagos, cierres ni fallos de la base productiva para ensayar. Los casos artificiales se prueban en fixtures
 y destinos aislados. Las escrituras reales de aceptación se coordinan para no repetir selección ni consumir crédito extra

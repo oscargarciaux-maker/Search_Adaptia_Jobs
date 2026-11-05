@@ -13,6 +13,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 
 # Formatos de claves de los servicios del proyecto (GitHub, Apify, Anthropic, AWS) y bloques de llave privada
 CLAVES = re.compile(r"ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|apify_api_[A-Za-z0-9]{20,}|sk-ant-[A-Za-z0-9_-]{20,}"
+                    r"|sb_secret_[A-Za-z0-9_-]{16,}|gh[osru]_[A-Za-z0-9]{20,}"
                     r"|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----")
 CORREO = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z0-9.-]*[A-Za-z]{2,}")
 # Direcciones técnicas que no son de una persona (p. ej. el usuario de GitHub Actions al publicar)
@@ -50,6 +51,8 @@ def test_ningun_archivo_trae_claves_ni_correos():
 def test_el_detector_reconoce_claves_y_correos():
     assert CLAVES.search("token = ghp_" + "a" * 36)
     assert CLAVES.search("APIFY_TOKEN=apify_api_" + "B" * 30)
+    assert CLAVES.search("SUPABASE_SECRET_KEY=sb_secret_" + "X" * 32)
+    assert CLAVES.search("GITHUB_TOKEN=ghs_" + "Y" * 36)
     assert CORREO.search("escribe a alguien" + "@" + "empresa.com")  # partido para no dispararse a sí mismo
     assert not CLAVES.search("APIFY_TOKEN va en los secretos de GitHub")
 

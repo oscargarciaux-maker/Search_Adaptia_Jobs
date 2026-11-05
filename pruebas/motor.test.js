@@ -42,11 +42,10 @@ test("solo comparte el enlace comprobado y vigente, aunque el principal falle", 
   assert.deepEqual(M.textoWhatsApp([v], { ahora: "2026-11-05T18:00:00Z" }), []);
 });
 
-test("pendientes no se exportan como enlaces comprobados y rechazadas no aparecen", () => {
+test("pendientes no se comparten como enlaces comprobados y rechazadas no aparecen", () => {
   const pendiente = { ...VACANTES[0], verificacion: { estado: "pendiente", enlaces: [] } };
   assert.deepEqual(M.enlacesComprobados(VACANTES[0]), []);
   assert.deepEqual(M.textoWhatsApp([pendiente], {}), []);
-  assert.equal(M.filasExcel([pendiente], {}, 21).length, 1);
   assert.equal(M.filtrar([pendiente], { soloVerificadas: true }).length, 0);
   assert.equal(M.filtrar([{ ...pendiente, verificacion: { estado: "rechazada" } }], {}).length, 0);
 });
@@ -124,14 +123,6 @@ test("texto para WhatsApp en mensajes de 15", () => {
   assert.ok(msg.includes("https://www.linkedin.com/jobs/view/1"));
   const muchas = Array.from({ length: 31 }, (_, i) => V({ id: String(i), titulo: "UX Designer" }));
   assert.equal(M.textoWhatsApp(muchas, { titulo: "UX", fecha: "28 oct", hoy: "2026-10-28" }).length, 3);
-});
-
-test("filas del Excel con encabezados en español", () => {
-  const filas = M.filasExcel(M.filtrar(VACANTES, { familias: ["edicion-video"], hoy: "2026-10-28", dias: 30 }), { VE: "Venezuela" }, 20);
-  assert.equal(filas[0][0], "Cargo");
-  assert.equal(filas[1][0], "Editor de video");
-  assert.equal(filas[1][3], "Venezuela");
-  assert.equal(filas[1][13], "https://www.linkedin.com/jobs/view/4");
 });
 
 test("fechas relativas", () => {

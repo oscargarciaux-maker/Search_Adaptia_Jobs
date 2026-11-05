@@ -6,12 +6,13 @@ empieza en [GUIA_CLIENTE.md](GUIA_CLIENTE.md); los resultados observados están 
 | Revisión | Qué cambió | Consecuencia para el cliente |
 |---|---|---|
 | PR #6 — cobertura/integridad | LATAM y España más remotas mundiales, prioridad remota, rotación de aliases, identidad por enlaces/contenido y reintentos | Colombia no limita cobertura; la cuota se evalúa por rol y la no repetición necesita memoria |
-| PR #7 — calidad y Supabase | Contenido que no es oferta, preflight obligatorio, persistencia/reintentos y retirada del Excel automático | Supabase es obligatorio; Excel es solo descarga opcional; fallo se informa sin inventar entregas |
+| PR #7 — calidad y Supabase | Contenido que no es oferta, preflight obligatorio, persistencia/reintentos y retirada del Excel automático | Supabase obligatorio; la descarga opcional que existía entonces se retiró en la revisión posterior |
 | PR #8 — Apify formal | Actor de ofertas LinkedIn sin cookies, build comprobado, tope USD 5/mes, reservas durables y feed pagado apagado | Apify sí aporta ofertas; conservar presupuesto y revisar gasto de toda la cuenta |
 | PR #9 — catálogo y frecuencia | Captura horaria, tres tiempos, lote idempotente recuperable, catálogo/selección privados y despliegue explícito Pages | Aplicar SQL 002/variables si falta; repetir el día no crea otras veinte por rol |
 | PR #10 — portales inválidos | Limitar etiqueta DNS Recruitee y aislar errores de un candidato | Un nombre largo o URL inválida no aborta todos los descubrimientos |
 | PR #11 — enlaces vigentes | GET acotado, redirecciones, cierres, cobro explícito, título, pendiente ante bloqueo, caché y enlaces compartibles | Las nuevas selecciones requieren evidencia; puede haber déficit; se conservan snapshots y se informa estado actual |
 | Revisión documental posterior | Manual del operador, instalación/traspaso actualizados, mantenimiento, recuperación y aceptación con evidencias | El cliente tiene una ruta de operación coherente; las instrucciones históricas quedan identificadas |
+| Revisión de producto y mantenimiento | Retirada de exportaciones de hojas de cálculo, guardia de recuperación parcial y trazabilidad de ejecución | Supabase como destino, inconsistencia sin lote detiene selección antes de gastar y riesgos priorizados en el manual |
 
 ## Datos y activación
 

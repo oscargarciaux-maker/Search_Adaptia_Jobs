@@ -201,6 +201,40 @@ def test_registro_recupera_snapshot_del_dia_sin_descargar_historico():
     assert memoria[v["id"]] == HOY and lote["elegidas"]["ux-ui-designer"][0][0]["id"] == v["id"]
 
 
+def test_recuperacion_identifica_v1_del_dia_sin_snapshot_canonico(monkeypatch):
+    v = oferta()
+    monkeypatch.setattr(supabase, "credenciales", lambda: ("https://example.supabase.co", "sb_secret_prueba"))
+    class Sesion:
+        def get(self, url, **op):
+            filas = [{"offer_url": v["enlace"], "delivery_date": HOY}] if url.endswith("/ofertas") else []
+            return type("R", (), {"status_code": 200, "json": lambda self: filas})()
+    _, lote = supabase.leer_entregas(HOY, Sesion())
+    assert lote["v1_sin_registro_hoy"] == [contrato.url_limpia(v["enlace"])]
+
+
+@pytest.mark.parametrize("con_lote_local", [False, True])
+def test_perder_registro_y_estado_no_crea_otro_lote_ni_gasta_apify(monkeypatch, tmp_path, con_lote_local):
+    import json
+    v = oferta()
+    monkeypatch.setenv("CATALOGO_ACTIVO", "true")
+    monkeypatch.setattr(supabase, "exigir_conexion", lambda: None)
+    monkeypatch.setattr(supabase, "exigir_catalogo", lambda: None)
+    monkeypatch.setattr(supabase, "leer_entregas", lambda hoy: ({v["enlace"]: HOY},
+        {"fecha": HOY, "elegidas": {}, "v1_sin_registro_hoy": [contrato.url_limpia(v["enlace"])]}))
+    if con_lote_local:
+        trabajo = tmp_path / "trabajo"
+        trabajo.mkdir()
+        (trabajo / "lote_entrega.json").write_text(json.dumps({"fecha": HOY,
+            "elegidas": {"ux-ui-designer": [[v, "exacto"]]}}))
+    def recoger(*a, **k):
+        raise RuntimeError("captura alcanzada con lote recuperable")
+    monkeypatch.setattr(bodega, "recoger", recoger)
+    esperado = "captura alcanzada" if con_lote_local else "sin registro de selección ni lote recuperable"
+    with pytest.raises(RuntimeError, match=esperado):
+        bodega.correr(tmp_path, hoy=HOY)
+    assert not (tmp_path / "trabajo/entregadas.json").exists()
+
+
 def test_sin_siete_dias_reales_no_se_declara_listo_para_whatsapp():
     ahora = datetime(2026, 11, 4, 12, tzinfo=timezone.utc)
     r = {"capturada_en": AHORA, "catalogo": {"filas": 1, "enviadas": 1, "pendientes": 0}, "historico_entregas": [],

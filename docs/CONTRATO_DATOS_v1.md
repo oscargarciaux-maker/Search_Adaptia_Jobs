@@ -2,11 +2,17 @@
 
 **Para:** quien construye el scraper y cualquier agente futuro · **De:** Adaptia Jobs · **Fecha:** 28 de octubre de 2026
 
+Los nombres/valores v1 siguen en la tabla histórica `ofertas`. El flujo vigente escribe JSON en Supabase; no utiliza
+hojas de cálculo. Catálogo/selección y verificación se amplían en [v2](CONTRATO_DATOS_v2.md) y
+[v3](CONTRATO_DATOS_v3.md). La sección 3 conserva diseño original de otra etapa, no funciones adicionales garantizadas.
+
 Este documento define **una sola forma de describir una oferta**. La plataforma, el scraper, la IA que analiza ofertas pegadas y los agentes futuros usan **los mismos nombres de campo y los mismos valores permitidos**. Si algo no está aquí, se agrega aquí primero (con versión nueva) y después se usa.
 
 ## 1. Cómo se entregan las ofertas
 
-Una fila por oferta, con estas columnas (nombres en inglés, en minúscula, con guion bajo). Sirve igual para un **CSV**, una **hoja de Google** o un **JSON** (un objeto por oferta con las mismas claves).
+Una fila por enlace de oferta, con estas columnas (nombres en inglés, en minúscula, con guion bajo). Dos enlaces de una
+misma vacante pueden producir dos filas v1 y una sola selección canónica v2. El programa envía objetos JSON a Supabase;
+los ejemplos CSV al final se conservan como representaciones históricas del vocabulario.
 
 - Solo `job_title` y `company_name` son obligatorios. **Todo lo demás es opcional**: si no se conoce, se deja vacío. Nunca inventes un valor para llenar un campo.
 - Las listas se escriben separadas por `|` (por ejemplo `CO|MX`). En JSON también pueden ser arreglos.
@@ -132,13 +138,13 @@ Las palabras clave van en el idioma original de la oferta, de más a menos impor
 
 Cualquier columna adicional que mande el scraper (por ejemplo `search_tag`) **no se pierde**: se guarda aparte en un campo de extras (hasta 20 columnas, 500 caracteres cada una).
 
-## 3. Qué hace la plataforma con cada fila
+## 3. Diseño original de la plataforma receptora (histórico)
 
 1. **Idioma:** si `posting_language` es un idioma distinto de `es`/`en`, la fila **no entra al catálogo** (queda guardada con el motivo).
 2. **Duplicados:** primero por enlace (sin parámetros de seguimiento; en LinkedIn solo cuenta el número de la oferta) y luego por contenido (empresa + cargo + descripción iguales). Misma oferta con otro enlace → el enlace se **agrega** a la oferta existente. Si cambia el cargo o la descripción, es **otra oferta**.
 3. **Nunca sobrescribe:** una oferta que ya existe no se modifica por una nueva fila. Solo se le agregan enlaces, o se marca vencida si la fila trae `status = expired`.
 4. **Repositorio propio:** toda fila recibida se guarda tal cual llegó, aunque se omita o falle. Si la hoja de origen se daña, las ofertas y los procesos de los clientes no se afectan.
-5. **Límites:** hasta 500 filas por llamada; el CSV del administrador se envía en bloques automáticamente.
+5. **Límites:** el adaptador v1 vigente envía hasta 500 objetos JSON por llamada a Supabase.
 
 ## 4. Ejemplos
 

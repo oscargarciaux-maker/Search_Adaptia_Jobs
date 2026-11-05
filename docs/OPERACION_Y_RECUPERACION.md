@@ -62,6 +62,7 @@ pendientes, retrasar o perder horarios; no se utiliza como una cola con conserva
 | Error 401/403 Supabase | Tipo de clave, vigencia y proyecto | Sustituir secreto por secret/service_role de la cuenta correcta; no publicarlo |
 | Tablas existen pero API no accede | Grants, RLS y recarga de esquema | Revisar scripts completos; no abrir permisos anon para hacer funcionar el scraper |
 | Pendientes de sincronización | Tipo de cola y último HTTP/permiso | Corregir causa y reintentar con memoria intacta; conservar fecha e ID |
+| Filas v1 de hoy sin registro ni lote recuperable | Artefacto/estado del mismo corte y `entregas_diarias` | Recuperar el lote y completar su registro; el arranque se detiene antes de buscar para no escoger otra entrega |
 | Hay menos de 20 en un rol | Motivos, descripción, enlaces, país, no repetición y máximo por empresa | Revisar refuerzos/fuentes/alias; no rellenar con pendientes, repeticiones o cargos ajenos |
 | La selección histórica contiene enlaces fallidos | Reporte actual de verificación | No reenviar esas ofertas; conservar snapshot, revisar casos y esperar nuevas oportunidades |
 | Muchos 403/429/CAPTCHA de un portal | Salud de esa fuente, otros orígenes y frecuencia | Dejarlos pendientes; no declararlos cerrados, aumentar agresividad ni pedir una cookie personal |
