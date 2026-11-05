@@ -1,40 +1,110 @@
 # Instalación
 
-Hay dos niveles. El **básico** deja la página funcionando con dos clics y sin cuentas pagas. Los **opcionales** suben el
-volumen (Apify, Brave) o vuelven la página privada y compartida entre equipos (Cloudflare). Ninguna clave se escribe en
-el repositorio ni en un chat: todas van en los "secretos" de GitHub o de Cloudflare.
+Lo que hace el sistema cada noche (1:17, hora de Bogotá), solo, en GitHub:
 
-## Básico (gratis, unos 5 minutos)
+1. **Busca** vacantes en LinkedIn (buscador público, sin cuenta), Indeed, los portales de empleo de cientos de empresas,
+   Get on Board, tableros remotos y **publicaciones «contratando» de LinkedIn** (con Apify).
+2. **Arma la entrega del día:** 20 vacantes **nuevas** (nunca entregadas antes) por cada rol —Product designer, UX/UI
+   designer, Product Owner, Product manager, AI Engineer y QA—, variadas en idioma, nivel, país y modalidad, de LATAM y
+   España, con las columnas del contrato de datos (`docs/CONTRATO_DATOS_v1.md`).
+3. **La guarda** en la base de datos (Supabase) y en un Excel que se descarga desde la página.
 
-1. **Fusionar el código en `main`.** En GitHub, abre el pull request de la versión 1 y toca *Merge*. Desde ese momento la
-   búsqueda corre sola cada noche a la 1:17 (hora de Bogotá).
-2. **Activar la página.** En el repositorio: *Settings → Pages → Build and deployment → Source: Deploy from a branch →
-   Branch: `publicado` / `(root)` → Save*. En uno o dos minutos la página queda en
-   `https://<usuario>.github.io/<repositorio>/` (GitHub muestra el enlace en esa misma pantalla).
-3. **Primera búsqueda completa** (opcional, si no quieres esperar a la noche): *Actions → Bodega nocturna → Run workflow →
-   modo `inicial`*. Tarda unos 40 minutos.
-4. **Revisar que todo esté bien:** *Actions → Diagnóstico → Run workflow*. El resumen dice qué fuente funciona y qué falta.
+Ninguna clave se escribe en el repositorio ni en un chat: todas van en los **secretos** de GitHub
+(*Settings → Secrets and variables → Actions → New repository secret*).
 
-Con el nivel básico:
-- La página es pública para quien tenga el enlace (no aparece en buscadores: lleva `noindex`). Solo muestra vacantes
-  públicas; no hay datos de clientes.
-- "Marcar enviadas" se guarda en el navegador de cada equipo. Para pasar el historial a otro equipo: pestaña *Estado →
-  Exportar historial* y en el otro *Importar historial*.
-- "Buscar en vivo" abre GitHub Actions: allí se toca *Run workflow*, se escribe el cargo y el país, y en unos 15 minutos
-  aparece en la página.
+Tiempo total de la instalación: unos 30 minutos. Costo: USD 0 (Supabase gratis, Apify gratis con USD 5 al mes de uso).
 
-## Opcional: más volumen de LinkedIn con Apify
+---
 
-Apify recorre el buscador público de LinkedIn sin que lo bloqueen (nunca con una cuenta: no le des tu cookie a ningún
-actor; si un actor la pide, no se usa).
+## 1. GitHub (obligatorio)
 
-1. Crea una cuenta en https://apify.com y, en *Settings → Integrations*, copia tu **API token**.
-2. En *Billing → Limits* pon un **límite de gasto mensual** (sugerido para empezar: USD 50).
-3. En GitHub: *Settings → Secrets and variables → Actions → New repository secret* → nombre `APIFY_TOKEN`, valor: el token.
-4. Elige el actor: busca en la tienda de Apify un "LinkedIn Jobs Scraper" **sin login ni cookies** y escribe su id
-   (por ejemplo `usuario/linkedin-jobs-scraper`) en `datos/config.yaml`, campo `apify.actor_linkedin`. Pídele a Claude
-   que compare dos actores con las mismas búsquedas antes de dejar uno (paso 6 del plan).
-5. Corre el *Diagnóstico*: debe decir "clave válida; actor: …".
+1. **Cuenta y repositorio.** Este repositorio vive en la cuenta de GitHub de quien lo usa (ver `docs/TRASPASO.md` para
+   pasarlo a otra cuenta).
+2. **Activar Actions** si GitHub lo pide: pestaña *Actions → I understand my workflows, enable them*.
+3. **Activar la página.** *Settings → Pages → Build and deployment → Source: Deploy from a branch → Branch: `publicado` /
+   `(root)` → Save*. La rama `publicado` aparece después de la primera búsqueda (paso 4). En uno o dos minutos la página
+   queda en `https://<usuario>.github.io/<repositorio>/` (GitHub muestra el enlace en esa misma pantalla).
+
+## 2. Supabase: la base de datos de la entrega (gratis, 10 minutos)
+
+Supabase guarda cada día las vacantes entregadas en una tabla llamada `ofertas`, con las columnas del contrato. Desde ahí
+se exportan a Excel, y ahí las leerá después el bot de WhatsApp.
+
+1. **Crear la cuenta:** entra a https://supabase.com → *Start your project* → regístrate (con GitHub o con correo).
+2. **Crear el proyecto:** *New project*.
+   - *Organization*: la que crea Supabase por defecto (plan *Free*).
+   - *Project name*: por ejemplo `vacantes`.
+   - *Database password*: toca *Generate a password* y guárdala en un lugar seguro (no se usa en este sistema, pero la
+     pide Supabase si algún día necesitas entrar a la base directamente).
+   - *Region*: la más cercana, por ejemplo *East US (North Virginia)* o *South America (São Paulo)*.
+   - *Create new project*. Tarda uno o dos minutos.
+3. **Crear la tabla:** menú izquierdo → *SQL Editor* → *New query*. Abre en GitHub el archivo `supabase/esquema.sql`,
+   copia **todo** su contenido, pégalo en el editor y toca *Run*. Debe decir *Success. No rows returned*.
+   En *Table Editor* aparece la tabla `ofertas` (vacía) y la vista `entrega_de_hoy`.
+4. **Copiar la dirección y la clave secreta:** *Project Settings* (engranaje) →
+   - *Data API* (o *API*): copia la **Project URL** (`https://xxxxxxxx.supabase.co`).
+   - *API Keys*: en *Secret keys* copia la clave **secreta** (`sb_secret_…`). Si tu proyecto solo muestra las claves
+     antiguas, usa la **`service_role`** (no la `anon`). **Nunca** la pegues en un chat, un correo ni en el repositorio.
+5. **Guardarlas en GitHub** como dos secretos:
+   - `SUPABASE_URL` = la Project URL.
+   - `SUPABASE_SECRET_KEY` = la clave secreta.
+
+La tabla tiene la seguridad de filas activada y sin permisos públicos: solo entra quien tenga la clave secreta.
+
+**Plan gratis de Supabase:** 500 MB de base de datos (alcanza para años de entregas diarias: cada día son unas 150 filas)
+y pausa los proyectos que pasan 7 días sin actividad; como la entrega escribe todas las noches, no se pausa.
+
+## 3. Apify: publicaciones «contratando» de LinkedIn (gratis hasta USD 5 al mes, 5 minutos)
+
+Apify corre un "actor" que busca publicaciones del feed de LinkedIn (reclutadores que escriben "estamos contratando un
+Product Designer"). **Nunca** con una cuenta de LinkedIn: el actor elegido no pide cookie ni inicio de sesión. Si algún
+día un actor pide la cookie `li_at` o tu usuario, no se usa.
+
+1. **Crear la cuenta:** https://console.apify.com/sign-up (plan *Free*: USD 5 de uso al mes, sin tarjeta).
+2. **Copiar el token:** *Settings → API & Integrations → Personal API tokens* → copia el token (`apify_api_…`).
+3. **Guardarlo en GitHub:** secreto `APIFY_TOKEN`.
+4. **Actor:** ya viene elegido en `datos/config.yaml` → `apify.actor_publicaciones: "harvestapi/linkedin-post-search"`
+   (sin cookies; cobra por publicación, ≈ USD 2 por 1.000). Con `publicaciones_por_dia: 72` el gasto es ≈ USD 4,3 al mes.
+   - Si el *Diagnóstico* dice que el actor no corre en el plan gratis, cambia a
+     `"lofomachines/linkedin-post-search-scraper"` (funciona en el plan gratis con 10 publicaciones por corrida).
+   - Las búsquedas que hace están en `datos/entrega.yaml` → `consultas_publicaciones`.
+5. **Gasto:** en el plan gratis Apify se detiene solo al llegar a los USD 5 del mes (no cobra más; esos días no entran
+   publicaciones). Si algún día pasas a un plan pago, pon un límite mensual en *Billing → Limits*.
+
+Sin Apify todo lo demás funciona igual: solo no entran las publicaciones del feed.
+
+## 4. Primera corrida y revisión
+
+1. **Primera búsqueda completa** (para no esperar a la noche): *Actions → Bodega nocturna → Run workflow → modo
+   `inicial`*. Tarda entre 40 y 60 minutos. Al terminar, el resumen de la corrida dice cuántas vacantes entregó por rol y
+   cuántas filas guardó en Supabase.
+2. **Diagnóstico:** *Actions → Diagnóstico → Run workflow*. Debe salir ✅ en *Supabase (entrega diaria)* y en *Apify*.
+   ➖ significa "opcional sin configurar"; ❌ dice qué arreglar (por ejemplo, "usa la clave secreta, no la pública").
+3. **Ver la entrega:**
+   - En la página: pestaña *Estado → Entrega del día* → *Descargar Excel* (o CSV). Ahí también dice cuántas faltaron por
+     rol si un día no hubo 20 nuevas.
+   - En Supabase: *Table Editor → entrega_de_hoy* (la más reciente) o *ofertas* (todas). Para Excel: botón *Export →
+     Export to CSV*.
+   - En GitHub: rama `publicado`, carpeta `datos/entregas/` (un archivo por día, se guardan 60 días).
+
+## Cómo funciona la entrega (y qué se puede ajustar sin tocar código)
+
+`datos/entrega.yaml`:
+- `por_rol` (20), `idiomas` (`es` y `en`: el contrato no acepta otros), `max_por_empresa` (2 por rol y día),
+  `dias_frescura` (14: solo vacantes vistas por primera vez en esos días).
+- `roles`: cada rol junta familias del mapa de cargos (`datos/mapa_cargos.yaml`), con sus cargos exactos, similares y
+  cercanos. Para agregar un rol: un bloque nuevo aquí (y la familia en el mapa si no existe).
+- `consultas_publicaciones`: búsquedas de Apify.
+
+Reglas fijas (`buscador/entrega.py`, `buscador/contrato.py`):
+- **Nunca repetidas:** `trabajo/entregadas.json` (en la rama `publicado`) guarda la huella y los enlaces de todo lo
+  entregado en los últimos 180 días. Una vacante que ya salió no vuelve a salir aunque siga abierta.
+- **Variadas:** dentro de cada rol se toma una por una la que menos se parece a las ya elegidas (idioma, nivel, país,
+  modalidad, fuente), prefiriendo las de cargo exacto, con descripción completa y más nuevas.
+- **Solo con descripción completa** (el contrato la necesita para detectar copias) y con empresa conocida.
+- **Nada inventado:** lo que el aviso no dice queda vacío (moneda de un "$" solo, modalidad si no la dice, sector,
+  palabras clave de rol y blandas, resumen: los completa la plataforma con IA).
+- Si un día no hay 20 nuevas de un rol, se entregan las que haya y el resumen dice cuántas faltaron.
 
 ## Opcional: descubrir más empresas con Brave Search
 
@@ -62,10 +132,11 @@ el celular, y "Buscar en vivo" lanza la búsqueda directamente.
 6. Vuelve a desplegar (*Deployments → Retry deployment*) y entra desde el computador y el celular.
 7. Si usas Cloudflare, puedes apagar GitHub Pages (*Settings → Pages → Unpublish*) para que solo quede la versión privada.
 
-## Ajustes sin tocar código
+## Otros ajustes sin tocar código
 
-- `datos/config.yaml`: países, días, presupuestos por fuente, actor de Apify.
+- `datos/config.yaml`: países (LATAM y España), días, presupuestos por fuente, actor y tope de Apify.
 - `datos/mapa_cargos.yaml`: cargos y sus parecidos (o la skill `nueva-familia`).
+- `datos/paises.yaml`: países, ciudades y las palabras que abren una vacante remota a LATAM, al mundo o a Europa.
 - `datos/dominios.yaml`: qué sitios cuentan como original, portal o agregador.
 - `datos/empresas_ats.csv`: empresas cuyo portal se lee cada noche (crece sola en `trabajo/empresas_ats.csv`).
 - Hora de la búsqueda: `cron` en `.github/workflows/bodega.yml` (está en UTC: Bogotá + 5 horas).

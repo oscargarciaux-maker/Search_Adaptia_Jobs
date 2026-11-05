@@ -4,6 +4,7 @@ import pytest
 from buscador import paises
 
 TODOS = paises.datos()["codigos"]
+LATAM = paises.datos()["latam"]
 
 # (título, ubicación, descripción, remoto, países esperados, confianza esperada o None)
 CASOS = [
@@ -30,8 +31,10 @@ CASOS = [
     ("Programador", "Managua, Nicaragua", "", None, ["NI"], "alta"),
     # Presencial fuera de LATAM
     ("Product Designer", "New York, NY, United States", "", None, [], "alta"),
-    ("UX Designer", "Madrid, Comunidad de Madrid, España", "", None, [], "alta"),
+    ("UX Designer", "Madrid, Comunidad de Madrid, España", "", None, ["ES"], "alta"),
+    ("UX Designer", "Lisbon, Portugal", "", None, [], "alta"),
     ("Video Editor", "London, England, United Kingdom", "", None, [], "alta"),
+    ("Test Engineer", "Santa Ana, California, United States", "", None, [], "alta"),
     # Remoto en un país
     ("Product Designer", "Colombia", "", True, ["CO"], "media"),
     ("UX/UI Designer - Remote", "Mexico", "", None, ["MX"], "media"),
@@ -40,20 +43,21 @@ CASOS = [
     # Remoto en una lista de países
     ("Backend Engineer", "Remote - Mexico, Colombia, Argentina", "", None, ["MX", "CO", "AR"], "alta"),
     # Remoto para toda LATAM o el mundo
-    ("Product Designer", "Latin America", "", True, TODOS, "alta"),
-    ("UX Designer (Remote LATAM)", "", "", None, TODOS, "alta"),
+    ("Product Designer", "Latin America", "", True, LATAM, "alta"),
+    ("UX Designer (Remote LATAM)", "", "", None, LATAM, "alta"),
     ("Video Editor", "Remote - Worldwide", "", None, TODOS, "alta"),
     ("Frontend Developer", "Anywhere", "", None, TODOS, "alta"),
-    ("QA Engineer", "Remote (Americas)", "", None, TODOS, "alta"),
-    ("Designer", "Remote - South America", "", None, TODOS, "alta"),
+    ("QA Engineer", "Remote (Americas)", "", None, LATAM, "alta"),
+    ("Designer", "Remote - South America", "", None, LATAM, "alta"),
     # Remoto fuera de LATAM
     ("Product Designer", "Remote - US", "", None, [], "alta"),
     ("UX Designer", "United States (Remote)", "", None, [], "alta"),
-    ("Developer", "Remote - Europe", "", None, [], "alta"),
+    ("Developer", "Remote - Europe", "", None, ["ES"], "alta"),
+    ("Developer", "Remote - Spain", "", None, ["ES"], "media"),
     ("Senior Product Designer", "Remote", "This role is US-only. You must reside in the United States.", None, [], "alta"),
     ("Product Designer", "Remote", "Candidates must be based in Canada.", None, [], "alta"),
     # Restricción en la descripción hacia LATAM
-    ("Designer", "Remote", "You must be based in Latin America to apply.", None, TODOS, "alta"),
+    ("Designer", "Remote", "You must be based in Latin America to apply.", None, LATAM, "alta"),
     ("Developer", "Remote", "Only candidates from Colombia or Mexico.", None, ["CO", "MX"], "alta"),
     # Zona horaria
     ("Product Designer", "Remote", "We work in UTC-3 to UTC-5 hours.", None, ["AR", "BO", "BR", "CL", "CO", "CU", "DO", "EC", "PA", "PE", "PR", "PY", "UY", "VE"], "media"),
@@ -61,7 +65,7 @@ CASOS = [
     # Remoto sin región
     ("Video Editor", "Remote", "Edit short videos for social media.", None, TODOS, "baja"),
     # Remoto con LATAM solo en la descripción
-    ("Developer", "Remote", "We are a fully remote team hiring across LATAM.", None, TODOS, "media"),
+    ("Developer", "Remote", "We are a fully remote team hiring across LATAM.", None, LATAM, "media"),
 ]
 
 
@@ -89,7 +93,8 @@ def test_modalidad():
 
 def test_datos_de_paises_bien_formados():
     d = paises.datos()
-    assert len(d["codigos"]) == len(set(d["codigos"])) == 20
+    assert len(d["codigos"]) == len(set(d["codigos"])) == 21
+    assert d["europa"] == ["ES"] and len(d["latam"]) == 20
     for p in d["paises"]:
         assert set(p) >= {"codigo", "nombre", "nombres", "gentilicios", "ciudades", "utc"}
-        assert -8 <= p["utc"] <= -2
+        assert -8 <= p["utc"] <= -2 or p.get("region") == "europa"

@@ -1,6 +1,6 @@
 name: Diagnóstico
 
-# Revisa la configuración, cada fuente, las claves opcionales (Apify, Brave) y la última bodega publicada.
+# Revisa la configuración, cada fuente, Supabase, las claves de Apify y Brave y la última bodega publicada.
 # A mano: Actions > Diagnóstico > Run workflow. El resultado queda en el resumen de la corrida.
 on:
   workflow_dispatch: {}
@@ -23,5 +23,7 @@ jobs:
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
           BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python -m buscador.diagnostico

@@ -58,6 +58,15 @@ def crear(titulo, empresa, enlace, fuente, ubicacion="", descripcion="", fecha="
     }
 
 
+def reetiquetar(v):
+    """Vuelve a leer de la descripción guardada las etiquetas de texto, así un arreglo en `etiquetas` también llega a
+    las vacantes de noches anteriores."""
+    desc = v.get("_descripcion", "")
+    if desc:
+        v["ingles"], v["anos_min"], v["salario"] = etiquetas.ingles(desc), etiquetas.anos_min(desc), etiquetas.salario(desc)
+    return v
+
+
 def _rango_enlace(v):
     return enlaces.TIPOS.index(v["tipo_enlace"]) if v["tipo_enlace"] in enlaces.TIPOS else 9
 

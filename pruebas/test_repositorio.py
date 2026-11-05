@@ -52,3 +52,16 @@ def test_el_detector_reconoce_claves_y_correos():
     assert CLAVES.search("APIFY_TOKEN=apify_api_" + "B" * 30)
     assert CORREO.search("escribe a alguien" + "@" + "empresa.com")  # partido para no dispararse a sí mismo
     assert not CLAVES.search("APIFY_TOKEN va en los secretos de GitHub")
+
+
+def test_no_depende_de_otros_repositorios():
+    """El proyecto es independiente: el código no nombra ni descarga nada de otros repositorios de quien lo construyó."""
+    import re
+    from pathlib import Path
+    raiz = Path(__file__).resolve().parent.parent
+    otro = re.compile(r"ux_job_agent|ux-job-agent")
+    hallados = [str(a.relative_to(raiz)) for carpeta in ("buscador", "web", "functions", ".github", "datos", "supabase")
+                for a in (raiz / carpeta).rglob("*") if a.is_file() and a.suffix in (".py", ".js", ".yml", ".yaml", ".sql",
+                                                                                     ".html", ".csv")
+                and otro.search(a.read_text(encoding="utf-8", errors="ignore"))]
+    assert not hallados, hallados

@@ -1,5 +1,6 @@
-# Países de LATAM que cubre el buscador. Por cada uno: código ISO, nombre para la página, nombres con los que aparece
-# en los avisos (español, inglés, portugués), gentilicios, ciudades principales y zona horaria (UTC, hora estándar).
+# Países que cubre el buscador: LATAM y el mundo hispanohablante (España; decisión de Oscar, 5 nov 2026). Por cada uno:
+# código ISO, nombre para la página, nombres con los que aparece en los avisos (español, inglés, portugués), gentilicios,
+# ciudades principales y zona horaria (UTC, hora estándar). `region: europa` marca a los que no son de LATAM.
 # Se puede agregar una ciudad o un nombre sin tocar código; las pruebas revisan el formato.
 paises:
   - codigo: AR
@@ -125,16 +126,29 @@ paises:
     gentilicios: [venezolano, venezolana, venezolanos]
     ciudades: [caracas, maracaibo, valencia venezuela, barquisimeto, maracay, puerto ordaz]
     utc: -4
+  - codigo: ES
+    nombre: España
+    region: europa
+    nombres: [espana, spain]
+    gentilicios: [espanol, espanola, spanish citizen]
+    ciudades: [madrid, barcelona, sevilla, seville, bilbao, malaga, zaragoza, alicante, palma de mallorca, las palmas,
+               murcia, valladolid, a coruna, vigo, pamplona]  # sin Valencia ni Granada: también son de VE y NI
+    utc: 1
 
 # Palabras que abren una vacante remota a toda LATAM
 toda_latam: [latam, latin america, latinoamerica, america latina, south america, sudamerica, suramerica, americas,
-             the americas, central america, centroamerica, worldwide, anywhere, global, globally, any country,
-             cualquier pais, todo el mundo, international]
+             the americas, central america, centroamerica]
+
+# Palabras que la abren a cualquier país (LATAM y España)
+todo_el_mundo: [worldwide, anywhere, global, globally, any country, cualquier pais, todo el mundo, international,
+                cualquier parte del mundo]
+
+# Palabras que abren una vacante remota a Europa: desde el mundo hispanohablante, solo España
+toda_europa: [europe, european union, eu, emea, europa, union europea, cet, cest]
 
 # Lugares fuera de LATAM: si el aviso solo nombra estos, nadie de LATAM puede aplicar
 fuera_de_latam: [united states, us, usa, u.s., u.s.a, estados unidos, eeuu, ee.uu, us only, canada, north america,
-                 united kingdom, uk, england, london, ireland, dublin, europe, european union, eu, emea, spain, espana,
-                 madrid, barcelona, portugal, lisbon, lisboa, germany, berlin, france, paris, netherlands, amsterdam,
+                 united kingdom, uk, england, london, ireland, dublin, portugal, lisbon, lisboa, germany, berlin, france, paris, netherlands, amsterdam,
                  italy, poland, romania, ukraine, india, bangalore, bengaluru, pakistan, philippines, manila, apac,
                  asia, australia, new zealand, singapore, japan, israel, uae, dubai, south africa, nigeria, kenya,
                  egypt, new york, san francisco, california, texas, florida, miami, seattle, boston, chicago, austin,

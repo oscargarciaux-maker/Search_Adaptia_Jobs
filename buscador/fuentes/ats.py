@@ -3,7 +3,7 @@ gratis, y todo lo que publican está abierto y es el aviso original.
 
 La lista de empresas (`datos/empresas_ats.csv`) crece sola: cada noche se prueban, en cada sistema, los nombres de las
 empresas que trajeron las demás fuentes (LinkedIn, Indeed, tableros remotos) y las que descubre Brave. Las que tienen
-portal quedan en la lista y se leen todas las noches. Adaptado de apps_script/Fuentes.gs de ux_job_agent.
+portal quedan en la lista y se leen todas las noches.
 """
 import csv
 import re

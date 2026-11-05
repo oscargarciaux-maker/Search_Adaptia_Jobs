@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 NOMBRE = "Indeed"
 # Países de LATAM que Indeed tiene en JobSpy (código ISO → nombre en JobSpy)
 PAISES = {"AR": "argentina", "BR": "brazil", "CL": "chile", "CO": "colombia", "CR": "costa rica", "EC": "ecuador",
-          "MX": "mexico", "PA": "panama", "PE": "peru", "UY": "uruguay", "VE": "venezuela"}
+          "MX": "mexico", "PA": "panama", "PE": "peru", "UY": "uruguay", "VE": "venezuela", "ES": "spain"}
 
 
 def _limpio(valor):
@@ -24,14 +24,15 @@ def _limpio(valor):
 
 
 def buscar(mapa, paises_activos, estado, presupuesto, hoy=None, max_dias=30, por_busqueda=30, reloj=time.monotonic,
-           limite_segundos=None, scrape=None):
+           limite_segundos=None, scrape=None, prioritarias=()):
     """Vacantes crudas de Indeed y estadísticas. `scrape` permite probar sin red (por defecto jobspy.scrape_jobs)."""
     if scrape is None:
         from jobspy import scrape_jobs as scrape
     hoy = hoy or datetime.now(timezone.utc).date().isoformat()
     inicio = reloj()
     combinaciones = [(f["id"], f["consultas"][0], p) for f in mapa for p in paises_activos if p in PAISES]
-    combinaciones.sort(key=lambda c: estado.get(f"{c[0]}@{c[2]}", ""))
+    from buscador.fuentes.linkedin_publico import orden
+    combinaciones.sort(key=orden(estado, hoy, set(prioritarias)))
     crudas, hechas, fallidas, seguidas = [], 0, 0, 0
     for familia, consulta, pais in combinaciones:
         if hechas >= presupuesto or seguidas >= 3 or (limite_segundos and reloj() - inicio > limite_segundos):

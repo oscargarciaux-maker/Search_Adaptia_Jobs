@@ -97,6 +97,13 @@ def test_idioma_anos_y_salario():
     assert etiquetas.salario("Cleo has raised $300M from top investors.") == ""
     assert etiquetas.salario("Procesamos US$ 2.000 millones en transacciones. Salario: USD 1,500 - 2,000 per month") \
         == "USD 1,500 - 2,000 per month"
+    assert etiquetas.salario("Sueldo: $15,000 – $20,000 MXN mensuales") == "$15,000 – $20,000 MXN"
+    assert etiquetas.salario("We are at $450M ARR, growing fast. Scaling to $100M+ next year.") == ""
+    assert etiquetas.salario("Postula en https://ejemplo.com/s/348 hoy") == ""
+    assert etiquetas.salario("Sueldo: S/.3,000.00 - S/.3,400.00 al mes") == "S/.3,000.00 - S/.3,400.00 al mes"
+    assert etiquetas.salario("ya captamos más de US$ 755 milhões") == ""
+    assert etiquetas.salario("Impact on revenue — Compensation: $100,000 OTE") == "$100,000"
+    assert etiquetas.salario("Manejo de presupuestos de paid media, mínimo $150M CLP anuales") == ""
 
 
 def _v(**k):

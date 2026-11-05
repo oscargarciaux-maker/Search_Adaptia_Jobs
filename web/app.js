@@ -128,7 +128,7 @@
   function lugarBusqueda() {
     const p = $("pais").value;
     const remotas = $("remotas").checked, presenciales = $("presenciales").checked;
-    if (!p) return remotas && !presenciales ? "Remotas para LATAM" : "LATAM";
+    if (!p) return remotas && !presenciales ? "Remotas para LATAM y España" : "LATAM y España";
     return `${estado.nombres[p]}${remotas ? " y remoto" : ""}`;
   }
 
@@ -239,7 +239,7 @@
     $("mas").hidden = r.length <= estado.visibles;
     $("ver-mas").textContent = `Ver ${fmt.format(Math.min(POR_PAGINA, r.length - estado.visibles))} más (quedan ${fmt.format(r.length - estado.visibles)})`;
     if (!r.length) {
-      const ideas = [$("dias").value !== "30" ? "los últimos 30 días" : null, $("pais").value ? "«Toda LATAM»" : null,
+      const ideas = [$("dias").value !== "30" ? "los últimos 30 días" : null, $("pais").value ? "«Todos (LATAM y España)»" : null,
         estado.familia && estado.grados.size < 3 ? "las cercanas" : null, !$("remotas").checked || !$("presenciales").checked ? "las dos modalidades" : null].filter(Boolean);
       mostrarVacio(`No hay vacantes de ${nombreBusqueda()} con estos filtros.`,
         (ideas.length ? `Prueba con ${ideas.join(", ")}. ` : "") + "También puedes pedir una búsqueda en vivo en todas las fuentes:", true);
@@ -411,10 +411,27 @@
       [["Vacantes abiertas", s.vacantes_en_bodega], ["Nuevas en esa búsqueda", s.nuevas_hoy], ["Leídas de las fuentes", s.crudas_hoy],
         ["Tipos de cargo con vacantes", Object.keys(s.por_familia || {}).length]]
         .map(([t, n]) => el("div", { class: "metrica" }, el("strong", { text: fmt.format(n || 0) }), el("span", { text: t })))));
+    const e = s.entrega;
+    if (e && e.roles) {
+      const sb = e.supabase || {};
+      caja.append(el("h3", { class: "area", text: `Entrega del día: ${fmt.format(e.vacantes || 0)} vacantes nuevas` }),
+        el("div", { class: "tabla-scroll" }, el("table", { class: "tabla" },
+          el("thead", {}, el("tr", {}, el("th", { text: "Rol" }), el("th", { class: "num", text: "Entregadas" }),
+            el("th", { class: "num", text: "Faltaron" }), el("th", { text: "Idiomas" }))),
+          el("tbody", {}, Object.values(e.roles).map(r => el("tr", {},
+            el("td", { text: r.nombre }), el("td", { class: "num", text: fmt.format(r.entregadas) }),
+            el("td", { class: "num", text: r.faltan ? fmt.format(r.faltan) : "—" }),
+            el("td", { text: Object.entries(r.idiomas || {}).map(([k, n]) => `${k === "es" ? "español" : "inglés"} ${n}`).join(" · ") })))))),
+        el("p", { class: "acciones-fila" },
+          el("a", { class: "boton boton--secundario", href: "datos/entregas/ultima.xlsx", download: `entrega_${s.fecha}.xlsx`, text: "Descargar Excel" }),
+          el("a", { class: "boton boton--secundario", href: "datos/entregas/ultima.csv", download: `entrega_${s.fecha}.csv`, text: "Descargar CSV" })),
+        el("p", { class: "nota", text: sb.error || (sb.errores && sb.errores.length) ? `Supabase: no se pudo guardar (${(sb.errores || [sb.error]).join("; ")}).`
+          : sb.omitida ? "Supabase: no está conectado todavía." : sb.enviadas !== undefined ? `Supabase: ${fmt.format(sb.enviadas)} filas guardadas.` : "" }));
+    }
     const filas = Object.entries(s.fuentes || {}).map(([nombre, d]) => el("tr", {},
       el("td", { text: nombre }),
       el("td", { text: d.error ? `Falló: ${d.error}` : d.omitida ? `No corrió: ${d.omitida}` : "Funcionó" }),
-      el("td", { class: "num", text: d.avisos !== undefined ? fmt.format(d.avisos) : d.con_original !== undefined ? fmt.format(d.con_original) : d.portales_nuevos !== undefined ? `${fmt.format(d.portales_nuevos)} portales nuevos` : "—" }),
+      el("td", { class: "num", text: d.avisos !== undefined ? fmt.format(d.avisos) : d.vacantes !== undefined ? fmt.format(d.vacantes) : d.con_original !== undefined ? fmt.format(d.con_original) : d.portales_nuevos !== undefined ? `${fmt.format(d.portales_nuevos)} portales nuevos` : "—" }),
       el("td", { class: "num", text: d.segundos !== undefined ? `${Math.round(d.segundos / 60)} min` : "" })));
     caja.append(el("h3", { class: "area", text: "Fuentes" }),
       el("div", { class: "tabla-scroll" }, el("table", { class: "tabla" },

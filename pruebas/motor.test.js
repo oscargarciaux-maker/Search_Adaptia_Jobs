@@ -98,3 +98,10 @@ test("fechas relativas", () => {
   assert.equal(M.fechaRelativa("2026-10-20", "2026-10-28"), "hace 8 días");
   assert.equal(M.fechaRelativa("", "2026-10-28"), "fecha sin confirmar");
 });
+
+test("dondeAplica distingue LATAM de LATAM y España", () => {
+  const todos = ["AR", "BO", "CO", "ES"];
+  assert.equal(M.dondeAplica({ paises: todos }, {}, 4), "LATAM y España");
+  assert.equal(M.dondeAplica({ paises: ["AR", "BO", "CO"] }, {}, 4), "Toda LATAM");
+  assert.equal(M.dondeAplica({ paises: ["ES"] }, { ES: "España" }, 4), "España");
+});
