@@ -22,7 +22,7 @@ def vacante(item):
     ubicacion = ("Remote " + (zona or "") + " " if remoto else "") + paises
     return {"titulo": a.get("title", ""), "empresa": empresa, "ubicacion": ubicacion.strip(),
             "descripcion": _texto(" ".join(str(a.get(k) or "") for k in ("description_headline", "description",
-                                                                           "functions", "desirable")))[:8000],
+                                                                           "functions", "desirable")))[:30000],
             "fecha": fecha, "enlace": ((item or {}).get("links") or {}).get("public_url", ""),
             "remoto": True if remoto else None, "fuente": NOMBRE}
 

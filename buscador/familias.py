@@ -99,7 +99,9 @@ def clasificar(titulo, descripcion=""):
     salida = {}
     excluidas = set()
     for fam in mapa():
-        if fam["_excluir"] and fam["_excluir"].search(completo):
+        # Un vecino explícito (p. ej. UX Engineer) no debe quedar anulado por la exclusión genérica «engineer».
+        nombrado = any(base in fam["_titulos"][g] for g in GRADOS)
+        if fam["_excluir"] and fam["_excluir"].search(completo) and not nombrado:
             excluidas.add(fam["id"])
             continue
         grado = _grado(fam, base, extremos)

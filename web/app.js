@@ -414,9 +414,9 @@
     const e = s.entrega;
     if (e && e.roles) {
       const sb = e.supabase || {};
-      caja.append(el("h3", { class: "area", text: `Entrega del día: ${fmt.format(e.vacantes || 0)} vacantes nuevas` }),
+      caja.append(el("h3", { class: "area", text: `Entrega del día: ${fmt.format(e.vacantes || 0)} vacantes seleccionadas` }),
         el("div", { class: "tabla-scroll" }, el("table", { class: "tabla" },
-          el("thead", {}, el("tr", {}, el("th", { text: "Rol" }), el("th", { class: "num", text: "Entregadas" }),
+          el("thead", {}, el("tr", {}, el("th", { text: "Rol" }), el("th", { class: "num", text: "Seleccionadas" }),
             el("th", { class: "num", text: "Faltaron" }), el("th", { text: "Idiomas" }))),
           el("tbody", {}, Object.values(e.roles).map(r => el("tr", {},
             el("td", { text: r.nombre }), el("td", { class: "num", text: fmt.format(r.entregadas) }),
@@ -426,8 +426,14 @@
           el("a", { class: "boton boton--secundario", href: "datos/entregas/ultima.xlsx", download: `entrega_${s.fecha}.xlsx`, text: "Descargar Excel" }),
           el("a", { class: "boton boton--secundario", href: "datos/entregas/ultima.csv", download: `entrega_${s.fecha}.csv`, text: "Descargar CSV" })),
         el("p", { class: "nota", text: sb.error || (sb.errores && sb.errores.length) ? `Supabase: no se pudo guardar (${(sb.errores || [sb.error]).join("; ")}).`
-          : sb.omitida ? "Supabase: no está conectado todavía." : sb.enviadas !== undefined ? `Supabase: ${fmt.format(sb.enviadas)} filas guardadas.` : "" }));
+          : sb.omitida ? "Supabase: no está conectado todavía." : sb.enviadas !== undefined ? `Supabase: ${fmt.format(sb.enviadas)} filas sincronizadas (incluye existentes).` : "" }));
+      caja.append(el("p", { class: "nota", text: "Excel y CSV son copias descargables de la selección; el estado de sincronización con Supabase se muestra arriba." }));
+      if (e.meta_cumplida === false) caja.append(el("p", { class: "confirmar", text: `Meta diaria incompleta: se buscan ${e.meta_por_rol || 20} vacantes nuevas por cada rol.` }));
+      Object.values(e.roles).filter(r => r.faltan && r.descartadas).forEach(r => caja.append(el("p", { class: "nota", text:
+        `${r.nombre}: ${r.candidatas} candidatas válidas; capacidad de ${r.capacidad_con_tope_empresa} con el límite por empresa. ` +
+        `Sin descripción suficiente: ${r.descartadas["sin descripción completa"] || 0}. Reserva sin entregar: ${r.reserva_sin_entregar || 0}.` })));
     }
+    if (e && e.supabase && e.supabase.pendientes) caja.append(el("p", { class: "nota", text: `${fmt.format(e.supabase.pendientes)} filas pendientes de sincronizar; se reintentarán en la próxima corrida.` }));
     const filas = Object.entries(s.fuentes || {}).map(([nombre, d]) => el("tr", {},
       el("td", { text: nombre }),
       el("td", { text: d.error ? `Falló: ${d.error}` : d.omitida ? `No corrió: ${d.omitida}` : "Funcionó" }),

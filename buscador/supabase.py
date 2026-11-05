@@ -59,14 +59,14 @@ def subir(filas, url=None, clave=None, sesion=None):
     if url is None:
         url, clave = credenciales()
     url = base(url)
-    if not url:
+    if not url or not clave:
         return {"omitida": "sin SUPABASE_URL o SUPABASE_SECRET_KEY"}
     sesion = sesion or requests.Session()
     cabeceras = {"apikey": clave, "Content-Type": "application/json",
                  "Prefer": "resolution=ignore-duplicates,return=minimal"}
     if clave.startswith("eyJ"):   # las claves antiguas (JWT) también van como Authorization
         cabeceras["Authorization"] = f"Bearer {clave}"
-    enviadas, errores = 0, []
+    enviadas, errores, confirmadas = 0, [], []
     objetos = [fila_db(f) for f in filas]
     for i in range(0, len(objetos), LOTE):
         lote = objetos[i:i + LOTE]
@@ -77,9 +77,11 @@ def subir(filas, url=None, clave=None, sesion=None):
             continue
         if r.status_code < 300:
             enviadas += len(lote)
+            confirmadas.extend(f["external_id"] for f in lote)
         else:
             errores.append(f"{r.status_code}: {r.text[:300]}")
-    return {"filas": len(objetos), "enviadas": enviadas, "errores": errores}
+    # Aceptadas incluye ofertas que ya existían: el servidor puede ignorarlas sin devolver sus filas.
+    return {"filas": len(objetos), "enviadas": enviadas, "errores": errores, "confirmadas": confirmadas}
 
 
 def probar(url=None, clave=None, sesion=None):

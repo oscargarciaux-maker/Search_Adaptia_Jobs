@@ -33,7 +33,7 @@ def remotive(cliente):
         for j in (datos or {}).get("jobs") or []:
             salida.append({"titulo": j.get("title", ""), "empresa": j.get("company_name", ""),
                            "ubicacion": "Remote - " + (j.get("candidate_required_location") or ""),
-                           "descripcion": _texto(j.get("description"))[:8000], "fecha": str(j.get("publication_date", ""))[:10],
+                           "descripcion": _texto(j.get("description"))[:30000], "fecha": str(j.get("publication_date", ""))[:10],
                            "enlace": j.get("url", ""), "remoto": True, "fuente": "Remotive"})
     return salida
 
@@ -41,7 +41,7 @@ def remotive(cliente):
 def working_nomads(cliente):
     datos = cliente.json("https://www.workingnomads.com/api/exposed_jobs/") or []
     return [{"titulo": j.get("title", ""), "empresa": j.get("company_name", ""),
-             "ubicacion": "Remote - " + (j.get("location") or ""), "descripcion": _texto(j.get("description"))[:8000],
+             "ubicacion": "Remote - " + (j.get("location") or ""), "descripcion": _texto(j.get("description"))[:30000],
              "fecha": str(j.get("pub_date", ""))[:10], "enlace": j.get("url", ""), "remoto": True,
              "fuente": "Working Nomads"} for j in datos if isinstance(j, dict)]
 

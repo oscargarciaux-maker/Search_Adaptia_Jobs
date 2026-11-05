@@ -9,6 +9,7 @@ import os
 import time
 from urllib.parse import urlencode
 
+from buscador import cobertura
 from buscador.fuentes import linkedin_publico
 
 NOMBRE = "LinkedIn (Apify)"
@@ -39,7 +40,7 @@ def normalizar_item(item):
         "titulo": _primero(item, "title", "jobTitle", "position"),
         "empresa": _primero(item, "companyName", "company", "company_name"),
         "ubicacion": _primero(item, "location", "jobLocation", "place"),
-        "descripcion": _primero(item, "descriptionText", "description", "jobDescription")[:8000],
+        "descripcion": _primero(item, "descriptionText", "description", "jobDescription")[:30000],
         "fecha": _primero(item, "postedAt", "publishedAt", "postedDate", "listedAt", "datePosted")[:10],
         "enlace": enlace,
         "enlace_directo": _primero(item, "applyUrl", "applyLink", "externalApplyLink", "companyApplyUrl"),
@@ -59,9 +60,10 @@ def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=100, pre
     pendientes = sorted(combinaciones, key=lambda c: estado.get(f"{c[0]}@{c[2]}", ""))[:presupuesto]
     urls = []
     for familia, consultas, lugar, params in pendientes:
-        ultima = estado.get(f"{familia}@{lugar}")
+        terminos = cobertura.rotar(consultas, hoy, 4)
+        ultima = estado.get(cobertura.clave_consulta(f"{familia}@{lugar}", terminos))
         dias = max_dias if not ultima else min(max_dias, max(1, (datetime.fromisoformat(hoy) - datetime.fromisoformat(ultima)).days + 1))
-        urls.append(url_busqueda(consultas, params, dias))
+        urls.append(url_busqueda(terminos, params, dias))
     # Se mandan en tandas para que una falla no pierda todo
     crudas, fallidas = [], 0
     for i in range(0, len(urls), 10):
@@ -80,4 +82,5 @@ def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=100, pre
                 crudas.append(v)
         for familia, consultas, lugar, params in pendientes[i:i + 10]:
             estado[f"{familia}@{lugar}"] = hoy
+            estado[cobertura.clave_consulta(f"{familia}@{lugar}", cobertura.rotar(consultas, hoy, 4))] = hoy
     return crudas, {"busquedas": len(urls), "tandas_fallidas": fallidas, "avisos": len(crudas)}

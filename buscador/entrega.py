@@ -24,8 +24,9 @@ def config():
 
 
 def huellas(v):
-    """Claves con las que se reconoce una vacante ya entregada: su huella (empresa + cargo) y sus enlaces limpios."""
-    return [v["id"]] + [contrato.url_limpia(u) for u in (v.get("enlace"), v.get("enlace_directo")) if u]
+    """Claves con las que se reconoce una vacante ya entregada: su identidad estable y todos sus enlaces limpios."""
+    return [v["id"]] + [contrato.url_limpia(u) for u in
+                        [v.get("enlace"), v.get("enlace_directo"), *v.get("_enlaces", [])] if u]
 
 
 def rol_de(v, roles):
@@ -51,7 +52,7 @@ def _rasgos(v):
     return {
         "idioma": v.get("idioma", ""),
         "nivel": fila.get("seniority") or "sin nivel",
-        "pais": fila.get("office_country") or (fila.get("hire_scope") or "remoto"),
+        "pais": fila.get("office_country") or "|".join(sorted(v.get("paises", []))) or "sin dato",
         "modo": fila.get("work_mode") or "sin dato",
         "fuente": v.get("fuente", ""),
         "empresa": normalizar.empresa(v.get("empresa", "")),
@@ -59,7 +60,15 @@ def _rasgos(v):
     }
 
 
-def variadas(candidatas, cuantas, max_por_empresa, hoy):
+def prioridad_remota(v):
+    if v.get("confianza_pais") == "baja":
+        return 3
+    if v.get("modalidad") == "remoto":
+        return 0 if v.get("confianza_pais") == "alta" and len(v.get("paises", [])) > 1 else 1
+    return 2
+
+
+def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False):
     """Toma `cuantas` candidatas [(vacante, grado)] una por una: en cada paso la de menor costo, donde el costo sube con
     lo que ya se repite (idioma, nivel, país, modalidad, fuente), con un grado más débil, sin descripción o más vieja."""
     elegidas, conteo = [], {k: Counter() for k in ("idioma", "nivel", "pais", "modo", "fuente", "empresa")}
@@ -76,7 +85,7 @@ def variadas(candidatas, cuantas, max_por_empresa, hoy):
         resto = [x for x in resto if conteo["empresa"][x[2]["empresa"]] < max_por_empresa]
         if not resto:
             break
-        mejor = min(resto, key=costo)
+        mejor = min(resto, key=lambda item: (prioridad_remota(item[0]) if preferir_remotas else 0, costo(item)))
         resto.remove(mejor)
         v, g, r = mejor
         elegidas.append((v, g))
@@ -91,32 +100,46 @@ def elegir(vacantes, entregadas, hoy, cfg=None):
     roles = cfg["roles"]
     desde = (date.fromisoformat(hoy) - timedelta(days=cfg.get("dias_frescura", 14))).isoformat()
     por_rol, motivos = {r["id"]: [] for r in roles}, Counter()
+    descartes_rol = {r["id"]: Counter() for r in roles}
     for v in vacantes:
         rol, grado = rol_de(v, roles)
         if not rol:
             continue
         if any(h in entregadas for h in huellas(v)):
             motivos["ya entregada"] += 1
+            descartes_rol[rol["id"]]["ya entregada"] += 1
             continue
         if (v.get("visto_primera_vez") or "") < desde:
             motivos["vista hace más de %d días" % cfg.get("dias_frescura", 14)] += 1
+            descartes_rol[rol["id"]]["fuera de frescura"] += 1
             continue
         motivo = contrato.entregable(v, tuple(cfg.get("idiomas", ["es", "en"])))
         if motivo:
             motivos[motivo] += 1
+            descartes_rol[rol["id"]][motivo] += 1
             continue
         por_rol[rol["id"]].append((v, grado))
     salida, resumen = {}, {}
     for rol in roles:
         candidatas = por_rol[rol["id"]]
-        salida[rol["id"]] = variadas(candidatas, cfg["por_rol"], cfg.get("max_por_empresa", 2), hoy)
+        salida[rol["id"]] = variadas(candidatas, cfg["por_rol"], cfg.get("max_por_empresa", 2), hoy,
+                                      cfg.get("preferir_remotas", False))
         elegidas = [v for v, _ in salida[rol["id"]]]
+        empresas = Counter(normalizar.empresa(v["empresa"]) for v, _ in candidatas)
+        capacidad = sum(min(n, cfg.get("max_por_empresa", 2)) for n in empresas.values())
         resumen[rol["id"]] = {
             "nombre": rol["nombre"], "candidatas": len(candidatas), "entregadas": len(elegidas),
             "faltan": max(0, cfg["por_rol"] - len(elegidas)),
             "idiomas": dict(Counter(v["idioma"] for v in elegidas)),
             "niveles": dict(Counter(contrato.seniority(v["titulo"]) or "sin nivel" for v in elegidas)),
             "paises": dict(Counter((v["paises"][0] if len(v["paises"]) == 1 else "varios") for v in elegidas)),
+            "remotas": sum(v["modalidad"] == "remoto" for v in elegidas),
+            "remotas_amplias": sum(prioridad_remota(v) == 0 for v in elegidas),
+            "descartadas": dict(descartes_rol[rol["id"]]),
+            "empresas_disponibles": len(empresas),
+            "capacidad_con_tope_empresa": capacidad,
+            "limitadas_por_empresa": len(candidatas) - capacidad,
+            "reserva_sin_entregar": len(candidatas) - len(elegidas),
         }
     return salida, {"roles": resumen, "descartadas": dict(motivos)}
 
@@ -131,6 +154,20 @@ def filas_de(elegidas, roles, hoy, capturada):
                     ids.add(fila["external_id"])
                     filas.append(fila)
     return filas
+
+
+def registrar_medicion(historial, resumen, hoy, dias=30):
+    """Serie corta para medir continuidad real; no predice ofertas futuras ni almacena descripciones."""
+    historial[hoy] = {
+        "fecha": hoy, "meta_cumplida": resumen["meta_cumplida"],
+        "pendientes_supabase": (resumen.get("supabase") or {}).get("pendientes", 0),
+        "roles": {rid: {k: r[k] for k in ("candidatas", "entregadas", "faltan", "reserva_sin_entregar")}
+                  for rid, r in resumen["roles"].items()},
+    }
+    desde = (date.fromisoformat(hoy) - timedelta(days=dias - 1)).isoformat()
+    for dia in [dia for dia in historial if dia < desde]:
+        del historial[dia]
+    return [historial[dia] for dia in sorted(historial) if dia <= hoy][-7:]
 
 
 def escribir(carpeta, hoy, filas, dias_guardados=60):
@@ -162,13 +199,18 @@ def escribir(carpeta, hoy, filas, dias_guardados=60):
             archivo.unlink()
 
 
-def correr(vacantes, entregadas, hoy, capturada, carpeta, subir=None):
+def correr(vacantes, entregadas, hoy, capturada, carpeta, subir=None, pendientes=None, persistir=None):
     """Elige, escribe y sube. `entregadas` (dict huella → fecha) se actualiza con lo entregado hoy.
     Devuelve el resumen para salud.json."""
     cfg = config()
     elegidas, resumen = elegir(vacantes, entregadas, hoy, cfg)
     filas = filas_de(elegidas, cfg["roles"], hoy, capturada)
     escribir(carpeta, hoy, filas)
+    pendientes = pendientes if pendientes is not None else {}
+    for fila in filas:
+        pendientes.setdefault(fila["external_id"], fila)
+    if persistir:
+        persistir(pendientes)  # diario durable antes de cualquier petición
     for lista in elegidas.values():
         for v, _ in lista:
             for h in huellas(v):
@@ -179,6 +221,14 @@ def correr(vacantes, entregadas, hoy, capturada, carpeta, subir=None):
         del entregadas[h]
     resumen["vacantes"] = sum(len(x) for x in elegidas.values())
     resumen["filas"] = len(filas)
+    resumen["meta_por_rol"] = cfg["por_rol"]
+    resumen["meta_cumplida"] = all(r["faltan"] == 0 for r in resumen["roles"].values())
     if subir is not None:
-        resumen["supabase"] = subir(filas)
+        resultado = dict(subir(list(pendientes.values())))
+        for external_id in resultado.pop("confirmadas", []):
+            pendientes.pop(external_id, None)
+        resultado["pendientes"] = len(pendientes)
+        resumen["supabase"] = resultado
+        if persistir:
+            persistir(pendientes)
     return resumen

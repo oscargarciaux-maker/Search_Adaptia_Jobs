@@ -5,6 +5,8 @@ Como LinkedIn, rota las combinaciones (familia, país) y cada corrida toma las q
 import time
 from datetime import datetime, timezone
 
+from buscador import cobertura
+
 NOMBRE = "Indeed"
 # Países de LATAM que Indeed tiene en JobSpy (código ISO → nombre en JobSpy)
 PAISES = {"AR": "argentina", "BR": "brazil", "CL": "chile", "CO": "colombia", "CR": "costa rica", "EC": "ecuador",
@@ -24,26 +26,34 @@ def _limpio(valor):
 
 
 def buscar(mapa, paises_activos, estado, presupuesto, hoy=None, max_dias=30, por_busqueda=30, reloj=time.monotonic,
-           limite_segundos=None, scrape=None, prioritarias=()):
+           limite_segundos=None, scrape=None, prioritarias=(), desfase_terminos=0):
     """Vacantes crudas de Indeed y estadísticas. `scrape` permite probar sin red (por defecto jobspy.scrape_jobs)."""
     if scrape is None:
         from jobspy import scrape_jobs as scrape
     hoy = hoy or datetime.now(timezone.utc).date().isoformat()
     inicio = reloj()
-    combinaciones = [(f["id"], f["consultas"][0], p) for f in mapa for p in paises_activos if p in PAISES]
-    from buscador.fuentes.linkedin_publico import orden
-    combinaciones.sort(key=orden(estado, hoy, set(prioritarias)))
+    combinaciones = [(f["id"], cobertura.rotar(cobertura.consultas(f), hoy, 1, desfase=desfase_terminos)[0], p + sufijo)
+                     for f in mapa for p in paises_activos if p in PAISES for sufijo in (":REMOTO", "")]
+    combinaciones = cobertura.repartir(combinaciones, estado, hoy, prioritarias)
     crudas, hechas, fallidas, seguidas = [], 0, 0, 0
+    por_familia, por_pais = {}, {}
     for familia, consulta, pais in combinaciones:
         if hechas >= presupuesto or seguidas >= 3 or (limite_segundos and reloj() - inicio > limite_segundos):
             break
-        clave = f"{familia}@{pais}"
-        ultima = estado.get(clave)
+        lugar = pais
+        pais = lugar.split(":")[0]
+        solo_remoto = lugar.endswith(":REMOTO")
+        clave = f"{familia}@{lugar}"
+        clave_terminos = cobertura.clave_consulta(clave, [consulta])
+        ultima = estado.get(clave_terminos)
         dias = max_dias if not ultima else min(max_dias, max(1, (datetime.fromisoformat(hoy) - datetime.fromisoformat(ultima)).days + 1))
         hechas += 1
+        por_familia[familia] = por_familia.get(familia, 0) + 1
+        por_pais[lugar] = por_pais.get(lugar, 0) + 1
         try:
             df = scrape(site_name=["indeed"], search_term=consulta, hours_old=dias * 24, results_wanted=por_busqueda,
-                        country_indeed=PAISES[pais], description_format="markdown", verbose=0)
+                        country_indeed=PAISES[pais], description_format="markdown", verbose=0,
+                        **({"is_remote": True} if solo_remoto else {}))
         except Exception as e:  # noqa: BLE001 — un bloqueo no detiene a las demás fuentes
             fallidas += 1
             seguidas += 1
@@ -52,15 +62,16 @@ def buscar(mapa, paises_activos, estado, presupuesto, hoy=None, max_dias=30, por
             continue
         seguidas = 0
         estado[clave] = hoy
+        estado[clave_terminos] = hoy
         for r in df.to_dict("records"):
             fecha = r.get("date_posted")
             crudas.append({
                 "titulo": _limpio(r.get("title")), "empresa": _limpio(r.get("company")),
                 "ubicacion": _limpio(r.get("location")) or PAISES[pais].title(),
-                "descripcion": _limpio(r.get("description"))[:8000],
+                "descripcion": _limpio(r.get("description"))[:30000],
                 "fecha": fecha.isoformat()[:10] if hasattr(fecha, "isoformat") else _limpio(fecha)[:10],
                 "enlace": _limpio(r.get("job_url")), "enlace_directo": _limpio(r.get("job_url_direct")),
                 "remoto": bool(r.get("is_remote")) or None, "fuente": NOMBRE,
             })
     return crudas, {"busquedas": hechas, "fallidas": fallidas, "avisos": len(crudas),
-                    "combinaciones_total": len(combinaciones)}
+                    "combinaciones_total": len(combinaciones), "por_familia": por_familia, "por_lugar": por_pais}

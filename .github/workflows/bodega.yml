@@ -55,6 +55,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python -m buscador.bodega --salida salida --modo "${{ inputs.modo || 'diario' }}" ${{ inputs.prueba && '--prueba' || '' }}
       - name: Publicar en la rama publicado
+        if: ${{ !inputs.prueba }}
         working-directory: salida
         run: |
           git init -q

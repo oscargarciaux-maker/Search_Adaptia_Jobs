@@ -3,6 +3,13 @@
 28 de octubre de 2026. Copia del documento de planeación (Claude Docs). Si cambia una decisión, se actualiza aquí.
 Nota: el plan llamaba al repositorio `buscador-vacantes-latam`; el repositorio real es `search_adaptia_jobs`.
 
+## Actualización de cobertura e integridad
+
+Las decisiones vigentes sobre remotas, aliases, duplicados y conservación están en
+[`COBERTURA_HISTORICO.md`](COBERTURA_HISTORICO.md). Prevalecen sobre las descripciones anteriores de deduplicación
+por empresa y cargo. Las casillas históricas de este plan no certifican la operación real; faltan mediciones
+de siete días y comprobar los servicios externos con sus cuentas.
+
 ## Resumen
 
 La versión 1 es una página privada donde Oscar escribe un cargo y un país de LATAM y, en segundos, ve todas las vacantes

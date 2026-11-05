@@ -136,7 +136,8 @@ def _muchas(n, idioma_en_cada=2):
 
 def test_variedad_y_tope_por_empresa():
     vac = _muchas(60, idioma_en_cada=6)   # solo 1 de cada 6 en inglés
-    elegidas, resumen = entrega.elegir(vac, {}, HOY)
+    cfg = dict(entrega.config(), preferir_remotas=False)  # aislar la variedad de la prioridad remota
+    elegidas, resumen = entrega.elegir(vac, {}, HOY, cfg)
     qa = [v for v, _ in elegidas["qa"]]
     assert len(qa) == 20
     idiomas = resumen["roles"]["qa"]["idiomas"]
@@ -185,6 +186,7 @@ def test_subir_a_supabase_por_lotes():
                                                                        "company_name": "A"} for i in range(1200)]
     s = _Sesion()
     r = supabase.subir(filas, "https://abc.supabase.co", "sb_secret_123", sesion=s)
+    assert r.pop("confirmadas") == [f"x-{i}" for i in range(1200)]
     assert r == {"filas": 1200, "enviadas": 1200, "errores": []}
     assert [n for _, n, _ in s.llamadas] == [500, 500, 200]
     url, _, cab = s.llamadas[0]
