@@ -11,6 +11,8 @@ recrear tablas ni repetir la primera carga solo por recibir este manual.
   Seguir primero [TRASPASO.md](TRASPASO.md). Copiar solo el código no conserva esos datos.
 - **Actualización desde la versión anterior:** aplicar `002_catalogo.sql` si falta y revisar
   [ACTIVAR_CAPTURA_HORARIA.md](ACTIVAR_CAPTURA_HORARIA.md). La verificación v3 no añade SQL ni secretos nuevos.
+- **Estado operativo duradero:** SQL 003 es una extensión separada de v3. Seguir
+  [ACTIVAR_ESTADO_OPERATIVO.md](ACTIVAR_ESTADO_OPERATIVO.md) para conservar reservas/pendientes en Supabase.
 
 No se promete una instalación de treinta minutos ni costo total cero. Los tiempos dependen de las cuentas y permisos;
 los límites gratuitos y precios se comprueban en cada proveedor.
@@ -75,7 +77,8 @@ La versión pública v3 guarda `verificacion` dentro de `catalogo_vacantes.datos
    `tope_mensual_usd: 5`, `tope_consulta_usd: 0.025`, `publicaciones_por_dia: 0`.
 4. No proporcionar sesión/cookies de LinkedIn ni habilitar otro actor por parecido de nombre. Un cambio de actor necesita
    adaptar y probar su esquema, permisos y tarifa.
-5. Conservar `trabajo/apify_presupuesto.json`. Las reservas pertenecen al proyecto y se mantienen al repetir corridas.
+5. Conservar `trabajo/apify_presupuesto.json`. En modo legado es el contador; con SQL 003/estado central activo es una
+   copia auxiliar del registro Supabase. La primera activación importa el corte y no debe asumir saldo vacío.
 6. Revisar el uso global en Apify: otros programas y la prueba explícita del actor pueden consumir la misma cuenta.
 
 La nocturna y las búsquedas profundas pueden usar este refuerzo, compartiendo el límite del proyecto. La captura horaria
@@ -92,6 +95,7 @@ En **Settings → Secrets and variables → Actions → Variables**, utilizar es
 | Variable | Valor | Efecto |
 |---|---|---|
 | `CAPTURA_HORARIA_ACTIVA` | `true` | Habilita el horario y el catálogo v2 de la nocturna |
+| `ESTADO_SUPABASE_ACTIVO` | `true`, solo tras SQL 003 y corte/importación | Centraliza presupuesto, pendientes y lote sin confirmar; ver guía específica |
 | `PAGES_POR_ACTIONS` | `true` para GitHub Pages; `false` o ausente para Cloudflare | Habilita el despliegue explícito de Pages |
 
 Crear `CAPTURA_HORARIA_ACTIVA=true` solo después del SQL. Para el primer arranque mantener el flujo **Captura horaria**
@@ -99,6 +103,8 @@ deshabilitado hasta completar la primera carga: así la nocturna puede usar v2 s
 Dejar inicialmente `PAGES_POR_ACTIONS=false` mientras todavía no existe `publicado`; se activa al configurar la página.
 `CATALOGO_ACTIVO` es un parámetro interno que la nocturna recibe de la primera variable, no una tercera variable que
 el cliente deba crear.
+La variable de estado central permanece ausente/apagada hasta seguir su guía. Fusionar su código no migra la base.
+Para una instalación nueva que lo use, aplicar también 003 e inicializar expresamente como indica esa guía.
 
 ## 7. Diagnóstico y primera captura
 

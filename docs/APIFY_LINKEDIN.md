@@ -26,7 +26,12 @@ las reservas de este programa son límites conservadores, no facturas ni estimac
 El mensual se reparte entre los días del mes: aproximadamente USD 0,16–0,18 diarios. El límite diario normalmente es el
 que restringe primero; con la tarifa consultada representa del orden de 60–80 ofertas brutas al día, no 60–80 entregables.
 
-Antes de iniciar se guarda una reserva en `trabajo/apify_presupuesto.json`. Las reservas comparten un bloqueo entre hilos,
+Con SQL 003 y `ESTADO_SUPABASE_ACTIVO=true`, antes de iniciar se confirma una reserva en `apify_reservas` de Supabase,
+con bloqueo por mes entre procesos y control diario/mensual/por corrida. El archivo pasa a ser copia auxiliar.
+La importación del contador antiguo preserva el mayor total conocido, sin sumar de nuevo reservas centrales reflejadas.
+Un fallo no habilita un contador local alternativo. Activación: [ACTIVAR_ESTADO_OPERATIVO.md](ACTIVAR_ESTADO_OPERATIVO.md).
+
+Mientras esa extensión no esté activa, se guarda la reserva en `trabajo/apify_presupuesto.json`. Las reservas comparten un bloqueo entre hilos,
 se conservan al repetir corridas y no se reinician con modo inicial. Si el proveedor no confirma el inicio o falla la
 lectura, la reserva no se devuelve ni se relanza automáticamente la misma petición. Es deliberadamente conservador:
 puede quedar crédito sin usar. La ejecución también lleva `maxTotalChargeUsd` en Apify.
@@ -35,8 +40,9 @@ Se registra el identificador de ejecución y el costo de uso que informe el prov
 todos los conceptos facturados; no se descuenta de las reservas automáticamente. La búsqueda pagada del feed está apagada
 por defecto. Si se habilita, comparte las mismas reservas y topes.
 
-Hay que conservar la memoria de presupuesto al copiar el proyecto o recuperar estado. Su borrado puede habilitar nuevas
-reservas. Otros proyectos, ejecuciones manuales y pruebas de diagnóstico consumen el crédito de la misma cuenta por
+Hay que conservar la memoria de presupuesto al copiar el proyecto o recuperar estado. En modo legado, borrar el archivo
+puede habilitar nuevas reservas; en modo central, respaldar también `apify_reservas` y no volver a código local atrasado.
+Otros proyectos, ejecuciones manuales y pruebas de diagnóstico consumen el crédito de la misma cuenta por
 fuera de esta memoria: mantener el plan gratuito y límites de cuenta de Apify como control global. El calendario del
 programa puede no coincidir con el ciclo de crédito del proveedor.
 

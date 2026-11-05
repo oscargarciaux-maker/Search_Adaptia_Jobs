@@ -398,6 +398,13 @@
     if (s.catalogo) caja.append(el("p", { class: "nota", text: s.catalogo.pendientes || (s.catalogo.errores || []).length
       ? `Catálogo: ${s.catalogo.pendientes || 0} filas pendientes de sincronizar.`
       : `Catálogo: ${s.catalogo.enviadas || 0} filas confirmadas en Supabase.` }));
+    if (s.estado_operativo?.activo) {
+      const o = s.estado_operativo, pendientes = Object.values(o.pendientes || {}).reduce((a, n) => a + n, 0);
+      caja.append(el("p", { class: pendientes || o.lotes_pendientes ? "confirmar" : "nota", text:
+        pendientes || o.lotes_pendientes
+          ? `Guardado en recuperación: ${pendientes} tareas pendientes y ${o.lotes_pendientes || 0} selecciones sin confirmar. Revisar antes de compartir.`
+          : "Guardado en Supabase confirmado, sin tareas pendientes de recuperación." }));
+    }
     if (s.verificacion_enlaces) {
       const r = s.verificacion_enlaces, e = r.estados || {}, d = r.seleccion_del_dia?.estados || {};
       caja.append(el("p", { class: "nota", text: `Comprobación de enlaces: ${e.verificada || 0} con enlace comprobado, ${e.pendiente || 0} por verificar, ${e.rechazada || 0} retiradas. No certifica la autenticidad de la empresa.` }));

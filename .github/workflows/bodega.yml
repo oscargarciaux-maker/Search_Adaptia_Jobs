@@ -56,6 +56,7 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           CATALOGO_ACTIVO: ${{ vars.CAPTURA_HORARIA_ACTIVA }}
+          ESTADO_SUPABASE_ACTIVO: ${{ vars.ESTADO_SUPABASE_ACTIVO }}
         run: python -m buscador.bodega --salida salida --modo "${{ inputs.modo || 'diario' }}" ${{ inputs.prueba && '--prueba' || '' }}
       - name: Publicar en la rama publicado
         if: ${{ !inputs.prueba }}

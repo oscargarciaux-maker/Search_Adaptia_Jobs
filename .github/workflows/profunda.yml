@@ -45,10 +45,20 @@ jobs:
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
           BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          ESTADO_SUPABASE_ACTIVO: ${{ vars.ESTADO_SUPABASE_ACTIVO }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           CONSULTA: ${{ inputs.consulta }}
           PAIS: ${{ inputs.pais }}
         run: python -m buscador.bodega --salida salida --consulta "$CONSULTA" --pais "$PAIS"
+      - name: Conservar estado de recuperación
+        if: ${{ always() && hashFiles('salida/trabajo/estado.json') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: estado-profunda-${{ github.run_id }}
+          path: salida/trabajo/
+          retention-days: 14
       - name: Publicar
         working-directory: salida
         run: |
@@ -59,3 +69,6 @@ jobs:
           git add -A
           git commit -qm "Búsqueda profunda $(date -u +%Y-%m-%dT%H:%MZ)"
           git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" publicado
+      - name: Comprobar estado central y catálogo
+        if: ${{ vars.ESTADO_SUPABASE_ACTIVO == 'true' }}
+        run: python -m buscador.validacion --salida salida --catalogo

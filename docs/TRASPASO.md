@@ -16,7 +16,7 @@ No transferir cuentas personales ni compartir contraseñas para simular el cambi
 | Elemento | Qué se entrega o configura | Evidencia |
 |---|---|---|
 | GitHub | Código `main`, flujos, rama `publicado`, permisos y ramas protegidas | Cliente entra con su cuenta y ve las ejecuciones |
-| Supabase | Proyecto conservado o restauración de tres tablas y permisos | Conteos, referencias y lectura/escritura reales |
+| Supabase | Proyecto conservado o restauración de tablas/permisos; cinco tablas y dos secuencias tras SQL 003 | Conteos, referencias, reservas y lectura/escritura reales |
 | Apify | Cuenta/organización del cliente, actor y límite | Token nuevo validado, saldo y reservas contrastados |
 | Alojamiento | Pages por Actions o Cloudflare; URL y acceso | Página real coincide con datos publicados |
 | Estado de trabajo | Toda la carpeta `trabajo/` de un mismo corte | Lote, colas y presupuesto respaldados juntos |
@@ -32,10 +32,11 @@ GitHub aloja código y procesos; no mueve automáticamente los proyectos de Supa
    **Búsqueda profunda**. Esperar a que las ejecuciones en curso terminen. Si se usa la función Cloudflare, evitar
    despachos desde la página durante el corte.
 3. Guardar URL, identificador de la última ejecución, commit `main` y commit `publicado` del corte, sin registrar secretos.
-4. Respaldar las tres tablas y la carpeta de trabajo siguiendo el manual de operación. Conservar los respaldos fuera
+4. Respaldar todas las tablas, secuencias y la carpeta de trabajo siguiendo el manual de operación. Conservar los respaldos fuera
    del repositorio y con acceso restringido. Los artefactos de Actions caducan; no son una copia permanente.
 5. Guardar los reportes de salud y sus pendientes. No vaciar las colas ni modificar fechas para que el corte parezca limpio.
 6. Registrar el saldo/uso de Apify y las reservas del archivo `apify_presupuesto.json` del mismo corte.
+   En modo central, contrastar también `apify_reservas`; el archivo es una copia auxiliar.
 
 Para detener operaciones no basta con cambiar `CAPTURA_HORARIA_ACTIVA=false`: la nocturna seguiría y además volvería
 al camino v1. Utilizar la deshabilitación de flujos cuando se requiere una pausa completa de mantenimiento.
@@ -69,12 +70,17 @@ Hay dos caminos; no ejecutarlos ambos a ciegas:
   del cliente. Comprobar permisos y facturación y rotar la clave de servicio coordinadamente.
 - **Crear otro proyecto:** preparar su esquema con `esquema.sql` y `002_catalogo.sql`; restaurar los datos en destino
   vacío y validar conteos, identidades, permisos y referencias antes de cambiar la conexión de producción.
+  Si el origen tiene SQL 003, aplicar también `003_estado_operativo.sql` antes de restaurar, sin inicializar vacío.
 
 Las tablas necesarias son:
 
 1. `catalogo_vacantes`: identidad, contenido, estados, tiempos y verificación de enlaces.
 2. `entregas_diarias`: registro de selección y snapshot; depende del catálogo mediante clave foránea.
 3. `ofertas`: filas históricas compatibles con v1, potencialmente varias por vacante.
+4. Si se aplicó 003, `estado_operativo`: marcador, colas con revisiones y selecciones sin confirmar.
+5. Si se aplicó 003, `apify_reservas`: reservas de crédito anteriores y centrales; nunca reiniciarlas al traspasar.
+
+Conservar las secuencias `ofertas_id_seq` y, tras 003, `estado_operativo_revision_seq`. La segunda evita reutilizar revisiones.
 
 La vista `entrega_de_hoy` se crea con el esquema y no sustituye las tablas. Exportar/importar únicamente `ofertas` no
 conserva el catálogo, el registro inmutable ni toda la capacidad de recuperación. No limitar la copia a registros activos:
@@ -98,13 +104,16 @@ Restaurar **toda** la carpeta `trabajo/` de un corte coherente. Sus piezas princ
 | `pendientes_supabase.json` | Filas históricas no confirmadas, con fecha original |
 | `pendientes_catalogo.json` | Cambios de catálogo no confirmados |
 | `pendientes_registro.json` | Selecciones no confirmadas en el registro v2 |
-| `apify_presupuesto.json` | Reservas de crédito; perderlo puede habilitar nuevas reservas |
+| `apify_presupuesto.json` | Contador en modo legado; copia auxiliar del registro Supabase en modo central |
 | `verificacion_enlaces.json` | Caché de evidencias; caduca y no debe rejuvenecerse al copiar |
 | `metricas_entrega.json` | Serie de días distintos para continuidad y preparación |
 
 No editar las fechas de estos archivos, regenerar IDs ni mezclar colas de una base con otro catálogo independiente.
 La memoria v2 puede reconstruir lote y no repetición desde Supabase, pero no reconstruye por sí sola presupuesto Apify,
 consultas, pendientes locales aún no confirmados o marcas del navegador. Esa recuperación no reemplaza el respaldo.
+Con SQL 003 y estado central activo, la base sí conserva reservas/colas y lotes sin confirmar; la carpeta sigue siendo
+necesaria para los demás auxiliares. Mantener `ESTADO_SUPABASE_ACTIVO=true` en el destino restaurado; no volver a una
+copia local antigua. Si aún no estaba activo, seguir [ACTIVAR_ESTADO_OPERATIVO.md](ACTIVAR_ESTADO_OPERATIVO.md).
 
 Para mover **Enviadas** del operador, exportar el JSON desde **Estado → Historial de enviadas** e importarlo en el
 nuevo navegador. Si se utiliza Cloudflare KV, incluir el traspaso/exportación de ese namespace por separado; no vive en
@@ -114,6 +123,7 @@ Supabase ni en el JSON del navegador como garantía de copia completa.
 
 1. Crear claves del cliente y actualizar los secretos `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `APIFY_TOKEN` y los opcionales.
 2. Confirmar las variables `CAPTURA_HORARIA_ACTIVA=true` y `PAGES_POR_ACTIONS` según el alojamiento.
+   Conservar además `ESTADO_SUPABASE_ACTIVO=true` si se traspasa una instancia central con SQL 003 restaurado.
 3. Si cambia el repositorio/propietario, revisar Pages, entorno `github-pages`, dominios y enlaces a Actions. La siguiente
    captura regenera `config.js` con el repositorio de ejecución; una copia antigua puede contener el anterior.
 4. En Cloudflare, actualizar conexión Git, Access, KV y `GITHUB_REPO`/`GITHUB_TOKEN_FLUJOS`. Verificar acceso autorizado y

@@ -22,6 +22,7 @@ WhatsApp ni seguimiento individual de candidaturas.
 | Decidir qué está comprobado y qué falta antes de aceptar/automatizar | [Aceptación y estado](docs/ACEPTACION_Y_ESTADO.md) |
 | Entender lo que cambió en las revisiones | [Historial de cambios](docs/HISTORIAL_CAMBIOS.md) |
 | Priorizar riesgos de producto, arquitectura, operación e IA | [Revisión de fiabilidad](docs/REVISION_FIABILIDAD.md) |
+| Aprender GitHub/Supabase y activar reservas/pendientes duraderos | [Estado operativo y activación](docs/ACTIVAR_ESTADO_OPERATIVO.md) |
 
 Los manuales anteriores prevalecen para uso/instalación. `docs/PLAN.md` conserva el diseño histórico; sus costos,
 casillas y actores originales no describen por sí solos la operación vigente.
@@ -48,6 +49,8 @@ Decisiones, límites y seguimiento futuro: [`docs/COBERTURA_HISTORICO.md`](docs/
 El catálogo v2 permite actualizar durante el día sin crear otra entrega diaria. Conserva publicación, detección y
 última observación por separado y archiva sin borrar historial en Supabase. Requiere la migración aditiva y la variable
 de activación; la captura horaria queda desactivada hasta entonces. Repetir una entrega completa solo reintenta el lote.
+La extensión SQL 003 permite conservar presupuesto, pendientes y selección sin confirmar en Supabase. Requiere activar
+`ESTADO_SUPABASE_ACTIVO=true` después del corte/importación; no se activa al fusionar código. Las cachés siguen en GitHub.
 WhatsApp sigue pendiente de validar continuidad y definir destinatarios/confirmaciones; no hay envíos automáticos.
 La programación solicita 1:17 a. m. Colombia para la nocturna y minuto 23 de cada hora para la captura; GitHub puede
 retrasar/saltar ejecuciones. El límite de USD 5 es Apify, no un precio total garantizado de todos los proveedores.

@@ -34,12 +34,19 @@ def sincronizar(vacantes, retiradas, pendientes, subir, persistir, observado=Non
     return dict(resultado, pendientes=len(pendientes), activas_elegibles=len(validas))
 
 
-def registrar_seleccion(lote, pendientes, subir, persistir):
+def filas_seleccion(lote):
     from buscador.entrega import GRADO_CONTRATO
+    filas = []
     for rol, lista in lote["elegidas"].items():
         for v, grado in lista:
-            pendientes.setdefault(v["id"], {"vacante_id": v["id"], "delivery_date": lote["fecha"], "role_id": rol,
+            filas.append({"vacante_id": v["id"], "delivery_date": lote["fecha"], "role_id": rol,
                 "match_grade": GRADO_CONTRATO[grado], "selected_at": v["_capturada_entrega"], "snapshot": v})
+    return filas
+
+
+def registrar_seleccion(lote, pendientes, subir, persistir):
+    for fila in filas_seleccion(lote):
+        pendientes.setdefault(fila["vacante_id"], fila)
     persistir(pendientes)
     resultado = dict(subir(list(pendientes.values())))
     for identificador in resultado.pop("confirmadas", []):

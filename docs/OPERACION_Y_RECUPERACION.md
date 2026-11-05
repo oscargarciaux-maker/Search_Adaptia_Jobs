@@ -2,6 +2,8 @@
 
 Manual del administrador, actualizado el 5 de noviembre de 2026. Complementa la [guía del operador](GUIA_CLIENTE.md).
 No modifica la instalación por leerlo. Registrar incidentes y respaldos fuera del repositorio, sin incluir secretos.
+La extensión de [estado operativo](ACTIVAR_ESTADO_OPERATIVO.md) centraliza reservas/pendientes solo tras SQL 003 y
+`ESTADO_SUPABASE_ACTIVO=true`. Los procedimientos distinguen modo legado y central; no asumir activación por tener código.
 
 ## 1. Qué comprobar cada día
 
@@ -30,6 +32,7 @@ no una garantía contractual del proveedor. Abrir una incidencia si hay retrasos
 | `ofertas` | Filas v1 por enlace seleccionado | Compatibilidad e histórico; `active` no certifica vigencia actual |
 | `entrega_de_hoy` | Vista de la fecha máxima existente en `ofertas` | Puede mostrar un día anterior; no tiene almacenamiento propio |
 | `publicado/trabajo/` | Estado de búsqueda, memoria, colas, presupuesto y caché | Continuar ejecuciones y recuperar pendientes |
+| Supabase con SQL 003 | `estado_operativo` y `apify_reservas` privados | Autoridad de pendientes/reservas en modo central; archivos de trabajo auxiliares |
 | `publicado/datos/` | Datos públicos de la página y reporte de salud | Consulta de la interfaz; no sustituye a Supabase |
 | Navegador o Cloudflare KV | Marcas manuales de enviadas | Historial del operador, sin destinatario ni comprobante WhatsApp |
 
@@ -119,9 +122,9 @@ del portal; compartir solo los motivos y URLs originales necesarios. No subir el
 Ejecutar en **Supabase → SQL Editor**, en el proyecto correcto. Son lecturas; no reemplazan la comprobación de la página.
 
 ```sql
--- Existencia de las tres tablas.
+-- Las tres tablas base; aparecen también las dos nuevas si se aplicó 003.
 select table_name from information_schema.tables
-where table_schema='public' and table_name in ('ofertas','catalogo_vacantes','entregas_diarias');
+where table_schema='public' and table_name in ('ofertas','catalogo_vacantes','entregas_diarias','estado_operativo','apify_reservas');
 
 -- Selecciones distintas por rol y día. Elegir después la fecha de negocio que se está revisando.
 select delivery_date, role_id, count(*) as seleccionadas
@@ -162,7 +165,7 @@ Un nombre/JSON alterado manualmente puede requerir diagnóstico técnico. No arr
 ## 7. Mantenimiento y costos
 
 **Semanal:** revisar déficit por rol, calidad por muestra, fuentes con fallos, colas, retrasos y consumo. Revisar el tamaño
-de las tres tablas con índices y las condiciones del plan Supabase. Si procede, acordar más capacidad o una estrategia
+de todas las tablas con índices (cinco tras 003) y las condiciones del plan Supabase. Si procede, acordar más capacidad o una estrategia
 explícita de archivo/respaldos; cambiar un estado a archived no reduce espacio por sí solo.
 
 **Mensual y al cambiar cuentas:** comprobar ciclo de crédito Apify, reservas, otros proyectos de la cuenta, permisos,
@@ -191,7 +194,9 @@ copia recuperable para el cliente.
 2. Descargar/guardar completa la rama `publicado`, en especial `trabajo/` y `datos/salud.json`, fuera del repositorio.
    La rama se reescribe y no es por sí misma un histórico de recuperación. Actions guarda artefactos de estado 14 días,
    no una copia permanente ni el contenido de Supabase.
-3. Exportar las tres tablas con tipos/JSON y la secuencia identity. Un técnico puede usar la receta siguiente, con cliente
+3. Si se aplicó 003, exportar cinco tablas y dos secuencias, aunque la variable aún no esté activa. Sin 003 hay tres
+   tablas y una secuencia: omitir los argumentos de `estado_operativo`, `apify_reservas` y su secuencia en esta receta.
+   Un técnico puede usar la receta siguiente, con cliente
    PostgreSQL compatible y acceso administrativo. Los servicios son perfiles de conexión seguros propios; no pegar
    contraseñas en argumentos ni en este manual. Ver [pg_service](https://www.postgresql.org/docs/current/libpq-pgservice.html).
 
@@ -200,18 +205,21 @@ copia recuperable para el cliente.
 ADAPTIA_RESPALDO=/ruta/privada/al/respaldo-del-corte
 pg_dump --dbname="service=adaptia_origen" --format=custom --data-only --no-owner --no-privileges \
   --table=public.catalogo_vacantes --table=public.entregas_diarias --table=public.ofertas \
+  --table=public.estado_operativo --table=public.apify_reservas --table=public.estado_operativo_revision_seq \
   --table=public.ofertas_id_seq --file="$ADAPTIA_RESPALDO/datos.dump"
 ```
 
 `adaptia_origen` referencia la conexión administrativa, TLS y credenciales fuera del código; el técnico prepara esos
 perfiles según Supabase y su red. Verificar `pg_get_serial_sequence('public.ofertas','id')` si el esquema tiene un
 nombre distinto al creado por el SQL del proyecto. Revisar la salida/exit code y un inventario con conteos, fechas,
-estados y secuencia. El respaldo puede contener descripciones/URLs; almacenarlo con acceso restringido, no en GitHub.
+estados, reservas, pendientes y ambas secuencias. Sin la secuencia de revisiones se puede reutilizar un recibo antiguo
+tras restaurar. El respaldo puede contener descripciones/URLs; almacenarlo con acceso restringido, no en GitHub.
 
 ### Ensayo de restauración
 
 4. Crear un destino aislado **vacío**, que no reciba clientes ni automatizaciones. Aplicar `esquema.sql` y
-   `002_catalogo.sql` con sus permisos. No crear roles nuevos en Supabase: son roles del proveedor.
+   `002_catalogo.sql` con sus permisos y `003_estado_operativo.sql` si el corte incluye esa extensión.
+   No inicializar un marcador/presupuesto vacío antes de restaurar. No crear roles nuevos en Supabase: son roles del proveedor.
 5. Restaurar sin apuntar jamás al proyecto productivo por accidente:
 
 ```bash
@@ -219,13 +227,13 @@ pg_restore --dbname="service=adaptia_destino" --data-only --no-owner --no-privil
   --single-transaction --exit-on-error "$ADAPTIA_RESPALDO/datos.dump"
 ```
 
-6. Comparar conteos/IDs/fechas/snapshots, estados cerrados/archivados, referencias y valor de la secuencia. Confirmar
+6. Comparar conteos/IDs/fechas/snapshots, estados cerrados/archivados, referencias, reservas, pendientes y secuencias. Confirmar
    RLS/grants después de aplicar el esquema. Probar una inserción ficticia en ese destino y retirarlo al terminar el ensayo.
 7. Verificar también que la copia de `trabajo/` conserva colas, lote, memoria y presupuesto del corte. No rejuvenecer
    fechas de verificación al copiar. Registrar quién ensayó, fecha, resultados y ubicación del respaldo.
 
-La receta de tres tablas/secuencia se ensayó con datos ficticios en PostgreSQL 17: conteos, clave foránea, cierre,
-permisos y siguiente identidad se conservaron. No equivale a restaurar el proyecto real del cliente ni certifica sus
+La receta de cinco tablas/dos secuencias se ensayó con datos ficticios en PostgreSQL 17: contenido, clave foránea, cierre,
+presupuesto, pendiente, permisos, siguiente identidad y revisión se conservaron. Se repite en CI. No equivale a restaurar el proyecto real del cliente ni certifica sus
 credenciales/red. Si hay otras tablas de negocio, extensiones o un esquema modificado, ajustar y ensayar su respaldo.
 
 ### Recuperar producción después de un incidente
@@ -242,6 +250,10 @@ credenciales/red. Si hay otras tablas de negocio, extensiones o un esquema modif
 La recuperación puede necesitar decisión humana si Supabase confirmó filas y se perdió una cola antes de publicarla.
 V2 ayuda a reconstruir selección/no repetición, pero no restaura saldo ni reservas del proveedor. No garantizar que todo
 se recupera automáticamente ni borrar filas para forzar otro resultado.
+Con modo central activo, SQL 003 conserva las reservas y los pendientes confirmados en esa base y permite reconstruir
+colas desde los lotes interrumpidos, también de días anteriores. Todavía se necesita el respaldo de `trabajo/` para
+rotación, inventario, caché de enlaces y métricas. Una restauración vieja puede omitir consumo posterior al corte:
+contrastar Apify antes de reanudar; un backup viejo no repone crédito real. No apagar la variable como recuperación rápida.
 
 ## 9. Actualizaciones y regreso de versión
 

@@ -28,9 +28,14 @@ def errores(reporte):
 
 def errores_catalogo(reporte):
     c = reporte.get("catalogo") or {}
+    fallos = []
     if not c or c.get("omitida") or c.get("errores") or c.get("pendientes") or c.get("enviadas") != c.get("filas"):
-        return ["El catálogo no está sincronizado; se conserva la cola para reintentar."]
-    return []
+        fallos.append("El catálogo no está sincronizado; se conserva la cola para reintentar.")
+    estado = reporte.get("estado_operativo") or {}
+    if estado.get("activo") and (any(estado.get("pendientes", {}).values()) or estado.get("lotes_pendientes") or
+            any(r.get("errores") or r.get("omitida") for r in estado.get("reintentos", {}).values())):
+        fallos.append("Hay operaciones centrales sin confirmar; conservar estado y revisar los reintentos.")
+    return fallos
 
 
 def main():

@@ -56,7 +56,7 @@ P0: resolver/acreditar antes de automatizar WhatsApp. P1: siguiente trabajo de e
 |---|---|---|
 | P0 | Fusión y pruebas no acreditan ejecución de v3 | Ver un ciclo real con el SHA correcto, reporte de enlaces, persistencia y página; conservar su ID |
 | P0 | No hay monitor independiente de ejecuciones; un cron ausente puede no generar fallo/notificación | Supervisar desde otro proceso/proveedor hora del último dato útil, errores/colas y última captura válida; acordar destinatario y respuesta |
-| P0 | Solo se ensayó respaldo/restauración ficticio; no hay backup completo programado por el código | Acordar retención y responsable y restaurar un corte del cliente en destino aislado, incluyendo tres tablas, secuencia y trabajo |
+| P0 | Solo se ensayó respaldo/restauración ficticio; no hay backup completo programado por el código | Acordar retención y responsable y restaurar un corte del cliente en destino aislado, incluyendo todas las tablas/secuencias y trabajo; cinco/dos tras 003 |
 | P0 | Supabase, registro de selección y archivos Git no comparten una transacción | La protección nueva detiene arranque si detecta v1 del día sin registro/lote recuperable; documentar recuperación, no repetir a ciegas |
 | P1 | `catalogo.sincronizar` vuelve a encolar todas las filas cada captura | Medir tráfico/tiempo y separar cambios de contenido de actualizaciones pequeñas de observación; no reenviar descripción completa sin cambios |
 | P1 | Descripciones y snapshots se repiten en catálogo, selección y filas v1; histórico crece | Medir tamaño con índices, filas actualizadas/muertas, cuotas y respaldo. Archivar no libera espacio. Acordar política antes de límites |
@@ -68,6 +68,12 @@ P0: resolver/acreditar antes de automatizar WhatsApp. P1: siguiente trabajo de e
 | P2 | Llegarán perfiles personales, mensajes y candidaturas si se amplía alcance | Separar datos por cliente, autenticar, definir permisos y retención antes de guardar información personal o automatizar envíos |
 
 ## 4. Arquitectura: qué conviene conservar y qué evolucionar
+
+**Actualización de implementación:** la extensión de [estado operativo](ACTIVAR_ESTADO_OPERATIVO.md) prepara reservas,
+colas y selección sin confirmar en Supabase, con SQL 003, bloqueo/CAS y recuperación. Tiene pruebas PostgreSQL de
+concurrencia y respaldo/restauración de cinco tablas/dos secuencias. Requiere activación y evidencia reales; no está
+activada por esta revisión. Los párrafos siguientes describen el riesgo del modo legado que motivó el cambio.
+Registro completo de ejecuciones, optimización del catálogo, backups programados y monitor independiente siguen pendientes.
 
 ### Supabase como estado duradero
 
