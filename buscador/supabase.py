@@ -3,7 +3,8 @@
 Necesita dos secretos de GitHub: SUPABASE_URL (https://<proyecto>.supabase.co) y SUPABASE_SECRET_KEY (la clave secreta
 del proyecto: Project Settings > API Keys; también sirve la antigua service_role). La entrega normal exige estos secretos
 antes de recoger. `subir` conserva un resultado explícito de omisión para pruebas y llamadas aisladas sin configurar.
-Como pide el contrato, una oferta que ya existe no se sobrescribe: las filas con un external_id repetido se ignoran.
+Los reintentos por external_id no duplican filas. SQL 005 conserva una oportunidad por vacante_id y archiva
+copias alternativas por portal, manteniendo las descripciones y snapshots históricos.
 """
 import os
 

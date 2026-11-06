@@ -270,8 +270,8 @@ def entregable(v, idiomas=("es", "en")):
 
 
 def filas(v, rol="", grado="", fecha_entrega="", capturada="", solo_comprobados=True):
-    """Filas del contrato para una vacante: una por enlace (LinkedIn y el directo de la empresa), con el mismo contenido
-    (el contrato las une). `capturada`: fecha y hora ISO de la corrida."""
+    """Una fila por vacante reconocida (v1 + v5), con enlace principal comprobado y alternativas asociadas.
+    `capturada`: fecha y hora ISO de la corrida."""
     mod, ciudad, pais_oficina, alcance, hire_paises, regiones = ubicacion(v)
     desc = v.get("_descripcion", "")
     anos_min, anos_max = anos(desc, v.get("anos_min"))
