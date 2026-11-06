@@ -19,6 +19,8 @@ Supabase conserva los datos; el navegador muestra la página. Las cuentas y sus 
 El administrador configura los accesos una vez siguiendo [Instalación automática](INSTALACION_AUTOMATICA.md). Las
 actualizaciones aprobadas preparan la base sin que el operador copie SQL 002/003 ni active variables. Si falla la
 preparación, se muestra el motivo y se conserva la copia cifrada disponible; no reiniciar reservas para desbloquearla.
+Para consultar después las claves y entregarlas al propietario, usar un gestor compartido siguiendo
+[Credenciales y accesos](CREDENCIALES_Y_ACCESOS.md). La guía explica qué clave es cada una; no contiene valores privados.
 
 | Situación | Documento y acción |
 |---|---|

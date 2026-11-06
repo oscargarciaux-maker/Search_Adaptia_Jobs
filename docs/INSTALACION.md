@@ -3,6 +3,8 @@
 Actualizado el 5 de noviembre de 2026. Este procedimiento incluye catálogo v2, verificación pública v3 e instalación automática.
 Para utilizar una instalación ya operativa, empezar en [GUIA_CLIENTE.md](GUIA_CLIENTE.md): no reemplazar cuentas,
 recrear tablas ni repetir la primera carga solo por recibir este manual.
+El inventario y almacenamiento privado de claves están en [Credenciales y accesos](CREDENCIALES_Y_ACCESOS.md):
+guardar primero en el gestor del cliente y después copiar cada valor al secreto de GitHub que corresponde.
 
 ## 1. Elegir instalación nueva o continuidad
 

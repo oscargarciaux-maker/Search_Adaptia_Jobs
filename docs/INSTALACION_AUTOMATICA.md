@@ -3,6 +3,9 @@
 Este es el camino preferido para entregar el proyecto. Sustituye copiar los SQL 001/002/003 y activar variables a mano.
 La configuración inicial de cuentas/secretos sigue correspondiendo al propietario; las siguientes actualizaciones las
 ejecuta GitHub. Un PR incorpora código; la ejecución **Preparar Supabase** acredita la instalación de esa versión.
+Antes de configurar secretos, organizar los valores privados en el gestor del cliente siguiendo
+[Credenciales y accesos](CREDENCIALES_Y_ACCESOS.md). Esa guía distingue contraseña PostgreSQL, URI completa, clave API
+y clave de respaldo, y explica cuándo se conservan o eliminan los corchetes del marcador.
 
 ## Contrato de automatización
 
@@ -69,6 +72,10 @@ Write-Host "Clave de respaldo generada y copiada."
 Settings y actualizar las aplicaciones que usen esa conexión. Un error `[DB_AUTENTICACION]` puede deberse también a
 caracteres sin codificar en la URI. Este bloque de PowerShell conserva el servidor/usuario de la URI original y codifica
 la contraseña en el equipo del administrador, sin imprimirla ni enviarla al chat:
+
+En la URI final se reemplaza todo `[YOUR-PASSWORD]`, incluidos los corchetes. Solo se conservan en la plantilla original
+que se pega en el primer aviso del comando. El segundo aviso recibe la contraseña real de la base, sin corchetes añadidos.
+`SUPABASE_DB_URL` siempre recibe la URI final completa, no solamente esa contraseña.
 
 ```powershell
 $uriConMarcador = Read-Host "Pega la URI Session pooler original con [YOUR-PASSWORD]"

@@ -18,6 +18,7 @@ WhatsApp ni seguimiento individual de candidaturas.
 | Operador y cliente: aprender a usar e interpretar resultados | [Manual del cliente](docs/GUIA_CLIENTE.md) |
 | Administrador: instalar o actualizar sin perder datos | [Instalación](docs/INSTALACION.md) |
 | Configurar una vez y aplicar SQL/activación automáticamente | [Instalación automática](docs/INSTALACION_AUTOMATICA.md) |
+| Guardar/consultar accesos, distinguir claves y compartirlos con el propietario | [Credenciales y accesos](docs/CREDENCIALES_Y_ACCESOS.md) |
 | Cambiar propietario/cuentas conservando historial y presupuesto | [Traspaso](docs/TRASPASO.md) |
 | Operar, resolver incidentes, respaldar y restaurar | [Operación y recuperación](docs/OPERACION_Y_RECUPERACION.md) |
 | Decidir qué está comprobado y qué falta antes de aceptar/automatizar | [Aceptación y estado](docs/ACEPTACION_Y_ESTADO.md) |

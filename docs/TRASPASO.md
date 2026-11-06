@@ -4,6 +4,9 @@ Versión vigente: 5 de noviembre de 2026. Acompaña [GUIA_CLIENTE.md](GUIA_CLIEN
 [OPERACION_Y_RECUPERACION.md](OPERACION_Y_RECUPERACION.md) y [ACEPTACION_Y_ESTADO.md](ACEPTACION_Y_ESTADO.md).
 La preparación preferida del destino está en [INSTALACION_AUTOMATICA.md](INSTALACION_AUTOMATICA.md): el cliente configura
 accesos una vez y no copia SQL 002/003 ni crea variables de captura. Continuidad sigue requiriendo un corte coherente.
+Organizar los valores privados en un gestor compartido y validar acceso con el cliente según
+[Credenciales y accesos](CREDENCIALES_Y_ACCESOS.md). El repositorio solo conserva el mapa de nombres/funciones;
+GitHub no permite volver a leer el valor de un secreto después de guardarlo.
 
 ## 1. Acordar qué se transfiere
 
