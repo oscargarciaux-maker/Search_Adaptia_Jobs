@@ -18,7 +18,7 @@ def sin_archivos_reales_de_actions(monkeypatch):
 
 def test_migraciones_en_orden_y_hash_del_sql_original():
     versiones = migraciones.descubrir()
-    assert [m.version for m in versiones] == ["001", "002", "003", "004", "005", "006"]
+    assert [m.version for m in versiones] == ["001", "002", "003", "004", "005", "006", "007"]
     assert all(len(m.digest) == 64 for m in versiones)
     assert "begin;\n" not in versiones[1].cuerpo.lower()
     assert "begin\n" in versiones[1].cuerpo.lower()  # conserva el cuerpo PL/pgSQL
@@ -191,3 +191,36 @@ def test_respaldo_se_sube_antes_de_aplicar_sql():
     texto = (migraciones.RAIZ / ".github/actions/preparar-supabase/action.yml").read_text()
     assert texto.index("--fase respaldo") < texto.index("uses: actions/upload-artifact@v4") < texto.index("--fase aplicar")
     assert "continue-on-error" not in texto
+
+
+@pytest.mark.parametrize('codigo,categoria', [('23505','identidad_unica'),('23503','referencia_pendiente'),('57014','tiempo_consulta'),('55P03','bloqueo'),('42501','permisos')])
+def test_error_sql_explica_categoria_sin_revelar_datos(codigo, categoria):
+    class ErrorPrivado(Exception):
+        sqlstate = codigo
+    mensaje = migraciones.error_sql(ErrorPrivado('URI privada; fila privada; contraseña privada'))
+    assert codigo in mensaje and categoria in mensaje and 'privada' not in mensaje
+
+
+def test_ensayo_de_migracion_revierte_transaccion_tambien_al_fallar(monkeypatch):
+    from buscador import diagnostico_migraciones
+    from contextlib import contextmanager
+    transacciones = []
+    class Conexion:
+        @contextmanager
+        def transaction(self, **op):
+            transacciones.append(op)
+            try: yield
+            finally: transacciones.append('salida')
+        def execute(self, consulta): pass
+    monkeypatch.setattr(migraciones, 'pendientes', lambda *a: [])
+    def fallo(*a): raise RuntimeError('fallo controlado')
+    monkeypatch.setattr(migraciones, 'aplicar', fallo)
+    with pytest.raises(RuntimeError): diagnostico_migraciones.ensayar(Conexion())
+    assert transacciones == [{'force_rollback': True}, 'salida']
+
+
+def test_ciclos_solo_aliases_y_no_referencias_explicitas():
+    assert migraciones.ciclos_aliases([('a',None,['a','b']),('b',None,['a','b'])]) == [('a','b')]
+    assert not migraciones.ciclos_aliases([('a','b',['a','b']),('b','a',['a','b'])])
+    assert not migraciones.ciclos_aliases([('a',None,['a','b']),('b',None,['b'])])
+    assert not migraciones.ciclos_aliases([('a',None,['a','c']),('b',None,['b','c']),('c',None,['c'])])

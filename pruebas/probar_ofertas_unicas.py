@@ -14,6 +14,55 @@ from psycopg.types.json import Jsonb
 from buscador import migraciones
 
 
+
+def probar_aliases(conectar, nombre):
+    from buscador.diagnostico_migraciones import ensayar
+    with conectar() as admin:
+        admin.execute(sql.SQL("create database {}").format(sql.Identifier(nombre)))
+    try:
+        with conectar(nombre) as c:
+            ms = migraciones.descubrir()
+            with c.transaction(): migraciones.aplicar(c,[m for m in ms if m.version<"006"])
+            c.execute("""insert into public.catalogo_vacantes(id,datos,status,observed_at) values
+                ('1111111111111111','{"enlace":"https://jobs.lever.co/ciclo/a"}','active',now()),
+                ('2222222222222222','{"enlace":"https://jobs.lever.co/ciclo/b"}','active',now());
+                insert into public.ofertas(external_id,job_title,company_name,offer_url,vacante_id) values
+                ('ciclo-a','QA','Empresa','https://jobs.lever.co/ciclo/a','1111111111111111'),
+                ('ciclo-b','QA','Empresa','https://jobs.lever.co/ciclo/b','2222222222222222');
+                update public.catalogo_vacantes set datos=datos||'{"ids_agrupados":["1111111111111111","2222222222222222"]}'::jsonb;
+                insert into public.entregas_diarias(vacante_id,delivery_date,role_id,match_grade,selected_at,snapshot)
+                values('2222222222222222',current_date,'qa','exact',now(),'{"conservar":"histórico"}');""")
+            antes = c.execute("select jsonb_agg(to_jsonb(c) order by id) from public.catalogo_vacantes c").fetchone()[0]
+            assert ensayar(c) == ['006','007']
+            assert c.execute("select jsonb_agg(to_jsonb(c) order by id) from public.catalogo_vacantes c").fetchone()[0] == antes
+            assert c.execute("select count(*) from public.ofertas").fetchone()[0] == 2
+            assert '006' not in migraciones.aplicadas(c)
+            with c.transaction(): migraciones.aplicar(c,[m for m in ms if m.version>="006"])
+            assert c.execute("select count(*) from public.ofertas").fetchone()[0] == 1
+            assert c.execute("select count(*) from public.ofertas_enlaces_historicos").fetchone()[0] == 1
+            assert c.execute("select snapshot->>'conservar' from public.entregas_diarias").fetchone()[0] == 'histórico'
+            # Recrear la misma equivalencia implícita después de instalar: tanto RPC como inserción convergen.
+            c.execute("update public.catalogo_vacantes set datos=datos-'duplicada_de',status='active'")
+            assert c.execute("select public.adaptia_vacante_principal('2222222222222222')").fetchone()[0] == '1111111111111111'
+            c.execute("select public.reconciliar_ofertas()")
+            c.execute("""insert into public.ofertas(external_id,job_title,company_name,offer_url,vacante_id)
+                values('ciclo-c','QA','Empresa','https://jobs.lever.co/ciclo/c','2222222222222222')""")
+            assert c.execute("select count(*) from public.ofertas").fetchone()[0] == 1
+            # Una contradicción explícita sigue abortando sin tocar ofertas ni archivo.
+            c.execute("""update public.catalogo_vacantes set datos=jsonb_set(datos,'{duplicada_de}',
+                to_jsonb(case when id='1111111111111111' then '2222222222222222' else '1111111111111111' end))""")
+            for q in ("select public.reconciliar_ofertas()", "select public.adaptia_vacante_principal('1111111111111111')"):
+                try:
+                    with c.transaction(): c.execute(q)
+                    raise AssertionError('Una referencia explícita contradictoria fue aceptada')
+                except psycopg.errors.RaiseException: pass
+            assert c.execute("select count(*) from public.ofertas").fetchone()[0] == 1
+        print('Aliases recíprocos, preparación desde 005, ensayo revertido, inserción y ciclos explícitos: aprobados.')
+    finally:
+        with conectar() as admin:
+            admin.execute(sql.SQL("drop database {}").format(sql.Identifier(nombre)))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--lote", help="Corte externo para ensayar, sin escribir sus datos ni descripciones en el repositorio")
@@ -157,6 +206,7 @@ def main():
                 c.execute("select public.reconciliar_ofertas()")
             assert c.execute("select count(*) from public.ofertas where vacante_id='aaaaaaaaaaaaaaaa'").fetchone()[0] == 1
             assert 'https://jobs.lever.co/a/adicional' in c.execute("select enlaces_alternativos from public.ofertas where id=37").fetchone()[0]
+        probar_aliases(conectar,nombre+"_aliases")
         print("Identidad, archivo, repetición, referencias, concurrencia y catálogo de 18.000 filas bajo presupuesto de consulta: aprobados.")
     finally:
         with conectar() as admin:

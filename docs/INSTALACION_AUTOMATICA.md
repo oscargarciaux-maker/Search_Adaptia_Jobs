@@ -1,6 +1,6 @@
 # Instalación y actualizaciones automáticas
 
-Este es el camino preferido para entregar el proyecto. Sustituye copiar los SQL 001–006 y activar variables a mano.
+Este es el camino preferido para entregar el proyecto. Sustituye copiar los SQL 001–007 y activar variables a mano.
 La configuración inicial de cuentas/secretos sigue correspondiendo al propietario; las siguientes actualizaciones las
 ejecuta GitHub. Un PR incorpora código; la ejecución **Preparar Supabase** acredita la instalación de esa versión.
 

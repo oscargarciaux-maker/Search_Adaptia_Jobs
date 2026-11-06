@@ -123,3 +123,30 @@ def test_oficinas_y_clientes_extranjeros_no_son_restriccion_de_residencia():
     r = paises.elegibles("QA Engineer", "Remote Worldwide",
                         "Our offices are in Germany and Monaco. You will test software used in the Netherlands.")
     assert r["paises"] == TODOS and r["confianza"] == "alta"
+
+
+@pytest.mark.parametrize("ubicacion", ["Tartu, Condado de Tartu, Estonia", "Tallinn, Estonia", "Riga, Latvia", "Vilnius, Lithuania", "Helsinki, Finland", "Oslo, Norway", "Estonia (Remote, EMEA)"])
+@pytest.mark.parametrize("remoto", [None, True])
+def test_pais_extranjero_no_se_convierte_en_todo_el_mundo(ubicacion, remoto):
+    r = paises.elegibles("Product Owner", ubicacion, "Work with distributed teams across time zones. Global scope and inclusive working environment.", remoto)
+    assert r["paises"] == [] and r["confianza"] == "alta"
+
+
+def test_restriccion_estonia_prevalece_sobre_remoto_mundial():
+    assert paises.elegibles("Product Owner", "Remote Worldwide", "Candidates must be physically located in Estonia.")["paises"] == []
+
+
+def test_sede_estonia_no_restringe_una_remota_mundial_confirmada():
+    r = paises.elegibles("Product Owner", "Remote Worldwide", "Our headquarters are in Tallinn, Estonia. Work from anywhere.")
+    assert r["paises"] == TODOS and r["confianza"] == "alta"
+
+
+def test_residencia_desconocida_no_hereda_espana_de_emea():
+    r = paises.elegibles("Product Owner (Remote in Atlantis)", "Remote in EMEA")
+    assert r["confianza"] == "baja"
+
+
+def test_herramienta_exclusiva_no_es_restriccion_geografica():
+    r = paises.elegibles("Staff Product Designer (AI Track)", "RS, Brazil",
+                         "You design exclusively in Figma and hand off static specs. Our team works remotely.", True)
+    assert r["paises"] == ["BR"] and r["confianza"] == "media"

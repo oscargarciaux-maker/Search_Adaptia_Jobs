@@ -95,7 +95,7 @@ def main():
             assert not conn.execute("select has_table_privilege('service_role','public.adaptia_migraciones','SELECT')").fetchone()[0]
             # Una migración inválida revierte también su primer ALTER correcto.
             cuerpo = "alter table public.ofertas add column prueba_fallida text; select no_existe;"
-            mala = migraciones.Migracion("007", "007_fallida.sql", sha256(cuerpo.encode()).hexdigest(), cuerpo)
+            mala = migraciones.Migracion("008", "008_fallida.sql", sha256(cuerpo.encode()).hexdigest(), cuerpo)
             plan = migraciones.planificar(conn, trabajo, raiz / "antes-fallo.enc", llave, ms + [mala])
             try:
                 migraciones.preparar(conn, trabajo, plan, ms + [mala])
@@ -103,10 +103,10 @@ def main():
             except psycopg.errors.UndefinedColumn:
                 pass
             assert not conn.execute("select 1 from information_schema.columns where table_schema='public' and table_name='ofertas' and column_name='prueba_fallida'").fetchone()
-            assert "007" not in migraciones.aplicadas(conn)
+            assert "008" not in migraciones.aplicadas(conn)
             # Dos procesos/conexiones parten del mismo corte: solo uno aplica.
             cuerpo = "alter table public.ofertas add column prueba_concurrencia text;"
-            buena = migraciones.Migracion("007", "007_correcta.sql", sha256(cuerpo.encode()).hexdigest(), cuerpo)
+            buena = migraciones.Migracion("008", "008_correcta.sql", sha256(cuerpo.encode()).hexdigest(), cuerpo)
             versiones = ms + [buena]
             plan = migraciones.planificar(conn, trabajo, raiz / "concurrencia.enc", llave, versiones)
             def intentar(_):

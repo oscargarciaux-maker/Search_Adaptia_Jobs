@@ -99,10 +99,15 @@ def _por_zona_horaria(t):
 
 def _restriccion(desc):
     """Lugar al que la descripción restringe la residencia, o '' si no restringe."""
-    m = _RESTRINGE.search(desc)
-    if not m:
-        return ""
-    return (m.group("lugar") or m.group("lugar2") or m.group("lugar3") or "").strip()
+    d = datos()
+    for m in _RESTRINGE.finditer(desc):
+        lugar = (m.group("lugar") or m.group("lugar2") or m.group("lugar3") or "").strip()
+        contexto = m.group(0)[:m.group(0).find(lugar)]
+        residencia = re.search(r"\b(reside|live|located|based|living|residing|candidates|applicants|candidatos|personas|residents)\b", contexto)
+        conocido = _paises_nombrados(lugar) or any(_nombra(lugar,d[k]) for k in ("fuera","toda_latam","toda_europa","mundo")) or any(_nombra(lugar,r["nombres"]) for r in d["subregiones"])
+        if residencia or conocido:
+            return lugar
+    return ""
 
 
 def modalidad(titulo, ubicacion, descripcion="", remoto=None):
@@ -171,7 +176,9 @@ def elegibles(titulo, ubicacion, descripcion="", remoto=None):
         if _nombra(restringe, d["fuera"]) or re.match(r"(us|usa|u\.s|uk)\b", restringe):
             return []
         return None
-    limites = [valor for texto in restricciones if texto for valor in [interpretar(texto)] if valor is not None]
+    limites = [interpretar(texto) for texto in restricciones if texto]
+    if any(valor is None for valor in limites):
+        return r(todos, "baja", "restricción de residencia sin confirmar")
     if limites:
         permitidos = set(todos).intersection(*(set(valor) for valor in limites))
         return r([c for c in todos if c in permitidos], "alta",
@@ -185,10 +192,10 @@ def elegibles(titulo, ubicacion, descripcion="", remoto=None):
         return r(sorted(set(latam) | (set(europa) & set(nombrados))), "alta", "")
     if nombrados:
         return r(nombrados, "media" if len(nombrados) == 1 else "alta", "")
-    if es_europa:
-        return r(europa, "alta", "remoto para Europa")
     if fuera:
         return r([], "alta", "remoto fuera de LATAM y España")
+    if es_europa:
+        return r(europa, "alta", "remoto para Europa")
     zona = _por_zona_horaria(normalizar.sin_tildes(f"{ubicacion} {titulo} {descripcion[:6000]}").lower())
     if zona is not None:
         return r(zona, "media", "por zona horaria")

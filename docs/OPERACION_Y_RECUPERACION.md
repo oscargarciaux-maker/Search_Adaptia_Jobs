@@ -89,11 +89,20 @@ el catálogo. Evita miles de consultas internas repetidas que pueden exceder el 
 El preparador la aplica y reconcilia después del respaldo, sin SQL manual. Un código `57014` indica que la base
 canceló la consulta por tiempo; conservar el estado, no confundirlo con una captura vacía ni borrar reservas/colas.
 
+SQL 007 permite equivalencias recíprocas de aliases, sin aceptar referencias explícitas contradictorias. Si la
+preparación de 006 se detuvo por esos aliases, el instalador los ordena dentro de su transacción respaldada y continúa.
+Los registros y snapshots históricos se conservan. Los errores SQL muestran código y categoría, nunca filas o URI.
+
 En **Actions → Diagnóstico → Run workflow**, rama `main`:
+
+- `ensayar_migraciones=true`: ensayo del SQL de identidad pendiente (006/007) con reversión obligatoria de toda la transacción. No instala
+  versiones ni conserva reparaciones. Tiene prioridad sobre los demás modos y no consume Apify. No reemplaza al
+  preparador con respaldo. Espera como máximo tres segundos por un bloqueo y treinta por consulta.
+
 
 - `auditar_producto=true`: consulta de solo lectura con conteos de la última fecha por `search_tag`/`role_id`,
   muestra pública acotada de QA y estado de una URL opcional en `vacante_url`. No escribe, migra ni usa Apify.
-  Tiene prioridad sobre las otras opciones. Comparar fechas, no solo el nombre del rol.
+  Tiene prioridad sobre las otras opciones salvo el ensayo de migraciones y la consolidación. Comparar fechas, no solo el nombre del rol.
 
 - `solo_conexion_db=true`: comprobar específicamente el acceso PostgreSQL administrativo en solo lectura. No aplica
   migraciones ni usa Apify; tiene prioridad sobre las otras opciones. Distingue configuración, autenticación, red y TLS

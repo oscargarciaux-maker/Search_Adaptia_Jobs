@@ -32,3 +32,8 @@ y una muestra pública acotada, nunca el contenido completo de la bodega ni cred
 SQL 006 mantiene este contrato y resuelve las identidades por lotes para respetar el presupuesto de consulta de
 la API en catálogos grandes. La reconciliación se aplica en la preparación y en las capturas, conservando archivo,
 vínculos inequívocos, bloqueo de concurrencia y protección de referencias externas.
+
+SQL 007 resuelve equivalencias recíprocas inferidas de `ids_agrupados` con un principal estable (el menor ID).
+No resuelve automáticamente ciclos de `duplicada_de` explícitos: esos siguen abortando. Si 006 está pendiente,
+el instalador prepara únicamente esos aliases recíprocos dentro de la misma transacción y después del respaldo,
+sin cambiar SQL 001–006 ni borrar fichas o selecciones. La preparación y la inserción comparten bloqueo.
