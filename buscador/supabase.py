@@ -192,7 +192,15 @@ def reconciliar_ofertas(sesion=None):
     try:
         r = (sesion or requests).post(f"{url}/rest/v1/rpc/reconciliar_ofertas", headers=cabeceras, json={}, timeout=60)
         if r.status_code != 200 or not isinstance(r.json(), dict):
-            return {"errores": ["No se confirmó la reconciliación de ofertas únicas"]}
+            import re
+            error = r.json() if isinstance(r.json(), dict) else {}
+            codigo = str(error.get("code", ""))
+            codigo = codigo if re.fullmatch(r"[A-Z0-9]{5,12}", codigo) else "sin_codigo"
+            mensaje = str(error.get("message", "")).lower()
+            motivos = {"ciclo de identidades": "ciclo_de_identidad", "referencias a ofertas": "referencias_externas",
+                "archivo histórico no coincide": "archivo_no_coincide", "principal todavía no": "principal_pendiente"}
+            clase = next((v for k,v in motivos.items() if k in mensaje), "error_servidor")
+            return {"errores": [f"Reconciliación no confirmada (HTTP {r.status_code}; {codigo}; {clase})"]}
         return r.json()
     except requests.RequestException:
         return {"errores": ["No se pudo completar la reconciliación de ofertas únicas"]}

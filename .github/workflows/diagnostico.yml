@@ -5,6 +5,10 @@ name: Diagnóstico
 on:
   workflow_dispatch:
     inputs:
+      reconciliar_ofertas:
+        description: "Reintentar exclusivamente la consolidación de copias, sin buscar ni usar Apify"
+        type: boolean
+        default: false
       auditar_producto:
         description: "Conteos reales por rol y estado de una URL pública; solo lectura, sin Apify"
         type: boolean
@@ -40,21 +44,27 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
+      - name: Reintentar consolidación de copias
+        if: ${{ inputs.reconciliar_ofertas }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python -c "from buscador.supabase import reconciliar_ofertas; print(reconciliar_ofertas())"
       - name: Comprobar conexión administrativa en solo lectura
-        if: ${{ !inputs.auditar_producto && inputs.solo_conexion_db }}
+        if: ${{ !inputs.reconciliar_ofertas && !inputs.auditar_producto && inputs.solo_conexion_db }}
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         run: python -m buscador.diagnostico_conexion
       - name: Auditar roles y estado actual sin escribir
-        if: ${{ inputs.auditar_producto }}
+        if: ${{ !inputs.reconciliar_ofertas && inputs.auditar_producto }}
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           VACANTE_PUBLICA_URL: ${{ inputs.vacante_url }}
         run: python -m buscador.auditoria_producto
       - name: Revisar
-        if: ${{ !inputs.auditar_producto && !inputs.solo_conexion_db && !inputs.solo_supabase && !inputs.probar_apify }}
+        if: ${{ !inputs.reconciliar_ofertas && !inputs.auditar_producto && !inputs.solo_conexion_db && !inputs.solo_supabase && !inputs.probar_apify }}
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
           BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
@@ -63,13 +73,13 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python -m buscador.diagnostico
       - name: Comprobar Supabase sin escribir
-        if: ${{ !inputs.auditar_producto && !inputs.solo_conexion_db && inputs.solo_supabase && !inputs.probar_apify }}
+        if: ${{ !inputs.reconciliar_ofertas && !inputs.auditar_producto && !inputs.solo_conexion_db && inputs.solo_supabase && !inputs.probar_apify }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: python -c "from buscador.supabase import exigir_conexion; print(exigir_conexion())"
       - name: Probar una oferta LinkedIn con Apify
-        if: ${{ !inputs.auditar_producto && !inputs.solo_conexion_db && inputs.probar_apify }}
+        if: ${{ !inputs.reconciliar_ofertas && !inputs.auditar_producto && !inputs.solo_conexion_db && inputs.probar_apify }}
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
         run: python -m buscador.diagnostico_apify
