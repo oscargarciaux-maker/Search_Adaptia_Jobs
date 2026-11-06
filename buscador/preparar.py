@@ -8,6 +8,7 @@ import time
 from uuid import uuid4
 
 import requests
+import psycopg
 
 from buscador import migraciones, respaldo, supabase
 
@@ -117,7 +118,7 @@ def main():
         correr(args)
     except Exception as e:
         # Mensajes propios son controlados; no mostrar detalles SQL, DSN, filas o errores libpq.
-        mensaje = str(e) if type(e) is RuntimeError else "Preparación no confirmada; revisar credenciales, conexión y migración. Se conserva el respaldo cifrado disponible."
+        mensaje = migraciones.error_sql(e) if isinstance(e, psycopg.Error) else (str(e) if type(e) is RuntimeError else "Preparación no confirmada; revisar credenciales, conexión y migración. Se conserva el respaldo cifrado disponible.")
         print("::error::" + mensaje)
         raise SystemExit(1) from None
 

@@ -79,6 +79,20 @@ def error_conexion(error, directa=False):
     return "[DB_CONEXION] No se pudo establecer la conexión. Revisar disponibilidad, conexión Session pooler y acceso del proyecto; el error original se omite para proteger credenciales."
 
 
+
+def error_sql(error):
+    """Solo código SQL y categorías controladas; nunca filas, consultas ni conexión."""
+    codigo = str(getattr(error, "sqlstate", "") or "sin_codigo")
+    if not re.fullmatch(r"[A-Z0-9]{5}", codigo): codigo = "sin_codigo"
+    clases = {"23505": "identidad_unica", "23503": "referencia_pendiente", "57014": "tiempo_consulta",
+              "55P03": "bloqueo", "42501": "permisos"}
+    mensaje = str(error).casefold()
+    propios = {"ciclo de identidades": "ciclo_de_identidad", "principal todavía no": "principal_pendiente",
+               "archivo histórico no coincide": "archivo_no_coincide", "referencias a ofertas": "referencias_externas"}
+    clase = clases.get(codigo) or next((v for k,v in propios.items() if k in mensaje), "error_sql")
+    return f"[DB_SQL {codigo}; {clase}] No se confirmó la actualización; la transacción fallida se revierte."
+
+
 def conexion(dsn, url):
     """Mismo proyecto y TLS verificado, con errores acotados sin datos de la conexión."""
     if not dsn or not str(dsn).strip():
