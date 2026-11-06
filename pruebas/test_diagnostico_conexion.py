@@ -1,10 +1,12 @@
 """Diagnósticos concretos sin credenciales y consulta PostgreSQL estrictamente de lectura."""
 from contextlib import nullcontext
+from pathlib import Path
 
 import psycopg
 import pytest
 
 from buscador import diagnostico_conexion, migraciones
+from buscador import tls_supabase
 
 
 @pytest.mark.parametrize("error,directa,codigo", [
@@ -69,3 +71,41 @@ def test_error_inesperado_del_probe_no_se_imprime(monkeypatch, capsys):
     with pytest.raises(SystemExit): diagnostico_conexion.main()
     salida = capsys.readouterr().out
     assert "DB_DIAGNOSTICO" in salida and "contraseña privada" not in salida
+
+
+def test_autoridades_incluyen_raiz_supabase_y_se_retiraran():
+    with tls_supabase.autoridades() as ruta:
+        datos = Path(ruta).read_bytes()
+        assert tls_supabase.CA.read_bytes() in datos
+        assert datos.count(b"-----BEGIN CERTIFICATE-----") > 1
+    assert not Path(ruta).exists()
+
+
+def test_raiz_alterada_no_se_acepta(monkeypatch, tmp_path):
+    from cryptography import x509
+    from cryptography.hazmat.primitives import serialization
+    # Alterar una firma conserva el formato X.509, pero debe invalidar la huella fijada.
+    original = x509.load_pem_x509_certificate(tls_supabase.CA.read_bytes())
+    der = bytearray(original.public_bytes(serialization.Encoding.DER))
+    der[-1] ^= 1
+    cert = x509.load_der_x509_certificate(bytes(der))
+    distinta = tmp_path / "distinta.crt"
+    distinta.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    monkeypatch.setattr(tls_supabase, "CA", distinta)
+    with pytest.raises(RuntimeError, match="DB_TLS_CA"):
+        with tls_supabase.autoridades(): pytest.fail("No aceptar otra raíz")
+
+
+def test_raiz_disponible_durante_conexion_y_tls_sigue_verificado(monkeypatch):
+    from psycopg.conninfo import make_conninfo
+    vistos = []
+    def conectar(**op):
+        assert op["sslmode"] == "verify-full"
+        assert tls_supabase.CA.read_bytes() in Path(op["sslrootcert"]).read_bytes()
+        vistos.append(op["sslrootcert"])
+        raise psycopg.OperationalError("certificate verify failed: dato privado")
+    monkeypatch.setattr(psycopg, "connect", conectar)
+    dsn = make_conninfo(host="aws-0.pooler.supabase.com", user="postgres.proyecto", password="ensayo")
+    with pytest.raises(RuntimeError, match="DB_TLS"):
+        migraciones.conexion(dsn, "https://proyecto.supabase.co")
+    assert vistos and not Path(vistos[0]).exists()

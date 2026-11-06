@@ -12,6 +12,7 @@ import psycopg
 from psycopg.conninfo import conninfo_to_dict
 
 from buscador import respaldo
+from buscador.tls_supabase import autoridades
 
 RAIZ = Path(__file__).resolve().parent.parent
 DIARIO = """
@@ -109,10 +110,13 @@ def conexion(dsn, url):
         # Evitar opciones que cambien el destino real o degraden TLS de la URI.
         if set(opciones) - {"host", "port", "user", "password", "dbname", "sslmode"}:
             raise RuntimeError("[DB_OPCIONES] La URI contiene opciones no admitidas. Copiar la conexión Session pooler sin parámetros adicionales.")
-        opciones.update(sslmode="verify-full", sslrootcert="/etc/ssl/certs/ca-certificates.crt")
+        opciones.update(sslmode="verify-full")
     opciones.update(connect_timeout=20, application_name="adaptia_migraciones")
     try:
-        return psycopg.connect(**opciones, autocommit=True)
+        if local:
+            return psycopg.connect(**opciones, autocommit=True)
+        with autoridades() as raiz:
+            return psycopg.connect(**opciones, sslrootcert=raiz, autocommit=True)
     except psycopg.Error as e:
         raise RuntimeError(error_conexion(e, directa=directo)) from None
 

@@ -9,6 +9,8 @@ ejecuta GitHub. Un PR incorpora código; la ejecución **Preparar Supabase** acr
 - Conexión administrativa privada `SUPABASE_DB_URL`, dirigida al mismo proyecto que `SUPABASE_URL`. Se usa el pooler
   **Session** de Supabase para disponer de IPv4 y bloqueos de sesión; no el pooler Transaction de puerto 6543.
   TLS verifica certificado y nombre. La contraseña va en Secrets, nunca en argumentos, artefactos ni logs.
+  El programa incluye la raíz pública oficial de Supabase y la combina con las del sistema; no hace falta añadir
+  otro secreto de certificado. Referencia y huella en [certificados](../supabase/certificados/README.md).
 - Clave de respaldo `SUPABASE_BACKUP_KEY`: 32 bytes aleatorios codificados en base64 URL segura. Se conserva también
   fuera de GitHub en el gestor del cliente: sin ella no se pueden recuperar las copias cifradas.
 - Las migraciones se descubren en orden: `esquema.sql` como 001 y archivos `NNN_nombre.sql` posteriores. Se registra
