@@ -49,6 +49,13 @@ histórico. La cifra seleccionada no equivale a oportunidades disponibles ahora.
 rellenarse con repeticiones, pendientes o cargos ajenos. Las ubicaciones con confianza baja quedan fuera de nuevas
 entregas hasta confirmarse; una etiqueta remota no acredita que se pueda aplicar desde cualquier país. Se conservan variantes pertinentes del mapa de cargos.
 
+La cobertura permitida es LATAM y España. Entre ofertas pertinentes se priorizan las remotas que permitan trabajar
+desde esa cobertura, incluidas las mundiales. Las presenciales e híbridas necesitan una ubicación local identificada;
+las remotas limitadas a países ajenos se excluyen. País desconocido, simple coincidencia horaria o texto comercial
+sobre un equipo global no son prueba de elegibilidad. Si falta evidencia, no se completa la meta con ese aviso.
+La sede de la empresa puede estar en otro país si el puesto permite realmente trabajar desde la cobertura.
+Las fichas externas pueden contener errores: estas reglas no equivalen a una garantía absoluta sobre cada anuncio.
+
 ## 3. Ejecuciones y horarios
 
 En GitHub → Actions se revisan Bodega nocturna, Captura horaria, Preparar Supabase, Búsqueda profunda, Diagnóstico

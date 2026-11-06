@@ -132,7 +132,7 @@ paises:
     nombres: [espana, spain]
     gentilicios: [espanol, espanola, spanish citizen]
     ciudades: [madrid, barcelona, sevilla, seville, bilbao, malaga, zaragoza, alicante, palma de mallorca, las palmas,
-               murcia, valladolid, a coruna, vigo, pamplona]  # sin Valencia ni Granada: también son de VE y NI
+               murcia, valladolid, a coruna, vigo, pamplona, pamplona/iruna]  # sin Valencia ni Granada: también son de VE y NI
     utc: 1
 
 # Palabras que abren una vacante remota a toda LATAM
@@ -145,11 +145,11 @@ subregiones:
     paises: [CR, GT, HN, NI, PA, SV]
 
 # Palabras que la abren a cualquier país (LATAM y España)
-todo_el_mundo: [worldwide, anywhere, global, globally, any country, cualquier pais, todo el mundo,
+todo_el_mundo: [worldwide, anywhere, any country, cualquier pais, todo el mundo,
                 cualquier parte del mundo]
 
 # Palabras que abren una vacante remota a Europa: desde el mundo hispanohablante, solo España
-toda_europa: [europe, european union, eu, emea, europa, union europea, cet, cest]
+toda_europa: [europe, european union, eu, emea, europa, union europea]
 
 # Lugares fuera de LATAM: si el aviso solo nombra estos, nadie de LATAM puede aplicar
 fuera_de_latam: [united states, us, usa, u.s., u.s.a, estados unidos, eeuu, ee.uu, us only, canada, north america,
