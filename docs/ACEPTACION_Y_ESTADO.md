@@ -21,7 +21,7 @@ aprobados por haber fusionado otro PR. Instrucciones de uso: [GUIA_CLIENTE.md](G
   inventario previo, prioridad de afinidad, vista SQL 004 y disponibilidad por rol. No modifica ni repone snapshots
   históricos. El aumento horario a 120 revisiones/180 segundos es un límite, no prueba de haberlas realizado.
 - Faltan continuidad de siete días, calidad y capacidad/recuperación aceptadas por el cliente; no se declara producto
-  perfecto ni listo para envío WhatsApp automático. [Guion y evidencia por caso](DEMOSTRACION_CLIENTE.md).
+  perfecto ni listo para envío WhatsApp automático.
 
 Validación del cambio propuesto: 539 pruebas Python y suite Node; SQL 004 aplicada dos veces en PostgreSQL 17
 aislado, con permisos, caducidad, fechas inválidas, enlaces ajenos, cierres y preservación del histórico. Se ensayaron
