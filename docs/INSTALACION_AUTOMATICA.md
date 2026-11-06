@@ -51,6 +51,14 @@ instalar sin esperar al siguiente horario.
 
 ## Comprobación y recuperación
 
+Si falla la conexión, ejecutar **Actions → Diagnóstico → solo_conexion_db=true**, dejando las otras opciones apagadas.
+Comprueba autenticación con `SELECT 1` dentro de una transacción de solo lectura: no aplica SQL de migración, consulta
+vacantes, ejecuta Apify ni publica. Distingue URI inválida, proyecto/puerto incorrecto, contraseña ausente, autenticación
+rechazada, DNS, ruta IPv6 de conexión directa, tiempo agotado y certificado TLS. Solo imprime categorías/mensajes
+controlados; nunca DSN, contraseña, usuario/proyecto ni el error original de libpq. No desactivar TLS para corregir un fallo.
+Si no hay categoría concluyente, el resultado no prueba que la contraseña sea incorrecta. Este diagnóstico puede
+ejecutarse sobre una rama de revisión; la preparación con migraciones continúa limitada a main.
+
 El resumen de Actions indica migraciones aplicadas o ya vigentes, respaldo generado y preparación confirmada. La siguiente
 captura debe mostrar `estado_operativo.activo: true`, cero pendientes y su SHA. Eso no acredita calidad de todos los enlaces.
 No se ha configurado ni ejecutado esta instalación en la base real durante el desarrollo del cambio.

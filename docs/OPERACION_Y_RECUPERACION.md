@@ -89,6 +89,11 @@ cantidad de pendientes y mensaje de error sanitizado. No copiar variables de ent
 
 En **Actions → Diagnóstico → Run workflow**, rama `main`:
 
+- `solo_conexion_db=true`: comprobar específicamente el acceso PostgreSQL administrativo en solo lectura. No aplica
+  migraciones ni usa Apify; tiene prioridad sobre las otras opciones. Distingue configuración, autenticación, red y TLS
+  con categorías seguras. Una conexión directa sin ruta IPv6 requiere elegir Session pooler 5432; un fallo de certificado
+  exige corregir servidor/certificado, conservando su verificación. No cambiar contraseñas sin evidencia del diagnóstico.
+
 - `solo_supabase=true`, `probar_apify=false`: lee conexión/esquema v1, sin crear ofertas. No prueba escritura ni todo v2.
 - Ambos `false`: diagnóstico de configuración/fuentes, consulta de cuenta Apify y, si está, una consulta Brave.
   No ejecuta el actor Apify. Que aparezca una fuente opcional omitida no es un fallo de Supabase.
