@@ -440,7 +440,8 @@ familias:
                  pruebas automatizadas, test cases, casos de prueba]
   genericos: [qa, tester, testing, pruebas, quality]
   excluir: [quality assurance alimentos, food quality, calidad de alimentos, inspector de calidad, quality inspector,
-            control de calidad planta, manufacturing quality]
+            control de calidad planta, manufacturing quality, qa customer success manager,
+            quality assurance customer service, quality analyst call center]
 
 # ───────────── Datos e IA ─────────────
 - id: analista-datos

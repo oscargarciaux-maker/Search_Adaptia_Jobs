@@ -34,6 +34,8 @@ no una garantía contractual del proveedor. Abrir una incidencia si hay retrasos
 | `entregas_diarias` | ID, día, rol, grado y snapshot de selección | Reconstrucción de lote/no repetición; no representa envío a una persona |
 | `ofertas` | Filas v1 por enlace seleccionado | Compatibilidad e histórico; `active` no certifica vigencia actual |
 | `entrega_de_hoy` | Vista de la fecha máxima existente en `ofertas` | Puede mostrar un día anterior; no tiene almacenamiento propio |
+| `seleccion_estado_actual` | Vista privada que cruza selección con catálogo, rol vigente y enlaces | `estado_actual=lista` exige enlace de la ficha con menos de seis horas; no usar `ofertas.active` para enviar |
+| `resumen_entregas_actual` | Vista privada por fecha/rol | Distingue seleccionadas, listas ahora, pendientes, retiradas y afinidad por revisar; no cuenta filas v1 como ofertas |
 | `publicado/trabajo/` | Estado de búsqueda, memoria, colas, presupuesto y caché | Continuar ejecuciones y recuperar pendientes |
 | Supabase con SQL 003 | `estado_operativo` y `apify_reservas` privados | Autoridad de pendientes/reservas en modo central; archivos de trabajo auxiliares |
 | `adaptia_migraciones` | Versión, nombre, hash y fecha; acceso administrativo | Evita repetir o modificar migraciones ya aplicadas; incluir en respaldos automáticos |
@@ -65,7 +67,7 @@ pendientes, retrasar o perder horarios; no se utiliza como una cola con conserva
 | Síntoma | Revisar primero | Acción segura |
 |---|---|---|
 | No apareció la captura a la hora solicitada | Actions, habilitación del workflow, cola y avisos de GitHub | Esperar si está en curso; investigar retraso; reejecutar una sola vez si procede |
-| Falta catálogo v2 / `002_catalogo.sql` | Tablas, Project URL y permisos de servicio del mismo proyecto | Aplicar el SQL administrativo correcto; no desactivar integridad ni crear tablas con nombres aproximados |
+| Falta catálogo v2 / vistas actuales | Tablas, Project URL y permisos del mismo proyecto | Revisar Preparar Supabase y su respaldo; el instalador aplica migraciones pendientes. No desactivar integridad ni crear tablas aproximadas |
 | Error 401/403 Supabase | Tipo de clave, vigencia y proyecto | Sustituir secreto por secret/service_role de la cuenta correcta; no publicarlo |
 | Tablas existen pero API no accede | Grants, RLS y recarga de esquema | Revisar scripts completos; no abrir permisos anon para hacer funcionar el scraper |
 | Pendientes de sincronización | Tipo de cola y último HTTP/permiso | Corregir causa y reintentar con memoria intacta; conservar fecha e ID |
@@ -88,6 +90,10 @@ cantidad de pendientes y mensaje de error sanitizado. No copiar variables de ent
 ## 5. Diagnósticos y acciones manuales
 
 En **Actions → Diagnóstico → Run workflow**, rama `main`:
+
+- `auditar_producto=true`: consulta de solo lectura con conteos de la última fecha por `search_tag`/`role_id`,
+  muestra pública acotada de QA y estado de una URL opcional en `vacante_url`. No escribe, migra ni usa Apify.
+  Tiene prioridad sobre las otras opciones. Comparar fechas, no solo el nombre del rol; ver [demostración](DEMOSTRACION_CLIENTE.md).
 
 - `solo_conexion_db=true`: comprobar específicamente el acceso PostgreSQL administrativo en solo lectura. No aplica
   migraciones ni usa Apify; tiene prioridad sobre las otras opciones. Distingue configuración, autenticación, red y TLS

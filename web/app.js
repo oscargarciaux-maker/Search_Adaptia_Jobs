@@ -101,7 +101,7 @@
     };
   }
 
-  function buscar() {
+  function buscar({ conservarVisibles = false } = {}) {
     const hayBusqueda = estado.familia || estado.texto || $("palabras-extra").value.trim();
     $("filtros").hidden = !hayBusqueda;
     $("barra-acciones").hidden = !hayBusqueda;
@@ -117,7 +117,7 @@
       return;
     }
     estado.resultados = M.ordenar(M.filtrar(estado.vacantes, opciones()), $("orden").value);
-    estado.visibles = POR_PAGINA;
+    if (!conservarVisibles) estado.visibles = POR_PAGINA;
     estado.seleccion = new Set([...estado.seleccion].filter(id => estado.resultados.some(v => v.id === id && M.enlacesComprobados(v).length)));
     pintarPalabras();
     pintarResultados();
@@ -602,13 +602,12 @@
         estado.vacantes = await leerJsonComprimido("datos/vacantes.json.gz");
         estado.salud = salud;
         $("estado-datos").textContent = `${fmt.format(estado.vacantes.length)} vacantes · actualizado ${new Date(salud.capturada_en).toLocaleString("es-CO")}`;
-        buscar();
         avisar("El catálogo se actualizó con la última captura.");
       }
     } catch (e) { /* conservar resultados si falla la red; no reemplazarlos por una lista vacía */ }
     finally {
       // La comprobación puede caducar aunque no cambie el archivo publicado o falle la red.
-      buscar();
+      buscar({ conservarVisibles: true });
       pintarSalud();
       refrescando = false;
     }

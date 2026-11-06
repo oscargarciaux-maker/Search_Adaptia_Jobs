@@ -18,7 +18,7 @@ El resumen no inventa roles ausentes ni sustituye la meta configurada de veinte.
 rellenar cierres posteriores; un déficit se informa y requiere nuevas oportunidades, no duplicados.
 
 `salud.json.seleccion_actual` contiene fecha y roles (ID, nombre, meta y `vacantes`); cada entrada de vacante incluye
-solo ID, afinidad vigente y verificación pública, sin descripción ni snapshot privado. La página calcula cantidades
+solo ID, afinidad vigente, enlaces públicos y verificación pública, sin descripción ni snapshot privado. La página calcula cantidades
 vigentes con la hora del navegador; un dato caducado deja de contar aunque no haya nueva captura. La ausencia del
 campo en datos antiguos se indica y no se convierte en un conteo de disponibles.
 

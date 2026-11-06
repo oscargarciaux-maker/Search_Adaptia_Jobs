@@ -7,7 +7,7 @@ por_rol: 20
 
 # Supabase es el destino operativo de la entrega. No se generan hojas de cálculo.
 
-# Primero remotas con alcance confirmado para varios países, luego otras remotas con región identificada,
+# Dentro del mismo grado de afinidad, primero remotas con alcance confirmado para varios países, luego otras remotas con región identificada,
 # después locales; ubicaciones sin confirmar al final. No se eliminan las demás.
 preferir_remotas: true
 

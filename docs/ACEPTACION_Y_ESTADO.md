@@ -6,7 +6,32 @@ aprobados por haber fusionado otro PR. Instrucciones de uso: [GUIA_CLIENTE.md](G
 
 ## 1. Corte de evidencia
 
-**Diagnóstico de instalación del 5 de noviembre, noche de Colombia:** el intento
+### Actualización de la noche del 5 de noviembre de 2026, Colombia
+
+- **Preparación automática confirmada:** [42155588984](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42155588984)
+  terminó con respaldo cifrado y SQL 001–003; los fallos de contraseña/TLS documentados más abajo quedaron superados.
+- **Captura central posterior confirmada:** [42159000280](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42159000280)
+  terminó a las 11:00 p. m. y confirmó catálogo/estado central, sin pendientes de sincronización. Programó 40 revisiones;
+  el lote histórico mostró 32 verificadas, 86 pendientes y 2 rechazadas. Este resultado no acredita 120 listas actuales.
+- **Auditoría real de Supabase en solo lectura:** [42160286445](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42160286445),
+  11:04 p. m. Confirmó 20 selecciones por cada uno de seis roles y 162 filas v1. QA tiene 20 selecciones/27 filas,
+  pero diez seleccionadas eran desarrollo genérico demasiado cercano; otro título corresponde a calidad de Customer
+  Success. No afirmar veinte ofertas pertinentes de QA. La muestra es de títulos públicos y estados, sin imprimir secretos.
+- **Corrección incluida con estos documentos, todavía requiere fusión/captura:** afinidad QA/IA, reclasificación del
+  inventario previo, prioridad de afinidad, vista SQL 004 y disponibilidad por rol. No modifica ni repone snapshots
+  históricos. El aumento horario a 120 revisiones/180 segundos es un límite, no prueba de haberlas realizado.
+- Faltan continuidad de siete días, calidad y capacidad/recuperación aceptadas por el cliente; no se declara producto
+  perfecto ni listo para envío WhatsApp automático. [Guion y evidencia por caso](DEMOSTRACION_CLIENTE.md).
+
+Validación del cambio propuesto: 539 pruebas Python y suite Node; SQL 004 aplicada dos veces en PostgreSQL 17
+aislado, con permisos, caducidad, fechas inválidas, enlaces ajenos, cierres y preservación del histórico. Se ensayaron
+instalación/migraciones, respaldo cifrado y restauración. Una captura pública `--prueba` de seis minutos obtuvo 1.336
+vacantes temporales y 11 enlaces comprobados de 12 programados; sin escritura en Supabase ni actor Apify. No acredita
+una nueva selección productiva de 120 con el cambio ni comprobación exhaustiva de la calidad de esas 1.336 fichas.
+
+Las secciones siguientes conservan evidencia histórica; sus pendientes antiguos no sustituyen esta actualización.
+
+**Diagnóstico histórico del 5 de noviembre, superado por la preparación indicada arriba:** el intento
 [42147221329](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42147221329) superó el formato de
 la clave de respaldo y falló al conectar. Una comprobación de solo lectura en la rama de corrección aisló un error TLS
 ([42147821931](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42147821931)). Al añadir la raíz
@@ -131,8 +156,8 @@ Estas funciones no están construidas ni deben presentarse al cliente como inclu
 
 Guardar una copia privada que contenga: instancia/URL; fecha/hora Colombia; commits de código y datos; responsables;
 IDs de ejecuciones; filas verificadas de la tabla anterior; incidencias; ubicación protegida del respaldo y resultado
-de restauración; costos/capacidad aprobados; límites aceptados; y fecha del siguiente control. Las claves se guardan en
-un gestor seguro, nunca en ese acta ni en este repositorio.
+de restauración; costos/capacidad aprobados; límites aceptados; y fecha del siguiente control. Las claves se conservan
+en una ubicación privada acordada por propietario y cliente, nunca en ese acta ni en este repositorio.
 
 Declaración sugerida: «Se acepta la versión y alcance indicados con las evidencias y pendientes registrados. Se conoce
 que fuentes externas, disponibilidad de ofertas y planes de proveedores pueden cambiar; los incidentes se atenderán

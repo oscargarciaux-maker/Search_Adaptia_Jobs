@@ -1,7 +1,9 @@
 # Manual del cliente — Adaptia Jobs
 
-Versión documental: 5 de noviembre de 2026. Describe el código de `main` tras los PR 6–11. Que un cambio esté fusionado
-no demuestra que ya haya pasado por una captura y llegado a la página; comprobarlo como se indica abajo.
+Versión documental: revisión de la noche del 5 de noviembre de 2026. Describe el código incluido con este manual.
+Que un cambio esté fusionado no demuestra que ya haya pasado por una captura y llegado a la página; comprobarlo abajo.
+Para presentar el producto, seguir el [guion de demostración](DEMOSTRACION_CLIENTE.md), con mapa del sistema,
+recorrido de diez minutos, auditoría de roles y explicación de la vigencia.
 
 ## 1. Qué recibe y por dónde empezar
 
@@ -106,6 +108,7 @@ cubre todo LinkedIn. La meta diaria se limita a los seis roles; buscar otro carg
 | Enlace comprobado | Se pudo verificar el enlace en la hora mostrada | Garantizar que la empresa sea auténtica o que nunca cierre |
 | Nuevas hoy en la bodega | Detectadas por primera vez ese día | Todas publicadas en las últimas 24 horas |
 | 20 por rol | Seleccionadas para ese rol en la fecha indicada | 20 sumadas entre los seis roles |
+| Listas ahora por rol | Siguen en catálogo, corresponden al perfil y tienen enlace comprobado vigente | Todas las históricas siguen abiertas o son pertinentes |
 | Filas sincronizadas | Registros aceptados por Supabase, incluidos existentes | Ofertas distintas o inserciones totalmente nuevas |
 | Faltaron | Diferencia frente a la meta de ese rol | Un fallo de todo el programa necesariamente |
 
@@ -117,7 +120,7 @@ en la tabla histórica. Las capturas horarias no crean otras 120 ofertas ni marc
 | Estado visible | Qué se sabe | Qué hace el operador |
 |---|---|---|
 | Enlace comprobado | Hay una ficha específica accesible y compatible con el anuncio | Revisar condiciones y utilizar el enlace ofrecido |
-| Enlace por verificar | Falta evidencia, caducó la comprobación o el sitio bloqueó la lectura | No incluirlo en la selección automática; revisar y comunicar al administrador |
+| Enlace por verificar | Falta evidencia, caducó la comprobación o el sitio bloqueó la lectura | Se reintenta automáticamente con límites; utilizar otras comprobadas y reportar solo problemas persistentes o repetidos |
 | Oferta retirada por evidencia | Hubo cierre, 404, ciclo, página general o cobro detectado | Conservar referencia histórica; no compartir como oportunidad vigente |
 
 Un 403, CAPTCHA, login o timeout no demuestra fraude ni cierre. Un ciclo de aplicación puede depender de una sesión.
@@ -127,6 +130,12 @@ Una petición de pago oculta después de registrarse puede quedar fuera de lo ob
 Si solo uno de los dos enlaces funciona, la aplicación puede conservar la oferta y compartir únicamente el comprobado.
 Una comprobación positiva caduca a las seis horas; los pendientes se reintentan según sus límites, con caché de treinta
 minutos. No se comprueban diez mil enlaces en cada captura: la revisión es gradual y prioriza el lote del día.
+La captura horaria programa hasta 120 candidatas en 180 segundos, con concurrencia acotada y reutilización de caché.
+No es necesario configurar nada por cada pendiente. La tabla de disponibilidad de Estado separa pendientes,
+retiradas, fuera del perfil/catálogo y faltantes vigentes; se recalcula la caducidad aunque no llegue otra captura.
+En Supabase, consultar `seleccion_estado_actual` / `resumen_entregas_actual` tras la preparación automática SQL 004.
+`ofertas.status=active` es histórico; `catalogo_vacantes.status=active` tampoco basta sin comprobar enlace y rol.
+Una retirada posterior no se sustituye silenciosamente por otra selección; el histórico no cambia para aparentar 120.
 
 Para reportar un problema al responsable: copiar el cargo, empresa, URL, fecha/hora y qué ocurrió. No enviar cookies,
 credenciales ni datos de formularios. La página no incluye todavía un sistema de incidencias ni una aprobación manual

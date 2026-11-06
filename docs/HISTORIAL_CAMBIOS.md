@@ -5,6 +5,7 @@ empieza en [GUIA_CLIENTE.md](GUIA_CLIENTE.md); los resultados observados están 
 
 | Revisión | Qué cambió | Consecuencia para el cliente |
 |---|---|---|
+| Vigencia y demostración — requiere fusión y captura | QA/IA sin cercanos genéricos, reclasificación, vistas privadas SQL 004 y conteos actuales por rol | No confundir 120 históricas con 120 listas; manual de demostración y diagnóstico de solo lectura con evidencia real |
 | PR #6 — cobertura/integridad | LATAM y España más remotas mundiales, prioridad remota, rotación de aliases, identidad por enlaces/contenido y reintentos | Colombia no limita cobertura; la cuota se evalúa por rol y la no repetición necesita memoria |
 | PR #7 — calidad y Supabase | Contenido que no es oferta, preflight obligatorio, persistencia/reintentos y retirada del Excel automático | Supabase obligatorio; la descarga opcional que existía entonces se retiró en la revisión posterior |
 | PR #8 — Apify formal | Actor de ofertas LinkedIn sin cookies, build comprobado, tope USD 5/mes, reservas durables y feed pagado apagado | Apify sí aporta ofertas; conservar presupuesto y revisar gasto de toda la cuenta |

@@ -239,12 +239,16 @@ def test_sin_siete_dias_reales_no_se_declara_listo_para_whatsapp():
     ahora = datetime(2026, 11, 4, 12, tzinfo=timezone.utc)
     r = {"capturada_en": AHORA, "catalogo": {"filas": 1, "enviadas": 1, "pendientes": 0}, "historico_entregas": [],
          "frescura": {"observadas_2h": 1}, "entrega": {"vacantes": 1},
+         "seleccion_actual": {"roles": {"qa": {"vacantes": [{"afinidad_vigente": True}]}}},
          "verificacion_enlaces": {"seleccion_del_dia": {"vacantes": 1, "estados": {"verificada": 1}}}}
     assert not preparacion.evaluar(r, ahora)["apto_para_piloto_whatsapp"]
     r["historico_entregas"] = [{"fecha": (ahora.date() - timedelta(days=i)).isoformat(), "meta_cumplida": True,
                                  "pendientes_supabase": 0, "registro_confirmado": True,
                                  "enlaces_comprobados": True} for i in range(7)]
     assert preparacion.evaluar(r, ahora)["apto_para_piloto_whatsapp"]
+    r["seleccion_actual"]["roles"]["qa"]["vacantes"][0]["afinidad_vigente"] = False
+    assert not preparacion.evaluar(r, ahora)["apto_para_piloto_whatsapp"]
+    r["seleccion_actual"]["roles"]["qa"]["vacantes"][0]["afinidad_vigente"] = True
     r["historico_entregas"][3]["registro_confirmado"] = False
     assert not preparacion.evaluar(r, ahora)["apto_para_piloto_whatsapp"]
 

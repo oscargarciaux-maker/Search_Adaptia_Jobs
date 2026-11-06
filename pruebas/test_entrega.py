@@ -131,6 +131,9 @@ def test_qa_no_se_rellena_con_desarrollo_generico_y_conserva_variantes():
                    "Software Developer in Test", "SDET"):
         v = _v(titulo, "Empresa", "Remote LATAM", TEXTO_EN, "https://jobs.lever.co/acme/2")
         assert entrega.rol_de(v, roles)[0]["id"] == "qa"
+    servicio = _v("QA, Customer Success Manager, LATAM", "Empresa", "Remote LATAM", TEXTO_EN,
+                   "https://jobs.lever.co/acme/customer-success")
+    assert "qa" not in {f["familia"] for f in servicio["familias"]}
 
 
 def test_ia_conserva_cargo_mixto_explicito_sin_contar_todo_backend():

@@ -34,6 +34,7 @@ left join lateral (
        then c.datos->'verificacion'->'enlaces' else '[]'::jsonb end) r
   cross join lateral (select public.adaptia_fecha_segura(r->>'comprobada_en') as comprobada_en) fecha
   where c.datos->'verificacion'->>'estado' = 'verificada' and r->>'estado' = 'verificada'
+    and r->>'url' ~* '^https?://'
     and r->>'url' in (c.datos->>'enlace', c.datos->>'enlace_directo')
     and fecha.comprobada_en <= now() and fecha.comprobada_en > now() - interval '6 hours'
   order by fecha.comprobada_en desc limit 1

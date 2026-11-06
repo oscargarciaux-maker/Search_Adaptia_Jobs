@@ -37,6 +37,10 @@ def evaluar(reporte, ahora=None):
     n = (reporte.get("entrega") or {}).get("vacantes", 0)
     criterios["seleccion_con_enlaces_comprobados"] = bool(n and seleccion.get("vacantes") == n and
         seleccion.get("estados", {}).get("verificada") == n)
+    perfiles = [v for r in (reporte.get("seleccion_actual") or {}).get("roles", {}).values()
+                for v in r.get("vacantes", [])]
+    criterios["seleccion_con_afinidad_confirmada"] = bool(n and len(perfiles) == n and
+        all(v.get("afinidad_vigente") for v in perfiles))
     return {"apto_para_piloto_whatsapp": all(criterios.values()), "criterios": criterios,
             "nota": "Esto no sustituye revisar enlaces ni definir consentimiento, destinatarios y confirmación de envíos."}
 
