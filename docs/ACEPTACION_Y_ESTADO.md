@@ -6,6 +6,24 @@ aprobados por haber fusionado otro PR. Instrucciones de uso: [GUIA_CLIENTE.md](G
 
 ## 1. Corte de evidencia
 
+### Corrida del 6 de noviembre de 2026: revisión posterior
+
+La [nocturna 42180442019](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42180442019)
+terminó a las 2:58 a. m. Colombia con 120 seleccionadas, 121 filas y veinte por cada rol. Se comprobó al menos un
+enlace de cada seleccionada en ese corte. Usó cuatro migraciones y fue anterior a la fusión del PR 20.
+
+La preparación [42247389682](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42247389682)
+aplicó 005 a las 10:55 a. m. La [auditoría 42248248084](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42248248084)
+posterior detectó 119 oportunidades distintas entre 120 selecciones: dos QA de OfferUp eran una misma oportunidad.
+Otras dos QA exigían residencia en Alemania/Países Bajos y Réunion/Mónaco pese a la etiqueta general EMEA. La revisión
+de ese lote deja 17 QA distintas dentro de la cobertura según las reglas corregidas, no veinte certificadas.
+
+La [captura 42248658081](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42248658081)
+guardó catálogo y estado sin pendientes, pero falló al validar reconciliación. Una comprobación específica obtuvo
+HTTP 500 / SQLSTATE 57014: la API canceló la consulta por tiempo. SQL 006 prepara resolución por lotes; el ajuste de
+residencia reconoce requisitos físicos y alcance específico del título. Ambos requieren fusión/preparación/captura
+para acreditar su resultado productivo. Los snapshots históricos se conservan y no se usan para aparentar reposición.
+
 ### Corrección de identidad preparada el 6 de noviembre de 2026
 
 La auditoría de solo lectura [42181448612](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42181448612)

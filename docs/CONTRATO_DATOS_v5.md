@@ -28,3 +28,7 @@ La reparación de duplicidad no repone automáticamente vacantes cerradas ni ree
 La migración y reconciliación son automáticas después del respaldo; no requieren pegar SQL. Un vínculo desconocido
 o una fusión ambigua debe conservarse y revisarse, no eliminarse por compartir título. La auditoría devuelve conteos
 y una muestra pública acotada, nunca el contenido completo de la bodega ni credenciales.
+
+SQL 006 mantiene este contrato y resuelve las identidades por lotes para respetar el presupuesto de consulta de
+la API en catálogos grandes. La reconciliación se aplica en la preparación y en las capturas, conservando archivo,
+vínculos inequívocos, bloqueo de concurrencia y protección de referencias externas.

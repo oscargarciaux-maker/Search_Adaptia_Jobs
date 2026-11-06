@@ -97,5 +97,10 @@ jobs:
           [print(f'  {k}: {v}') for k, v in s['fuentes'].items()]
           e = s.get('entrega') or {}
           print(f\"Verificación de enlaces: {s.get('verificacion_enlaces', {})}\")
-          print(f\"Entrega del día: {e.get('vacantes', 0)} vacantes, {e.get('filas', 0)} filas · Supabase: {e.get('supabase')}\")
-          [print(f\"  {r['nombre']}: {r['entregadas']} (faltaron {r['faltan']})\") for r in (e.get('roles') or {}).values()]" >> "$GITHUB_STEP_SUMMARY" || true
+          print(f\"Selección histórica del día: {e.get('vacantes', 0)} vacantes, {e.get('filas', 0)} filas · Supabase: {e.get('supabase')}\")
+          [print(f\"  {r['nombre']}: {r['entregadas']} (faltaron {r['faltan']})\") for r in (e.get('roles') or {}).values()]
+          print('Disponibilidad observada en esta captura:')
+          for r in ((s.get('seleccion_actual') or {}).get('roles') or {}).values():
+              listas=sum(v.get('catalog_status')=='active' and v.get('afinidad_vigente') is True and (v.get('verificacion') or {}).get('estado')=='verificada' for v in r.get('vacantes',[]))
+              print('{}: {} listas; {} faltantes vigentes frente a la meta'.format(r['nombre'],listas,max(0,r.get('meta',20)-listas)))
+          " >> "$GITHUB_STEP_SUMMARY" || true

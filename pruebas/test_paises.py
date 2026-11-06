@@ -98,3 +98,28 @@ def test_datos_de_paises_bien_formados():
     for p in d["paises"]:
         assert set(p) >= {"codigo", "nombre", "nombres", "gentilicios", "ciudades", "utc"}
         assert -8 <= p["utc"] <= -2 or p.get("region") == "europa"
+
+
+@pytest.mark.parametrize("titulo,descripcion", [
+    ("Freelance Software Tester (Remote in Réunion, Monaco)", "Location: Must be physically located in Réunion or Monaco."),
+    ("Freelance Software Tester (Remote in Germany & the Netherlands)", "Location: Must be physically located in Germany or the Netherlands."),
+    ("QA Engineer", "Candidates must be physically located in Germany."),
+    ("QA Engineer (Remote in Germany)", "We welcome candidates across Europe."),
+    ("QA Engineer (Remote in Monaco)", "Work on a global project."),
+    ("QA Engineer (Remote in Germany)", "You must be based in Europe."),
+])
+def test_residencia_especifica_prevalece_sobre_region_general(titulo, descripcion):
+    r = paises.elegibles(titulo, "Remote in EMEA", descripcion)
+    assert r["paises"] == [] and r["confianza"] == "alta"
+
+
+def test_lista_mixta_y_espana_siguen_permitidas():
+    r = paises.elegibles("QA Engineer (Remote in Spain or Germany)", "Remote in EMEA",
+                         "Candidates must be physically located in Spain or Germany.")
+    assert r["paises"] == ["ES"]
+
+
+def test_oficinas_y_clientes_extranjeros_no_son_restriccion_de_residencia():
+    r = paises.elegibles("QA Engineer", "Remote Worldwide",
+                        "Our offices are in Germany and Monaco. You will test software used in the Netherlands.")
+    assert r["paises"] == TODOS and r["confianza"] == "alta"

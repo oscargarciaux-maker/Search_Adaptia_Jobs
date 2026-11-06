@@ -32,12 +32,14 @@ def main():
     try:
         with conectar(nombre) as c:
             ms = migraciones.descubrir()
-            with c.transaction(): migraciones.aplicar(c, ms[:-1])
+            with c.transaction(): migraciones.aplicar(c, [m for m in ms if m.version<"005"])
             if args.lote:
-                from buscador import catalogo, contrato, entrega, supabase
+                from buscador import catalogo, contrato, entrega, supabase, vacante
                 lote = json.loads(Path(args.lote).read_text())
                 vacantes = {v["id"]: v for lista in lote["elegidas"].values() for v,_ in lista}
-                for v in vacantes.values():
+                agrupadas = vacante.juntar(list(vacantes.values()))
+                principales = {identificador:v["id"] for v in agrupadas for identificador in [v["id"],*v.get("_ids_fusionados",[])]}
+                for v in list(agrupadas) + [dict(v,duplicada_de=principales[v["id"]]) for v in vacantes.values() if principales[v["id"]]!=v["id"]]:
                     c.execute("insert into public.catalogo_vacantes select * from jsonb_populate_record(null::public.catalogo_vacantes,%s)",
                         (Jsonb(catalogo.fila(v,"2026-11-06T00:00:00Z")),))
                 for row in catalogo.filas_seleccion(lote):
@@ -54,12 +56,15 @@ def main():
                         for u in (v.get("enlace"),v.get("enlace_directo")):
                             if not u: continue
                             url = contrato.url_limpia(u)
+                            revision = v.get("verificacion")
+                            if revision is not None and url not in {contrato.url_limpia(e["url"]) for e in revision.get("enlaces",[]) if e.get("estado")=="verificada"}:
+                                continue
                             if url in vistas: continue
                             vistas.add(url)
                             f = dict(fila,offer_url=url,external_id=contrato.external_id(url),source_portal=contrato.portal(url))
                             c.execute(insertar,(Jsonb(supabase.fila_db(f)),))
                 antes = c.execute("select count(*) from public.ofertas").fetchone()[0]
-                with c.transaction(): migraciones.aplicar(c,ms[-1:])
+                with c.transaction(): migraciones.aplicar(c,[m for m in ms if m.version>="005"])
                 despues = c.execute("select count(*) from public.ofertas").fetchone()[0]
                 archivo = c.execute("select count(*) from public.ofertas_enlaces_historicos").fetchone()[0]
                 assert antes == despues + archivo
@@ -82,7 +87,7 @@ def main():
               (40,'ambigua-b','Otro puesto','Empresa','https://jobs.lever.co/a/ambigua');
              select setval('public.ofertas_id_seq',40);""")
             original = c.execute("select to_jsonb(o) from public.ofertas o where id=38").fetchone()[0]
-            with c.transaction(): migraciones.aplicar(c, ms[-1:])
+            with c.transaction(): migraciones.aplicar(c, [m for m in ms if m.version>="005"])
             assert c.execute("select id from public.ofertas where vacante_id='aaaaaaaaaaaaaaaa'").fetchall() == [(37,)]
             fila = c.execute("select fila_original from public.ofertas_enlaces_historicos where oferta_id=38").fetchone()[0]
             assert all(fila[k] == v for k,v in original.items())
@@ -113,7 +118,10 @@ def main():
             assert not c.execute("select has_table_privilege('anon','public.ofertas_enlaces_historicos','SELECT')").fetchone()[0]
             assert not c.execute("select has_function_privilege('authenticated','public.reconciliar_ofertas()','EXECUTE')").fetchone()[0]
             # Una copia archivada anteriormente se reconoce por los IDs agrupados del principal.
-            c.execute("""insert into public.catalogo_vacantes(id,datos,status,observed_at)
+            c.execute("""update public.catalogo_vacantes set datos=jsonb_set(datos,'{enlaces_alternativos}',
+             coalesce(datos->'enlaces_alternativos','[]')||'["https://jobs.lever.co/a/adicional"]'::jsonb)
+             where id='aaaaaaaaaaaaaaaa';
+             insert into public.catalogo_vacantes(id,datos,status,observed_at)
              values('eeeeeeeeeeeeeeee','{"enlace":"https://jobs.lever.co/a/antigua"}','archived',now());
              update public.catalogo_vacantes set datos=datos||'{"ids_agrupados":["aaaaaaaaaaaaaaaa","eeeeeeeeeeeeeeee"]}'::jsonb
               where id='aaaaaaaaaaaaaaaa';
@@ -138,7 +146,18 @@ def main():
                  values(%s,'QA Engineer','Otra empresa',%s,'dddddddddddddddd') on conflict(external_id) do nothing""",
                  ("copia-"+str(n),"https://jobs.lever.co/a/otra-"+str(n)))
             assert c.execute("select count(*) from public.ofertas_enlaces_historicos where vacante_id='dddddddddddddddd'").fetchone()[0] == 1
-        print("Filas 37/38 → una oportunidad, archivo íntegro, ambigüedad conservada, migración repetible y concurrencia: aprobados.")
+            c.execute("""insert into public.catalogo_vacantes(id,datos,status,observed_at)
+             select substr(md5('volumen-'||n),1,16),jsonb_build_object(
+              'enlace','https://jobs.lever.co/volumen/'||n,
+              'ids_agrupados',jsonb_build_array(substr(md5('volumen-'||n),1,16)),
+              'resumen',repeat('Responsabilidades y condiciones del puesto. ',50)), 'active',now()
+             from generate_series(1,18000) n;""")
+            with c.transaction():
+                c.execute("set local statement_timeout='8s'")
+                c.execute("select public.reconciliar_ofertas()")
+            assert c.execute("select count(*) from public.ofertas where vacante_id='aaaaaaaaaaaaaaaa'").fetchone()[0] == 1
+            assert 'https://jobs.lever.co/a/adicional' in c.execute("select enlaces_alternativos from public.ofertas where id=37").fetchone()[0]
+        print("Identidad, archivo, repetición, referencias, concurrencia y catálogo de 18.000 filas bajo presupuesto de consulta: aprobados.")
     finally:
         with conectar() as admin:
             admin.execute(sql.SQL("drop database {}").format(sql.Identifier(nombre)))

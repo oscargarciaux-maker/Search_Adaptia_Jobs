@@ -1,7 +1,7 @@
 # Aprender y activar el estado operativo en Supabase
 
 **Camino preferido actual:** [INSTALACION_AUTOMATICA.md](INSTALACION_AUTOMATICA.md). Con dos accesos iniciales adicionales,
-GitHub respalda, aplica 001–005 e importa/activa sin copiar SQL ni crear variables. Las secciones 3–4 y 7 de esta
+GitHub respalda, aplica 001–006 e importa/activa sin copiar SQL ni crear variables. Las secciones 3–4 y 7 de esta
 guía describen la alternativa manual anterior. Los conceptos y límites siguientes siguen siendo útiles para aprender.
 El instalador añade `adaptia_migraciones`: sus cortes incluyen siete tablas y dos secuencias.
 

@@ -26,7 +26,7 @@ _HIBRIDO = re.compile(r"\b(hybrid|hibrido|hibrida|semipresencial|semi presencial
 _PRESENCIAL = re.compile(r"\b(on ?site|onsite|presencial|in office|in-office)\b")
 # Restricciones de residencia en la descripción. Se comparan contra el texto normalizado (sin tildes, minúsculas).
 _RESTRINGE = re.compile(
-    r"\b(must|should|need to|required to|have to)\s+(be\s+)?(reside|live|located|based|living|residing)\s+(in|within)\s+"
+    r"\b(must|should|need to|required to|have to)\s+(be\s+)?(?:(?:physically|currently|legally)\s+)?(reside|live|located|based|living|residing)\s+(in|within)\s+"
     r"(the\s+)?(?P<lugar>[a-z .]{2,40})"
     r"|\b(only|solo|solamente|unicamente|exclusively)\s+(open\s+to\s+)?(candidates|applicants|candidatos|personas|residents)?\s*"
     r"(from|in|de|en|residing in|located in|based in)\s+(the\s+)?(?P<lugar2>[a-z .]{2,40})"
@@ -150,22 +150,32 @@ def elegibles(titulo, ubicacion, descripcion="", remoto=None):
         return r(todos, "baja", "confirmar ubicación")
 
     # Remoto: primero las restricciones explícitas de la descripción
-    restringe = _restriccion(desc)
-    if restringe:
+    titulo_normalizado = normalizar.texto(titulo)
+    remoto_en = re.search(r"\bremote\s+(?:only\s+)?(?:in|from|within)\s+([a-z /.+]{2,80})", titulo_normalizado)
+    restricciones = [_restriccion(desc), _restriccion(titulo_normalizado)]
+    if remoto_en:
+        restricciones.append(remoto_en.group(1))
+    def interpretar(restringe):
         r_paises = _paises_nombrados(restringe)
         if r_paises:
-            return r(r_paises, "alta", "solo " + ", ".join(r_paises))
+            return r_paises
         region = subregion(restringe)
         if region:
-            return r(region, "alta", "restricción regional")
+            return region
         if _nombra(restringe, d["toda_latam"]):
-            return r(latam, "alta", "")
+            return latam
         if _nombra(restringe, d["mundo"]):
-            return r(todos, "alta", "")
+            return todos
         if _nombra(restringe, d["toda_europa"]):
-            return r(europa, "alta", "remoto para Europa")
+            return europa
         if _nombra(restringe, d["fuera"]) or re.match(r"(us|usa|u\.s|uk)\b", restringe):
-            return r([], "alta", "remoto fuera de LATAM y España")
+            return []
+        return None
+    limites = [valor for texto in restricciones if texto for valor in [interpretar(texto)] if valor is not None]
+    if limites:
+        permitidos = set(todos).intersection(*(set(valor) for valor in limites))
+        return r([c for c in todos if c in permitidos], "alta",
+                 "restricción explícita de residencia" if permitidos else "remoto fuera de LATAM y España")
     if es_mundo:
         return r(todos, "alta", "")
     region = subregion(ambito)

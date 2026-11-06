@@ -154,6 +154,7 @@ toda_europa: [europe, european union, eu, emea, europa, union europea, cet, cest
 # Lugares fuera de LATAM: si el aviso solo nombra estos, nadie de LATAM puede aplicar
 fuera_de_latam: [united states, us, usa, u.s., u.s.a, estados unidos, eeuu, ee.uu, us only, canada, north america,
                  united kingdom, uk, england, london, ireland, dublin, portugal, lisbon, lisboa, germany, berlin, france, paris, netherlands, amsterdam,
+                 alemania, paises bajos, holanda, monaco, reunion,
                  italy, poland, romania, ukraine, india, bangalore, bengaluru, pakistan, philippines, manila, apac,
                  asia, australia, new zealand, singapore, japan, israel, uae, dubai, south africa, nigeria, kenya,
                  egypt, new york, san francisco, california, texas, florida, miami, seattle, boston, chicago, austin,
