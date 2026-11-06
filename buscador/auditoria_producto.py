@@ -6,11 +6,43 @@ from urllib.parse import parse_qs, urlparse
 from buscador import migraciones, supabase
 
 
+def duplicados(conn):
+    from collections import defaultdict
+    from buscador import contrato, vacante
+    seleccionadas = [r[0] for r in conn.execute("""select snapshot from public.entregas_diarias
+        where delivery_date=(select max(delivery_date) from public.entregas_diarias)
+        order by selected_at,vacante_id""").fetchall()]
+    unicas = vacante.juntar(seleccionadas)
+    urls = defaultdict(set)
+    for v in unicas:
+        for u in [v.get("enlace"), v.get("enlace_directo"), *v.get("_enlaces", [])]:
+            if u:
+                urls[contrato.url_limpia(u)].add(v["id"])
+    grupos = defaultdict(list)
+    filas = conn.execute("""select id,offer_url from public.ofertas
+        where delivery_date=(select max(delivery_date) from public.entregas_diarias) order by id""").fetchall()
+    sin_vinculo = 0
+    for identificador, u in filas:
+        destinos = urls.get(contrato.url_limpia(u), set())
+        if len(destinos) == 1:
+            grupos[next(iter(destinos))].append(identificador)
+        else:
+            sin_vinculo += 1
+    repetidos = [ids for ids in grupos.values() if len(ids)>1]
+    return {"filas_operativas": len(filas), "selecciones_historicas": len(seleccionadas),
+        "vacantes_reconocidas": len(unicas), "copias_en_seleccion": len(seleccionadas)-len(unicas),
+        "grupos_con_filas_repetidas": len(repetidos), "filas_adicionales": sum(len(x)-1 for x in repetidos),
+        "sin_vinculo_inequivoco": sin_vinculo, "muestra_ids": repetidos[:5]}
+
+
 def consultar(conn, url=""):
     with conn.transaction():
         conn.execute("set transaction read only")
         conn.execute("set local statement_timeout = '30s'")
         informe = {}
+        informe["duplicados"] = duplicados(conn)
+        if conn.execute("select to_regclass('public.ofertas_enlaces_historicos')").fetchone()[0]:
+            informe["enlaces_archivados"] = conn.execute("select count(*) from public.ofertas_enlaces_historicos").fetchone()[0]
         for tabla, campo in (("ofertas", "search_tag"), ("entregas_diarias", "role_id")):
             # Identificadores constantes internos; nunca provienen del formulario.
             informe[tabla] = conn.execute(f"select delivery_date::text, {campo}, count(*) from public.{tabla} "

@@ -256,3 +256,9 @@ def test_cierre_confirmado_se_guarda_sin_borrar_snapshot_historico(monkeypatch, 
     assert r["verificacion_enlaces"]["seleccion_del_dia"]["estados"] == {"rechazada": 1}
     assert r["seleccion_actual"]["roles"]["ux-ui-designer"]["vacantes"][0]["verificacion"]["estado"] == "rechazada"
     assert r["seleccion_actual"]["roles"]["ux-ui-designer"]["vacantes"][0]["catalog_status"] == "closed"
+
+
+@pytest.fixture(autouse=True)
+def reconciliacion_de_integracion_simulada(monkeypatch):
+    from buscador import supabase
+    monkeypatch.setattr(supabase, "reconciliar_ofertas", lambda: {"archivadas": 0, "sin_identificar": 0})

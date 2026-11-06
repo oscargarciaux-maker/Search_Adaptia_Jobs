@@ -207,9 +207,10 @@ def limpiar(previas, crudas, hoy, dias_maximos, enlaces_ats, empresas_leidas, co
             previas_validas.append(vacante.reetiquetar(dict(v)))
     todas = vacante.juntar(previas_validas + nuevas)
     ids_unidos = {v["id"] for v in todas}
+    destinos = {identificador: v["id"] for v in todas for identificador in v.get("_ids_fusionados", [])}
     for v in previas_validas:
         if v["id"] not in ids_unidos:
-            retirar(v, "archived", "fusionada con otra fuente")
+            retirar(dict(v, duplicada_de=destinos.get(v["id"])), "archived", "fusionada con otra fuente")
     salida = []
     for v in todas:
         if _fecha_de(v) and _fecha_de(v) < limite:
@@ -397,6 +398,8 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         from buscador import catalogo, supabase
         resumen_catalogo = catalogo.sincronizar(vacantes, retiradas, pendientes_catalogo, supabase.subir_catalogo,
                                                guardar_catalogo)
+        if not resumen_catalogo.get("pendientes") and not resumen_catalogo.get("errores"):
+            resumen_catalogo["identidad"] = supabase.reconciliar_ofertas()
     reintentos_centrales = {}
     if central and (modo == "incremental" or consulta):
         from buscador import supabase

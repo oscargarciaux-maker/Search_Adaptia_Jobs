@@ -10,7 +10,7 @@ from pathlib import Path
 
 import yaml
 
-from buscador import contrato, familias, normalizar
+from buscador import contrato, familias, normalizar, vacante
 
 RAIZ = Path(__file__).resolve().parent.parent
 GRADOS = familias.GRADOS            # exacto, similar, cercano
@@ -23,7 +23,7 @@ def config():
 
 def huellas(v):
     """Claves con las que se reconoce una vacante ya entregada: su identidad estable y todos sus enlaces limpios."""
-    return [v["id"]] + [contrato.url_limpia(u) for u in
+    return [v["id"], *v.get("_ids_fusionados", [])] + [contrato.url_limpia(u) for u in
                         [v.get("enlace"), v.get("enlace_directo"), *v.get("_enlaces", [])] if u]
 
 
@@ -107,7 +107,7 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificac
     desde = (date.fromisoformat(hoy) - timedelta(days=cfg.get("dias_frescura", 14))).isoformat()
     por_rol, motivos = {r["id"]: [] for r in roles}, Counter()
     descartes_rol = {r["id"]: Counter() for r in roles}
-    for v in vacantes:
+    for v in vacante.juntar(vacantes):
         if any(h in incluidas for h in huellas(v)):
             continue
         rol, grado = rol_de(v, roles)
@@ -138,11 +138,13 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificac
         salida[rol["id"]] = variadas(candidatas, cfg["por_rol"], cfg.get("max_por_empresa", 2), hoy,
                                       cfg.get("preferir_remotas", False), iniciales.get(rol["id"], []))
         elegidas = [v for v, _ in salida[rol["id"]]]
+        unicas = len(vacante.juntar(elegidas))
         empresas = Counter(normalizar.empresa(v["empresa"]) for v, _ in candidatas + list(iniciales.get(rol["id"], [])))
         capacidad = sum(min(n, cfg.get("max_por_empresa", 2)) for n in empresas.values())
         resumen[rol["id"]] = {
             "nombre": rol["nombre"], "candidatas": len(candidatas) + len(iniciales.get(rol["id"], [])), "entregadas": len(elegidas),
-            "faltan": max(0, cfg["por_rol"] - len(elegidas)),
+            "unicas": unicas, "duplicadas": len(elegidas) - unicas,
+            "faltan": max(0, cfg["por_rol"] - unicas),
             "idiomas": dict(Counter(v["idioma"] for v in elegidas)),
             "niveles": dict(Counter(contrato.seniority(v["titulo"]) or "sin nivel" for v in elegidas)),
             "paises": dict(Counter((v["paises"][0] if len(v["paises"]) == 1 else "varios") for v in elegidas)),

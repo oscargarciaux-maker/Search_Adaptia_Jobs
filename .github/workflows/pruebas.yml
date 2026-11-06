@@ -50,6 +50,7 @@ jobs:
           # Usar pg_dump/pg_restore 17 del mismo contenedor, sin depender de la versión del runner.
           python3 pruebas/probar_concurrencia_estado.py --docker "${{ job.services.postgres.id }}"
           python -m pruebas.probar_migraciones
+          python -m pruebas.probar_ofertas_unicas
   pruebas:
     runs-on: ubuntu-latest
     timeout-minutes: 15

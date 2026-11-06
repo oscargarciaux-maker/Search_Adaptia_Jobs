@@ -183,6 +183,20 @@ def subir_catalogo(filas, sesion=None, tabla="catalogo_vacantes"):
     return {"filas": len(filas), "enviadas": len(confirmadas), "confirmadas": confirmadas, "errores": errores}
 
 
+def reconciliar_ofertas(sesion=None):
+    url, clave = credenciales()
+    cabeceras = {"apikey": clave}
+    if clave and clave.startswith("eyJ"):
+        cabeceras["Authorization"] = f"Bearer {clave}"
+    try:
+        r = (sesion or requests).post(f"{url}/rest/v1/rpc/reconciliar_ofertas", headers=cabeceras, json={}, timeout=60)
+        if r.status_code != 200 or not isinstance(r.json(), dict):
+            return {"errores": ["No se confirmó la reconciliación de ofertas únicas"]}
+        return r.json()
+    except requests.RequestException:
+        return {"errores": ["No se pudo completar la reconciliación de ofertas únicas"]}
+
+
 def leer_entregas(hoy, sesion=None):
     """Recuperar identidades sin cargar todo el histórico de descripciones; solo snapshots de hoy."""
     url, clave = credenciales()
@@ -194,13 +208,15 @@ def leer_entregas(hoy, sesion=None):
     offset = 0
     while True:
         r = sesion.get(f"{url}/rest/v1/entregas_diarias", headers=cab, timeout=30,
-                       params={"select": "vacante_id,delivery_date,enlace:snapshot->>enlace,enlace_directo:snapshot->>enlace_directo,aliases:snapshot->_enlaces",
+                       params={"select": "vacante_id,delivery_date,enlace:snapshot->>enlace,enlace_directo:snapshot->>enlace_directo,aliases:snapshot->_enlaces,ids_fusionados:snapshot->_ids_fusionados",
                                "order": "vacante_id", "limit": 1000, "offset": offset})
         if r.status_code != 200 or not isinstance(r.json(), list):
             raise RuntimeError("No se pudo recuperar la memoria de entregas desde Supabase.")
         filas = r.json()
         memoria.update({f["vacante_id"]: f["delivery_date"] for f in filas})
         for f in filas:
+            for identificador in f.get("ids_fusionados") or []:
+                memoria[identificador] = f["delivery_date"]
             for enlace in [f.get("enlace"), f.get("enlace_directo"), *(f.get("aliases") or [])]:
                 if enlace:
                     memoria[contrato.url_limpia(enlace)] = f["delivery_date"]

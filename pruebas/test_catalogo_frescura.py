@@ -266,3 +266,9 @@ def test_un_dominio_parecido_no_se_convierte_en_url_o_id_linkedin():
     assert not contrato.external_id(falsa).startswith("lnkd-")
     assert contrato.portal(falsa) != "LinkedIn"
     assert not contrato.external_id("https://evil-linkedin.com/posts/ana_activity-7391234567890123456-abcd").startswith("lnkdpost-")
+
+
+@pytest.fixture(autouse=True)
+def reconciliacion_de_integracion_simulada(monkeypatch):
+    from buscador import supabase
+    monkeypatch.setattr(supabase, "reconciliar_ofertas", lambda: {"archivadas": 0, "sin_identificar": 0})

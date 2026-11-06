@@ -228,3 +228,9 @@ def test_diaria_recupera_canonico_antes_de_importar_archivo_atrasado(monkeypatch
     monkeypatch.setattr(bodega, "recoger", lambda *a, **k: pytest.fail("No iniciar fuentes en este ensayo"))
     with pytest.raises(RuntimeError, match="Canónico recuperado"):
         bodega.correr(tmp_path, hoy=HOY)
+
+
+@pytest.fixture(autouse=True)
+def reconciliacion_de_integracion_simulada(monkeypatch):
+    from buscador import supabase
+    monkeypatch.setattr(supabase, "reconciliar_ofertas", lambda: {"archivadas": 0, "sin_identificar": 0})
