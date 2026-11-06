@@ -32,7 +32,7 @@ def main():
     try:
         with conectar(nombre) as c:
             ms = migraciones.descubrir()
-            with c.transaction(): migraciones.aplicar(c, ms[:-1])
+            with c.transaction(): migraciones.aplicar(c, [m for m in ms if m.version<"005"])
             if args.lote:
                 from buscador import catalogo, contrato, entrega, supabase
                 lote = json.loads(Path(args.lote).read_text())
@@ -59,7 +59,7 @@ def main():
                             f = dict(fila,offer_url=url,external_id=contrato.external_id(url),source_portal=contrato.portal(url))
                             c.execute(insertar,(Jsonb(supabase.fila_db(f)),))
                 antes = c.execute("select count(*) from public.ofertas").fetchone()[0]
-                with c.transaction(): migraciones.aplicar(c,ms[-1:])
+                with c.transaction(): migraciones.aplicar(c,[m for m in ms if m.version>="005"])
                 despues = c.execute("select count(*) from public.ofertas").fetchone()[0]
                 archivo = c.execute("select count(*) from public.ofertas_enlaces_historicos").fetchone()[0]
                 assert antes == despues + archivo
@@ -82,7 +82,7 @@ def main():
               (40,'ambigua-b','Otro puesto','Empresa','https://jobs.lever.co/a/ambigua');
              select setval('public.ofertas_id_seq',40);""")
             original = c.execute("select to_jsonb(o) from public.ofertas o where id=38").fetchone()[0]
-            with c.transaction(): migraciones.aplicar(c, ms[-1:])
+            with c.transaction(): migraciones.aplicar(c, [m for m in ms if m.version>="005"])
             assert c.execute("select id from public.ofertas where vacante_id='aaaaaaaaaaaaaaaa'").fetchall() == [(37,)]
             fila = c.execute("select fila_original from public.ofertas_enlaces_historicos where oferta_id=38").fetchone()[0]
             assert all(fila[k] == v for k,v in original.items())
@@ -138,7 +138,17 @@ def main():
                  values(%s,'QA Engineer','Otra empresa',%s,'dddddddddddddddd') on conflict(external_id) do nothing""",
                  ("copia-"+str(n),"https://jobs.lever.co/a/otra-"+str(n)))
             assert c.execute("select count(*) from public.ofertas_enlaces_historicos where vacante_id='dddddddddddddddd'").fetchone()[0] == 1
-        print("Filas 37/38 → una oportunidad, archivo íntegro, ambigüedad conservada, migración repetible y concurrencia: aprobados.")
+            c.execute("""insert into public.catalogo_vacantes(id,datos,status,observed_at)
+             select substr(md5('volumen-'||n),1,16),jsonb_build_object(
+              'enlace','https://jobs.lever.co/volumen/'||n,
+              'ids_agrupados',jsonb_build_array(substr(md5('volumen-'||n),1,16)),
+              'resumen',repeat('Responsabilidades y condiciones del puesto. ',50)), 'active',now()
+             from generate_series(1,18000) n;""")
+            with c.transaction():
+                c.execute("set local statement_timeout='8s'")
+                c.execute("select public.reconciliar_ofertas()")
+            assert c.execute("select count(*) from public.ofertas where vacante_id='aaaaaaaaaaaaaaaa'").fetchone()[0] == 1
+        print("Identidad, archivo, repetición, referencias, concurrencia y catálogo de 18.000 filas bajo presupuesto de consulta: aprobados.")
     finally:
         with conectar() as admin:
             admin.execute(sql.SQL("drop database {}").format(sql.Identifier(nombre)))

@@ -49,7 +49,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-        run: python -c "from buscador.supabase import reconciliar_ofertas; print(reconciliar_ofertas())"
+        run: python -c "from buscador.supabase import reconciliar_ofertas; r=reconciliar_ofertas(); print(r); raise SystemExit(bool(r.get('errores')))"
       - name: Comprobar conexión administrativa en solo lectura
         if: ${{ !inputs.reconciliar_ofertas && !inputs.auditar_producto && inputs.solo_conexion_db }}
         env:

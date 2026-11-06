@@ -84,6 +84,11 @@ cantidad de pendientes y mensaje de error sanitizado. No copiar variables de ent
 
 ## 5. Diagnósticos y acciones manuales
 
+SQL 006 conserva la identidad y archivo definidos en 005, pero resuelve las cadenas de IDs una sola vez para todo
+el catálogo. Evita miles de consultas internas repetidas que pueden exceder el límite de tiempo de la API.
+El preparador la aplica y reconcilia después del respaldo, sin SQL manual. Un código `57014` indica que la base
+canceló la consulta por tiempo; conservar el estado, no confundirlo con una captura vacía ni borrar reservas/colas.
+
 En **Actions → Diagnóstico → Run workflow**, rama `main`:
 
 - `auditar_producto=true`: consulta de solo lectura con conteos de la última fecha por `search_tag`/`role_id`,
