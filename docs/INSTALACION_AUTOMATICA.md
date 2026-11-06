@@ -9,6 +9,8 @@ ejecuta GitHub. Un PR incorpora código; la ejecución **Preparar Supabase** acr
 - Conexión administrativa privada `SUPABASE_DB_URL`, dirigida al mismo proyecto que `SUPABASE_URL`. Se usa el pooler
   **Session** de Supabase para disponer de IPv4 y bloqueos de sesión; no el pooler Transaction de puerto 6543.
   TLS verifica certificado y nombre. La contraseña va en Secrets, nunca en argumentos, artefactos ni logs.
+  El programa incluye la raíz pública oficial de Supabase y la combina con las del sistema; no hace falta añadir
+  otro secreto de certificado. Referencia y huella en [certificados](../supabase/certificados/README.md).
 - Clave de respaldo `SUPABASE_BACKUP_KEY`: 32 bytes aleatorios codificados en base64 URL segura. Se conserva también
   fuera de GitHub en el gestor del cliente: sin ella no se pueden recuperar las copias cifradas.
 - Las migraciones se descubren en orden: `esquema.sql` como 001 y archivos `NNN_nombre.sql` posteriores. Se registra
@@ -49,7 +51,48 @@ necesario copiar SQL ni crear `ESTADO_SUPABASE_ACTIVO`/`CAPTURA_HORARIA_ACTIVA` 
 Pages/Cloudflare conserva su configuración propia. Si se añaden secretos después de una fusión, el botón anterior permite
 instalar sin esperar al siguiente horario.
 
+### Generar la clave de respaldo en Windows
+
+En PowerShell privado, este bloque genera el formato exacto y lo copia al portapapeles. Pegar directamente el resultado
+en el valor de `SUPABASE_BACKUP_KEY` y guardar también una copia en el gestor; no compartirlo por chat.
+
+```powershell
+$claveRespaldoBytes = New-Object byte[] 32
+[Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($claveRespaldoBytes)
+[Convert]::ToBase64String($claveRespaldoBytes).TrimEnd('=').Replace('+','-').Replace('/','_') | Set-Clipboard
+Write-Host "Clave de respaldo generada y copiada."
+```
+
+### Contraseña de la base dentro de la URI
+
+`[YOUR-PASSWORD]` corresponde a la contraseña PostgreSQL del proyecto. Si se desconoce, restablecerla desde Database
+Settings y actualizar las aplicaciones que usen esa conexión. Un error `[DB_AUTENTICACION]` puede deberse también a
+caracteres sin codificar en la URI. Este bloque de PowerShell conserva el servidor/usuario de la URI original y codifica
+la contraseña en el equipo del administrador, sin imprimirla ni enviarla al chat:
+
+```powershell
+$uriConMarcador = Read-Host "Pega la URI Session pooler original con [YOUR-PASSWORD]"
+if (-not $uriConMarcador.Contains('[YOUR-PASSWORD]')) { throw 'La URI debe conservar [YOUR-PASSWORD].' }
+$claveSeguraDb = Read-Host "Contraseña vigente de la base" -AsSecureString
+$claveTextoDb = [Net.NetworkCredential]::new('', $claveSeguraDb).Password
+$uriConMarcador.Replace('[YOUR-PASSWORD]', [Uri]::EscapeDataString($claveTextoDb)) | Set-Clipboard
+$claveTextoDb = $null
+Write-Host "Conexión preparada y copiada. Pegar en SUPABASE_DB_URL."
+```
+
+Una contraseña codificada sigue siendo privada. Si el diagnóstico falla por TLS o red, ese resultado no demuestra que
+la contraseña sea incorrecta. Con `[DB_AUTENTICACION]`, el servidor sí rechazó las credenciales recibidas. El diagnóstico
+de conexión no necesita la clave de respaldo; Preparar Supabase sí valida ambas configuraciones.
+
 ## Comprobación y recuperación
+
+Si falla la conexión, ejecutar **Actions → Diagnóstico → solo_conexion_db=true**, dejando las otras opciones apagadas.
+Comprueba autenticación con `SELECT 1` dentro de una transacción de solo lectura: no aplica SQL de migración, consulta
+vacantes, ejecuta Apify ni publica. Distingue URI inválida, proyecto/puerto incorrecto, contraseña ausente, autenticación
+rechazada, DNS, ruta IPv6 de conexión directa, tiempo agotado y certificado TLS. Solo imprime categorías/mensajes
+controlados; nunca DSN, contraseña, usuario/proyecto ni el error original de libpq. No desactivar TLS para corregir un fallo.
+Si no hay categoría concluyente, el resultado no prueba que la contraseña sea incorrecta. Este diagnóstico puede
+ejecutarse sobre una rama de revisión; la preparación con migraciones continúa limitada a main.
 
 El resumen de Actions indica migraciones aplicadas o ya vigentes, respaldo generado y preparación confirmada. La siguiente
 captura debe mostrar `estado_operativo.activo: true`, cero pendientes y su SHA. Eso no acredita calidad de todos los enlaces.

@@ -12,6 +12,7 @@ import psycopg
 from psycopg.conninfo import conninfo_to_dict
 
 from buscador import respaldo
+from buscador.tls_supabase import autoridades
 
 RAIZ = Path(__file__).resolve().parent.parent
 DIARIO = """
@@ -54,27 +55,70 @@ def descubrir(raiz=RAIZ):
     return [Migracion(v, p.name, sha256(p.read_bytes()).hexdigest(), sin_transaccion_externa(p.read_text())) for v, p in archivos]
 
 
+def error_conexion(error, directa=False):
+    """Clasificar en memoria; nunca devolver el error libpq que puede contener la URI/contraseña."""
+    texto = str(error).casefold()
+    estado = getattr(error, "sqlstate", None)
+    if estado == "28P01" or "password authentication failed" in texto:
+        return "[DB_AUTENTICACION] El servidor rechazó la autenticación. Revisar contraseña de la base y codificación de caracteres especiales en la URI."
+    if "tenant or user not found" in texto:
+        return "[DB_USUARIO] El pooler no reconoce el usuario/proyecto. Volver a copiar la URI Session pooler del proyecto correcto."
+    if "certificate" in texto or "sslrootcert" in texto:
+        return "[DB_TLS] No se pudo verificar el certificado TLS. Revisar servidor y certificado; conservar la verificación TLS."
+    if "network is unreachable" in texto or "no route to host" in texto:
+        return ("[DB_IPV6] La conexión directa no tiene ruta de red desde el ejecutor. Usar Session pooler, puerto 5432."
+                if directa else "[DB_RED] No hay ruta de red al pooler. Revisar disponibilidad y restricciones de red del proyecto.")
+    if any(t in texto for t in ("could not translate host", "name or service not known", "name resolution", "nodename nor servname")):
+        return "[DB_DNS] No se pudo resolver el servidor. Revisar la URI copiada y la disponibilidad del proyecto."
+    if "timeout" in texto or "timed out" in texto:
+        return "[DB_TIEMPO] La conexión agotó su tiempo. Revisar proyecto activo, Session pooler y restricciones de red."
+    if "connection refused" in texto:
+        return "[DB_RECHAZADA] El servidor rechazó la conexión de red. Revisar puerto 5432, estado del proyecto y acceso de red."
+    if estado == "3D000":
+        return "[DB_BASE] El servidor no reconoce el nombre de la base. Copiar la URI completa del proyecto."
+    return "[DB_CONEXION] No se pudo establecer la conexión. Revisar disponibilidad, conexión Session pooler y acceso del proyecto; el error original se omite para proteger credenciales."
+
+
 def conexion(dsn, url):
-    """No aceptar una base distinta a la API configurada ni un pooler Transaction."""
+    """Mismo proyecto y TLS verificado, con errores acotados sin datos de la conexión."""
+    if not dsn or not str(dsn).strip():
+        raise RuntimeError("[DB_SECRETO] Falta SUPABASE_DB_URL en los secretos de Actions.")
     try:
         opciones = conninfo_to_dict(dsn)
-        host = opciones.get("host", "").lower()
-        ref = urlparse(url).hostname or ""
-        if not re.fullmatch(r"[a-z0-9]+\.supabase\.co", ref):
-            raise ValueError()
-        proyecto = ref.split(".")[0]
-        local = os.environ.get("ADAPTIA_PRUEBA_SQL") == "true" and host in ("127.0.0.1", "localhost")
-        if not local:
-            directo = host == "db." + ref
-            pooler = host.endswith(".pooler.supabase.com") and opciones.get("user") == "postgres." + proyecto
-            if not (directo or pooler) or opciones.get("port", "5432") != "5432": raise ValueError()
-            # Evitar opciones que cambien el destino real o degraden TLS de la URI.
-            if set(opciones) - {"host", "port", "user", "password", "dbname", "sslmode"}: raise ValueError()
-            opciones.update(sslmode="verify-full", sslrootcert="/etc/ssl/certs/ca-certificates.crt")
-        opciones.update(connect_timeout=20, application_name="adaptia_migraciones")
-        return psycopg.connect(**opciones, autocommit=True)
     except (ValueError, psycopg.Error):
-        raise RuntimeError("No se pudo conectar al mismo proyecto: revisar SUPABASE_DB_URL, contraseña, Session pooler 5432, TLS y red.") from None
+        raise RuntimeError("[DB_URI] SUPABASE_DB_URL no es una conexión PostgreSQL válida. Copiar la URI completa y codificar los caracteres especiales de la contraseña.") from None
+    try:
+        ref = urlparse(url).hostname or ""
+    except (ValueError, TypeError):
+        ref = ""
+    if not re.fullmatch(r"[a-z0-9]+\.supabase\.co", ref):
+        raise RuntimeError("[DB_API_URL] SUPABASE_URL debe ser la dirección API del proyecto Supabase.")
+    host = opciones.get("host", "").lower()
+    proyecto = ref.split(".")[0]
+    directo = host == "db." + ref
+    local = os.environ.get("ADAPTIA_PRUEBA_SQL") == "true" and host in ("127.0.0.1", "localhost")
+    if not local:
+        pooler = host.endswith(".pooler.supabase.com") and opciones.get("user") == "postgres." + proyecto
+        if not (directo or pooler):
+            raise RuntimeError("[DB_PROYECTO] La conexión no apunta al mismo proyecto de SUPABASE_URL o el usuario del pooler no coincide. Copiar Session pooler del proyecto correcto.")
+        if opciones.get("port", "5432") != "5432":
+            raise RuntimeError("[DB_PUERTO] Usar Session pooler del mismo proyecto en puerto 5432, no Transaction pooler 6543.")
+        if not opciones.get("password"):
+            raise RuntimeError("[DB_PASSWORD] Falta la contraseña de la base dentro de SUPABASE_DB_URL.")
+        if any(t in opciones["password"].upper() for t in ("YOUR-PASSWORD", "YOUR_PASSWORD", "[PASSWORD]")):
+            raise RuntimeError("[DB_PASSWORD] La URI conserva el marcador de contraseña. Sustituirlo por la contraseña real de la base, codificada para URI.")
+        # Evitar opciones que cambien el destino real o degraden TLS de la URI.
+        if set(opciones) - {"host", "port", "user", "password", "dbname", "sslmode"}:
+            raise RuntimeError("[DB_OPCIONES] La URI contiene opciones no admitidas. Copiar la conexión Session pooler sin parámetros adicionales.")
+        opciones.update(sslmode="verify-full")
+    opciones.update(connect_timeout=20, application_name="adaptia_migraciones")
+    try:
+        if local:
+            return psycopg.connect(**opciones, autocommit=True)
+        with autoridades() as raiz:
+            return psycopg.connect(**opciones, sslrootcert=raiz, autocommit=True)
+    except psycopg.Error as e:
+        raise RuntimeError(error_conexion(e, directa=directo)) from None
 
 
 def aplicadas(conn):
