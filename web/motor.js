@@ -220,11 +220,26 @@
     return mensajes;
   }
 
+  function disponibilidadSeleccion(seleccion, ahora) {
+    return Object.entries(seleccion?.roles || {}).map(([id, rol]) => {
+      const r = { id, nombre: rol.nombre, seleccionadas: (rol.vacantes || []).length,
+        listas: 0, porVerificar: 0, retiradas: 0, fueraPerfil: 0 };
+      for (const v of rol.vacantes || []) {
+        if (["closed", "archived"].includes(v.catalog_status) || v.verificacion?.estado === "rechazada") r.retiradas++;
+        else if (!v.afinidad_vigente || v.catalog_status !== "active") r.fueraPerfil++;
+        else if (enlacesComprobados(v, ahora).length) r.listas++;
+        else r.porVerificar++;
+      }
+      r.faltanVigentes = Math.max(0, (rol.meta || 20) - r.listas);
+      return r;
+    });
+  }
+
   const IDIOMA = { es: "Español", en: "Inglés", pt: "Portugués" };
   const GRADO_TEXTO = { exacto: "Exacta", similar: "Similar", cercano: "Cercana", palabra: "Por palabra", todas: "" };
 
   const Motor = { GRADOS, NIVELES, normalizar, base, contieneFrase, prepararMapa, sugerir, filtrar, ordenar, conteos,
-    fechaRelativa, antiguedad, enlacesComprobados, dondeAplica, textoWhatsApp, diasEntre, fechaDe, MODALIDAD, INGLES, IDIOMA, GRADO_TEXTO };
+    fechaRelativa, antiguedad, enlacesComprobados, disponibilidadSeleccion, dondeAplica, textoWhatsApp, diasEntre, fechaDe, MODALIDAD, INGLES, IDIOMA, GRADO_TEXTO };
   if (typeof module !== "undefined" && module.exports) module.exports = Motor;
   else raiz.Motor = Motor;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -3,6 +3,26 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const M = require("../web/motor.js");
 
+test("la disponibilidad por rol caduca sin otra captura y separa el histórico", () => {
+  const enlace = "https://jobs.lever.co/acme/1";
+  const buena = { id: "1", catalog_status: "active", afinidad_vigente: true, enlace, verificacion: { estado: "verificada", enlaces: [
+    { url: enlace, estado: "verificada", comprobada_en: "2026-11-06T00:00:00Z" }] } };
+  const seleccion = { roles: { qa: { nombre: "QA", meta: 20, vacantes: [buena,
+    { ...buena, id: "2", afinidad_vigente: false },
+    { id: "3", verificacion: { estado: "rechazada" } },
+    { id: "4", catalog_status: "active", afinidad_vigente: true, verificacion: { estado: "pendiente" } }] } } };
+  const r = M.disponibilidadSeleccion(seleccion, "2026-11-06T05:59:59Z")[0];
+  assert.deepEqual([r.seleccionadas, r.listas, r.porVerificar, r.retiradas, r.fueraPerfil, r.faltanVigentes], [4, 1, 1, 1, 1, 19]);
+  const caducada = M.disponibilidadSeleccion(seleccion, "2026-11-06T06:00:00Z")[0];
+  assert.equal(caducada.listas, 0);
+  assert.equal(caducada.porVerificar, 2);
+  assert.equal(M.disponibilidadSeleccion(seleccion, "2026-11-05T23:59:00Z")[0].listas, 0);
+  seleccion.roles.qa.vacantes[0].catalog_status = "closed";
+  const cerrada = M.disponibilidadSeleccion(seleccion, "2026-11-06T05:00:00Z")[0];
+  assert.equal(cerrada.listas, 0);
+  assert.equal(cerrada.retiradas, 2); // un positivo en caché no revive un cierre del catálogo
+});
+
 const MAPA = M.prepararMapa([
   { id: "diseno-producto-ux", nombre: "Diseño de producto y UX/UI", area: "Diseño",
     exactos: ["product designer", "product design", "diseñador ux/ui", "ux designer", "ui designer"],

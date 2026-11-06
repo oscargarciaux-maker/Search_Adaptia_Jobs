@@ -88,7 +88,8 @@ def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False, 
         resto = [x for x in resto if conteo["empresa"][x[2]["empresa"]] < max_por_empresa]
         if not resto:
             break
-        mejor = min(resto, key=lambda item: (prioridad_remota(item[0]) if preferir_remotas else 0, costo(item)))
+        mejor = min(resto, key=lambda item: (GRADOS.index(item[1]),
+                    prioridad_remota(item[0]) if preferir_remotas else 0, costo(item)))
         resto.remove(mejor)
         v, g, r = mejor
         elegidas.append((v, g))

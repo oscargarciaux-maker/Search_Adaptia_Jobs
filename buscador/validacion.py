@@ -23,6 +23,10 @@ def errores(reporte):
     revision = (reporte.get("verificacion_enlaces") or {}).get("seleccion_del_dia")
     if revision and revision.get("vacantes") and revision.get("estados", {}).get("verificada", 0) != revision["vacantes"]:
         fallos.append("La selección histórica tiene enlaces sin comprobación vigente o rechazados; revisar antes de compartir.")
+    seleccion = reporte.get("seleccion_actual") or {}
+    for rol in seleccion.get("roles", {}).values():
+        if any(not v.get("afinidad_vigente") for v in rol.get("vacantes", [])):
+            fallos.append(f"{rol['nombre']}: la selección histórica contiene vacantes fuera del perfil o del catálogo activo.")
     return fallos
 
 

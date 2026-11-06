@@ -435,12 +435,13 @@ familias:
   similares: [qa manual, manual tester, tester manual, performance tester, pruebas de rendimiento, qa lead, test lead,
               mobile tester, game tester, probador de videojuegos, accessibility tester, uat tester,
               software quality engineer, qa specialist, especialista qa]
-  cercanos: [desarrollador, software engineer, business analyst, analista funcional, devops engineer]
+  cercanos: [test automation developer, software developer in test, ingeniero de automatización de pruebas]
   herramientas: [selenium, cypress, playwright, appium, jmeter, postman, jira, testrail, cucumber, gherkin,
                  pruebas automatizadas, test cases, casos de prueba]
   genericos: [qa, tester, testing, pruebas, quality]
   excluir: [quality assurance alimentos, food quality, calidad de alimentos, inspector de calidad, quality inspector,
-            control de calidad planta, manufacturing quality]
+            control de calidad planta, manufacturing quality, qa customer success manager,
+            quality assurance customer service, quality analyst call center]
 
 # ───────────── Datos e IA ─────────────
 - id: analista-datos
@@ -510,8 +511,9 @@ familias:
             nlp engineer, ai developer, desarrollador de ia, desarrollador de inteligencia artificial]
   similares: [ai specialist, especialista en ia, ai solutions architect, prompt engineer, ingeniero de prompts,
               conversational ai developer, chatbot developer, desarrollador de chatbots, ai researcher, ml researcher,
-              ai product engineer, applied ai engineer]
-  cercanos: [data scientist, científico de datos, data engineer, backend developer, ai trainer]
+              ai product engineer, applied ai engineer, machine learning / data engineer,
+              machine learning data engineer]
+  cercanos: [data scientist, científico de datos, ai trainer, machine learning developer]
   herramientas: [pytorch, tensorflow, llm, openai, langchain, rag, hugging face, mlops, computer vision, nlp,
                  machine learning, deep learning]
   genericos: [engineer, ingeniero, developer, desarrollador, ai, ia]

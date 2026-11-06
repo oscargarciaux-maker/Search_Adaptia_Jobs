@@ -51,7 +51,7 @@ def main():
             assert not conn.execute("select to_regclass('public.ofertas')").fetchone()[0]
             assert not migraciones.aplicadas(conn)  # el SQL y el diario se revirtieron juntos
             r = migraciones.preparar(conn, trabajo, plan, instancia_nueva=True)
-            assert r["aplicadas"] == ["001", "002", "003"]
+            assert r["aplicadas"] == [m.version for m in ms]
             journal = conn.execute("select version,aplicada_en from public.adaptia_migraciones order by version").fetchall()
             otro = migraciones.planificar(conn, trabajo, raiz / "no-necesaria.enc", llave)
             assert not otro["necesaria"] and not (raiz / "no-necesaria.enc").exists()
@@ -95,7 +95,7 @@ def main():
             assert not conn.execute("select has_table_privilege('service_role','public.adaptia_migraciones','SELECT')").fetchone()[0]
             # Una migración inválida revierte también su primer ALTER correcto.
             cuerpo = "alter table public.ofertas add column prueba_fallida text; select no_existe;"
-            mala = migraciones.Migracion("004", "004_fallida.sql", sha256(cuerpo.encode()).hexdigest(), cuerpo)
+            mala = migraciones.Migracion("005", "005_fallida.sql", sha256(cuerpo.encode()).hexdigest(), cuerpo)
             plan = migraciones.planificar(conn, trabajo, raiz / "antes-fallo.enc", llave, ms + [mala])
             try:
                 migraciones.preparar(conn, trabajo, plan, ms + [mala])
@@ -103,10 +103,10 @@ def main():
             except psycopg.errors.UndefinedColumn:
                 pass
             assert not conn.execute("select 1 from information_schema.columns where table_schema='public' and table_name='ofertas' and column_name='prueba_fallida'").fetchone()
-            assert "004" not in migraciones.aplicadas(conn)
+            assert "005" not in migraciones.aplicadas(conn)
             # Dos procesos/conexiones parten del mismo corte: solo uno aplica.
             cuerpo = "alter table public.ofertas add column prueba_concurrencia text;"
-            buena = migraciones.Migracion("004", "004_correcta.sql", sha256(cuerpo.encode()).hexdigest(), cuerpo)
+            buena = migraciones.Migracion("005", "005_correcta.sql", sha256(cuerpo.encode()).hexdigest(), cuerpo)
             versiones = ms + [buena]
             plan = migraciones.planificar(conn, trabajo, raiz / "concurrencia.enc", llave, versiones)
             def intentar(_):
@@ -118,7 +118,7 @@ def main():
                         return False
             with ThreadPoolExecutor(2) as ex:
                 assert sum(ex.map(intentar, range(2))) == 1
-            assert len(migraciones.aplicadas(conn)) == 4
+            assert len(migraciones.aplicadas(conn)) == len(ms) + 1
             # Backup de las seis tablas y ambas secuencias; el archivo no contiene el texto en claro.
             conn.execute("select public.estado_guardar('ofertas','[{\"identificador\":\"pendiente\",\"revision\":0,\"payload\":{\"external_id\":\"pendiente\"}}]')")
             conn.execute("insert into public.ofertas(external_id,job_title,company_name) select 'lote-'||n,'QA','Ensayo' from generate_series(1,201) n")

@@ -101,7 +101,7 @@
     };
   }
 
-  function buscar() {
+  function buscar({ conservarVisibles = false } = {}) {
     const hayBusqueda = estado.familia || estado.texto || $("palabras-extra").value.trim();
     $("filtros").hidden = !hayBusqueda;
     $("barra-acciones").hidden = !hayBusqueda;
@@ -117,7 +117,7 @@
       return;
     }
     estado.resultados = M.ordenar(M.filtrar(estado.vacantes, opciones()), $("orden").value);
-    estado.visibles = POR_PAGINA;
+    if (!conservarVisibles) estado.visibles = POR_PAGINA;
     estado.seleccion = new Set([...estado.seleccion].filter(id => estado.resultados.some(v => v.id === id && M.enlacesComprobados(v).length)));
     pintarPalabras();
     pintarResultados();
@@ -395,6 +395,9 @@
     caja.innerHTML = "";
     if (!s) { caja.append(el("p", { text: "Todavía no hay reporte de la búsqueda nocturna." })); return; }
     caja.append(el("h2", { text: `Última búsqueda: ${s.capturada_en ? new Date(s.capturada_en).toLocaleString("es-CO") : fechaCorta(s.fecha)} (${s.minutos} min)` }));
+    if (!s.capturada_en || Date.now() - Date.parse(s.capturada_en) > 2 * 3600000) {
+      caja.append(el("p", { class: "confirmar", text: "El catálogo lleva más de dos horas sin una captura confirmada. Revisar la última ejecución en GitHub Actions antes de compartir." }));
+    }
     if (s.catalogo) caja.append(el("p", { class: "nota", text: s.catalogo.pendientes || (s.catalogo.errores || []).length
       ? `Catálogo: ${s.catalogo.pendientes || 0} filas pendientes de sincronizar.`
       : `Catálogo: ${s.catalogo.enviadas || 0} filas confirmadas en Supabase.` }));
@@ -412,10 +415,21 @@
         `Estado actual de la selección del día: ${d.pendiente || 0} por verificar y ${d.rechazada || 0} rechazadas. El histórico se conserva; estos enlaces no deben compartirse automáticamente.` }));
     }
     caja.append(el("div", { class: "metricas" },
-      [["Vacantes abiertas", s.vacantes_en_bodega], ["Nuevas en esa búsqueda", s.nuevas_hoy], ["Leídas de las fuentes", s.crudas_hoy],
+      [["Vacantes en catálogo", s.vacantes_en_bodega], ["Nuevas en esa búsqueda", s.nuevas_hoy], ["Leídas de las fuentes", s.crudas_hoy],
         ["Tipos de cargo con vacantes", Object.keys(s.por_familia || {}).length]]
         .map(([t, n]) => el("div", { class: "metrica" }, el("strong", { text: fmt.format(n || 0) }), el("span", { text: t })))));
     const e = s.entrega;
+    const disponibles = M.disponibilidadSeleccion(s.seleccion_actual);
+    if (disponibles.length && s.seleccion_actual.fecha) {
+      caja.append(el("h3", { text: `Disponibilidad de la selección del ${fechaCorta(s.seleccion_actual.fecha)}` }),
+        el("div", { class: "tabla-scroll" }, el("table", { class: "tabla" },
+          el("thead", {}, el("tr", {}, ["Rol", "Seleccionadas", "Listas ahora", "Por verificar", "Retiradas", "Fuera de perfil / catálogo", "Faltan vigentes"].map(text => el("th", { text })))),
+          el("tbody", {}, disponibles.map(r => el("tr", {},
+            [r.nombre, r.seleccionadas, r.listas, r.porVerificar, r.retiradas, r.fueraPerfil, r.faltanVigentes].map(text => el("td", { text: String(text) }))))))),
+        el("p", { class: "nota", text: "Listas ahora exige afinidad con el rol, presencia en el catálogo activo y enlace comprobado hace menos de seis horas. Las pendientes se reintentan automáticamente dentro del presupuesto; no tienes que configurar nada por cada vacante. Las rechazadas se apartan. No se reemplazan ni se cuentan dos veces las selecciones históricas." }));
+    } else {
+      caja.append(el("p", { class: "confirmar", text: "Este reporte no incluye disponibilidad por rol. El conteo histórico de seleccionadas no confirma cuántas siguen listas para compartir." }));
+    }
     if (e && e.roles) {
       const sb = e.supabase || {};
       caja.append(el("h3", { class: "area", text: `Entrega del ${fechaCorta(e.fecha || s.fecha)}: ${fmt.format(e.vacantes || 0)} vacantes seleccionadas` }),
@@ -588,12 +602,15 @@
         estado.vacantes = await leerJsonComprimido("datos/vacantes.json.gz");
         estado.salud = salud;
         $("estado-datos").textContent = `${fmt.format(estado.vacantes.length)} vacantes · actualizado ${new Date(salud.capturada_en).toLocaleString("es-CO")}`;
-        buscar();
-        pintarSalud();
         avisar("El catálogo se actualizó con la última captura.");
       }
     } catch (e) { /* conservar resultados si falla la red; no reemplazarlos por una lista vacía */ }
-    finally { refrescando = false; }
+    finally {
+      // La comprobación puede caducar aunque no cambie el archivo publicado o falle la red.
+      buscar({ conservarVisibles: true });
+      pintarSalud();
+      refrescando = false;
+    }
   }
   setInterval(refrescarNovedades, 60000);
   document.addEventListener("visibilitychange", refrescarNovedades);

@@ -16,7 +16,7 @@ from pathlib import Path
 
 import yaml
 
-from buscador import calidad, cobertura, enlaces, familias, normalizar, paises, tiempos, vacante
+from buscador import calidad, contrato, cobertura, enlaces, familias, normalizar, paises, tiempos, vacante
 from buscador.fuentes import ats, brave, getonbrd, indeed, linkedin_apify, linkedin_publico, publicaciones_apify, remotos
 from buscador.http import Cliente
 
@@ -337,6 +337,9 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     cfg_revision.setdefault(clave_n, 40 if modo == "incremental" else 300)
     cfg_revision.setdefault(clave_s, 90 if modo == "incremental" else 240)
     resumen_revision = {}
+    from buscador import entrega
+    config_entrega = entrega.config()
+    roles_actuales = config_entrega["roles"]
     def comprobar_destinos(lista):
         nonlocal resumen_revision
         t0 = time.monotonic()
@@ -345,8 +348,21 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         cfg_revision[clave_n] = max(0, cfg_revision[clave_n] - resumen_revision["candidatas_programadas"])
         cfg_revision[clave_s] = max(0, cfg_revision[clave_s] - (time.monotonic() - t0))
         _guardar_json(trabajo / "verificacion_enlaces.json", cache_enlaces)
+        # También sincronizar cierres de seleccionadas que ya salieron del inventario activo.
+        ids_lista = {v["id"] for v in lista}
+        if lote_previo.get("fecha") == hoy:
+            for grupo in lote_previo.get("elegidas", {}).values():
+                for historica, _ in grupo:
+                    if historica["id"] not in ids_lista:
+                        actual = vacante.reetiquetar(dict(historica))
+                        verificar_enlaces.anotar(actual, cache_enlaces)
+                        if actual["verificacion"]["estado"] == "rechazada":
+                            razon = actual["verificacion"]["motivo"]
+                            retiradas.append((actual, "closed" if razon == "vacante cerrada" else "archived", razon))
         salida_verificada = []
         for v in lista:
+            rol, _ = entrega.rol_de(v, roles_actuales)
+            v["rol_entrega_actual"] = rol["id"] if rol else ""
             revision = v["verificacion"]
             if revision["estado"] == "rechazada":
                 razon = revision["motivo"]
@@ -436,6 +452,20 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
             verificar_enlaces.anotar(v, cache_enlaces)
         resumen_revision["seleccion_del_dia"] = verificar_enlaces.resumen(actuales)
     resumen_revision["rechazos_en_corrida"] = {m: n for m, n in descartes.items() if m in verificar_enlaces.RECHAZOS}
+    seleccion_actual = {"fecha": lote_actual.get("fecha"), "roles": {}}
+    por_id_vigente = {v["id"]: v for v in vacantes}
+    estados_catalogo = {v["id"]: estado for v, estado, _ in retiradas}
+    estados_catalogo.update({v["id"]: "archived" if contrato.entregable(v) else "active" for v in vacantes})
+    for rol in roles_actuales:
+        entradas = []
+        for original, _ in lote_actual.get("elegidas", {}).get(rol["id"], []):
+            actual = dict(por_id_vigente.get(original["id"], original))
+            revision = verificar_enlaces.anotar(actual, cache_enlaces)
+            entradas.append({"id": actual["id"], "catalog_status": estados_catalogo.get(actual["id"], "sin_catalogo"), "afinidad_vigente":
+                actual.get("rol_entrega_actual") == rol["id"] if actual["id"] in por_id_vigente else False,
+                "enlace": actual.get("enlace", ""), "enlace_directo": actual.get("enlace_directo", ""),
+                "verificacion": revision})
+        seleccion_actual["roles"][rol["id"]] = {"nombre": rol["nombre"], "meta": config_entrega["por_rol"], "vacantes": entradas}
     reporte = {
         "fecha": hoy, "hora_utc": datetime.now(timezone.utc).strftime("%H:%M"), "modo": modo,
         "codigo_commit": os.environ.get("GITHUB_SHA", ""), "ejecucion_id": os.environ.get("GITHUB_RUN_ID", ""),
@@ -450,6 +480,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         "por_modalidad": dict(Counter(v["modalidad"] for v in vacantes)),
         "ubicacion_por_confirmar": sum(v["confianza_pais"] == "baja" for v in vacantes),
         "entrega": resumen_entrega,
+        "seleccion_actual": seleccion_actual,
         "refuerzos": refuerzos,
         "historico_entregas": historico_entregas,
         "catalogo": resumen_catalogo,
