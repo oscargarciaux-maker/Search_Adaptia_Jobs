@@ -14,19 +14,26 @@ del título «Remote in…», también cuando la ficha de ubicación es más amp
 se intersectan; una oficina o un cliente extranjero en la descripción no es por sí solo una restricción. La revisión
 también se aplica al inventario guardado, archivando las no elegibles sin reescribir selecciones históricas.
 
+Estonia y los demás países europeos fuera de España se reconocen también por sus aliases configurados. Una ubicación
+extranjera específica prevalece frente a una etiqueta EMEA general. El texto comercial «global scope» no acredita
+contratación mundial. Las ubicaciones de confianza baja se conservan para revisar, pero `contrato.entregable` las
+excluye de nuevas entregas con motivo `elegibilidad regional por confirmar`; no cuentan para completar veinte.
+Las remotas con alcance mundial explícito siguen siendo válidas. La sede extranjera de una empresa, por sí sola,
+no restringe un aviso mundial. Frases de herramientas como «exclusively in Figma» no son restricciones geográficas.
+
 - LATAM (20 territorios configurados), España y ofertas remotas mundiales. Otros países se ampliarán después.
-- Bogotá fija únicamente la hora de ejecución, no una preferencia de país. La página no selecciona Colombia por defecto.
+- Bogotá fija únicamente la hora de ejecución, no una preferencia de país.
 - LinkedIn incorpora búsquedas remotas para LATAM, España y Worldwide, además de las búsquedas por país.
 - Indeed consulta modos remoto y general en sus 12 países soportados. No todos los países tienen una fuente equivalente.
 - Se reparte el presupuesto por turnos entre familias, con cuatro turnos prioritarios por uno para las demás.
   Dentro de cada familia se atienden combinaciones menos recientes; en empates, remotas primero y desempate diario.
-- La entrega y el orden inicial de la página favorecen remotas para varios países con confianza alta, luego
-  otras remotas con región identificada (incluye estimaciones de confianza media), locales y ubicaciones dudosas.
+- La entrega favorece remotas para varios países con confianza alta, luego
+  otras remotas con región identificada (incluye estimaciones de confianza media) y locales con país identificado.
   No se descartan locales para inflar una cuota remota artificial.
   El límite de dos ofertas por empresa y rol sigue vigente. `preferir_remotas` se configura en `datos/entrega.yaml`.
 - Remoto no significa mundial: un puesto remoto limitado a Colombia sigue siendo solo para Colombia.
   Las restricciones de residencia prevalecen y una región desconocida se muestra como «por confirmar».
-  El filtro «País confirmado» exige confianza alta; las estimaciones por zona horaria tienen confianza media.
+  Las estimaciones por zona horaria tienen confianza media; no equivalen a residencia confirmada por el empleador.
 - No hay cuota por país: se diversifican las ofertas disponibles sin inventar cobertura. Que un país no aparezca en una
   entrega no prueba que no tenga ofertas. Las fuentes y sus bloqueos afectan el resultado.
 

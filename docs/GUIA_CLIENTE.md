@@ -46,7 +46,8 @@ no significa publicada hoy. Las horas terminadas en Z se expresan en UTC; Colomb
 La meta diaria es veinte nuevas por cada uno de seis roles: Product Designer, UX/UI Designer, Product Owner,
 Product Manager, AI Engineer y QA. Las capturas horarias no crean otro lote ni reponen automáticamente cierres del
 histórico. La cifra seleccionada no equivale a oportunidades disponibles ahora. Un déficit debe mostrarse, no
-rellenarse con repeticiones, pendientes o cargos ajenos. Se conservan variantes pertinentes del mapa de cargos.
+rellenarse con repeticiones, pendientes o cargos ajenos. Las ubicaciones con confianza baja quedan fuera de nuevas
+entregas hasta confirmarse; una etiqueta remota no acredita que se pueda aplicar desde cualquier país. Se conservan variantes pertinentes del mapa de cargos.
 
 ## 3. Ejecuciones y horarios
 
