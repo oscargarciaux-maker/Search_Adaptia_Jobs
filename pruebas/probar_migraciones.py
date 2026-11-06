@@ -122,6 +122,17 @@ def main():
             # Backup de las siete tablas y ambas secuencias; el archivo no contiene el texto en claro.
             conn.execute("select public.estado_guardar('ofertas','[{\"identificador\":\"pendiente\",\"revision\":0,\"payload\":{\"external_id\":\"pendiente\"}}]')")
             conn.execute("insert into public.ofertas(external_id,job_title,company_name) select 'lote-'||n,'QA','Ensayo' from generate_series(1,201) n")
+            # Archivo con decimal anidado y una fusión todavía pendiente: recuperar sin aplicar limpieza al corte.
+            conn.execute("""update public.ofertas set vacante_id='aaaaaaaaaaaaaaaa' where external_id='ensayo';
+                insert into public.ofertas(external_id,job_title,company_name,vacante_id,salary_min)
+                 values('copia-archivada','QA','Ensayo','aaaaaaaaaaaaaaaa',123456789.123456789);
+                insert into public.catalogo_vacantes(id,datos,status,observed_at)
+                 values('bbbbbbbbbbbbbbbb','{"duplicada_de":"aaaaaaaaaaaaaaaa"}','archived',now());
+                alter table public.ofertas disable trigger oferta_unica;
+                insert into public.ofertas(external_id,job_title,company_name,vacante_id)
+                 values('alias-pendiente','QA','Ensayo','bbbbbbbbbbbbbbbb');
+                alter table public.ofertas enable trigger oferta_unica;""")
+            siguiente_id = conn.execute("select last_value+1 from public.ofertas_id_seq").fetchone()[0]
             copia = respaldo.crear(conn, trabajo, raiz / "completo.enc", llave)
             assert b"Empresa ficticia" not in copia.read_bytes()
             with nueva() as (_, destino):
@@ -144,7 +155,8 @@ def main():
                     consulta = sql.SQL("select last_value,is_called from public.{}").format(sql.Identifier(nombre))
                     assert conn.execute(consulta).fetchone() == destino.execute(consulta).fetchone(), nombre
                 assert (raiz / "trabajo-restaurado/estado.json").read_bytes() == (trabajo / "estado.json").read_bytes()
-                assert destino.execute("insert into public.ofertas(external_id,job_title,company_name) values('nueva','QA','Ensayo') returning id").fetchone()[0] == 203
+                assert destino.execute("insert into public.ofertas(external_id,job_title,company_name) values('nueva','QA','Ensayo') returning id").fetchone()[0] == siguiente_id
+                assert destino.execute("select tgenabled from pg_trigger where tgname='oferta_unica'").fetchone()[0] == 'O'
                 assert not destino.execute("select has_table_privilege('anon','public.estado_operativo','SELECT')").fetchone()[0]
         print("Actualización manual → automática sin perder crédito/historia, respaldo obligatorio y migradores concurrentes: aprobados.")
         print("Copia AES-GCM y restauración: siete tablas, dos secuencias, decimales exactos, pendiente, permisos y trabajo; corrupción rechazada.")
