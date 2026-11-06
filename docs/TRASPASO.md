@@ -18,21 +18,18 @@ No transferir cuentas personales ni compartir contraseñas para simular el cambi
 | Elemento | Qué se entrega o configura | Evidencia |
 |---|---|---|
 | GitHub | Código `main`, flujos, rama `publicado`, permisos y ramas protegidas | Cliente entra con su cuenta y ve las ejecuciones |
-| Supabase | Proyecto conservado o restauración de tablas/permisos; cinco tablas y dos secuencias tras SQL 003 | Conteos, referencias, reservas y lectura/escritura reales |
+| Supabase | Proyecto conservado o restauración de tablas/permisos; siete tablas y dos secuencias con el instalador | Conteos, referencias, reservas y lectura/escritura reales |
 | Apify | Cuenta/organización del cliente, actor y límite | Token nuevo validado, saldo y reservas contrastados |
-| Alojamiento | Pages por Actions o Cloudflare; URL y acceso | Página real coincide con datos publicados |
 | Estado de trabajo | Toda la carpeta `trabajo/` de un mismo corte | Lote, colas y presupuesto respaldados juntos |
-| Marcas del navegador | Exportación opcional del historial de enviadas | Importación probada en el navegador del nuevo operador |
 | Manuales y soporte | Versiones vigentes, incidencias conocidas y responsables | Cliente completa una búsqueda/selección sin ayuda |
 
-GitHub aloja código y procesos; no mueve automáticamente los proyectos de Supabase, Apify o Cloudflare.
+GitHub aloja código y procesos; no mueve automáticamente los proyectos de Supabase o Apify.
 
 ## 2. Preparar un corte consistente
 
 1. Elegir una ventana en que no se esté enviando una selección a clientes.
 2. En Actions, deshabilitar temporalmente los flujos que escriben: **Bodega nocturna**, **Captura horaria** y
-   **Búsqueda profunda**. Esperar a que las ejecuciones en curso terminen. Si se usa la función Cloudflare, evitar
-   despachos desde la página durante el corte.
+   **Búsqueda profunda**. Esperar a que las ejecuciones en curso terminen.
 3. Guardar URL, identificador de la última ejecución, commit `main` y commit `publicado` del corte, sin registrar secretos.
 4. Respaldar todas las tablas, secuencias y la carpeta de trabajo siguiendo el manual de operación. Conservar los respaldos fuera
    del repositorio y con acceso restringido. Los artefactos de Actions caducan; no son una copia permanente.
@@ -48,8 +45,7 @@ al camino v1. Utilizar la deshabilitación de flujos cuando se requiere una paus
 ### Transferir propiedad y continuar la misma instancia
 
 En GitHub: **Settings → General → Danger Zone → Transfer ownership**. El destinatario acepta la transferencia.
-Comprobar después ramas, permisos, Actions, secretos, variables, entornos, protección y páginas: las condiciones pueden
-variar entre organizaciones y planes. La URL o dominio puede requerir cambios.
+Comprobar después ramas, permisos, Actions, secretos, variables, entornos y protección: las condiciones pueden variar entre organizaciones y planes.
 
 No afirmar que todos los secretos desaparecen al transferir: una transferencia puede conservar configuración del
 repositorio. Revisar y sustituir las credenciales por las del cliente según el plan de continuidad. Eliminar accesos
@@ -113,16 +109,12 @@ Restaurar **toda** la carpeta `trabajo/` de un corte coherente. Sus piezas princ
 
 No editar las fechas de estos archivos, regenerar IDs ni mezclar colas de una base con otro catálogo independiente.
 La memoria v2 puede reconstruir lote y no repetición desde Supabase, pero no reconstruye por sí sola presupuesto Apify,
-consultas, pendientes locales aún no confirmados o marcas del navegador. Esa recuperación no reemplaza el respaldo.
+consultas, pendientes locales aún no confirmados del inventario. Esa recuperación no reemplaza el respaldo.
 Con SQL 003 y estado central activo, la base sí conserva reservas/colas y lotes sin confirmar; la carpeta sigue siendo
 necesaria para los demás auxiliares. Mantener `ESTADO_SUPABASE_ACTIVO=true` en el destino restaurado; no volver a una
 copia local antigua. Si aún no estaba activo, seguir [ACTIVAR_ESTADO_OPERATIVO.md](ACTIVAR_ESTADO_OPERATIVO.md).
 
-Para mover **Enviadas** del operador, exportar el JSON desde **Estado → Historial de enviadas** e importarlo en el
-nuevo navegador. Si se utiliza Cloudflare KV, incluir el traspaso/exportación de ese namespace por separado; no vive en
-Supabase ni en el JSON del navegador como garantía de copia completa.
-
-## 6. Reconfigurar cuentas y alojamiento
+## 6. Reconfigurar cuentas
 
 1. Crear claves del cliente y actualizar los secretos `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `APIFY_TOKEN` y los opcionales.
    En modo automático, incluir `SUPABASE_DB_URL` del destino y `SUPABASE_BACKUP_KEY`. Conservar también, en su gestor,
@@ -131,11 +123,8 @@ Supabase ni en el JSON del navegador como garantía de copia completa.
    Conservar además `ESTADO_SUPABASE_ACTIVO=true` si se traspasa una instancia central con SQL 003 restaurado.
    Las variables de captura/estado anteriores son del camino manual; el automático usa su marca privada. El alojamiento
    sí conserva configuración propia. Ejecutar Preparar Supabase tras restaurar en destino, dejando Instancia nueva apagada.
-3. Si cambia el repositorio/propietario, revisar Pages, entorno `github-pages`, dominios y enlaces a Actions. La siguiente
-   captura regenera `config.js` con el repositorio de ejecución; una copia antigua puede contener el anterior.
-4. En Cloudflare, actualizar conexión Git, Access, KV y `GITHUB_REPO`/`GITHUB_TOKEN_FLUJOS`. Verificar acceso autorizado y
-   denegado; no confiar en que proteger el dominio haga privado el repositorio.
-5. Comprobar presupuesto global Apify. Si otro proyecto sigue usando la cuenta de origen, no atribuir su gasto a esta copia.
+3. Si cambia el repositorio/propietario, revisar enlaces a Actions y permisos del nuevo propietario.
+4. No se transfiere un sitio web ni marcas del navegador: la operación utiliza Supabase y Actions.
 
 Los secretos antiguos se revocan en el proveedor cuando ya no hagan falta. Cambiar solo el valor en GitHub no invalida
 un token que siga existiendo en Apify/Supabase. No borrar o pausar el proyecto de origen antes de validar destino y respaldo.
@@ -148,7 +137,7 @@ un token que siga existiendo en Apify/Supabase. No borrar o pausar el proyecto d
 3. Habilitar solo el flujo que se va a probar y realizar una prueba acotada sin escritura.
 4. Ejecutar una captura real con memoria restaurada. Si se repite el mismo día, debe reintentar/completar el lote,
    no crear otros veinte por rol. Verificar catálogo/registro/colas y que el presupuesto no reinició sus reservas.
-5. Confirmar la página real, una selección y la conservación de una oferta cerrada/archivada. Las comprobaciones de
+5. Confirmar las vistas de Supabase, una selección y la conservación de una oferta cerrada/archivada. Las comprobaciones de
    enlaces caducadas se vuelven a revisar; no forzarlas a positivas para aprobar el traspaso.
 6. Si se verifica continuidad en el mismo día, comparar IDs de `entregas_diarias`, no solo el número de filas de `ofertas`.
 7. Rehabilitar la programación y retirar la posibilidad de ejecutar la instancia antigua.

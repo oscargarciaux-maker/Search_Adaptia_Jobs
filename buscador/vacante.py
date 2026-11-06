@@ -8,7 +8,7 @@ CAMPOS_PUBLICOS = ["id", "titulo", "empresa", "ubicacion", "familias", "paises",
                    "nota_pais", "idioma", "ingles", "nivel", "anos_min", "salario", "herramientas",
                    "fecha_publicacion", "fecha_estimada", "visto_primera_vez", "visto_ultima_vez", "fuente", "fuentes",
                    "enlace", "enlace_directo", "tipo_enlace", "resumen", "publicada_en", "detectada_en", "vista_en",
-                   "verificacion", "rol_entrega_actual"]
+                   "verificacion", "rol_entrega_actual", "enlaces_alternativos", "duplicada_de", "ids_agrupados"]
 
 
 def huella(empresa, titulo, enlace=""):
@@ -102,6 +102,7 @@ def unir(a, b):
     if v["confianza_pais"] == "baja":
         v["nota_pais"] = "confirmar países: fuentes con ubicación incierta"
     v["_enlaces"] = sorted(set(todos + a.get("_enlaces", []) + b.get("_enlaces", [])))
+    v["_ids_fusionados"] = sorted({a["id"], b["id"], *a.get("_ids_fusionados", []), *b.get("_ids_fusionados", [])})
     fechas = [x["fecha_publicacion"] for x in (a, b) if x["fecha_publicacion"] and not x.get("fecha_estimada")]
     if fechas:
         v["fecha_publicacion"], v["fecha_estimada"] = min(fechas), False
@@ -136,21 +137,28 @@ def juntar(vacantes):
     Un nombre de cargo parecido no identifica una oferta. No recupera registros que el código anterior ya fusionó.
     """
     from buscador.contrato import url_limpia
+    from buscador import identidad
     por_id = {}
     por_desc = {}
     por_url = {}
+    por_grupo = {}
     for v in vacantes:
         if not v:
             continue
         clave_desc = None
         desc = normalizar.texto(v.get("_descripcion", ""))
-        if len(desc) >= 200:
+        if len(desc) >= 200 and identidad.grupo(v):
             clave_desc = (normalizar.empresa(v["empresa"]), normalizar.texto(v["titulo"]),
                           normalizar.texto(v.get("ubicacion", "")), hashlib.sha256(desc.encode()).hexdigest())
         urls = {url_limpia(u) for u in [v.get("enlace"), v.get("enlace_directo"), *v.get("_enlaces", [])] if u}
         coincidencias = {por_url[u] for u in urls if u in por_url}
         if clave_desc and clave_desc in por_desc:
             coincidencias.add(por_desc[clave_desc])
+        grupo = identidad.grupo(v)
+        if grupo:
+            for identificador in por_grupo.get(grupo, []):
+                if identificador in por_id and identidad.misma(por_id[identificador], v):
+                    coincidencias.add(identificador)
         destino = next(iter(coincidencias), None)
         if len(coincidencias) > 1:
             # Una tercera fuente puede demostrar que dos grupos anteriores eran la misma oferta.
@@ -169,9 +177,16 @@ def juntar(vacantes):
             por_desc.setdefault(clave_desc, destino)
         for u in urls:
             por_url[u] = destino
+        if grupo:
+            por_grupo.setdefault(grupo, set()).add(destino)
     return list(por_id.values())
 
 
 def publica(v):
     """La vacante sin los campos internos (la descripción completa no se publica)."""
-    return {k: v.get(k) for k in CAMPOS_PUBLICOS}
+    from buscador.contrato import url_limpia
+    salida = {k: v.get(k) for k in CAMPOS_PUBLICOS}
+    salida["enlaces_alternativos"] = sorted({url_limpia(u) for u in
+        [v.get("enlace"), v.get("enlace_directo"), *v.get("_enlaces", [])] if u})
+    salida["ids_agrupados"] = sorted({v["id"], *v.get("_ids_fusionados", [])})
+    return salida

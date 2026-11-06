@@ -20,9 +20,8 @@ rellenar cierres posteriores; un déficit se informa y requiere nuevas oportunid
 `salud.json.seleccion_actual` contiene fecha y roles (ID, nombre, meta y `vacantes`); cada entrada de vacante incluye
 solo ID, `catalog_status` (`active`, `closed`, `archived`, `sin_catalogo`), afinidad vigente, enlaces públicos y
 verificación pública, sin descripción ni snapshot privado. Un cierre/archivo del catálogo impide contar una oferta
-lista aunque aún quede un enlace positivo en caché. La página calcula cantidades
-vigentes con la hora del navegador; un dato caducado deja de contar aunque no haya nueva captura. La ausencia del
-campo en datos antiguos se indica y no se convierte en un conteo de disponibles.
+lista aunque aún quede un enlace positivo en caché. El reporte es una foto fechada de la captura: para disponibilidad
+vigente consultar las vistas de Supabase, que calculan caducidad con la hora de la base. No hay interfaz web.
 
 El diagnóstico de producto es manual y de solo lectura: conteos por rol/fecha, títulos públicos de QA y consulta
 de una URL pública. No aplica migraciones ni consulta fuentes ni consume Apify. Errores privados no se imprimen.

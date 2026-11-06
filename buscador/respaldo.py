@@ -11,7 +11,7 @@ from uuid import uuid4
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from psycopg import sql
 
-TABLAS = ("catalogo_vacantes", "entregas_diarias", "ofertas", "estado_operativo", "apify_reservas", "adaptia_migraciones")
+TABLAS = ("catalogo_vacantes", "entregas_diarias", "ofertas", "ofertas_enlaces_historicos", "estado_operativo", "apify_reservas", "adaptia_migraciones")
 SECUENCIAS = ("ofertas_id_seq", "estado_operativo_revision_seq")
 MAGIA = b"ADAPTIA1\n"
 
@@ -107,6 +107,12 @@ def restaurar(conn, archivo, llave, trabajo):
             for tabla in existentes(conn, TABLAS[:-1]):
                 if conn.execute(sql.SQL("select exists(select 1 from public.{})").format(sql.Identifier(tabla))).fetchone()[0]:
                     raise RuntimeError("La restauración exige tablas de negocio vacías.")
+            # Restaurar el corte exacto, incluso si contenía aliases todavía sin reconciliar.
+            # El ALTER se revierte junto con los datos si falla la transacción.
+            trigger_unico = conn.execute("""select tgenabled from pg_trigger
+                where tgrelid=to_regclass('public.ofertas') and tgname='oferta_unica'""").fetchone()
+            if trigger_unico and trigger_unico[0] != 'D':
+                conn.execute("alter table public.ofertas disable trigger oferta_unica")
             with gzip.GzipFile(fileobj=comprimido, mode="rb") as entrada:
                 cabecera = json.loads(next(entrada))
                 if cabecera.get("formato") != 1 or not set(cabecera["tablas"]) <= set(TABLAS):
@@ -144,6 +150,9 @@ def restaurar(conn, archivo, llave, trabajo):
                         archivos.append((ruta, base64.b64decode(dato["contenido"], validate=True)))
                     else: raise RuntimeError("Registro de respaldo desconocido.")
                 enviar()
+            if trigger_unico and trigger_unico[0] != 'D':
+                modo = {'O': '', 'A': 'always ', 'R': 'replica '}[trigger_unico[0]]
+                conn.execute("alter table public.ofertas enable " + modo + "trigger oferta_unica")
             trabajo.mkdir(mode=0o700, parents=True)
             for ruta, contenido in archivos:
                 destino = trabajo / str(ruta)

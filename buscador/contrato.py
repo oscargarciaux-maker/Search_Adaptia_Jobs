@@ -21,7 +21,7 @@ COLUMNAS = [
     "description_full", "company_about", "summary", "apply_email", "company_website",
 ]
 # Columnas adicionales (el contrato las guarda aparte como extras)
-EXTRAS = ["search_tag", "delivery_date", "source_type", "match_grade"]
+EXTRAS = ["search_tag", "delivery_date", "source_type", "match_grade", "vacante_id", "enlaces_alternativos"]
 LISTAS = {"hire_countries", "hire_regions", "language_requirements", "industries", "keywords_role",
           "keywords_technical", "keywords_soft"}
 NUMEROS = {"years_experience_min", "years_experience_max", "salary_min", "salary_max"}
@@ -270,13 +270,16 @@ def entregable(v, idiomas=("es", "en")):
 
 
 def filas(v, rol="", grado="", fecha_entrega="", capturada="", solo_comprobados=True):
-    """Filas del contrato para una vacante: una por enlace (LinkedIn y el directo de la empresa), con el mismo contenido
-    (el contrato las une). `capturada`: fecha y hora ISO de la corrida."""
+    """Una fila por vacante reconocida (v1 + v5), con enlace principal comprobado y alternativas asociadas.
+    `capturada`: fecha y hora ISO de la corrida."""
     mod, ciudad, pais_oficina, alcance, hire_paises, regiones = ubicacion(v)
     desc = v.get("_descripcion", "")
     anos_min, anos_max = anos(desc, v.get("anos_min"))
     s_texto, s_min, s_max, s_moneda, s_periodo = salario(v.get("salario"), desc)
     base = {
+        "vacante_id": v["id"],
+        "enlaces_alternativos": sorted({url_limpia(u) for u in
+            [v.get("enlace"), v.get("enlace_directo"), *v.get("_enlaces", [])] if u}),
         "job_title": v["titulo"][:300], "company_name": v["empresa"][:300], "status": "active",
         "published_date": "" if v.get("fecha_estimada") else (v.get("fecha_publicacion") or "")[:10],
         "scraped_at": capturada,
@@ -306,4 +309,5 @@ def filas(v, rol="", grado="", fecha_entrega="", capturada="", solo_comprobados=
         vistos.add(url)
         fila = dict(base, external_id=external_id(url), offer_url=url, source_portal=portal(url))
         salida.append({c: fila.get(c, "") for c in COLUMNAS + EXTRAS})
+        break  # Una oportunidad, una fila; sus otros enlaces quedan asociados.
     return salida

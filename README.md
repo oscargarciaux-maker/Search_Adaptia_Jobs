@@ -6,10 +6,11 @@ Manager, AI Engineer y QA), variadas y sin repetir, en **Supabase**. La captura 
 sin crear otra entrega. Se comprueban enlaces antes de nuevas selecciones; cierres, páginas generales y cobros detectados
 se apartan y lo que no puede comprobarse queda pendiente. La cobertura/volumen no se garantizan por completo.
 
-La página permite buscar dentro de la ventana activa de 30 días, elegir ofertas comprobadas y copiar para WhatsApp
-para compartir por WhatsApp manualmente. Supabase es el destino de las vacantes; se retiró la exportación a hojas de
-cálculo. La búsqueda diaria no usa IA ni sesión personal de LinkedIn. Todavía no hay agente
-WhatsApp ni seguimiento individual de candidaturas.
+La operación se consulta en Supabase y GitHub Actions. `ofertas` contiene una fila por oportunidad reconocida, con
+sus enlaces asociados. Las copias anteriores por portal se archivan sin perder sus datos; no cuentan para el cupo. La interfaz web y sus despliegues se retiraron por decisión
+del propietario. La búsqueda diaria no usa IA ni sesión personal de LinkedIn. Todavía no hay agente WhatsApp
+ni seguimiento individual de candidaturas. La rama histórica `publicado` conserva reportes y estado de captura,
+no un sitio web; no borrarla porque contiene inventario y memoria necesarios para continuar.
 
 ## Documentación de entrega
 
@@ -34,7 +35,8 @@ Referencias técnicas y antecedentes:
 - Activar captura horaria y catálogo Supabase: [`docs/ACTIVAR_CAPTURA_HORARIA.md`](docs/ACTIVAR_CAPTURA_HORARIA.md)
 - Integridad de enlaces y resultados de auditoría: [`docs/CONTROL_CALIDAD_ENLACES.md`](docs/CONTROL_CALIDAD_ENLACES.md)
 - Contratos: [v1 histórico](docs/CONTRATO_DATOS_v1.md), [catálogo v2](docs/CONTRATO_DATOS_v2.md),
-  [verificación pública v3](docs/CONTRATO_DATOS_v3.md) · Reglas para desarrollo: [CLAUDE.md](CLAUDE.md)
+  [verificación v3](docs/CONTRATO_DATOS_v3.md), [consulta v4](docs/CONTRATO_DATOS_v4.md),
+  [identidad y entrega única v5](docs/CONTRATO_DATOS_v5.md) · Reglas para desarrollo: [CLAUDE.md](CLAUDE.md)
 
 ## Cobertura y conservación
 
@@ -61,6 +63,5 @@ retrasar/saltar ejecuciones. El límite de USD 5 es Apify, no un precio total ga
 ```bash
 pip install -r requirements.txt
 python -m pytest -q
-node --test pruebas/*.test.js
 python -m buscador.bodega --salida /tmp/prueba --prueba   # prueba en vivo de unos 5 minutos
 ```

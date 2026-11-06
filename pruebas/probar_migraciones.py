@@ -95,7 +95,7 @@ def main():
             assert not conn.execute("select has_table_privilege('service_role','public.adaptia_migraciones','SELECT')").fetchone()[0]
             # Una migración inválida revierte también su primer ALTER correcto.
             cuerpo = "alter table public.ofertas add column prueba_fallida text; select no_existe;"
-            mala = migraciones.Migracion("005", "005_fallida.sql", sha256(cuerpo.encode()).hexdigest(), cuerpo)
+            mala = migraciones.Migracion("006", "006_fallida.sql", sha256(cuerpo.encode()).hexdigest(), cuerpo)
             plan = migraciones.planificar(conn, trabajo, raiz / "antes-fallo.enc", llave, ms + [mala])
             try:
                 migraciones.preparar(conn, trabajo, plan, ms + [mala])
@@ -103,10 +103,10 @@ def main():
             except psycopg.errors.UndefinedColumn:
                 pass
             assert not conn.execute("select 1 from information_schema.columns where table_schema='public' and table_name='ofertas' and column_name='prueba_fallida'").fetchone()
-            assert "005" not in migraciones.aplicadas(conn)
+            assert "006" not in migraciones.aplicadas(conn)
             # Dos procesos/conexiones parten del mismo corte: solo uno aplica.
             cuerpo = "alter table public.ofertas add column prueba_concurrencia text;"
-            buena = migraciones.Migracion("005", "005_correcta.sql", sha256(cuerpo.encode()).hexdigest(), cuerpo)
+            buena = migraciones.Migracion("006", "006_correcta.sql", sha256(cuerpo.encode()).hexdigest(), cuerpo)
             versiones = ms + [buena]
             plan = migraciones.planificar(conn, trabajo, raiz / "concurrencia.enc", llave, versiones)
             def intentar(_):
@@ -119,9 +119,20 @@ def main():
             with ThreadPoolExecutor(2) as ex:
                 assert sum(ex.map(intentar, range(2))) == 1
             assert len(migraciones.aplicadas(conn)) == len(ms) + 1
-            # Backup de las seis tablas y ambas secuencias; el archivo no contiene el texto en claro.
+            # Backup de las siete tablas y ambas secuencias; el archivo no contiene el texto en claro.
             conn.execute("select public.estado_guardar('ofertas','[{\"identificador\":\"pendiente\",\"revision\":0,\"payload\":{\"external_id\":\"pendiente\"}}]')")
             conn.execute("insert into public.ofertas(external_id,job_title,company_name) select 'lote-'||n,'QA','Ensayo' from generate_series(1,201) n")
+            # Archivo con decimal anidado y una fusión todavía pendiente: recuperar sin aplicar limpieza al corte.
+            conn.execute("""update public.ofertas set vacante_id='aaaaaaaaaaaaaaaa' where external_id='ensayo';
+                insert into public.ofertas(external_id,job_title,company_name,vacante_id,salary_min)
+                 values('copia-archivada','QA','Ensayo','aaaaaaaaaaaaaaaa',123456789.123456789);
+                insert into public.catalogo_vacantes(id,datos,status,observed_at)
+                 values('bbbbbbbbbbbbbbbb','{"duplicada_de":"aaaaaaaaaaaaaaaa"}','archived',now());
+                alter table public.ofertas disable trigger oferta_unica;
+                insert into public.ofertas(external_id,job_title,company_name,vacante_id)
+                 values('alias-pendiente','QA','Ensayo','bbbbbbbbbbbbbbbb');
+                alter table public.ofertas enable trigger oferta_unica;""")
+            siguiente_id = conn.execute("select last_value+1 from public.ofertas_id_seq").fetchone()[0]
             copia = respaldo.crear(conn, trabajo, raiz / "completo.enc", llave)
             assert b"Empresa ficticia" not in copia.read_bytes()
             with nueva() as (_, destino):
@@ -144,10 +155,11 @@ def main():
                     consulta = sql.SQL("select last_value,is_called from public.{}").format(sql.Identifier(nombre))
                     assert conn.execute(consulta).fetchone() == destino.execute(consulta).fetchone(), nombre
                 assert (raiz / "trabajo-restaurado/estado.json").read_bytes() == (trabajo / "estado.json").read_bytes()
-                assert destino.execute("insert into public.ofertas(external_id,job_title,company_name) values('nueva','QA','Ensayo') returning id").fetchone()[0] == 203
+                assert destino.execute("insert into public.ofertas(external_id,job_title,company_name) values('nueva','QA','Ensayo') returning id").fetchone()[0] == siguiente_id
+                assert destino.execute("select tgenabled from pg_trigger where tgname='oferta_unica'").fetchone()[0] == 'O'
                 assert not destino.execute("select has_table_privilege('anon','public.estado_operativo','SELECT')").fetchone()[0]
         print("Actualización manual → automática sin perder crédito/historia, respaldo obligatorio y migradores concurrentes: aprobados.")
-        print("Copia AES-GCM y restauración: seis tablas, dos secuencias, decimales exactos, pendiente, permisos y trabajo; corrupción rechazada.")
+        print("Copia AES-GCM y restauración: siete tablas, dos secuencias, decimales exactos, pendiente, permisos y trabajo; corrupción rechazada.")
 
 
 if __name__ == "__main__":

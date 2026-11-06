@@ -264,13 +264,6 @@ def test_mapa_bien_formado():
             assert isinstance(f.get(campo) or [], list), (f["id"], campo)
 
 
-def test_la_pagina_recibe_cada_familia_con_sus_claves():
-    pagina = familias.para_la_pagina()
-    ux = next(f for f in pagina if f["id"] == "diseno-producto-ux")
-    assert "product designer" in ux["claves"] and "ux/ui" in ux["claves"]
-    assert "product owner" in ux["cercanos"]
-
-
 def test_nivel_del_titulo():
     assert normalizar.nivel("Senior Product Designer") == "senior"
     assert normalizar.nivel("Desarrollador Java Semi Senior") == "semi senior"

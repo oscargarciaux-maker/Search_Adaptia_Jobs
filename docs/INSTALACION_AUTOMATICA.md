@@ -1,6 +1,6 @@
 # Instalación y actualizaciones automáticas
 
-Este es el camino preferido para entregar el proyecto. Sustituye copiar los SQL 001/002/003 y activar variables a mano.
+Este es el camino preferido para entregar el proyecto. Sustituye copiar los SQL 001–005 y activar variables a mano.
 La configuración inicial de cuentas/secretos sigue correspondiendo al propietario; las siguientes actualizaciones las
 ejecuta GitHub. Un PR incorpora código; la ejecución **Preparar Supabase** acredita la instalación de esa versión.
 
@@ -104,6 +104,6 @@ independiente. El respaldo se comprime y cifra en flujo; los originales de traba
 
 La restauración se ensaya en una base vacía y aislada: preparar el esquema, descifrar/verificar la copia, restaurar tablas
 en orden, identidades/secuencias y trabajo. Nunca ejecutar una restauración sobre producción para probar si funciona.
-El historial de migraciones también viaja en el corte; tras este cambio son seis tablas de proyecto y dos secuencias.
+El historial de migraciones también viaja en el corte; tras este cambio son siete tablas de proyecto y dos secuencias.
 Conservar las versiones SQL originales y la clave que corresponde al artefacto. Una copia vieja no repone crédito Apify:
 contrastar consumo posterior al corte antes de volver a abrir el servicio.

@@ -1,7 +1,7 @@
 """Pruebas del esqueleto: la configuración se puede leer y el repositorio no trae claves ni correos.
 
 El repositorio se le entrega a otra persona y puede ser público: ninguna clave, token ni correo debe quedar en un
-archivo (las claves van en los secretos de GitHub y de Cloudflare).
+archivo (las claves van en los secretos de GitHub).
 """
 import re
 import subprocess
@@ -63,7 +63,7 @@ def test_no_depende_de_otros_repositorios():
     from pathlib import Path
     raiz = Path(__file__).resolve().parent.parent
     otro = re.compile(r"ux_job_agent|ux-job-agent")
-    hallados = [str(a.relative_to(raiz)) for carpeta in ("buscador", "web", "functions", ".github", "datos", "supabase")
+    hallados = [str(a.relative_to(raiz)) for carpeta in ("buscador", ".github", "datos", "supabase")
                 for a in (raiz / carpeta).rglob("*") if a.is_file() and a.suffix in (".py", ".js", ".yml", ".yaml", ".sql",
                                                                                      ".html", ".csv")
                 and otro.search(a.read_text(encoding="utf-8", errors="ignore"))]

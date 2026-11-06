@@ -26,12 +26,12 @@ def test_filas_del_contrato_en_espanol():
            "https://www.linkedin.com/jobs/view/product-designer-at-acme-4012345678?refId=abc&trk=x",
            directo="https://job-boards.greenhouse.io/acme/jobs/123?gh_src=lnkd&utm_source=li")
     filas = contrato.filas(v, "Product designer", "exact", HOY, "2026-11-05T07:00:00Z")
-    assert [f["offer_url"] for f in filas] == ["https://www.linkedin.com/jobs/view/4012345678/",
-                                               "https://job-boards.greenhouse.io/acme/jobs/123"]
+    assert [f["offer_url"] for f in filas] == ["https://www.linkedin.com/jobs/view/4012345678/"]
     f = filas[0]
     assert set(f) == set(contrato.COLUMNAS + contrato.EXTRAS)
-    assert f["external_id"] == "lnkd-4012345678" and filas[1]["external_id"].startswith("greenhouse-")
-    assert f["source_portal"] == "LinkedIn" and filas[1]["source_portal"] == "Greenhouse"
+    assert f["external_id"] == "lnkd-4012345678" and f["vacante_id"] == v["id"]
+    assert f["source_portal"] == "LinkedIn"
+    assert f["enlaces_alternativos"] == ["https://job-boards.greenhouse.io/acme/jobs/123", "https://www.linkedin.com/jobs/view/4012345678/"]
     assert (f["work_mode"], f["office_city"], f["office_country"], f["hire_scope"], f["hire_countries"]) == \
         ("hybrid", "Bogotá", "CO", "city", "CO")
     assert f["posting_language"] == "es" and f["language_requirements"] == "en:B2:0"

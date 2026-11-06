@@ -131,15 +131,6 @@ def consultas(familia_id):
     return next(f["consultas"] for f in mapa() if f["id"] == familia_id)
 
 
-def para_la_pagina():
-    """Mapa reducido para la página: nombres y títulos como se escriben, y las frases normalizadas para buscar."""
-    return [{
-        "id": f["id"], "nombre": f["nombre"], "area": f["area"],
-        "exactos": f.get("exactos") or [], "similares": f.get("similares") or [], "cercanos": f.get("cercanos") or [],
-        "claves": sorted({k for g in GRADOS for k in f["_titulos"][g]} | {normalizar.titulo_base(f["nombre"])}),
-    } for f in mapa()]
-
-
 def herramientas_en(descripcion, familia_ids=None):
     """Herramientas del oficio que menciona la descripción (de las familias dadas, o de todas)."""
     desc = normalizar.texto(descripcion)[:8000]

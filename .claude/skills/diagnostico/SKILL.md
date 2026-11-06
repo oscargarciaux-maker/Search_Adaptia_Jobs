@@ -1,6 +1,6 @@
 ---
 name: diagnostico
-description: Explica en lenguaje sencillo qué pasó en la última búsqueda nocturna (cuántas vacantes, qué fuente falló, por qué salieron pocas de un cargo o un país) y qué hacer. Úsala con "qué pasó anoche", "por qué salieron pocas", "no funciona la página" o "revisa el buscador".
+description: Explica en lenguaje sencillo qué pasó en la última búsqueda nocturna (cuántas vacantes, qué fuente falló, por qué salieron pocas de un cargo o un país) y qué hacer. Úsala con "qué pasó anoche", "por qué salieron pocas", "falló la captura" o "revisa el buscador".
 ---
 
 # Diagnóstico
