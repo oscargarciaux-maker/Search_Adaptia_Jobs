@@ -95,7 +95,7 @@ Los registros y snapshots históricos se conservan. Los errores SQL muestran có
 
 En **Actions → Diagnóstico → Run workflow**, rama `main`:
 
-- `ensayar_migraciones=true`: ensayo del SQL pendiente con reversión obligatoria de toda la transacción. No instala
+- `ensayar_migraciones=true`: ensayo del SQL de identidad pendiente (006/007) con reversión obligatoria de toda la transacción. No instala
   versiones ni conserva reparaciones. Tiene prioridad sobre los demás modos y no consume Apify. No reemplaza al
   preparador con respaldo. Espera como máximo tres segundos por un bloqueo y treinta por consulta.
 

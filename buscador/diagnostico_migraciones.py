@@ -23,6 +23,8 @@ def ensayar(conn):
         conn.execute("set local statement_timeout='30s'")
         conn.execute("select pg_advisory_xact_lock(hashtextextended('adaptia.migraciones',0))")
         pendientes = migraciones.pendientes(conn, migraciones.descubrir())
+        if any(m.version not in {"006","007"} for m in pendientes):
+            raise RuntimeError("Este ensayo admite únicamente las migraciones de identidad 006/007; usar el instalador respaldado para otras versiones.")
         migraciones.aplicar(conn, pendientes)
         return [m.version for m in pendientes]
 

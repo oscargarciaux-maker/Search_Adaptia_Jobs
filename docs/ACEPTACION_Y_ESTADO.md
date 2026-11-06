@@ -6,6 +6,28 @@ aprobados por haber fusionado otro PR. Instrucciones de uso: [GUIA_CLIENTE.md](G
 
 ## 1. Corte de evidencia
 
+### Estonia y preparación posterior al PR 21 — 6 de noviembre de 2026
+
+El PR 21 se fusionó a las 12:34 p. m. Colombia. La preparación
+[42262920061](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42262920061) conservó el respaldo,
+pero no instaló 006: ocho ciclos de aliases inferidos bloquearon la reconciliación. La reparación preparada conserva
+SQL 001–006, ordena esos aliases dentro de la transacción respaldada antes de 006 e incorpora 007 para resolver
+futuros ciclos implícitos. Las referencias explícitas contradictorias siguen abortando.
+
+La auditoría de solo lectura [42264805543](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42264805543)
+confirmó el caso LinkedIn 4487752612: Product Owner de Playtech, Tartu/Estonia, fila 222 de `ofertas`, ID
+`99af2b8a2f2e8824`, seleccionado el 6 de noviembre. El catálogo lo tenía activo con todos los países y confianza
+baja. El filtro anterior desconocía Estonia y la entrega admitía ubicaciones de confianza baja.
+Las reglas corregidas excluyen ese país y apartan las ubicaciones sin confirmar de nuevas entregas. Al revisar
+6.555 fichas activas con esas reglas, 206 quedan fuera de cobertura y 1.039 pendientes de región; son cifras del
+catálogo, no de las 120 seleccionadas ni una certificación individual de las demás.
+
+El ensayo [42264625952](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42264625952)
+ejecutó 006/007 sobre los datos reales y revirtió toda la transacción correctamente. No instaló migraciones ni retiró
+ofertas productivas. Las pruebas PostgreSQL aisladas también comprueban la reversión del ensayo, el archivo de copias,
+la conservación de snapshots y el rechazo de ciclos explícitos. La activación efectiva requiere fusionar el arreglo,
+verificar Preparar Supabase y comprobar una captura; no se acredita solo con estos ensayos.
+
 ### Corrida del 6 de noviembre de 2026: revisión posterior
 
 La [nocturna 42180442019](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42180442019)
