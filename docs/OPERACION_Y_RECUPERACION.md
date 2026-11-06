@@ -32,7 +32,8 @@ no una garantía contractual del proveedor. Abrir una incidencia si hay retrasos
 |---|---|---|
 | `catalogo_vacantes` | Vacante canónica, descripción, tiempos, estado y JSON público | Referencia actual e historial; puede estar activa, cerrada o archivada |
 | `entregas_diarias` | ID, día, rol, grado y snapshot de selección | Reconstrucción de lote/no repetición; no representa envío a una persona |
-| `ofertas` | Filas v1 por enlace seleccionado | Compatibilidad e histórico; `active` no certifica vigencia actual |
+| `ofertas` | Una fila por vacante reconocida tras SQL 005 | Compatible con v1 y extras v5; `active` no certifica vigencia actual |
+| `ofertas_enlaces_historicos` | Copias por URL archivadas con fila original completa e ID principal | Conservación, auditoría y recuperación; no cuentan como otras vacantes |
 | `entrega_de_hoy` | Vista de la fecha máxima existente en `ofertas` | Puede mostrar un día anterior; no tiene almacenamiento propio |
 | `seleccion_estado_actual` | Vista privada que cruza selección con catálogo, rol vigente y enlaces | `estado_actual=lista` exige enlace de la ficha con menos de seis horas; no usar `ofertas.active` para enviar |
 | `resumen_entregas_actual` | Vista privada por fecha/rol | Distingue seleccionadas, listas ahora, pendientes, retiradas y afinidad por revisar; no cuenta filas v1 como ofertas |
@@ -218,7 +219,7 @@ copia recuperable para el cliente.
    Un técnico puede usar la receta siguiente, con cliente
    PostgreSQL compatible y acceso administrativo. Los servicios son perfiles de conexión seguros propios; no pegar
    contraseñas en argumentos ni en este manual. Ver [pg_service](https://www.postgresql.org/docs/current/libpq-pgservice.html).
-   Si se usó el instalador, hay seis tablas: añadir `--table=public.adaptia_migraciones` a esa receta. Conservar sus
+   Si se usó el instalador, hay siete tablas: añadir `--table=public.adaptia_migraciones` a esa receta. Conservar sus
    hashes/fechas; no reinicializar el diario durante una restauración. La receta pg_dump es una alternativa técnica
    al corte cifrado, no una tarea diaria del operador.
 

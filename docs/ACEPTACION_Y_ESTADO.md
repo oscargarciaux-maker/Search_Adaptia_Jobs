@@ -6,6 +6,24 @@ aprobados por haber fusionado otro PR. Instrucciones de uso: [GUIA_CLIENTE.md](G
 
 ## 1. Corte de evidencia
 
+### Corrección de identidad preparada el 6 de noviembre de 2026
+
+La auditoría de solo lectura [42181448612](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42181448612)
+revisó la entrega completa: 162 filas operativas, 120 selecciones y 120 oportunidades reconocidas. Encontró 42 grupos
+con dos filas por enlace y 42 filas adicionales; no quedaron vínculos ambiguos en esa entrega. El catálogo QA
+contenía 219 registros clasificados y 210 sin seleccionar; esto no certifica enlaces comprobados de todas ellas.
+
+SQL 005 y el contrato v5 convierten `ofertas` a una fila por vacante reconocida y conservan las copias en
+`ofertas_enlaces_historicos`. En PostgreSQL 17 aislado, un corte de las 120 seleccionadas reprodujo 162 filas;
+la migración dejó 120 y archivó 42, con cero sin identificar y sin cambiar las selecciones. También se ensayaron
+reintentos antiguos, inserciones concurrentes, enlaces ambiguos y aplicación repetida. Es evidencia de la reparación
+ensayada; todavía requiere fusión y preparación real para acreditar que Supabase productivo quedó consolidado.
+
+La captura pública `--prueba` del cambio terminó en 8,7 minutos con 1.483 registros temporales y doce comprobaciones
+positivas de doce programadas. No escribió en Supabase ni usó el actor Apify; no generó archivos de interfaz.
+GitHub rechazó la baja del sitio alojado con HTTP 403 tanto en esta sesión como desde Actions; el despliegue futuro
+está deshabilitado. La baja definitiva requiere los permisos administrativos del propietario. No declararla realizada.
+
 Alcance vigente: scraper, automatización y Supabase. La interfaz web y sus despliegues se retiran por decisión
 del propietario. Las referencias a web/Pages de cortes anteriores son evidencia histórica, no requisitos de entrega
 actual. Los criterios de interfaz, despliegue y envío manual desde la página quedan fuera de alcance. La retirada

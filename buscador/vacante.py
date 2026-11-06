@@ -8,7 +8,7 @@ CAMPOS_PUBLICOS = ["id", "titulo", "empresa", "ubicacion", "familias", "paises",
                    "nota_pais", "idioma", "ingles", "nivel", "anos_min", "salario", "herramientas",
                    "fecha_publicacion", "fecha_estimada", "visto_primera_vez", "visto_ultima_vez", "fuente", "fuentes",
                    "enlace", "enlace_directo", "tipo_enlace", "resumen", "publicada_en", "detectada_en", "vista_en",
-                   "verificacion", "rol_entrega_actual", "enlaces_alternativos", "duplicada_de"]
+                   "verificacion", "rol_entrega_actual", "enlaces_alternativos", "duplicada_de", "ids_agrupados"]
 
 
 def huella(empresa, titulo, enlace=""):
@@ -188,4 +188,5 @@ def publica(v):
     salida = {k: v.get(k) for k in CAMPOS_PUBLICOS}
     salida["enlaces_alternativos"] = sorted({url_limpia(u) for u in
         [v.get("enlace"), v.get("enlace_directo"), *v.get("_enlaces", [])] if u})
+    salida["ids_agrupados"] = sorted({v["id"], *v.get("_ids_fusionados", [])})
     return salida

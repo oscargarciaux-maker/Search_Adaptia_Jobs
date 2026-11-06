@@ -22,13 +22,15 @@ Camino preferido de instalación: `docs/INSTALACION_AUTOMATICA.md`. `SUPABASE_DB
 una vez como Secrets. Preparar Supabase sube respaldo cifrado antes de SQL, registra hashes en `adaptia_migraciones`
 y activa por marca privada; no pedir copiar 002/003 ni variables manuales para este camino. No modificar SQL ya registrado:
 añadir migración. Clave administrativa limitada a preparación; no se entrega a fuentes, navegador ni logs. Tras el
-instalador los cortes contienen seis tablas y dos secuencias. Probar `python -m pruebas.probar_migraciones` solo en PG aislado.
+instalador los cortes contienen siete tablas y dos secuencias. Probar `python -m pruebas.probar_migraciones` solo en PG aislado.
 SQL 003 + `ESTADO_SUPABASE_ACTIVO=true` activan el modo; no asumir que está desplegado. No volver al contador local
 como alternativa silenciosa ni vaciar reservas/colas para resolver errores. El arranque importa un corte coherente.
 `docs/PLAN.md` se conserva como diseño histórico: sus instrucciones antiguas no prevalecen sobre decisiones actuales.
 
 ## Decisiones vigentes de cobertura e integridad
 
+Leer `docs/CONTRATO_DATOS_v5.md`: una fila por vacante en `ofertas`, archivo íntegro de enlaces duplicados,
+IDs agrupados y selección sin contar copias. No borrar archivos históricos ni snapshots para ocultar déficit.
 Leer también `docs/CONTRATO_DATOS_v4.md`: vistas privadas de disponibilidad, afinidad vigente y reporte por rol.
 SQL 004 es aditivo y automático; no modificar SQL 001–003 ni el estado histórico v1. Conservar variantes pertinentes;
 desarrollo genérico no cuenta como QA/IA.
@@ -55,7 +57,7 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
 - **Volumen antes que filtros.** Solo filtran: el cargo (mapa de cargos), 30 días de antigüedad, que siga abierta, que no
   esté repetida, que tenga un enlace comprobado para nuevas entregas y que se pueda aplicar desde el país elegido.
   Inglés, nivel y años se muestran como columnas.
-- **Contrato de datos v1 manda** en la entrega: mismos nombres y valores; lo que el aviso no dice queda vacío (nunca se
+- **Contrato v1 + ampliación v5** en la entrega: nombres y valores compatibles, una fila por vacante reconocida; lo que el aviso no dice queda vacío (nunca se
   inventa: ni la moneda de un "$" solo, ni la modalidad que el aviso no dice). Un campo nuevo se agrega primero al
   contrato (versión nueva) y después al código. Solo ofertas en español o inglés.
 - **Entrega diaria:** `por_rol` nuevas por rol, nunca repetidas (`trabajo/entregadas.json`), variadas (idioma, nivel,
@@ -76,7 +78,7 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
 
 ## Cómo se trabaja
 - Un paso del plan por sesión, en una rama, con un PR que Oscar revisa y fusiona.
-- Pruebas obligatorias antes de cada push: `python -m pytest -q`; CI también comprueba PostgreSQL. No se requiere Node tras retirar la interfaz..
+- Pruebas obligatorias antes de cada push: `python -m pytest -q`; CI también comprueba PostgreSQL. No se requiere Node tras retirar la interfaz.
 - Prueba en vivo corta (unos 5 minutos, con internet): `python -m buscador.bodega --salida /tmp/prueba --prueba`.
 - Lo que cambia sin tocar código vive en `datos/` (mapa de cargos, países, dominios, empresas, `config.yaml`).
 - Respuestas a Oscar en español y en lenguaje sencillo.

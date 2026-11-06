@@ -8,7 +8,11 @@ hojas de cálculo. Catálogo/selección y verificación se amplían en [v2](CONT
 
 Este documento define **una sola forma de describir una oferta**. La plataforma, el scraper, la IA que analiza ofertas pegadas y los agentes futuros usan **los mismos nombres de campo y los mismos valores permitidos**. Si algo no está aquí, se agrega aquí primero (con versión nueva) y después se usa.
 
-## 1. Cómo se entregan las ofertas
+**Cambio vigente:** [v5](CONTRATO_DATOS_v5.md) mantiene las columnas y añade identidad y enlaces alternativos.
+`ofertas` pasa a una fila por vacante reconocida; las copias anteriores por enlace se conservan en
+`ofertas_enlaces_historicos`. El formato por enlace de abajo es el diseño anterior, no la regla actual de conteo.
+
+## 1. Formato original de entrega
 
 Una fila por enlace de oferta, con estas columnas (nombres en inglés, en minúscula, con guion bajo). Dos enlaces de una
 misma vacante pueden producir dos filas v1 y una sola selección canónica v2. El programa envía objetos JSON a Supabase;

@@ -11,6 +11,7 @@ revoke all on public.ofertas_enlaces_historicos from public,anon,authenticated,s
 grant select on public.ofertas_enlaces_historicos to service_role;
 create unique index if not exists archivo_oferta_por_enlace on public.ofertas_enlaces_historicos
  (vacante_id,(fila_original->>'external_id'));
+create index if not exists catalogo_ids_agrupados on public.catalogo_vacantes using gin((datos->'ids_agrupados'));
 
 create or replace function public.adaptia_url_identidad(valor text) returns text
 language plpgsql immutable strict set search_path='' as $$
@@ -43,12 +44,17 @@ $$;
 
 create or replace function public.adaptia_vacante_principal(valor text) returns text
 language plpgsql stable set search_path='' as $$
-declare siguiente text; visitadas text[]:='{}'; actual text:=valor;
+declare siguiente text; visitadas text[]:='{}'; actual text:=valor; destinos bigint;
 begin
  for paso in 1..20 loop
   if actual=any(visitadas) then raise exception 'Ciclo de identidades de vacante'; end if;
   visitadas:=array_append(visitadas,actual);
   select datos->>'duplicada_de' into siguiente from public.catalogo_vacantes where id=actual;
+  if coalesce(siguiente,'')='' then
+   select min(id),count(*) into siguiente,destinos from public.catalogo_vacantes
+    where datos->'ids_agrupados' ? actual and id<>actual and coalesce(datos->>'duplicada_de','')='';
+   if destinos<>1 then return actual; end if;
+  end if;
   if coalesce(siguiente,'')='' then return actual; end if;
   if not exists(select 1 from public.catalogo_vacantes where id=siguiente) then
    raise exception 'La identidad principal todavía no está sincronizada'; end if;

@@ -14,7 +14,8 @@ alternativas. Las actualizaciones repetidas no duplican archivo. Los respaldos i
 La identidad se reconoce por URL compartida o contenido sustancialmente igual con empresa, título, nivel y lugar
 compatibles. Se normalizan HTML y diferencias de formato; los títulos iguales sin evidencia de contenido no bastan.
 Requisiciones distintas y ubicaciones incompatibles permanecen separadas. Las fusiones conservan todos los enlaces
-e identificadores previos. `datos.duplicada_de` señala un registro de catálogo archivado por fusión;
+e identificadores previos. `datos.ids_agrupados` conserva los IDs asociados al registro principal, incluso si una copia
+ya estaba archivada antes de detectarse su relación. `datos.duplicada_de` señala un registro archivado por fusión;
 `datos.enlaces_alternativos` conserva los enlaces asociados al registro principal. Los snapshots históricos no cambian.
 
 Las selecciones futuras se deduplican antes de elegir. Se conserva la memoria de IDs fusionados para impedir que

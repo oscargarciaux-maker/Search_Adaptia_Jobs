@@ -16,15 +16,17 @@ SQL Editor permite consultar las vistas si no aparecen en el listado. No compart
 | `entregas_diarias` | Selección histórica por fecha y rol, sin contar cada enlace como otra vacante |
 | `seleccion_estado_actual` | Selección cruzada con catálogo, afinidad y enlace vigentes; `estado_actual=lista` es la consulta operativa |
 | `resumen_entregas_actual` | Seleccionadas, listas ahora, pendientes, retiradas y afinidad por revisar, agrupadas por fecha y rol |
-| `ofertas` | Histórico compatible v1: una fila por enlace, no necesariamente una vacante diferente |
+| `ofertas` | Una fila operativa por vacante reconocida tras SQL 005, con los enlaces alternativos asociados |
+| `ofertas_enlaces_historicos` | Copias anteriores por URL conservadas íntegramente, con referencia al registro principal |
 | `entrega_de_hoy` | Última fecha existente en el histórico v1; puede corresponder a un día anterior |
 | `estado_operativo` | Tareas administrativas pendientes y recuperación; no es un listado para clientes |
 | `apify_reservas` | Reservas duraderas del presupuesto de Apify; no borrar para liberar crédito |
 | `adaptia_migraciones` | Versiones SQL instaladas; uso administrativo |
 
 Para QA, filtrar `role_id=qa` en la selección o `search_tag=QA` en el histórico. Sus títulos también pueden ser
-Tester, SDET o variantes pertinentes. Dos enlaces de la misma vacante se conservan como dos filas v1, pero una
-sola selección. No borrar el histórico para ocultar duplicidad visual, cierres o errores anteriores.
+Tester, SDET o variantes pertinentes. Dos enlaces de la misma vacante se asocian a una sola fila. SQL 005 archiva las copias antiguas sin perder sus datos
+y evita que un reintento las recree. Las filas con vínculo ambiguo se conservan y se informan como sin identificar;
+no se eliminan por compartir título. Consultar [Identidad v5](CONTRATO_DATOS_v5.md).
 
 ## 2. Estados, fechas y límites
 

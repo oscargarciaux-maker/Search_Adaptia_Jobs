@@ -5,6 +5,7 @@ empieza en [GUIA_CLIENTE.md](GUIA_CLIENTE.md); los resultados observados están 
 
 | Revisión | Qué cambió | Consecuencia para el cliente |
 |---|---|---|
+| Identidad v5 — requiere fusión y preparación automática | Una fila por vacante, enlaces asociados, archivo íntegro de copias antiguas y protección contra reintentos/concurrencia | Los otros portales no inflan la cantidad de oportunidades; SQL 005 reconcilia coincidencias inequívocas |
 | Operación sin interfaz web — pendiente de fusión | Se retiran frontend, Functions, Node y el despliegue de Pages; se conserva reporte y estado técnico | Consultar vacantes y disponibilidad en Supabase y ejecuciones en Actions |
 | Vigencia — comprobar captura posterior a la fusión | QA/IA sin cercanos genéricos, reclasificación, vistas privadas SQL 004 y conteos actuales por rol | No confundir 120 históricas con 120 listas; diagnóstico de solo lectura con evidencia real |
 | PR #6 — cobertura/integridad | LATAM y España más remotas mundiales, prioridad remota, rotación de aliases, identidad por enlaces/contenido y reintentos | Colombia no limita cobertura; la cuota se evalúa por rol y la no repetición necesita memoria |

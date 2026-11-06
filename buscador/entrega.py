@@ -216,12 +216,14 @@ def correr(vacantes, entregadas, hoy, capturada, carpeta, subir=None, pendientes
     for h in [h for h, f in entregadas.items() if f < limite]:
         del entregadas[h]
     resumen["vacantes"] = sum(len(x) for x in elegidas.values())
+    resumen["vacantes_unicas"] = len(vacante.juntar([v for lista in elegidas.values() for v,_ in lista]))
+    resumen["copias_en_lote"] = resumen["vacantes"] - resumen["vacantes_unicas"]
     resumen["enlaces_comprobados"] = bool(resumen["vacantes"]) and all(
         (v.get("verificacion") or {}).get("estado") == "verificada" for lista in elegidas.values() for v, _ in lista)
     resumen["filas"] = len(filas)
     resumen["archivos"] = False  # compatibilidad con reportes históricos; Supabase es el destino operativo
     resumen["meta_por_rol"] = cfg["por_rol"]
-    resumen["meta_cumplida"] = all(r["faltan"] == 0 for r in resumen["roles"].values())
+    resumen["meta_cumplida"] = all(r["faltan"] == 0 for r in resumen["roles"].values()) and not resumen["copias_en_lote"]
     if subir is not None:
         resultado = dict(subir(list(pendientes.values())))
         for external_id in resultado.pop("confirmadas", []):

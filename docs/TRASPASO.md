@@ -18,7 +18,7 @@ No transferir cuentas personales ni compartir contraseñas para simular el cambi
 | Elemento | Qué se entrega o configura | Evidencia |
 |---|---|---|
 | GitHub | Código `main`, flujos, rama `publicado`, permisos y ramas protegidas | Cliente entra con su cuenta y ve las ejecuciones |
-| Supabase | Proyecto conservado o restauración de tablas/permisos; seis tablas y dos secuencias con el instalador | Conteos, referencias, reservas y lectura/escritura reales |
+| Supabase | Proyecto conservado o restauración de tablas/permisos; siete tablas y dos secuencias con el instalador | Conteos, referencias, reservas y lectura/escritura reales |
 | Apify | Cuenta/organización del cliente, actor y límite | Token nuevo validado, saldo y reservas contrastados |
 | Estado de trabajo | Toda la carpeta `trabajo/` de un mismo corte | Lote, colas y presupuesto respaldados juntos |
 | Manuales y soporte | Versiones vigentes, incidencias conocidas y responsables | Cliente completa una búsqueda/selección sin ayuda |

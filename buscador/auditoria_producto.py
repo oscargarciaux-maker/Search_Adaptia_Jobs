@@ -40,6 +40,8 @@ def consultar(conn, url=""):
         conn.execute("set transaction read only")
         conn.execute("set local statement_timeout = '30s'")
         informe = {}
+        informe["totales"] = {tabla: conn.execute(f"select count(*) from public.{tabla}").fetchone()[0]
+            for tabla in ("ofertas","catalogo_vacantes","entregas_diarias")}
         informe["duplicados"] = duplicados(conn)
         if conn.execute("select to_regclass('public.ofertas_enlaces_historicos')").fetchone()[0]:
             informe["enlaces_archivados"] = conn.execute("select count(*) from public.ofertas_enlaces_historicos").fetchone()[0]
