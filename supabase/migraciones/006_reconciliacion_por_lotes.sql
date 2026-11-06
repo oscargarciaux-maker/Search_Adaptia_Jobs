@@ -72,7 +72,7 @@ begin
     from public.catalogo_vacantes c where c.id=m.value and jsonb_typeof(c.datos->'enlaces_alternativos')='array'
    union all select h.fila_original->>'offer_url' from public.ofertas_enlaces_historicos h where h.vacante_id=m.value
    union all select o.offer_url) u where coalesce(u.url,'')<>'')
- from jsonb_each_text(mapa) m where m.key=o.id::text and o.vacante_id is distinct from m.value;
+ from jsonb_each_text(mapa) m where m.key=o.id::text;
  return jsonb_build_object('archivadas',archivadas,'filas_unicas',(select count(*) from public.ofertas),
   'sin_identificar',(select count(*) from public.ofertas where vacante_id is null));
 end;
