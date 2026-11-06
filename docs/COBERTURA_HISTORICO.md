@@ -8,6 +8,12 @@ no implican un despliegue ni una modificación de servicios externos.
 
 ## Cobertura y selección
 
+Una región general de la fuente (por ejemplo EMEA) no convierte en elegible una oferta cuya residencia se limita
+explícitamente a otros países. Se reconocen restricciones como «must be physically located in» y el alcance específico
+del título «Remote in…», también cuando la ficha de ubicación es más amplia. Las restricciones explícitas reconocidas
+se intersectan; una oficina o un cliente extranjero en la descripción no es por sí solo una restricción. La revisión
+también se aplica al inventario guardado, archivando las no elegibles sin reescribir selecciones históricas.
+
 - LATAM (20 territorios configurados), España y ofertas remotas mundiales. Otros países se ampliarán después.
 - Bogotá fija únicamente la hora de ejecución, no una preferencia de país. La página no selecciona Colombia por defecto.
 - LinkedIn incorpora búsquedas remotas para LATAM, España y Worldwide, además de las búsquedas por país.

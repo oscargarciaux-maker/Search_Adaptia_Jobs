@@ -49,6 +49,22 @@ def test_releer_bodega_no_refresca_la_ultima_observacion():
     assert vacante.unir(legado, nueva)["detectada_en"] == ""
 
 
+@pytest.mark.parametrize("titulo,lugar", [
+    ("Freelance Software Tester (Remote in Réunion, Monaco)", "Réunion or Monaco"),
+    ("Freelance Software Tester (Remote in Germany & the Netherlands)", "Germany or the Netherlands"),
+])
+def test_revisar_inventario_retira_residencias_fuera_de_cobertura_sin_cambiar_snapshot(titulo, lugar):
+    v = oferta()
+    v.update(titulo=titulo, ubicacion="Remote in EMEA", paises=["ES"],
+             _descripcion="Location: Must be physically located in " + lugar + ". " + TEXTO)
+    original = deepcopy(v)
+    retiradas = []
+    salida, _, _ = bodega.limpiar([v], [], HOY, 30, set(), set(), retiradas=retiradas)
+    assert not salida and len(retiradas) == 1
+    assert retiradas[0][1:] == ("archived", "sin elegibilidad regional")
+    assert retiradas[0][0]["paises"] == [] and v == original
+
+
 def test_unir_no_pierde_hora_al_cruzar_medianoche_utc():
     v = oferta(fecha="2026-11-03T23:30:00-05:00")
     assert vacante.unir(v, dict(v))["publicada_en"] == "2026-11-04T04:30:00Z"
