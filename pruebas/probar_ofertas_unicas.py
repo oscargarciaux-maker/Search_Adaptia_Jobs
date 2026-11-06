@@ -95,6 +95,20 @@ def main():
             c.execute("""insert into public.ofertas(external_id,job_title,company_name,offer_url)
              values('portal-b','QA Engineer','Empresa','https://es.indeed.com/viewjob?jk=abc123') on conflict(external_id) do nothing""")
             assert c.execute("select count(*) from public.ofertas where vacante_id='aaaaaaaaaaaaaaaa'").fetchone()[0] == 1
+            c.execute("""create table public.referencia_prueba(oferta_id bigint references public.ofertas(id) on delete cascade);
+             insert into public.ofertas(external_id,job_title,company_name,offer_url)
+              values('referenciada','QA Engineer','Empresa','https://jobs.lever.co/a/pendiente');
+             insert into public.referencia_prueba select id from public.ofertas where external_id='referenciada';
+             update public.catalogo_vacantes set datos=datos||'{"enlaces_alternativos":["https://jobs.lever.co/a/pendiente"]}'::jsonb
+              where id='aaaaaaaaaaaaaaaa';""")
+            try:
+                with c.transaction(): c.execute("select public.reconciliar_ofertas()")
+                raise AssertionError("Una consolidación pudo retirar una fila con referencias")
+            except psycopg.errors.RaiseException:
+                pass
+            assert c.execute("select count(*) from public.referencia_prueba").fetchone()[0] == 1
+            assert c.execute("select count(*) from public.ofertas where external_id='referenciada'").fetchone()[0] == 1
+            c.execute("drop table public.referencia_prueba")
             assert c.execute("select count(*) from public.ofertas_enlaces_historicos").fetchone()[0] == 1
             assert not c.execute("select has_table_privilege('anon','public.ofertas_enlaces_historicos','SELECT')").fetchone()[0]
             assert not c.execute("select has_function_privilege('authenticated','public.reconciliar_ofertas()','EXECUTE')").fetchone()[0]

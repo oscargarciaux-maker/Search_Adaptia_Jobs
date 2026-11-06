@@ -82,9 +82,10 @@ $$;
 
 create or replace function public.reconciliar_ofertas() returns jsonb
 language plpgsql security definer set search_path='' as $$
-declare mapa jsonb; r record; archivadas integer:=0;
+declare mapa jsonb; r record; archivadas integer:=0; referencias boolean;
 begin
  perform pg_advisory_xact_lock(hashtextextended('adaptia.ofertas.unicas',0));
+ select exists(select 1 from pg_constraint where contype='f' and confrelid='public.ofertas'::regclass) into referencias;
  with enlaces as (
   select c.id,u.url from public.catalogo_vacantes c cross join lateral jsonb_array_elements_text(
     jsonb_build_array(c.datos->>'enlace',c.datos->>'enlace_directo')||
@@ -109,6 +110,7 @@ begin
   from public.ofertas o join jsonb_each_text(mapa) m on m.key=o.id::text
  loop
   if r.posicion>1 then
+   if referencias then raise exception 'Hay referencias a ofertas históricas; conservarlas y planificar sus aliases antes de consolidar'; end if;
    insert into public.ofertas_enlaces_historicos(oferta_id,vacante_id,fila_original)
     values(r.id,r.principal,r.original) on conflict(oferta_id) do nothing;
    if not exists(select 1 from public.ofertas_enlaces_historicos h where h.oferta_id=r.id and h.fila_original=r.original) then

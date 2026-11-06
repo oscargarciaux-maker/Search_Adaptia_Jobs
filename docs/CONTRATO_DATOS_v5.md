@@ -10,6 +10,8 @@ Los registros adicionales antiguos se conservan íntegros en `ofertas_enlaces_hi
 adicionales y conserva la de menor ID. Los vínculos ambiguos no se inventan y se informan como sin identificar.
 Un disparador serializa inserciones y evita recrear una segunda fila para la misma identidad, conservando copias
 alternativas. Las actualizaciones repetidas no duplican archivo. Los respaldos incluyen la nueva tabla.
+Si otras tablas referencian las filas antiguas de `ofertas`, la consolidación se detiene antes de retirarlas:
+no se permite que una relación en cascada elimine candidaturas u otros datos externos.
 
 La identidad se reconoce por URL compartida o contenido sustancialmente igual con empresa, título, nivel y lugar
 compatibles. Se normalizan HTML y diferencias de formato; los títulos iguales sin evidencia de contenido no bastan.
