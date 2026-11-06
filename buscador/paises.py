@@ -45,6 +45,10 @@ def datos():
     for p in paises:
         for frase in p["nombres"] + p["gentilicios"] + p["ciudades"]:
             claves.append((normalizar.texto(frase), p["codigo"]))
+    ciudades = {}
+    for p in paises:
+        for ciudad in p["ciudades"]:
+            ciudades.setdefault(normalizar.texto(ciudad),[]).append(p["codigo"])
     claves.sort(key=lambda x: -len(x[0]))  # las frases largas primero ("santiago de chile" antes que "santiago")
     return {
         "paises": paises,
@@ -53,6 +57,8 @@ def datos():
         "europa": [p["codigo"] for p in paises if p.get("region") == "europa"],
         "utc": {p["codigo"]: p["utc"] for p in paises},
         "claves": claves,
+        "nombres_pais": [(p["codigo"],[normalizar.texto(x) for x in p["nombres"]+p["gentilicios"]]) for p in paises],
+        "ciudades": ciudades,
         "toda_latam": sorted({normalizar.texto(x) for x in crudo["toda_latam"]}, key=len, reverse=True),
         "mundo": sorted({normalizar.texto(x) for x in crudo["todo_el_mundo"]}, key=len, reverse=True),
         "toda_europa": sorted({normalizar.texto(x) for x in crudo["toda_europa"]}, key=len, reverse=True),
@@ -156,11 +162,11 @@ def elegibles(titulo, ubicacion, descripcion="", remoto=None):
     mod = modalidad(titulo, ubicacion, descripcion, remoto)
     # El título no puede convertir una oficina de otro país en una ubicación permitida.
     geografia = normalizar.texto(ubicacion)
-    nombres_pais = [p["codigo"] for p in d["paises"] if _nombra(geografia,[normalizar.texto(x) for x in p["nombres"]+p["gentilicios"]])]
+    nombres_pais = [codigo for codigo,nombres in d["nombres_pais"] if _nombra(geografia,nombres)]
     ciudad_sola = normalizar.texto(_REMOTO.sub(" ",_HIBRIDO.sub(" ",_PRESENCIAL.sub(" ",geografia))))
     ciudad_sola = re.sub(r"^(?:area metropolitana de |region metropolitana de |greater )", "", ciudad_sola)
     ciudad_sola = re.sub(r" (?:y alrededores|and surrounding areas|metropolitan area|area)$", "", ciudad_sola)
-    ciudades = [p["codigo"] for p in d["paises"] if ciudad_sola in {normalizar.texto(x) for x in p["ciudades"]}]
+    ciudades = d["ciudades"].get(ciudad_sola,[])
     nombrados = nombres_pais or ciudades
     es_latam = _nombra(ambito, d["toda_latam"])
     es_mundo = _nombra(ambito, d["mundo"])
