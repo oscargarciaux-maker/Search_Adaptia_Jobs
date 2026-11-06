@@ -26,12 +26,21 @@ def consultar(conn, url=""):
             # Buscar el identificador público de Indeed también entre sus dominios nacionales.
             jk = parse_qs(p.query).get("jk", [""])[0] if (p.hostname or "").endswith(".indeed.com") else ""
             patron = "%jk=" + jk + "%" if jk and jk.isalnum() else url
-            informe["caso_ofertas"] = conn.execute("""select external_id,job_title,status,delivery_date::text,search_tag
-                from public.ofertas where offer_url like %s limit 10""", (patron,)).fetchall()
+            informe["caso_ofertas"] = conn.execute("""with objetivo as (
+                select job_title,company_name from public.ofertas where offer_url like %s limit 1)
+                select o.id,o.external_id,o.job_title,o.status,o.delivery_date::text,o.search_tag,
+                       o.source_portal,o.offer_url
+                from public.ofertas o join objetivo t using(job_title,company_name)
+                order by o.id limit 10""", (patron,)).fetchall()
             informe["caso_catalogo"] = conn.execute("""select id,datos->>'titulo',status,reason,observed_at::text,
                 datos->'verificacion'->>'estado',datos->'verificacion'->>'motivo'
                 from public.catalogo_vacantes where datos->>'enlace' like %s or datos->>'enlace_directo' like %s
                 limit 10""", (patron, patron)).fetchall()
+            informe["caso_seleccion"] = conn.execute("""select e.vacante_id,e.delivery_date::text,e.role_id,
+                e.snapshot->>'titulo',c.datos->>'enlace',c.datos->>'enlace_directo'
+                from public.entregas_diarias e join public.catalogo_vacantes c on c.id=e.vacante_id
+                where c.datos->>'enlace' like %s or c.datos->>'enlace_directo' like %s limit 10""",
+                (patron, patron)).fetchall()
         return informe
 
 

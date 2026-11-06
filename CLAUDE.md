@@ -30,7 +30,7 @@ como alternativa silenciosa ni vaciar reservas/colas para resolver errores. El a
 
 Leer también `docs/CONTRATO_DATOS_v4.md`: vistas privadas de disponibilidad, afinidad vigente y reporte por rol.
 SQL 004 es aditivo y automático; no modificar SQL 001–003 ni el estado histórico v1. Conservar variantes pertinentes;
-desarrollo genérico no cuenta como QA/IA. El guion para cliente está en `docs/DEMOSTRACION_CLIENTE.md`.
+desarrollo genérico no cuenta como QA/IA.
 Leer `docs/CONTRATO_DATOS_v3.md` y `docs/CONTROL_CALIDAD_ENLACES.md`: comprobar enlaces antes de nuevas entregas,
 no confundir HTTP 200 con ficha vigente ni 403 con cierre. La verificación tiene caducidad y presupuesto, no usa Apify
 ni envía formularios. Los snapshots históricos no se reescriben; un futuro bot debe consultar el catálogo y sus enlaces

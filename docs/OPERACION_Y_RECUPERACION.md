@@ -93,7 +93,7 @@ En **Actions → Diagnóstico → Run workflow**, rama `main`:
 
 - `auditar_producto=true`: consulta de solo lectura con conteos de la última fecha por `search_tag`/`role_id`,
   muestra pública acotada de QA y estado de una URL opcional en `vacante_url`. No escribe, migra ni usa Apify.
-  Tiene prioridad sobre las otras opciones. Comparar fechas, no solo el nombre del rol; ver [demostración](DEMOSTRACION_CLIENTE.md).
+  Tiene prioridad sobre las otras opciones. Comparar fechas, no solo el nombre del rol.
 
 - `solo_conexion_db=true`: comprobar específicamente el acceso PostgreSQL administrativo en solo lectura. No aplica
   migraciones ni usa Apify; tiene prioridad sobre las otras opciones. Distingue configuración, autenticación, red y TLS

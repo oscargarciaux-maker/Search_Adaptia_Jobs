@@ -2,8 +2,6 @@
 
 Versión documental: revisión de la noche del 5 de noviembre de 2026. Describe el código incluido con este manual.
 Que un cambio esté fusionado no demuestra que ya haya pasado por una captura y llegado a la página; comprobarlo abajo.
-Para presentar el producto, seguir el [guion de demostración](DEMOSTRACION_CLIENTE.md), con mapa del sistema,
-recorrido de diez minutos, auditoría de roles y explicación de la vigencia.
 
 ## 1. Qué recibe y por dónde empezar
 

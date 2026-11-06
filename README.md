@@ -15,7 +15,6 @@ WhatsApp ni seguimiento individual de candidaturas.
 
 | Para quién / tarea | Documento vigente |
 |---|---|
-| Mostrar el producto al cliente y explicar componentes, estados y roles | [Guion de demostración](docs/DEMOSTRACION_CLIENTE.md) |
 | Operador y cliente: aprender a usar e interpretar resultados | [Manual del cliente](docs/GUIA_CLIENTE.md) |
 | Administrador: instalar o actualizar sin perder datos | [Instalación](docs/INSTALACION.md) |
 | Configurar una vez y aplicar SQL/activación automáticamente | [Instalación automática](docs/INSTALACION_AUTOMATICA.md) |
