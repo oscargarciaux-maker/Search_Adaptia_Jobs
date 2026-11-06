@@ -1,7 +1,7 @@
 name: Búsqueda profunda
 
 # Busca en vivo un cargo (y sus parecidos del mapa) en todas las fuentes, lo suma a la bodega y vuelve a publicar.
-# La lanza la página (botón "Búsqueda profunda", con Cloudflare) o se corre a mano: Actions > Búsqueda profunda > Run workflow.
+# Se ejecuta en Actions > Búsqueda profunda > Run workflow.
 on:
   workflow_dispatch:
     inputs:

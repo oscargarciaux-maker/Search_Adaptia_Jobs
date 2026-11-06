@@ -6,10 +6,10 @@ Manager, AI Engineer y QA), variadas y sin repetir, en **Supabase**. La captura 
 sin crear otra entrega. Se comprueban enlaces antes de nuevas selecciones; cierres, páginas generales y cobros detectados
 se apartan y lo que no puede comprobarse queda pendiente. La cobertura/volumen no se garantizan por completo.
 
-La página permite buscar dentro de la ventana activa de 30 días, elegir ofertas comprobadas y copiar para WhatsApp
-para compartir por WhatsApp manualmente. Supabase es el destino de las vacantes; se retiró la exportación a hojas de
-cálculo. La búsqueda diaria no usa IA ni sesión personal de LinkedIn. Todavía no hay agente
-WhatsApp ni seguimiento individual de candidaturas.
+La operación se consulta en Supabase y GitHub Actions. La interfaz web y sus despliegues se retiraron por decisión
+del propietario. La búsqueda diaria no usa IA ni sesión personal de LinkedIn. Todavía no hay agente WhatsApp
+ni seguimiento individual de candidaturas. La rama histórica `publicado` conserva reportes y estado de captura,
+no un sitio web; no borrarla porque contiene inventario y memoria necesarios para continuar.
 
 ## Documentación de entrega
 
@@ -61,6 +61,5 @@ retrasar/saltar ejecuciones. El límite de USD 5 es Apify, no un precio total ga
 ```bash
 pip install -r requirements.txt
 python -m pytest -q
-node --test pruebas/*.test.js
 python -m buscador.bodega --salida /tmp/prueba --prueba   # prueba en vivo de unos 5 minutos
 ```

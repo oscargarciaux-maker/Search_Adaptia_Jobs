@@ -15,7 +15,7 @@ La preparación comparte la exclusión de las capturas; en este camino no hay qu
 2. **Bodega nocturna**: abrir la ejecución real, leer resumen y comprobar selección por los seis roles, faltantes,
    sincronización histórica, catálogo y registro de selección. `prueba=true` no acredita escritura.
 3. **Captura horaria**: comprobar que hubo un trabajo ejecutado, no omitido, y que el paso final de catálogo terminó.
-4. **Actualizar página** o despliegue Cloudflare: comparar la hora real del dato con la rama `publicado`.
+4. **Reporte y base**: comparar la hora de `publicado/datos/salud.json` con la última captura y las vistas de Supabase.
 5. **Calidad**: revisar estados y hora de enlaces de la selección del día. La selección histórica puede seguir en 120
    mientras una parte cerró después o está pendiente; no compartir por esa cifra sin mirar el estado actual.
 6. Abrir al menos una muestra de cada rol y revisar cargo afín, residencia, idioma y acceso a postulación.
@@ -39,8 +39,7 @@ no una garantía contractual del proveedor. Abrir una incidencia si hay retrasos
 | `publicado/trabajo/` | Estado de búsqueda, memoria, colas, presupuesto y caché | Continuar ejecuciones y recuperar pendientes |
 | Supabase con SQL 003 | `estado_operativo` y `apify_reservas` privados | Autoridad de pendientes/reservas en modo central; archivos de trabajo auxiliares |
 | `adaptia_migraciones` | Versión, nombre, hash y fecha; acceso administrativo | Evita repetir o modificar migraciones ya aplicadas; incluir en respaldos automáticos |
-| `publicado/datos/` | Datos públicos de la página y reporte de salud | Consulta de la interfaz; no sustituye a Supabase |
-| Navegador o Cloudflare KV | Marcas manuales de enviadas | Historial del operador, sin destinatario ni comprobante WhatsApp |
+| `publicado/datos/` | Reporte técnico de salud | Foto de la captura; no sustituye a Supabase |
 
 Cerrar significa evidencia de cierre; archivar puede deberse a antigüedad, fusión o enlace rechazado. Retirar del
 buscador no elimina registros en Supabase. Los 30 días son ventana activa, no retención máxima de la base.
@@ -51,12 +50,11 @@ una continuación sin duplicados.
 
 ## 3. Qué significa un resultado verde o rojo
 
-- **Verde en Pruebas:** pasaron Python/JavaScript/SQL de ese commit; SQL se prueba en PostgreSQL temporal.
+- **Verde en Pruebas:** pasaron Python/SQL de ese commit; SQL se prueba en PostgreSQL temporal.
 - **Verde en captura real:** revisar que no se hayan omitido los pasos y leer sus métricas. No equivale a verificación
   de todas las fuentes, de cada enlace del inventario ni de autenticidad de empresas.
 - **Rojo en validación al final:** puede haberse guardado ya catálogo/colas. Averiguar qué falta antes de repetir.
   Un fallo por déficit no significa que deban borrarse las ofertas válidas.
-- **Verde en despliegue:** se sirvieron archivos disponibles; pueden ser los datos anteriores si la captura falló antes.
 - **Pendiente/queued:** espera un runner o el grupo de publicación. No lanzar copias para forzar otra cola.
 
 Los trabajos comparten un grupo de publicación para evitar escrituras simultáneas. GitHub puede reemplazar trabajos
@@ -78,10 +76,6 @@ pendientes, retrasar o perder horarios; no se utiliza como una cola con conserva
 | Se detectó cobro o página general | URL y destino final, motivo y hora | Apartar, revisar original y documentar; no pagar para comprobar ni enviar formularios |
 | Apify aparece omitido | Cuota reservada, token, actor y crédito real | Si es por límite, esperar el período o usar fuentes gratuitas; no borrar reservas |
 | Dice «Publicaciones LinkedIn omitida» pero formal funciona | `publicaciones_por_dia=0` y bloque LinkedIn Apify | Es lo esperado: presupuesto reservado a fichas formales |
-| Web antigua con captura nueva | Despliegue, Source de Pages, variable y hora de salud | Ejecutar/reparar despliegue con datos existentes; no repetir toda la búsqueda para arreglar solo la web |
-| Pages no despliega | Source=GitHub Actions, `PAGES_POR_ACTIONS`, entorno/ramas | Corregir configuración; no volver a publicación desde rama |
-| Cloudflare tiene marcas/búsqueda distintas | Access, KV, repositorio/token y dominios | Revisar esa instalación; Functions no funcionan en GitHub Pages |
-| «Enviadas» desapareció en otro equipo | Historial local vs KV | Importar exportación o revisar KV; no borrar entregas de Supabase |
 | Capacidad Supabase o minutos Actions agotados | Uso/tamaño real y plan | Respaldar, acordar capacidad/frecuencia; archivar no libera automáticamente espacio |
 
 Para soporte guardar: enlace/ID de ejecución, commit, fecha/hora Colombia, rol afectado, URL problemática, último paso,
@@ -107,7 +101,7 @@ En **Actions → Diagnóstico → Run workflow**, rama `main`:
   crédito de la cuenta; no se incluye como una reserva normal del programa.
 
 En una captura, `prueba=true` no guarda ofertas ni actualiza la rama; no sirve para probar cuota/escritura productiva.
-**Búsqueda profunda** no tiene ese parámetro de prueba y puede consumir Apify. No repetirla para arreglar un despliegue.
+**Búsqueda profunda** no tiene ese parámetro de prueba y puede consumir Apify. No repetirla sin revisar el estado del presupuesto.
 
 Un técnico, desde el código aprobado con Python 3.12 y dependencias instaladas, puede revisar solo reportes:
 
@@ -134,7 +128,7 @@ del portal; compartir solo los motivos y URLs originales necesarios. No subir el
 
 ## 6. Consultas administrativas de comprobación
 
-Ejecutar en **Supabase → SQL Editor**, en el proyecto correcto. Son lecturas; no reemplazan la comprobación de la página.
+Ejecutar en **Supabase → SQL Editor**, en el proyecto correcto. Son lecturas; no certifican que todos los enlaces sigan abiertos.
 
 ```sql
 -- Las tres tablas base; aparecen también las dos nuevas si se aplicó 003.
@@ -288,7 +282,7 @@ contrastar Apify antes de reanudar; un backup viejo no repone crédito real. No 
 ## 9. Actualizaciones y regreso de versión
 
 Trabajar en rama y PR, ejecutar pruebas, revisar contrato y migraciones y respaldar antes de cambios de datos.
-Después de fusionar verificar la siguiente captura y la página, no solo el CI. Para regresar código, un técnico prepara
+Después de fusionar verificar la siguiente captura y las vistas de Supabase, no solo el CI. Para regresar código, un técnico prepara
 un revert revisable y pasa pruebas; no borrar tablas v2/v3 ni historia por regresar interfaz. Una versión anterior puede
 carecer de controles nuevos: no usarla como una solución permanente que vuelva a compartir enlaces sin comprobar.
 

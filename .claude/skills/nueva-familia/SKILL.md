@@ -5,7 +5,7 @@ description: Agrega un tipo de cargo (familia) al mapa de cargos o amplía una e
 
 # Nueva familia de cargos
 
-Objetivo: que al escribir ese cargo en la página salgan el exacto, los similares y los cercanos, de todos los niveles.
+Objetivo: que la captura reconozca el cargo exacto, los similares y los cercanos, de todos los niveles.
 
 1. Lee solo `datos/mapa_cargos.yaml` (el encabezado explica cada campo) y busca si ya hay una familia parecida: si existe,
    amplíala en vez de crear otra.
@@ -15,7 +15,7 @@ Objetivo: que al escribir ese cargo en la página salgan el exacto, los similare
    oficio en la descripción), `genericos` (palabras sueltas del oficio en el título) y `excluir` (oficios con nombre
    parecido que no son este).
 3. Agrega a `pruebas/test_familias.py` al menos 5 títulos reales de la familia (y 2 que NO deben entrar).
-4. Corre `python -m pytest -q` y `node --test pruebas/*.test.js`. Si una prueba vieja cambia, revisa que no se haya roto
+4. Corre `python -m pytest -q`. Si una prueba vieja cambia, revisa que no se haya roto
    otra familia (un título de una palabra en `similares` puede atrapar de más).
 5. Rama + PR. La familia empieza a buscarse en la siguiente bodega nocturna (o con *Bodega nocturna → modo inicial*).
 

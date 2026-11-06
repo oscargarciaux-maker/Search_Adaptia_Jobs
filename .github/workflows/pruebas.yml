@@ -1,6 +1,6 @@
 name: Pruebas
 
-# En cada push y PR: un cambio que rompa algo no se fusiona. Python (buscador/) y JavaScript (web/motor.js).
+# En cada push y PR: pruebas Python y PostgreSQL del scraper y la persistencia.
 on:
   push:
   pull_request:
@@ -59,9 +59,5 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
       - run: pip install -r requirements.txt
       - run: python -m pytest -q
-      - run: node --test pruebas/*.test.js

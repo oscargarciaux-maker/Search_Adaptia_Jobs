@@ -6,6 +6,11 @@ aprobados por haber fusionado otro PR. Instrucciones de uso: [GUIA_CLIENTE.md](G
 
 ## 1. Corte de evidencia
 
+Alcance vigente: scraper, automatización y Supabase. La interfaz web y sus despliegues se retiran por decisión
+del propietario. Las referencias a web/Pages de cortes anteriores son evidencia histórica, no requisitos de entrega
+actual. Los criterios de interfaz, despliegue y envío manual desde la página quedan fuera de alcance. La retirada
+local del código no acredita por sí sola que el sitio alojado se haya dado de baja.
+
 ### Actualización de la noche del 5 de noviembre de 2026, Colombia
 
 - **Preparación automática confirmada:** [42155588984](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42155588984)

@@ -21,6 +21,19 @@ def consultar(conn, url=""):
             from public.entregas_diarias e left join public.catalogo_vacantes c on c.id=e.vacante_id
             where e.role_id='qa' and e.delivery_date=(select max(delivery_date) from public.entregas_diarias)
             order by e.vacante_id limit 20""").fetchall()
+        if conn.execute("select to_regclass('public.resumen_entregas_actual')").fetchone()[0]:
+            informe["resumen_actual"] = conn.execute("""select role_id,seleccionadas,listas_ahora,
+                por_verificar,retiradas,revisar_afinidad from public.resumen_entregas_actual
+                where delivery_date=(select max(delivery_date) from public.entregas_diarias)
+                order by role_id""").fetchall()
+            informe["qa_actual"] = conn.execute("""select vacante_id,job_title,estado_actual
+                from public.seleccion_estado_actual where role_id='qa'
+                and delivery_date=(select max(delivery_date) from public.entregas_diarias)
+                order by estado_actual,job_title limit 20""").fetchall()
+            informe["qa_catalogo"] = conn.execute("""select count(*) as en_catalogo,
+                count(*) filter(where e.vacante_id is null) as sin_seleccionar
+                from public.catalogo_vacantes c left join public.entregas_diarias e on e.vacante_id=c.id
+                where c.status='active' and c.datos->>'rol_entrega_actual'='qa'""").fetchone()
         if url:
             p = urlparse(url)
             # Buscar el identificador público de Indeed también entre sus dominios nacionales.

@@ -5,6 +5,10 @@ name: Diagnóstico
 on:
   workflow_dispatch:
     inputs:
+      retirar_sitio:
+        description: "Dar de baja exclusivamente el sitio anterior; no modifica Supabase"
+        type: boolean
+        default: false
       auditar_producto:
         description: "Conteos reales por rol y estado de una URL pública; solo lectura, sin Apify"
         type: boolean
@@ -30,7 +34,20 @@ permissions:
   contents: read
 
 jobs:
+  retirar_sitio:
+    if: ${{ inputs.retirar_sitio }}
+    permissions:
+      pages: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Dar de baja GitHub Pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh api --method DELETE "repos/${GH_REPO}/pages" --silent
   diagnostico:
+    if: ${{ !inputs.retirar_sitio }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
