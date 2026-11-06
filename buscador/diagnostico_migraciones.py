@@ -1,6 +1,5 @@
 """Ensayo acotado del SQL pendiente: transacción revertida siempre, sin captura ni Apify."""
 import os
-from collections import defaultdict
 
 import psycopg
 
@@ -13,23 +12,8 @@ def identidades(conn):
         conn.execute("set transaction read only")
         conn.execute("set local statement_timeout='15s'")
         filas = conn.execute("select id,datos->>'duplicada_de',datos->'ids_agrupados' from public.catalogo_vacantes").fetchall()
-    aliases = defaultdict(set)
-    explicitas = {i:d for i,d,_ in filas if d}
-    for i,d,grupo in filas:
-        if not d and isinstance(grupo,list):
-            for a in grupo:
-                if a!=i: aliases[a].add(i)
-    siguiente = {i:explicitas.get(i) or (next(iter(aliases[i])) if len(aliases[i])==1 else None) for i,_,_ in filas}
-    ciclos = set()
-    for i in siguiente:
-        camino = []
-        actual = i
-        while actual and actual not in camino and len(camino)<21:
-            camino.append(actual)
-            actual = siguiente.get(actual)
-        if actual in camino:
-            ciclos.add(tuple(sorted(camino[camino.index(actual):])))
-    return {'ciclos':len(ciclos),'muestra':[{'ids':list(c),'explicitos':[i for i in c if i in explicitas]} for c in sorted(ciclos)[:5]]}
+    ciclos = migraciones.ciclos_aliases(filas)
+    return {'ciclos_aliases_sin_referencia_explicita':len(ciclos),'muestra_ids':[list(c) for c in ciclos[:5]]}
 
 
 def ensayar(conn):

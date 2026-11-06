@@ -151,10 +151,50 @@ def pendientes(conn, versiones):
     return faltantes
 
 
+
+def ciclos_aliases(filas):
+    """Solo ciclos inferidos por aliases únicos; las referencias explícitas contradictorias no se reparan."""
+    from collections import defaultdict
+    aliases = defaultdict(set)
+    explicitas = {i:d for i,d,grupo in filas if d}
+    for i,d,grupo in filas:
+        if not d and isinstance(grupo,list):
+            for a in grupo:
+                if a!=i: aliases[a].add(i)
+    siguiente = {i:explicitas.get(i) or (next(iter(aliases[i])) if len(aliases[i])==1 else None) for i,_,_ in filas}
+    ciclos, revisadas = set(), set()
+    for i in siguiente:
+        camino, posiciones = [], {}
+        actual = i
+        while actual and actual not in posiciones and actual not in revisadas:
+            posiciones[actual] = len(camino)
+            camino.append(actual)
+            actual = siguiente.get(actual)
+        if actual in posiciones:
+            ciclo = tuple(sorted(camino[posiciones[actual]:]))
+            if not any(i in explicitas for i in ciclo): ciclos.add(ciclo)
+        revisadas.update(camino)
+    return sorted(ciclos)
+
+
+def preparar_aliases_006(conn):
+    """Precondición de datos para 006 pendiente: mismo respaldo/transacción, sin reescribir SQL registrado."""
+    conn.execute("select pg_advisory_xact_lock(hashtextextended('adaptia.ofertas.unicas',0))")
+    filas = conn.execute("select id,datos->>'duplicada_de',datos->'ids_agrupados' from public.catalogo_vacantes").fetchall()
+    for ciclo in ciclos_aliases(filas):
+        # El menor ID hace la decisión estable e independiente del orden de lectura.
+        for identificador in ciclo[1:]:
+            conn.execute("""update public.catalogo_vacantes
+                set datos=jsonb_set(datos,'{duplicada_de}',to_jsonb(%s::text)),
+                    status='archived',reason='fusionada con otra fuente',observed_at=now()
+                where id=%s""", (ciclo[0],identificador))
+
+
 def aplicar(conn, versiones):
     if not versiones: return
     conn.execute(DIARIO)
     for m in versiones:
+        if m.version == "006": preparar_aliases_006(conn)
         conn.execute(m.cuerpo, prepare=False)
         conn.execute("insert into public.adaptia_migraciones(version,nombre,sha256) values(%s,%s,%s)",
                      (m.version, m.nombre, m.digest))

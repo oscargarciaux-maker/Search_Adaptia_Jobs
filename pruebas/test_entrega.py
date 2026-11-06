@@ -280,3 +280,15 @@ def test_direccion_de_supabase_con_ruta():
     supabase.subir([dict.fromkeys(contrato.COLUMNAS + contrato.EXTRAS, "") | {"external_id": "x"}],
                    "https://abc.supabase.co/rest/v1", "sb_secret_1", sesion=s)
     assert s.llamadas[0][0] == "https://abc.supabase.co/rest/v1/ofertas?on_conflict=external_id"
+
+
+def test_region_dudosa_no_completa_meta_pero_mundial_si():
+    texto = "Design screens for our application and collaborate with the product team. " * 8
+    for ubicacion in ("Remote", "Ciudad sin identificar"):
+        v = _v("Product Designer", "Empresa", ubicacion, texto, "https://jobs.lever.co/a/incierta")
+        assert v["confianza_pais"] == "baja"
+        assert contrato.entregable(v) == "elegibilidad regional por confirmar"
+        elegidas, _ = entrega.elegir([v], {}, HOY)
+        assert not any(elegidas.values())
+    mundial = _v("Product Designer", "Empresa", "Remote Worldwide", texto, "https://jobs.lever.co/a/mundial")
+    assert not contrato.entregable(mundial)

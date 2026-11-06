@@ -50,6 +50,7 @@ def test_releer_bodega_no_refresca_la_ultima_observacion():
 
 
 @pytest.mark.parametrize("titulo,lugar", [
+    ("Product Owner (Remote in Estonia)", "Estonia"),
     ("Freelance Software Tester (Remote in Réunion, Monaco)", "Réunion or Monaco"),
     ("Freelance Software Tester (Remote in Germany & the Netherlands)", "Germany or the Netherlands"),
 ])
@@ -288,3 +289,15 @@ def test_un_dominio_parecido_no_se_convierte_en_url_o_id_linkedin():
 def reconciliacion_de_integracion_simulada(monkeypatch):
     from buscador import supabase
     monkeypatch.setattr(supabase, "reconciliar_ofertas", lambda: {"archivadas": 0, "sin_identificar": 0})
+
+
+def test_revisar_estonia_del_inventario_y_conservar_historico():
+    v = dict(oferta(), titulo="Product Owner", ubicacion="Tartu, Condado de Tartu, Estonia", paises=paises.datos()["codigos"], modalidad="remoto", confianza_pais="baja")
+    original = deepcopy(v)
+    retiradas = []
+    salida, _, _ = bodega.limpiar([v], [], HOY, 30, set(), set(), retiradas=retiradas)
+    assert not salida and retiradas[0][1:] == ("archived", "sin elegibilidad regional")
+    pendientes = {}
+    catalogo.sincronizar(salida, retiradas, pendientes, lambda rows: {"confirmadas": []}, lambda p: None, AHORA)
+    assert pendientes[v["id"]]["status"] == "archived"
+    assert pendientes[v["id"]]["datos"]["paises"] == [] and v == original

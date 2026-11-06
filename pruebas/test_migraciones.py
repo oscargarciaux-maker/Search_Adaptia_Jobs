@@ -18,7 +18,7 @@ def sin_archivos_reales_de_actions(monkeypatch):
 
 def test_migraciones_en_orden_y_hash_del_sql_original():
     versiones = migraciones.descubrir()
-    assert [m.version for m in versiones] == ["001", "002", "003", "004", "005", "006"]
+    assert [m.version for m in versiones] == ["001", "002", "003", "004", "005", "006", "007"]
     assert all(len(m.digest) == 64 for m in versiones)
     assert "begin;\n" not in versiones[1].cuerpo.lower()
     assert "begin\n" in versiones[1].cuerpo.lower()  # conserva el cuerpo PL/pgSQL
@@ -217,3 +217,10 @@ def test_ensayo_de_migracion_revierte_transaccion_tambien_al_fallar(monkeypatch)
     monkeypatch.setattr(migraciones, 'aplicar', fallo)
     with pytest.raises(RuntimeError): diagnostico_migraciones.ensayar(Conexion())
     assert transacciones == [{'force_rollback': True}, 'salida']
+
+
+def test_ciclos_solo_aliases_y_no_referencias_explicitas():
+    assert migraciones.ciclos_aliases([('a',None,['a','b']),('b',None,['a','b'])]) == [('a','b')]
+    assert not migraciones.ciclos_aliases([('a','b',['a','b']),('b','a',['a','b'])])
+    assert not migraciones.ciclos_aliases([('a',None,['a','b']),('b',None,['b'])])
+    assert not migraciones.ciclos_aliases([('a',None,['a','c']),('b',None,['b','c']),('c',None,['c'])])
