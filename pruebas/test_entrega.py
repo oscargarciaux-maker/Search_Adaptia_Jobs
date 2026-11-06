@@ -121,6 +121,43 @@ def test_roles_de_la_entrega():
     assert entrega.rol_de(ai, roles)[0]["id"] == "ai-engineer"
 
 
+def test_qa_no_se_rellena_con_desarrollo_generico_y_conserva_variantes():
+    roles = entrega.config()["roles"]
+    for titulo in ("Software Engineer - Backend", "DevOps Engineer", "Senior Software Engineer - LATAM"):
+        v = _v(titulo, "Empresa", "Remote LATAM", "Build software services. " * 20, "https://jobs.lever.co/acme/1")
+        assert "qa" not in {f["familia"] for f in v["familias"]}
+        assert entrega.rol_de(v, roles)[0] is None
+    for titulo in ("QA Tester Jr.", "Tester Jr. Manual Bilingüe", "QA Test Automation | Mid (Remote)",
+                   "Software Developer in Test", "SDET"):
+        v = _v(titulo, "Empresa", "Remote LATAM", TEXTO_EN, "https://jobs.lever.co/acme/2")
+        assert entrega.rol_de(v, roles)[0]["id"] == "qa"
+
+
+def test_ia_conserva_cargo_mixto_explicito_sin_contar_todo_backend():
+    roles = entrega.config()["roles"]
+    for titulo in ("Machine Learning / Data Engineer", "LLM Engineer", "Applied AI Engineer"):
+        v = _v(titulo, "Empresa", "Remote LATAM", TEXTO_EN, "https://jobs.lever.co/acme/3")
+        assert entrega.rol_de(v, roles)[0]["id"] == "ai-engineer"
+    v = _v("Senior Backend Developer", "Empresa", "Remote LATAM", TEXTO_EN, "https://jobs.lever.co/acme/4")
+    assert entrega.rol_de(v, roles)[0] is None
+
+
+def test_afinidad_antes_de_alcance_remoto_para_cuota():
+    exacta = _v("QA Analyst", "A", "Remote, Mexico", TEXTO_EN, "https://jobs.lever.co/a/1")
+    cercana = _v("Software Developer in Test", "B", "Remote Worldwide", TEXTO_EN, "https://jobs.lever.co/b/1")
+    assert entrega.variadas([(cercana, "cercano"), (exacta, "exacto")], 1, 2, HOY,
+                           preferir_remotas=True)[0][0]["id"] == exacta["id"]
+
+
+def test_reetiquetar_corrige_familias_guardadas_sin_cambiar_identidad():
+    v = _v("DevOps Engineer", "Empresa", "Remote LATAM", TEXTO_EN, "https://jobs.lever.co/acme/5")
+    v["familias"].append({"familia": "qa", "coincidencia": "cercano"})
+    anterior = v["id"], v["detectada_en"], v["vista_en"]
+    actual = vacante.reetiquetar(v)
+    assert "qa" not in {f["familia"] for f in actual["familias"]}
+    assert (actual["id"], actual["detectada_en"], actual["vista_en"]) == anterior
+
+
 def _muchas(n, idioma_en_cada=2):
     salida = []
     for i in range(n):

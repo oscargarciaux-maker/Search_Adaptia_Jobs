@@ -14,8 +14,8 @@ hora_bodega_bogota: "01:17"
 verificacion_enlaces:
   vacantes_por_corrida: 300
   segundos_corrida: 240
-  vacantes_por_captura: 40
-  segundos_captura: 90
+  vacantes_por_captura: 120
+  segundos_captura: 180
 
 # Captura horaria gratuita, independiente de la entrega. Activación tras migración del catálogo v2.
 incremental:

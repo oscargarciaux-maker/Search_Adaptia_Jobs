@@ -8,7 +8,7 @@ CAMPOS_PUBLICOS = ["id", "titulo", "empresa", "ubicacion", "familias", "paises",
                    "nota_pais", "idioma", "ingles", "nivel", "anos_min", "salario", "herramientas",
                    "fecha_publicacion", "fecha_estimada", "visto_primera_vez", "visto_ultima_vez", "fuente", "fuentes",
                    "enlace", "enlace_directo", "tipo_enlace", "resumen", "publicada_en", "detectada_en", "vista_en",
-                   "verificacion"]
+                   "verificacion", "rol_entrega_actual"]
 
 
 def huella(empresa, titulo, enlace=""):
@@ -70,6 +70,7 @@ def reetiquetar(v):
     """Vuelve a leer de la descripción guardada las etiquetas de texto, así un arreglo en `etiquetas` también llega a
     las vacantes de noches anteriores."""
     desc = v.get("_descripcion", "")
+    v["familias"] = familias.clasificar(v["titulo"], desc)
     if desc:
         v["ingles"], v["anos_min"], v["salario"] = etiquetas.ingles(desc), etiquetas.anos_min(desc), etiquetas.salario(desc)
     if "greenhouse" in v.get("fuente", "").lower() and not v.get("_fecha_publicacion_origen"):

@@ -224,9 +224,13 @@ def test_validacion_no_aprueba_historial_si_sus_enlaces_actuales_fallaron():
          "verificacion_enlaces": {"seleccion_del_dia": {"vacantes": 120,
                                   "estados": {"verificada": 108, "pendiente": 5, "rechazada": 7}}}}
     assert any("selección histórica" in error for error in validacion.errores(r))
+    r["verificacion_enlaces"]["seleccion_del_dia"]["estados"] = {"verificada": 120}
+    r["seleccion_actual"] = {"roles": {"qa": {"nombre": "QA", "vacantes": [{"afinidad_vigente": False}]}}}
+    assert any("fuera del perfil" in error for error in validacion.errores(r))
 
 
-def test_cierre_confirmado_se_guarda_sin_borrar_snapshot_historico(monkeypatch, tmp_path):
+@pytest.mark.parametrize("en_inventario", [True, False])
+def test_cierre_confirmado_se_guarda_sin_borrar_snapshot_historico(monkeypatch, tmp_path, en_inventario):
     from buscador import incremental, supabase
     v = oferta()
     lote = {"fecha": "2026-11-05", "elegidas": {"ux-ui-designer": [[v, "exacto"]]}}
@@ -238,7 +242,7 @@ def test_cierre_confirmado_se_guarda_sin_borrar_snapshot_historico(monkeypatch, 
     monkeypatch.setattr(supabase, "exigir_conexion", lambda: None)
     monkeypatch.setattr(supabase, "exigir_catalogo", lambda: None)
     monkeypatch.setattr(incremental, "recoger", lambda *a: ([dict(titulo=v["titulo"], empresa=v["empresa"],
-        enlace=v["enlace"], fuente="Lever", ubicacion="Remote LATAM", descripcion=TEXTO)], set(), set(), {}))
+        enlace=v["enlace"], fuente="Lever", ubicacion="Remote LATAM", descripcion=TEXTO)] if en_inventario else [], set(), set(), {}))
     monkeypatch.setattr(ve, "comprobar", lambda u, t, **op:
         resultado(u, estado="rechazada", ahora=op["ahora"], motivo="vacante cerrada"))
     filas = []
@@ -250,3 +254,4 @@ def test_cierre_confirmado_se_guarda_sin_borrar_snapshot_historico(monkeypatch, 
     assert r["vacantes_en_bodega"] == 0 and filas[0]["status"] == "closed"
     assert archivo.read_text() == original
     assert r["verificacion_enlaces"]["seleccion_del_dia"]["estados"] == {"rechazada": 1}
+    assert r["seleccion_actual"]["roles"]["ux-ui-designer"]["vacantes"][0]["verificacion"]["estado"] == "rechazada"
