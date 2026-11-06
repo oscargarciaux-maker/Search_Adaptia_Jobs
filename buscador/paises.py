@@ -30,7 +30,9 @@ _RESTRINGE = re.compile(
     r"(the\s+)?(?P<lugar>[a-z .]{2,40})"
     r"|\b(only|solo|solamente|unicamente|exclusively)\s+(open\s+to\s+)?(candidates|applicants|candidatos|personas|residents)?\s*"
     r"(from|in|de|en|residing in|located in|based in)\s+(the\s+)?(?P<lugar2>[a-z .]{2,40})"
-    r"|\b(?P<lugar3>us|usa|u\.s|united states|uk|canada|eu|europe|india)[- ](only|based|residents?)\b")
+    r"|\b(?P<lugar3>us|usa|u\.s|united states|uk|canada|eu|europe|india)[- ](only|based|residents?)\b"
+    r"|\b(?:must be|must have|need to be|required to be)\s+(?:legally )?(?:authorized to work|eligible to work|the right to work)\s+in\s+(?:the )?(?P<lugar4>[a-z .]{2,40})"
+    r"|\b(?:debes?|debera[s]?|es necesario|se requiere)\s+(?:residir|vivir|estar ubicado|estar ubicada|tener residencia)\s+en\s+(?P<lugar5>[a-z .]{2,40})")
 _ZONA = re.compile(r"\b(?:utc|gmt)\s*([-+−–])\s*(\d{1,2})(?:[:.]\d{2})?(?:\s*(?:to|a|al|-|–|y|and)\s*(?:utc|gmt)?\s*([-+−–])\s*(\d{1,2}))?")
 _ZONAS_US = {"est": -5, "edt": -5, "eastern time": -5, "cst": -6, "central time": -6, "mst": -7, "pst": -8, "pacific time": -8}
 
@@ -43,6 +45,10 @@ def datos():
     for p in paises:
         for frase in p["nombres"] + p["gentilicios"] + p["ciudades"]:
             claves.append((normalizar.texto(frase), p["codigo"]))
+    ciudades = {}
+    for p in paises:
+        for ciudad in p["ciudades"]:
+            ciudades.setdefault(normalizar.texto(ciudad),[]).append(p["codigo"])
     claves.sort(key=lambda x: -len(x[0]))  # las frases largas primero ("santiago de chile" antes que "santiago")
     return {
         "paises": paises,
@@ -51,6 +57,8 @@ def datos():
         "europa": [p["codigo"] for p in paises if p.get("region") == "europa"],
         "utc": {p["codigo"]: p["utc"] for p in paises},
         "claves": claves,
+        "nombres_pais": [(p["codigo"],[normalizar.texto(x) for x in p["nombres"]+p["gentilicios"]]) for p in paises],
+        "ciudades": ciudades,
         "toda_latam": sorted({normalizar.texto(x) for x in crudo["toda_latam"]}, key=len, reverse=True),
         "mundo": sorted({normalizar.texto(x) for x in crudo["todo_el_mundo"]}, key=len, reverse=True),
         "toda_europa": sorted({normalizar.texto(x) for x in crudo["toda_europa"]}, key=len, reverse=True),
@@ -97,30 +105,48 @@ def _por_zona_horaria(t):
     return [c for c in datos()["codigos"] if any(lo <= utc[c] <= hi for lo, hi in rangos)]
 
 
-def _restriccion(desc):
-    """Lugar al que la descripción restringe la residencia, o '' si no restringe."""
+def _restricciones(desc):
+    """Todas las restricciones reconocidas; una frase comercial no acredita residencia."""
     d = datos()
-    for m in _RESTRINGE.finditer(desc):
-        lugar = (m.group("lugar") or m.group("lugar2") or m.group("lugar3") or "").strip()
-        contexto = m.group(0)[:m.group(0).find(lugar)]
+    restricciones = []
+    for m in re.finditer(r"(?=(?P<coincidencia>"+_RESTRINGE.pattern+r"))",desc):
+        lugar = (m.group("lugar") or m.group("lugar2") or m.group("lugar3") or m.group("lugar4") or m.group("lugar5") or "").strip()
+        coincidencia = m.group("coincidencia")
+        contexto = coincidencia[:coincidencia.find(lugar)]
         residencia = re.search(r"\b(reside|live|located|based|living|residing|candidates|applicants|candidatos|personas|residents)\b", contexto)
         conocido = _paises_nombrados(lugar) or any(_nombra(lugar,d[k]) for k in ("fuera","toda_latam","toda_europa","mundo")) or any(_nombra(lugar,r["nombres"]) for r in d["subregiones"])
-        if residencia or conocido:
-            return lugar
+        if residencia or conocido or m.group("lugar4") or m.group("lugar5"):
+            restricciones.append(lugar)
+    return restricciones
+
+
+def _contratacion_remota(desc):
+    d = datos()
+    alcances = sorted(set(d["mundo"]+d["toda_latam"]+d["toda_europa"]),key=len,reverse=True)
+    opciones = "|".join(re.escape(x) for x in alcances)
+    patron = (r"\b(?:hiring|contratamos|open to candidates|accepting candidates)\s+(?:remotely\s+)?"
+              r"(?:(?:across|in|from|en|de)\s+)?(?:all of\s+)?(?P<contratacion>"+opciones+r")\b"
+              r"|\b(?:work|working|trabajar|trabaja)\s+(?:remotely\s+)?(?:from|desde)\s+(?P<trabajo>"+opciones+r")\b")
+    for m in re.finditer(patron,desc):
+        if re.search(r"\b(?:not|no|cannot|can t|unable|except|excluding)\b",desc[max(0,m.start()-35):m.start()]):
+            continue
+        return m.group("contratacion") or m.group("trabajo")
     return ""
 
 
 def modalidad(titulo, ubicacion, descripcion="", remoto=None):
     t = normalizar.texto(f"{titulo} {ubicacion}")
-    d = normalizar.texto(descripcion)[:4000]
+    d = normalizar.texto(descripcion)[:30000]
     if _HIBRIDO.search(t):
         return "hibrido"
-    if remoto is True or _REMOTO.search(t):
-        return "remoto"
     if _PRESENCIAL.search(t):
         return "presencial"
     if _HIBRIDO.search(d):
         return "hibrido"
+    if re.search(r"\b(?:this (?:role|position|job) is|must work|will work|required to work|trabajo obligatorio|modalidad)\s+(?:fully |completely |100 )?(?:on ?site|onsite|in office|presencial)\b", d):
+        return "presencial"
+    if remoto is True or _REMOTO.search(t):
+        return "remoto"
     if _REMOTO_DESC.search(d):
         return "remoto"
     return "presencial" if t.strip() else "sin dato"
@@ -134,7 +160,14 @@ def elegibles(titulo, ubicacion, descripcion="", remoto=None):
     ambito = normalizar.texto(ubicacion) or lugar
     desc = normalizar.texto(descripcion)[:30000]
     mod = modalidad(titulo, ubicacion, descripcion, remoto)
-    nombrados = _paises_nombrados(lugar)
+    # El título no puede convertir una oficina de otro país en una ubicación permitida.
+    geografia = normalizar.texto(ubicacion)
+    nombres_pais = [codigo for codigo,nombres in d["nombres_pais"] if _nombra(geografia,nombres)]
+    ciudad_sola = normalizar.texto(_REMOTO.sub(" ",_HIBRIDO.sub(" ",_PRESENCIAL.sub(" ",geografia))))
+    ciudad_sola = re.sub(r"^(?:area metropolitana de |region metropolitana de |greater )", "", ciudad_sola)
+    ciudad_sola = re.sub(r" (?:y alrededores|and surrounding areas|metropolitan area|area)$", "", ciudad_sola)
+    ciudades = d["ciudades"].get(ciudad_sola,[])
+    nombrados = nombres_pais or ciudades
     es_latam = _nombra(ambito, d["toda_latam"])
     es_mundo = _nombra(ambito, d["mundo"])
     es_europa = _nombra(ambito, d["toda_europa"])
@@ -145,19 +178,10 @@ def elegibles(titulo, ubicacion, descripcion="", remoto=None):
     def r(paises, confianza, nota):
         return {"paises": paises, "modalidad": mod, "confianza": confianza, "nota": nota}
 
-    if mod != "remoto":
-        if nombrados and not (fuera and not _pais_por_nombre(lugar, nombrados)):
-            return r(nombrados, "alta", "")
-        if (es_latam or es_mundo) and not fuera and not es_europa:
-            return r(latam, "media", "región LATAM sin país")
-        if fuera or es_europa:
-            return r([], "alta", "fuera de LATAM y España")
-        return r(todos, "baja", "confirmar ubicación")
-
-    # Remoto: primero las restricciones explícitas de la descripción
+    # Residencia explícita: también restringe ofertas presenciales o híbridas.
     titulo_normalizado = normalizar.texto(titulo)
     remoto_en = re.search(r"\bremote\s+(?:only\s+)?(?:in|from|within)\s+([a-z /.+]{2,80})", titulo_normalizado)
-    restricciones = [_restriccion(desc), _restriccion(titulo_normalizado)]
+    restricciones = _restricciones(desc) + _restricciones(titulo_normalizado)
     if remoto_en:
         restricciones.append(remoto_en.group(1))
     def interpretar(restringe):
@@ -179,11 +203,22 @@ def elegibles(titulo, ubicacion, descripcion="", remoto=None):
     limites = [interpretar(texto) for texto in restricciones if texto]
     if any(valor is None for valor in limites):
         return r(todos, "baja", "restricción de residencia sin confirmar")
+    if mod != "remoto":
+        if nombrados and not (fuera and not nombres_pais):
+            permitidos = set(nombrados).intersection(*(set(valor) for valor in limites))
+            return r([c for c in nombrados if c in permitidos], "alta", "" if permitidos else "fuera de LATAM y España")
+        if fuera or es_europa:
+            return r([], "alta", "fuera de LATAM y España")
+        return r(todos, "baja", "confirmar ubicación")
+
     if limites:
         permitidos = set(todos).intersection(*(set(valor) for valor in limites))
         return r([c for c in todos if c in permitidos], "alta",
                  "restricción explícita de residencia" if permitidos else "remoto fuera de LATAM y España")
-    if es_mundo:
+    contratacion = _contratacion_remota(desc)
+    if contratacion:
+        return r(interpretar(contratacion), "alta", "contratación remota explícita")
+    if es_mundo or (_REMOTO.search(titulo_normalizado) and _nombra(titulo_normalizado,d["mundo"])):
         return r(todos, "alta", "")
     region = subregion(ambito)
     if region:
@@ -198,7 +233,5 @@ def elegibles(titulo, ubicacion, descripcion="", remoto=None):
         return r(europa, "alta", "remoto para Europa")
     zona = _por_zona_horaria(normalizar.sin_tildes(f"{ubicacion} {titulo} {descripcion[:6000]}").lower())
     if zona is not None:
-        return r(zona, "media", "por zona horaria")
-    if _nombra(desc, d["toda_latam"]):
-        return r(latam, "media", "")
+        return r(zona, "baja", "por zona horaria")
     return r(todos, "baja", "remoto: confirmar región")

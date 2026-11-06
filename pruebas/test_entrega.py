@@ -168,7 +168,10 @@ def _muchas(n, idioma_en_cada=2):
         nivel = ["Junior ", "Senior ", "", "Lead "][i % 4]
         lugar = ["Bogotá, Colombia", "Lima, Peru", "Ciudad de México, México", "Remote - LATAM"][i % 4]
         cargo = ["QA Analyst", "QA Engineer", "Software Tester"][i % 3]   # 3 cargos distintos por empresa
-        salida.append(_v(f"{nivel}{cargo}", f"Empresa {i // 3}", lugar, (TEXTO_EN if en else TEXTO_ES) + f" #{i}",
+        # Una ubicación remota no debe contradecirse con la modalidad híbrida del texto genérico.
+        texto = (TEXTO_EN if en else TEXTO_ES)
+        if "Remote" in lugar: texto = texto.replace("Modalidad híbrida.", "Modalidad remota.")
+        salida.append(_v(f"{nivel}{cargo}", f"Empresa {i // 3}", lugar, texto + f" #{i}",
                          f"https://www.linkedin.com/jobs/view/40{i:08d}/"))
     return salida
 

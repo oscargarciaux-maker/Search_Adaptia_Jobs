@@ -6,6 +6,18 @@ aprobados por haber fusionado otro PR. Instrucciones de uso: [GUIA_CLIENTE.md](G
 
 ## 1. Corte de evidencia
 
+### Admisión geográfica reforzada — 6 de noviembre de 2026
+
+La preparación [42270700157](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42270700157)
+terminó correctamente a la 1:27 p. m. Colombia: siete migraciones vigentes; aplicadas 006 y 007 después de fusionarse
+el PR 22. Esto acredita instalación del esquema, no una captura posterior ni corrección de toda ficha externa.
+
+La revisión siguiente refuerza la admisión por evidencia positiva: oficinas presenciales/híbridas dentro de cobertura,
+remotas con alcance pertinente, todas las restricciones de residencia reconocidas y exclusión de horarios como única
+prueba. Tampoco se promociona «Global» a ubicación física ni se toma un país del título para cambiar una oficina
+extranjera. Los metadatos sin confianza geográfica quedan fuera. Requiere fusionar este nuevo ajuste y observar una
+captura con su commit para acreditar el efecto productivo; los snapshots históricos no se reescriben.
+
 ### Estonia y preparación posterior al PR 21 — 6 de noviembre de 2026
 
 El PR 21 se fusionó a las 12:34 p. m. Colombia. La preparación

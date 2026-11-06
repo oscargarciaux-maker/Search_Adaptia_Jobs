@@ -264,7 +264,7 @@ def entregable(v, idiomas=("es", "en")):
         return "idioma fuera del contrato"
     if not v.get("paises"):
         return "no se puede aplicar desde los países"
-    if v.get("confianza_pais") == "baja":
+    if v.get("confianza_pais") not in {"alta", "media"} or v.get("nota_pais") == "por zona horaria":
         return "elegibilidad regional por confirmar"
     if (v.get("verificacion") or {}).get("estado") == "rechazada":
         return "enlaces rechazados: " + v["verificacion"].get("motivo", "sin destino válido")

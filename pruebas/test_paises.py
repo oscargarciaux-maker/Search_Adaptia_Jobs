@@ -60,12 +60,12 @@ CASOS = [
     ("Designer", "Remote", "You must be based in Latin America to apply.", None, LATAM, "alta"),
     ("Developer", "Remote", "Only candidates from Colombia or Mexico.", None, ["CO", "MX"], "alta"),
     # Zona horaria
-    ("Product Designer", "Remote", "We work in UTC-3 to UTC-5 hours.", None, ["AR", "BO", "BR", "CL", "CO", "CU", "DO", "EC", "PA", "PE", "PR", "PY", "UY", "VE"], "media"),
-    ("UX Designer", "Remote", "You need at least 4 hours overlap with EST.", None, None, "media"),
+    ("Product Designer", "Remote", "We work in UTC-3 to UTC-5 hours.", None, ["AR", "BO", "BR", "CL", "CO", "CU", "DO", "EC", "PA", "PE", "PR", "PY", "UY", "VE"], "baja"),
+    ("UX Designer", "Remote", "You need at least 4 hours overlap with EST.", None, None, "baja"),
     # Remoto sin región
     ("Video Editor", "Remote", "Edit short videos for social media.", None, TODOS, "baja"),
     # Remoto con LATAM solo en la descripción
-    ("Developer", "Remote", "We are a fully remote team hiring across LATAM.", None, LATAM, "media"),
+    ("Developer", "Remote", "We are a fully remote team hiring across LATAM.", None, LATAM, "alta"),
 ]
 
 

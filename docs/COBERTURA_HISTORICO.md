@@ -21,6 +21,22 @@ excluye de nuevas entregas con motivo `elegibilidad regional por confirmar`; no 
 Las remotas con alcance mundial explícito siguen siendo válidas. La sede extranjera de una empresa, por sí sola,
 no restringe un aviso mundial. Frases de herramientas como «exclusively in Figma» no son restricciones geográficas.
 
+La admisión exige evidencia positiva, no solo ausencia del país en una lista de exclusión. Una oferta presencial o
+híbrida necesita país de cobertura o una ciudad configurada identificable en la ubicación del aviso. Se reconocen
+formatos metropolitanos como «Madrid y alrededores» y «Área metropolitana de Lima». Un país escrito en el título no
+cambia una ubicación extranjera o desconocida; «Global», «Worldwide» y «LATAM» no identifican por sí solos una oficina.
+Las indicaciones presenciales/híbridas explícitas prevalecen sobre la bandera remota de una búsqueda.
+
+En remotas, se admite un alcance geográfico identificable que incluya LATAM o España, o contratación mundial explícita.
+Las invitaciones a contratar o trabajar desde una región también se leen en la descripción; «clientes en LATAM» y
+«equipo global» no acreditan elegibilidad. Los requisitos de residencia o autorización laboral conocidos prevalecen
+sobre el alcance general. Se revisan todas las restricciones reconocidas. Compartir zona horaria o indicar CET/CEST
+no acredita residencia ni elegibilidad: sin otra evidencia, queda fuera de nuevas entregas.
+
+Estas son condiciones comprobadas por el programa, no una garantía de que toda ficha externa sea correcta o de que
+se reconozcan todas las formas de expresar una restricción. Se mantienen auditoría, muestras y corrección de casos.
+Los registros históricos se conservan; consultar `seleccion_estado_actual` con `estado_actual=lista` para compartir.
+
 - LATAM (20 territorios configurados), España y ofertas remotas mundiales. Otros países se ampliarán después.
 - Bogotá fija únicamente la hora de ejecución, no una preferencia de país.
 - LinkedIn incorpora búsquedas remotas para LATAM, España y Worldwide, además de las búsquedas por país.
@@ -33,7 +49,7 @@ no restringe un aviso mundial. Frases de herramientas como «exclusively in Figm
   El límite de dos ofertas por empresa y rol sigue vigente. `preferir_remotas` se configura en `datos/entrega.yaml`.
 - Remoto no significa mundial: un puesto remoto limitado a Colombia sigue siendo solo para Colombia.
   Las restricciones de residencia prevalecen y una región desconocida se muestra como «por confirmar».
-  Las estimaciones por zona horaria tienen confianza media; no equivalen a residencia confirmada por el empleador.
+  Las estimaciones basadas solo en zona horaria quedan con confianza baja y fuera de nuevas entregas.
 - No hay cuota por país: se diversifican las ofertas disponibles sin inventar cobertura. Que un país no aparezca en una
   entrega no prueba que no tenga ofertas. Las fuentes y sus bloqueos afectan el resultado.
 
