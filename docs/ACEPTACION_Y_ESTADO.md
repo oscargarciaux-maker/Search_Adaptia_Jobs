@@ -6,6 +6,15 @@ aprobados por haber fusionado otro PR. Instrucciones de uso: [GUIA_CLIENTE.md](G
 
 ## 1. Corte de evidencia
 
+**Diagnóstico de instalación del 5 de noviembre, noche de Colombia:** el intento
+[42147221329](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42147221329) superó el formato de
+la clave de respaldo y falló al conectar. Una comprobación de solo lectura en la rama de corrección aisló un error TLS
+([42147821931](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42147821931)). Al añadir la raíz
+pública oficial Supabase manteniendo `verify-full`, la siguiente comprobación superó TLS y recibió rechazo de autenticación
+([42148436056](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42148436056)). Falta corregir la contraseña
+o su codificación en el secreto privado. No se aplicaron migraciones ni se escribieron vacantes en esas comprobaciones;
+el estado central productivo no queda acreditado por ellas.
+
 **Automatización de instalación preparada posteriormente:** se ensayaron en PostgreSQL 17 aislado la instalación nueva
 con autorización explícita, paso de una base manual a automática conservando historia y reservas, rechazo de SQL
 reescrito, rollback del lote y dos migradores concurrentes. El respaldo cifrado se debe subir antes de aplicar en Actions.

@@ -51,6 +51,39 @@ necesario copiar SQL ni crear `ESTADO_SUPABASE_ACTIVO`/`CAPTURA_HORARIA_ACTIVA` 
 Pages/Cloudflare conserva su configuración propia. Si se añaden secretos después de una fusión, el botón anterior permite
 instalar sin esperar al siguiente horario.
 
+### Generar la clave de respaldo en Windows
+
+En PowerShell privado, este bloque genera el formato exacto y lo copia al portapapeles. Pegar directamente el resultado
+en el valor de `SUPABASE_BACKUP_KEY` y guardar también una copia en el gestor; no compartirlo por chat.
+
+```powershell
+$claveRespaldoBytes = New-Object byte[] 32
+[Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($claveRespaldoBytes)
+[Convert]::ToBase64String($claveRespaldoBytes).TrimEnd('=').Replace('+','-').Replace('/','_') | Set-Clipboard
+Write-Host "Clave de respaldo generada y copiada."
+```
+
+### Contraseña de la base dentro de la URI
+
+`[YOUR-PASSWORD]` corresponde a la contraseña PostgreSQL del proyecto. Si se desconoce, restablecerla desde Database
+Settings y actualizar las aplicaciones que usen esa conexión. Un error `[DB_AUTENTICACION]` puede deberse también a
+caracteres sin codificar en la URI. Este bloque de PowerShell conserva el servidor/usuario de la URI original y codifica
+la contraseña en el equipo del administrador, sin imprimirla ni enviarla al chat:
+
+```powershell
+$uriConMarcador = Read-Host "Pega la URI Session pooler original con [YOUR-PASSWORD]"
+if (-not $uriConMarcador.Contains('[YOUR-PASSWORD]')) { throw 'La URI debe conservar [YOUR-PASSWORD].' }
+$claveSeguraDb = Read-Host "Contraseña vigente de la base" -AsSecureString
+$claveTextoDb = [Net.NetworkCredential]::new('', $claveSeguraDb).Password
+$uriConMarcador.Replace('[YOUR-PASSWORD]', [Uri]::EscapeDataString($claveTextoDb)) | Set-Clipboard
+$claveTextoDb = $null
+Write-Host "Conexión preparada y copiada. Pegar en SUPABASE_DB_URL."
+```
+
+Una contraseña codificada sigue siendo privada. Si el diagnóstico falla por TLS o red, ese resultado no demuestra que
+la contraseña sea incorrecta. Con `[DB_AUTENTICACION]`, el servidor sí rechazó las credenciales recibidas. El diagnóstico
+de conexión no necesita la clave de respaldo; Preparar Supabase sí valida ambas configuraciones.
+
 ## Comprobación y recuperación
 
 Si falla la conexión, ejecutar **Actions → Diagnóstico → solo_conexion_db=true**, dejando las otras opciones apagadas.
