@@ -225,8 +225,8 @@
       const r = { id, nombre: rol.nombre, seleccionadas: (rol.vacantes || []).length,
         listas: 0, porVerificar: 0, retiradas: 0, fueraPerfil: 0 };
       for (const v of rol.vacantes || []) {
-        if (v.verificacion?.estado === "rechazada") r.retiradas++;
-        else if (!v.afinidad_vigente) r.fueraPerfil++;
+        if (["closed", "archived"].includes(v.catalog_status) || v.verificacion?.estado === "rechazada") r.retiradas++;
+        else if (!v.afinidad_vigente || v.catalog_status !== "active") r.fueraPerfil++;
         else if (enlacesComprobados(v, ahora).length) r.listas++;
         else r.porVerificar++;
       }

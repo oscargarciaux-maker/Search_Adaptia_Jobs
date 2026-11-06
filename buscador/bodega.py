@@ -16,7 +16,7 @@ from pathlib import Path
 
 import yaml
 
-from buscador import calidad, cobertura, enlaces, familias, normalizar, paises, tiempos, vacante
+from buscador import calidad, contrato, cobertura, enlaces, familias, normalizar, paises, tiempos, vacante
 from buscador.fuentes import ats, brave, getonbrd, indeed, linkedin_apify, linkedin_publico, publicaciones_apify, remotos
 from buscador.http import Cliente
 
@@ -454,12 +454,14 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     resumen_revision["rechazos_en_corrida"] = {m: n for m, n in descartes.items() if m in verificar_enlaces.RECHAZOS}
     seleccion_actual = {"fecha": lote_actual.get("fecha"), "roles": {}}
     por_id_vigente = {v["id"]: v for v in vacantes}
+    estados_catalogo = {v["id"]: estado for v, estado, _ in retiradas}
+    estados_catalogo.update({v["id"]: "archived" if contrato.entregable(v) else "active" for v in vacantes})
     for rol in roles_actuales:
         entradas = []
         for original, _ in lote_actual.get("elegidas", {}).get(rol["id"], []):
             actual = dict(por_id_vigente.get(original["id"], original))
             revision = verificar_enlaces.anotar(actual, cache_enlaces)
-            entradas.append({"id": actual["id"], "afinidad_vigente":
+            entradas.append({"id": actual["id"], "catalog_status": estados_catalogo.get(actual["id"], "sin_catalogo"), "afinidad_vigente":
                 actual.get("rol_entrega_actual") == rol["id"] if actual["id"] in por_id_vigente else False,
                 "enlace": actual.get("enlace", ""), "enlace_directo": actual.get("enlace_directo", ""),
                 "verificacion": revision})

@@ -18,7 +18,9 @@ El resumen no inventa roles ausentes ni sustituye la meta configurada de veinte.
 rellenar cierres posteriores; un déficit se informa y requiere nuevas oportunidades, no duplicados.
 
 `salud.json.seleccion_actual` contiene fecha y roles (ID, nombre, meta y `vacantes`); cada entrada de vacante incluye
-solo ID, afinidad vigente, enlaces públicos y verificación pública, sin descripción ni snapshot privado. La página calcula cantidades
+solo ID, `catalog_status` (`active`, `closed`, `archived`, `sin_catalogo`), afinidad vigente, enlaces públicos y
+verificación pública, sin descripción ni snapshot privado. Un cierre/archivo del catálogo impide contar una oferta
+lista aunque aún quede un enlace positivo en caché. La página calcula cantidades
 vigentes con la hora del navegador; un dato caducado deja de contar aunque no haya nueva captura. La ausencia del
 campo en datos antiguos se indica y no se convierte en un conteo de disponibles.
 

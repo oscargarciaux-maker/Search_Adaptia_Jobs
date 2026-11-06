@@ -255,3 +255,4 @@ def test_cierre_confirmado_se_guarda_sin_borrar_snapshot_historico(monkeypatch, 
     assert archivo.read_text() == original
     assert r["verificacion_enlaces"]["seleccion_del_dia"]["estados"] == {"rechazada": 1}
     assert r["seleccion_actual"]["roles"]["ux-ui-designer"]["vacantes"][0]["verificacion"]["estado"] == "rechazada"
+    assert r["seleccion_actual"]["roles"]["ux-ui-designer"]["vacantes"][0]["catalog_status"] == "closed"
