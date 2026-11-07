@@ -1,0 +1,136 @@
+{
+ "2026-11-05": {
+  "fecha": "2026-11-05",
+  "meta_cumplida": true,
+  "pendientes_supabase": 0,
+  "registro_confirmado": true,
+  "roles": {
+   "product-designer": {
+    "candidatas": 79,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 59
+   },
+   "ux-ui-designer": {
+    "candidatas": 187,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 167
+   },
+   "product-owner": {
+    "candidatas": 403,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 383
+   },
+   "product-manager": {
+    "candidatas": 239,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 219
+   },
+   "ai-engineer": {
+    "candidatas": 492,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 472
+   },
+   "qa": {
+    "candidatas": 449,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 429
+   }
+  }
+ },
+ "2026-11-06": {
+  "fecha": "2026-11-06",
+  "meta_cumplida": true,
+  "pendientes_supabase": 0,
+  "registro_confirmado": true,
+  "enlaces_comprobados": true,
+  "roles": {
+   "product-designer": {
+    "candidatas": 20,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 0
+   },
+   "ux-ui-designer": {
+    "candidatas": 34,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 14
+   },
+   "product-owner": {
+    "candidatas": 24,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 4
+   },
+   "product-manager": {
+    "candidatas": 31,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 11
+   },
+   "ai-engineer": {
+    "candidatas": 29,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 9
+   },
+   "qa": {
+    "candidatas": 21,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 1
+   }
+  }
+ },
+ "2026-11-07": {
+  "fecha": "2026-11-07",
+  "meta_cumplida": true,
+  "pendientes_supabase": 0,
+  "registro_confirmado": true,
+  "enlaces_comprobados": true,
+  "roles": {
+   "product-designer": {
+    "candidatas": 28,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 8
+   },
+   "ux-ui-designer": {
+    "candidatas": 25,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 5
+   },
+   "product-owner": {
+    "candidatas": 21,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 1
+   },
+   "product-manager": {
+    "candidatas": 24,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 4
+   },
+   "ai-engineer": {
+    "candidatas": 34,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 14
+   },
+   "qa": {
+    "candidatas": 23,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 3
+   }
+  }
+ }
+}
