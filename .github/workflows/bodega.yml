@@ -1,7 +1,7 @@
 name: Bodega nocturna
 
-# Recoge vacantes de todas las fuentes, limpia, guarda 30 días, arma la entrega diaria (20 nuevas por rol, formato del
-# contrato de datos v1) y la guarda en Supabase, y publica la página con los datos en la rama `publicado`.
+# Usa la versión activa del panel (o seis cargos por veinte en legado), conserva catálogo y entrega en Supabase.
+# La rama publicado contiene estado y reportes técnicos, sin interfaz privada.
 # Cada noche a la 1:17 de Bogotá (6:17 UTC). A mano: Actions > Bodega nocturna > Run workflow.
 #   modo "inicial": olvida la rotación y pide 30 días a cada combinación (para la primera vez o tras un cambio grande)
 #   prueba: presupuestos mínimos (unos 5 minutos), para comprobar que todo funciona
@@ -66,7 +66,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: python -m buscador.bodega --salida salida --modo "${{ inputs.modo || 'diario' }}" ${{ inputs.prueba && '--prueba' || '' }}
+        run: python -m panel.ejecutor --salida salida --modo "${{ inputs.modo || 'diario' }}" ${{ inputs.prueba && '--prueba' || '' }}
       - name: Publicar en la rama publicado
         if: ${{ !inputs.prueba }}
         working-directory: salida

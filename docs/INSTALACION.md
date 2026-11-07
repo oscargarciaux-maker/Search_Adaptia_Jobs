@@ -1,8 +1,10 @@
 # Instalación y configuración del administrador
 
-Actualizado el 5 de noviembre de 2026. Este procedimiento incluye catálogo v2, verificación pública v3 e instalación automática.
+Actualizado para la revisión v6 del 6 de noviembre de 2026. Este procedimiento incluye catálogo v2, verificación pública v3 e instalación automática.
 Para utilizar una instalación ya operativa, empezar en [GUIA_CLIENTE.md](GUIA_CLIENTE.md): no reemplazar cuentas,
 recrear tablas ni repetir la primera carga solo por recibir este manual.
+
+El panel nuevo se instala por separado en un servidor privado: [PANEL_CONTROL.md](PANEL_CONTROL.md). Login y despliegue real se configurarán más adelante; el scraper conserva su operación hasta programar una versión de control vigente.
 
 ## 1. Elegir instalación nueva o continuidad
 
@@ -10,7 +12,7 @@ recrear tablas ni repetir la primera carga solo por recibir este manual.
 - **Continuidad de un negocio existente:** conservar historial, lote, reintentos, memoria de no repetición y reservas Apify.
   Seguir primero [TRASPASO.md](TRASPASO.md). Copiar solo el código no conserva esos datos.
 - **Instalación o actualización automática (preferida):** seguir [INSTALACION_AUTOMATICA.md](INSTALACION_AUTOMATICA.md).
-  El propietario configura accesos una vez; el programa aplica 001–007 y activa catálogo/estado central.
+  El propietario configura accesos una vez; el programa aplica 001–009 y activa catálogo/estado central.
 - **Instalación manual anterior:** se conserva como alternativa técnica en las guías de activación. No mezclarla
   con el camino automático ni repetir SQL por recibir este manual.
 
@@ -59,7 +61,7 @@ según las opciones de las cuentas. No poner claves en archivos, tickets, captur
    En continuidad dejarla apagada: importa el contador vigente de `publicado/trabajo/` sin reiniciar crédito.
 4. Comprobar el resultado: respaldo cifrado subido, migraciones vigentes y preparación confirmada. El proceso crea las
    tablas privadas, importa reservas y activa catálogo/estado central para las capturas. No copiar SQL al editor.
-5. La siguiente captura confirma uso real. El corte incluye seis tablas de proyecto y dos secuencias tras el instalador;
+5. La siguiente captura confirma uso real. El corte incluye once tablas de proyecto y dos secuencias tras el instalador;
    `adaptia_migraciones` registra versiones y hashes. No incluye Auth/Storage de Supabase.
 
 La conexión administrativa y la clave de cifrado solo se entregan a los pasos de preparación. La captura sigue usando

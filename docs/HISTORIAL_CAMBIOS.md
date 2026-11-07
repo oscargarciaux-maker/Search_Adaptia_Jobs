@@ -5,6 +5,8 @@ empieza en [GUIA_CLIENTE.md](GUIA_CLIENTE.md); los resultados observados están 
 
 | Revisión | Qué cambió | Consecuencia para el cliente |
 |---|---|---|
+| Control v6 — preparado para revisión | Panel privado, clientes/perfiles, cupos por cargo, versiones desde mañana, captura dirigida y copia WhatsApp | Sustituye la prohibición histórica de web y los seis cargos fijos cuando se active una versión; login y despliegue real diferidos |
+| Reconciliación SQL 008 — preparada | URLs indexadas y límite de consulta comprobado | Corrige la causa del 57014 observado; instalación y siguiente captura real pendientes |
 | Identidad v5 — requiere fusión y preparación automática | Una fila por vacante, enlaces asociados, archivo íntegro de copias antiguas y protección contra reintentos/concurrencia | Los otros portales no inflan la cantidad de oportunidades; SQL 005 reconcilia coincidencias inequívocas |
 | Operación sin interfaz web — pendiente de fusión | Se retiran frontend, Functions, Node y el despliegue de Pages; se conserva reporte y estado técnico | Consultar vacantes y disponibilidad en Supabase y ejecuciones en Actions |
 | Vigencia — comprobar captura posterior a la fusión | QA/IA sin cercanos genéricos, reclasificación, vistas privadas SQL 004 y conteos actuales por rol | No confundir 120 históricas con 120 listas; diagnóstico de solo lectura con evidencia real |
@@ -27,19 +29,19 @@ empieza en [GUIA_CLIENTE.md](GUIA_CLIENTE.md); los resultados observados están 
 - SQL 003 es la extensión de estado operativo, independiente de v3. `ESTADO_SUPABASE_ACTIVO=true` solo tras seguir su
   [guía de activación](ACTIVAR_ESTADO_OPERATIVO.md); no se aplicó a producción al desarrollar el código.
 - `CAPTURA_HORARIA_ACTIVA=true`: horario y v2 de la nocturna, después del SQL.
-- `PAGES_POR_ACTIONS=true`: solo para GitHub Pages por Actions; con Cloudflare se usa su despliegue.
+- Pages/Cloudflare históricos retirados. El nuevo panel necesita servidor privado; no usa PAGES_POR_ACTIONS.
 - Con instalación automática confirmada no se requieren las variables de captura/estado anteriores: Preparar Supabase
   aplica e importa desde el corte y deja una marca privada. Requiere configurar una vez `SUPABASE_DB_URL` y
   `SUPABASE_BACKUP_KEY`. Las alternativas manuales se conservan para instalaciones existentes.
 
 Una fusión aprueba código para las próximas ejecuciones; la evidencia de activación es una captura real con ese commit,
-su persistencia y su página actualizada. No se restauran ofertas recortadas/fusionadas por versiones antiguas de forma
+su persistencia y su reporte actualizado. No se restauran ofertas recortadas/fusionadas por versiones antiguas de forma
 automática: puede ser necesario volver a obtener información original.
 
 ## Decisiones que permanecen
 
-No se usa sesión personal de LinkedIn ni IA diaria. La meta sigue siendo 20 distintas por cada uno de seis roles,
+No se usa sesión personal de LinkedIn ni IA diaria. La meta suma 120 distintas, con cupos por cargo al activar v6 o seis cargos por veinte en legado,
 con máximo dos por empresa/rol/día, idiomas de entrega español/inglés y prioridad remota sin inventar elegibilidad.
-Se conserva historial para futuras candidaturas; aún no hay clientes, seguimiento individual ni agente WhatsApp.
+Se conserva historial para futuras candidaturas; hay gestión de clientes en v6; siguen fuera seguimiento individual y agente WhatsApp.
 La auditoría de enlaces no certifica a la empresa, elimina cargos ocultos tras login ni convierte cualquier cargo afín
 en una coincidencia perfecta para la persona.

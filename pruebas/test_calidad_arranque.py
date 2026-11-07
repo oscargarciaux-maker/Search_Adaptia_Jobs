@@ -7,6 +7,14 @@ import pytest
 from buscador import bodega, calidad, contrato, entrega, supabase, vacante, validacion
 from buscador.fuentes import publicaciones_apify
 
+
+def test_validacion_explica_timeout_sin_publicar_detalles_del_servidor():
+    reporte = {"catalogo": {"filas": 10, "enviadas": 10, "pendientes": 0, "errores": [],
+        "identidad": {"errores": ["Reconciliación no confirmada (HTTP 500; 57014; tiempo_consulta) detalle privado"]}}}
+    errores = validacion.errores_catalogo(reporte)
+    assert len(errores) == 1 and "57014" in errores[0] and "por tiempo" in errores[0]
+    assert "detalle privado" not in errores[0]
+
 HOY = "2026-11-04"
 TEXTO = "We are hiring a UX Designer to join our remote team in LATAM. Apply through our careers page. " * 5
 

@@ -37,3 +37,8 @@ SQL 007 resuelve equivalencias recíprocas inferidas de `ids_agrupados` con un p
 No resuelve automáticamente ciclos de `duplicada_de` explícitos: esos siguen abortando. Si 006 está pendiente,
 el instalador prepara únicamente esos aliases recíprocos dentro de la misma transacción y después del respaldo,
 sin cambiar SQL 001–006 ni borrar fichas o selecciones. La preparación y la inserción comparten bloqueo.
+
+SQL 008 acelera la misma búsqueda por URLs con índices de expresión en catálogo y snapshots. No añade tablas o campos,
+no cambia los criterios de identidad y conserva la prioridad de una URL inequívoca frente al ID almacenado. Los
+índices se mantienen al escribir. Las ambigüedades, referencias externas y errores siguen deteniendo la consolidación;
+no se permite que un fallo de tiempo se presente como éxito.

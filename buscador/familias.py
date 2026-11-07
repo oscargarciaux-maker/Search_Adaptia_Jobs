@@ -49,7 +49,7 @@ def _regex(frases):
 
 
 @lru_cache(maxsize=1)
-def mapa():
+def mapa_base():
     crudo = yaml.safe_load(RUTA.read_text(encoding="utf-8"))["familias"]
     familias = []
     for fam in crudo:
@@ -63,6 +63,33 @@ def mapa():
         f["_excluir"] = _regex([normalizar.texto(e) for e in fam.get("excluir") or []])
         familias.append(f)
     return familias
+
+
+_mapa_operativo = None
+
+
+def mapa():
+    return _mapa_operativo if _mapa_operativo is not None else mapa_base()
+
+
+def preparar(mapa_crudo):
+    resultado = []
+    for fam in mapa_crudo:
+        f = dict(fam)
+        f["_titulos"] = {grado: _frases(fam.get(campo), grado != "cercano") for campo, grado in _CAMPOS_TITULOS.items()}
+        f["_re"] = {g: _regex([x for x in f["_titulos"][g] if not _es_una_palabra(x)]) for g in GRADOS}
+        f["_una"] = {g: {x for x in f["_titulos"][g] if _es_una_palabra(x)} for g in GRADOS}
+        f["_herramientas"] = [normalizar.texto(h) for h in fam.get("herramientas", [])]
+        f["_genericos"] = set()
+        f["_excluir"] = _regex([normalizar.texto(e) for e in fam.get("excluir", [])])
+        resultado.append(f)
+    return resultado
+
+
+def configurar(mapa_crudo=None):
+    global _mapa_operativo
+    _mapa_operativo = preparar(mapa_crudo) if mapa_crudo is not None else None
+    _todas_las_frases.cache_clear()
 
 
 @lru_cache(maxsize=1)
@@ -99,6 +126,15 @@ def clasificar(titulo, descripcion=""):
     salida = {}
     excluidas = set()
     for fam in mapa():
+        if fam.get("_control_cargo"):
+            if fam["_excluir"] and fam["_excluir"].search(completo):
+                excluidas.add(fam["id"])
+                continue
+            from panel.terminos import grado as grado_control
+            g, _ = grado_control(titulo, fam["_control_cargo"])
+            if g:
+                salida[fam["id"]] = g
+            continue
         # Un vecino explícito (p. ej. UX Engineer) no debe quedar anulado por la exclusión genérica «engineer».
         nombrado = any(base in fam["_titulos"][g] for g in GRADOS)
         if fam["_excluir"] and fam["_excluir"].search(completo) and not nombrado:

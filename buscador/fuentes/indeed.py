@@ -33,7 +33,8 @@ def buscar(mapa, paises_activos, estado, presupuesto, hoy=None, max_dias=30, por
     hoy = hoy or datetime.now(timezone.utc).date().isoformat()
     inicio = reloj()
     combinaciones = [(f["id"], cobertura.rotar(cobertura.consultas(f), hoy, 1, desfase=desfase_terminos)[0], p + sufijo)
-                     for f in mapa for p in paises_activos if p in PAISES for sufijo in (":REMOTO", "")]
+                     for f in mapa for p in f.get("paises_objetivo", paises_activos) if p in PAISES
+                     for sufijo in ((":REMOTO",) if f.get("solo_remoto") else (":REMOTO", ""))]
     combinaciones = cobertura.repartir(combinaciones, estado, hoy, prioritarias)
     crudas, hechas, fallidas, seguidas = [], 0, 0, 0
     por_familia, por_pais = {}, {}

@@ -1,9 +1,9 @@
 # Aprender y activar el estado operativo en Supabase
 
 **Camino preferido actual:** [INSTALACION_AUTOMATICA.md](INSTALACION_AUTOMATICA.md). Con dos accesos iniciales adicionales,
-GitHub respalda, aplica 001–007 e importa/activa sin copiar SQL ni crear variables. Las secciones 3–4 y 7 de esta
+GitHub respalda, aplica 001–009 e importa/activa sin copiar SQL ni crear variables. Las secciones 3–4 y 7 de esta
 guía describen la alternativa manual anterior. Los conceptos y límites siguientes siguen siendo útiles para aprender.
-El instalador añade `adaptia_migraciones`: sus cortes incluyen siete tablas y dos secuencias.
+El instalador añade `adaptia_migraciones`: sus cortes incluyen once tablas y dos secuencias.
 
 Preparado el 5 de noviembre de 2026. **Código preparado no significa activación productiva.** Esta extensión requiere
 SQL 003 y la variable indicada más abajo. No se aplicó a la base real durante su desarrollo.
@@ -15,7 +15,7 @@ GitHub guarda el código, su historial y los manuales. Un PR es una propuesta re
 el código a `main`. GitHub Actions ejecuta ese código en una máquina temporal de la nube. Cuando antes se dijo «local»,
 se hablaba de los archivos de esa máquina, no necesariamente de tu computador. La máquina se descarta al terminar.
 
-La rama `publicado` conserva una página estática y copias de trabajo entre ejecuciones. Esa rama se reemplaza al publicar:
+La rama `publicado` conserva reportes técnicos y copias de trabajo entre ejecuciones, sin el nuevo panel privado. Esa rama se reemplaza al publicar:
 es útil para servir resultados y cachés, pero una copia perdida o atrasada puede perder un contador o una tarea.
 Supabase conserva datos y permite una **transacción**: comprobar una condición y guardar un cambio como una sola operación.
 Eso importa cuando dos procesos consultan el mismo saldo o intentan confirmar la misma tarea.
@@ -57,7 +57,7 @@ Estos pasos son de mantenimiento; no hace falta repetirlos cada día:
 
 1. Fusionar el PR aprobado y comprobar que `Pruebas` terminó bien, incluidos los trabajos Python/JavaScript y SQL.
 2. Deshabilitar **Bodega nocturna**, **Captura horaria** y **Búsqueda profunda** desde Actions. Esperar las ejecuciones
-   en curso y evitar despachos desde Cloudflare. No basta apagar la variable de captura horaria.
+   en curso y detener otras copias del capturador. No basta apagar la variable de captura horaria.
 3. Guardar un corte de `publicado` completo y el respaldo de las tres tablas existentes. Anotar SHA, ejecución, fecha
    y reservas. Seguir [OPERACION_Y_RECUPERACION.md](OPERACION_Y_RECUPERACION.md).
 4. Comprobar que `trabajo/apify_presupuesto.json` del corte contiene `mes` y `reservas`. Conservar lote y colas.
@@ -104,8 +104,8 @@ centrales ya reflejadas en la copia de trabajo.
 ## 5. Cómo comprobarlo sin conocer programación
 
 En Actions, el flujo debe terminar bien. En `datos/salud.json` del resultado buscar `estado_operativo.activo: true` y
-`pendientes` en cero. En la pestaña **Estado** de la página se muestra la confirmación o el trabajo por recuperar.
-Un reporte anterior o una página sin desplegar no acredita activación; comparar SHA/ejecución/hora del dato.
+`pendientes` en cero. Revisar Actions y el reporte técnico para confirmar el trabajo por recuperar.
+Un reporte anterior no acredita activación; comparar SHA/ejecución/hora del dato.
 
 En SQL Editor, estas lecturas no modifican datos:
 

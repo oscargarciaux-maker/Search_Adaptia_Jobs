@@ -17,8 +17,17 @@ GRADOS = familias.GRADOS            # exacto, similar, cercano
 GRADO_CONTRATO = {"exacto": "exact", "similar": "similar", "cercano": "close"}
 
 
+_config_operativa = None
+
+
 def config():
+    if _config_operativa is not None:
+        return _config_operativa
     return yaml.safe_load((RAIZ / "datos" / "entrega.yaml").read_text(encoding="utf-8"))
+
+
+def meta_de(rol, cfg):
+    return rol.get("cupo", cfg["por_rol"])
 
 
 def huellas(v):
@@ -38,6 +47,10 @@ def rol_de(v, roles):
             continue
         if rol.get("titulo") and not any(normalizar.contiene_frase(titulo, normalizar.texto(p)) for p in rol["titulo"]):
             continue
+        if "_perfiles" in rol:
+            from panel.afinidad import evaluar
+            if not any(evaluar(v, p, rol["_hoy"])["compatible"] for p in rol["_perfiles"]):
+                continue
         grado = min(en_rol, key=GRADOS.index)
         clave = (GRADOS.index(grado), orden)
         if mejor is None or clave < mejor[0]:
@@ -67,7 +80,7 @@ def prioridad_remota(v):
     return 2
 
 
-def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False, iniciales=()):
+def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False, iniciales=(), perfiles=()):
     """Toma `cuantas` candidatas [(vacante, grado)] una por una: en cada paso la de menor costo, donde el costo sube con
     lo que ya se repite (idioma, nivel, país, modalidad, fuente), con un grado más débil, sin descripción o más vieja."""
     elegidas, conteo = list(iniciales), {k: Counter() for k in ("idioma", "nivel", "pais", "modo", "fuente", "empresa")}
@@ -75,7 +88,12 @@ def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False, 
         rasgos = _rasgos(v)
         for k in conteo:
             conteo[k][rasgos[k]] += 1
-    resto = [(v, g, _rasgos(v)) for v, g in candidatas]
+    def destinatarios(v):
+        if not perfiles: return set()
+        from panel.afinidad import evaluar
+        return {p["cliente_id"] for p in perfiles if evaluar(v,p,hoy)["compatible"]}
+    atendidos = Counter(k for v,_ in iniciales for k in destinatarios(v))
+    resto = [(v, g, dict(_rasgos(v),_destinatarios=destinatarios(v))) for v, g in candidatas]
     hoy_d = date.fromisoformat(hoy)
     while resto and len(elegidas) < cuantas:
         def costo(item):
@@ -89,10 +107,12 @@ def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False, 
         if not resto:
             break
         mejor = min(resto, key=lambda item: (GRADOS.index(item[1]),
-                    prioridad_remota(item[0]) if preferir_remotas else 0, costo(item)))
+                    prioridad_remota(item[0]) if preferir_remotas else 0,
+                    min((atendidos[k] for k in item[2]["_destinatarios"]),default=0),costo(item)))
         resto.remove(mejor)
         v, g, r = mejor
         elegidas.append((v, g))
+        atendidos.update(r["_destinatarios"])
         for k in conteo:
             conteo[k][r[k]] += 1
     return elegidas
@@ -135,8 +155,8 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificac
     salida, resumen = {}, {}
     for rol in roles:
         candidatas = por_rol[rol["id"]]
-        salida[rol["id"]] = variadas(candidatas, cfg["por_rol"], cfg.get("max_por_empresa", 2), hoy,
-                                      cfg.get("preferir_remotas", False), iniciales.get(rol["id"], []))
+        salida[rol["id"]] = variadas(candidatas, meta_de(rol, cfg), cfg.get("max_por_empresa", 2), hoy,
+                                      cfg.get("preferir_remotas", False), iniciales.get(rol["id"], []), perfiles=rol.get("_perfiles",[]))
         elegidas = [v for v, _ in salida[rol["id"]]]
         unicas = len(vacante.juntar(elegidas))
         empresas = Counter(normalizar.empresa(v["empresa"]) for v, _ in candidatas + list(iniciales.get(rol["id"], [])))
@@ -144,7 +164,7 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificac
         resumen[rol["id"]] = {
             "nombre": rol["nombre"], "candidatas": len(candidatas) + len(iniciales.get(rol["id"], [])), "entregadas": len(elegidas),
             "unicas": unicas, "duplicadas": len(elegidas) - unicas,
-            "faltan": max(0, cfg["por_rol"] - unicas),
+            "faltan": max(0, meta_de(rol, cfg) - unicas),
             "idiomas": dict(Counter(v["idioma"] for v in elegidas)),
             "niveles": dict(Counter(contrato.seniority(v["titulo"]) or "sin nivel" for v in elegidas)),
             "paises": dict(Counter((v["paises"][0] if len(v["paises"]) == 1 else "varios") for v in elegidas)),
@@ -222,7 +242,8 @@ def correr(vacantes, entregadas, hoy, capturada, carpeta, subir=None, pendientes
         (v.get("verificacion") or {}).get("estado") == "verificada" for lista in elegidas.values() for v, _ in lista)
     resumen["filas"] = len(filas)
     resumen["archivos"] = False  # compatibilidad con reportes históricos; Supabase es el destino operativo
-    resumen["meta_por_rol"] = cfg["por_rol"]
+    resumen["meta_por_rol"] = cfg["por_rol"] if all(meta_de(r,cfg)==cfg["por_rol"] for r in cfg["roles"]) else None
+    resumen["metas_por_rol"] = {r["id"]:meta_de(r,cfg) for r in cfg["roles"]}
     resumen["meta_cumplida"] = all(r["faltan"] == 0 for r in resumen["roles"].values()) and not resumen["copias_en_lote"]
     if subir is not None:
         resultado = dict(subir(list(pendientes.values())))

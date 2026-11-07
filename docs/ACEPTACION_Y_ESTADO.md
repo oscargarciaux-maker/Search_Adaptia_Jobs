@@ -6,6 +6,38 @@ aprobados por haber fusionado otro PR. Instrucciones de uso: [GUIA_CLIENTE.md](G
 
 ## 1. Corte de evidencia
 
+### Control por clientes v6 — preparado para revisión, no desplegado
+
+Por petición del propietario, se implementa una nueva interfaz privada de clientes/perfiles, cargos abiertos, cupos
+por cargo que suman 120, filtros independientes, versiones desde mañana y copia manual de WhatsApp. La decisión
+anterior de retirar una web no prohíbe esta nueva plataforma. Inicio de sesión y alojamiento real diferidos por el
+propietario; la demostración usa exclusivamente datos ficticios y el servidor real permanece cerrado sin autorización.
+
+Evidencia local: 696 pruebas Python, compilación TypeScript/Vite, dos recorridos Playwright en Chromium (gestión,
+programación, copia real al portapapeles y móvil); PostgreSQL 17 prueba permisos, revisiones concurrentes, vigencia,
+referencias y copia/restauración de once tablas/dos secuencias. SQL 008 conserva el ensayo de 18.000 registros/300
+ofertas y límite de tres segundos. La imagen Docker se comprueba en modo ficticio y cerrada sin configuración real.
+
+El ensayo dirigido de fuentes públicas, sin Supabase/Apify, obtuvo 29 registros de inventario en 0,7 minutos con
+presupuestos mínimos. No seleccionó oportunidades para los filtros estrictos de la muestra; **no acredita 120 reales**.
+Se comprobaron cargos/lugares dirigidos y ausencia de nombres/identificadores de clientes en archivos de captura.
+La aceptación productiva requiere instalar 008/009, configurar alojamiento/login, programar criterios y observar una
+captura dirigida real. No se modifica el historial anterior para aparentar resultados nuevos. Manual: [PANEL_CONTROL.md](PANEL_CONTROL.md).
+
+### Alertas de captura y consulta de consolidación — 6 de noviembre de 2026
+
+La captura [42278586716](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42278586716)
+terminó correctamente a las 2:32 p. m. Colombia con el commit posterior al PR 23. La siguiente,
+[42285642036](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42285642036), terminó en fallo a las
+3:18 p. m.: preparación, captura, respaldo de estado y actualización del reporte completados; falló la validación final.
+El reporte confirmó 15.646 filas de catálogo enviadas sin errores ni pendientes, cero pendientes centrales, y error
+HTTP 500 / 57014 al reconciliar ofertas únicas. Esto acredita el guardado del catálogo de ese corte, no la consolidación.
+
+SQL 008 prepara consulta indexada de URLs sin modificar migraciones registradas. La prueba aislada PostgreSQL 17
+comprueba 18.000 registros con enlaces alternativos y 300 ofertas, uso real del índice y reconciliación bajo límite de
+tres segundos con service_role, además de archivo, ambigüedad, referencias y recuperación. El arreglo requiere revisión,
+fusión, instalación y comprobación real antes de afirmar recuperación productiva. No se silencian las alertas.
+
 ### Admisión geográfica reforzada — 6 de noviembre de 2026
 
 La preparación [42270700157](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42270700157)

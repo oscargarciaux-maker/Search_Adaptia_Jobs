@@ -1,0 +1,168 @@
+"""Adaptador del control privado al motor de captura existente, sin datos de clientes en reportes públicos."""
+import argparse
+from contextlib import contextmanager
+from copy import deepcopy
+from datetime import datetime
+from pathlib import Path
+
+from buscador import bodega, entrega, familias, paises, supabase
+from panel.afinidad import evaluar
+from panel.modelos import Configuracion
+from pydantic import ValidationError
+from panel.repositorio import RepositorioSupabase, hoy
+from panel.terminos import grado, sugerir
+
+
+def validar_version(version):
+    try:
+        return Configuracion.model_validate(version["configuracion"]).validar_publicacion()
+    except (ValidationError,ValueError,KeyError):
+        raise RuntimeError("La configuración privada no es válida; revísala en el panel. No se muestran datos de clientes.") from None
+
+
+def preparar(version, fecha):
+    cfg = validar_version(version)
+    mapa, roles = [], []
+    nombres = {p["codigo"]: p["nombre"] for p in paises.datos()["paises"]}
+    for c in cfg.cargos:
+        if not c.activo or not c.cupo:
+            continue
+        perfiles = cfg.perfiles_activos(c.id)
+        raw = c.model_dump(mode="json")
+        if not raw["terminos_exactos"]:
+            raw["terminos_exactos"] = sugerir(c.nombre, consultar_esco=False)["terminos_exactos"]
+        lugares = {}
+        for p in perfiles:
+            for codigo in p.paises:
+                if p.modalidad in ("cualquiera", "hibrido", "presencial"):
+                    lugares[codigo] = {"location": nombres[codigo]}
+                if p.modalidad in ("cualquiera", "remoto"):
+                    lugares["REMOTO_" + codigo] = {"location": nombres[codigo], "f_WT": "2"}
+            if p.modalidad in ("cualquiera", "remoto"):
+                lugares["REMOTO_MUNDO"] = {"location": "Worldwide", "f_WT": "2"}
+        rid = "cargo:" + str(c.id)
+        mapa.append({"id": rid, "nombre": c.nombre, "consultas": [c.nombre, *raw["terminos_exactos"], *raw["terminos_similares"]],
+            "exactos": raw["terminos_exactos"], "similares": raw["terminos_similares"], "cercanos": [],
+            "excluir": raw["terminos_excluidos"], "herramientas": [], "lugares": list(lugares.items()),
+            "_control_cargo": raw,
+            "paises_objetivo": sorted({x for p in perfiles for x in p.paises}),
+            "solo_remoto": all(p.modalidad == "remoto" for p in perfiles)})
+        roles.append({"id": rid, "nombre": c.nombre, "familias": [rid], "cupo": c.cupo,
+                      "_perfiles": [p.model_dump(mode="json") for p in perfiles], "_hoy": fecha})
+    configuracion = {"por_rol": 20, "roles": roles, "preferir_remotas": True, "max_por_empresa": 2,
+                     "dias_frescura": 30, "idiomas": ["es", "en"]}
+    motor = bodega.config()
+    motor["paises_activos"] = sorted({p for x in mapa for p in x["paises_objetivo"]})
+    motor["dias_maximos"] = max(p.antiguedad_dias for p in cfg.perfiles_activos())
+    motor["control_dirigido"] = True
+    motor["presupuestos"].update(linkedin_busquedas=min(300, max(24, len(roles) * 24)),
+        indeed_busquedas=min(72, max(6, len(roles) * 8)), getonbrd_busquedas=min(30, len(roles) * 4),
+        empresas_por_probar=20, remotos_paginas=24)
+    return mapa, configuracion, motor
+
+
+@contextmanager
+def activar(version, fecha):
+    mapa, cfg, motor = preparar(version, fecha)
+    anterior_e, anterior_b = entrega._config_operativa, bodega._config_operativa
+    familias.configurar(mapa)
+    entrega._config_operativa, bodega._config_operativa = cfg, motor
+    try:
+        yield cfg
+    finally:
+        familias.configurar()
+        entrega._config_operativa, bodega._config_operativa = anterior_e, anterior_b
+
+
+def iniciar(repo, version, fecha):
+    """Fija una versión diaria y permite releer la misma ejecución al reintentar."""
+    e = repo.pedir("GET", "panel_ejecuciones", params={"fecha": "eq." + fecha, "limit": 1})
+    if not e:
+        e = repo.pedir("POST", "panel_ejecuciones", json={"fecha": fecha, "revision": version["revision"]},
+                       params={"on_conflict": "fecha"}, headers={"Prefer":"resolution=ignore-duplicates"})  # repositorio aplica cabeceras comunes
+        e = repo.pedir("GET", "panel_ejecuciones", params={"fecha": "eq." + fecha, "limit": 1})
+    ejecucion = e[0]
+    if ejecucion["revision"] != version["revision"]:
+        raise RuntimeError("La captura de hoy conserva otra versión; no se reasigna el historial.")
+    return ejecucion
+
+
+def registrar(repo, version, fecha, reporte=None):
+    """Reconstruible desde la selección confirmada, incluso tras perder el proceso anterior."""
+    ejecucion = iniciar(repo, version, fecha)
+    cfg = validar_version(version)
+    seleccionadas = repo.pedir("GET", "entregas_diarias", params={"delivery_date": "eq." + fecha, "select": "*", "limit": 500})
+    filas, conteos = [], {}
+    for row in seleccionadas:
+        if not row["role_id"].startswith("cargo:"):
+            continue
+        cargo_id = row["role_id"].split(":", 1)[1]
+        conteos[cargo_id] = conteos.get(cargo_id, 0) + 1
+        for p in cfg.perfiles_activos(cargo_id):
+            match = evaluar(row["snapshot"], p, fecha)
+            if not match["compatible"]:
+                continue
+            c = next(c for c in cfg.cargos if str(c.id) == cargo_id)
+            _, evidencia = grado(row["snapshot"]["titulo"], c.model_dump(mode="json"))
+            filas.append({"ejecucion_id": ejecucion["id"], "cliente_id": str(p.cliente_id),
+                "perfil_id": str(p.id), "cargo_id": cargo_id, "vacante_id": row["vacante_id"],
+                "match_grade": row["match_grade"], "explicacion": [*match["pruebas"], evidencia or {"regla": "similitud textual"}],
+                "filtros": p.model_dump(mode="json"), "cargo_configuracion":c.model_dump(mode="json")})
+    for inicio in range(0, len(filas), 250):
+        repo.pedir("POST", "panel_asignaciones", params={"on_conflict": "ejecucion_id,perfil_id,vacante_id"},
+                    json=filas[inicio:inicio + 250], headers={"Prefer":"resolution=ignore-duplicates"})
+    faltantes = {c.nombre: max(0, c.cupo - conteos.get(str(c.id), 0)) for c in cfg.cargos if c.activo}
+    from buscador.validacion import errores_catalogo, errores
+    confirmado = reporte is None or not (errores_catalogo(reporte) if reporte.get("modo") == "incremental" else errores(reporte))
+    repo.pedir("PATCH", "panel_ejecuciones", params={"id": "eq." + ejecucion["id"]},
+        json={"estado": "parcial" if any(faltantes.values()) or not confirmado else "completa",
+              "resumen": {"vacantes": sum(conteos.values()), "meta": 120, "faltantes": faltantes,
+                          "asignaciones": len(filas)},
+              "terminada_en": datetime.now().astimezone().isoformat()})
+
+
+def correr(salida, modo="diario", prueba=False, repo=None):
+    fecha = hoy()
+    if prueba:
+        return bodega.correr(salida, modo=modo, prueba=True)
+    repo = repo or RepositorioSupabase()
+    version = repo.operativa(fecha)
+    if not version:
+        return bodega.correr(salida, modo=modo)
+    ejecucion = iniciar(repo, version, fecha)
+    try:
+        with activar(version, fecha):
+            previas = bodega._leer_json(Path(salida) / "trabajo/bodega.json.gz", [])
+            cargos = version["configuracion"]["cargos"]
+            bodega._config_operativa["empresas_objetivo"] = sorted({v["empresa"] for v in previas
+                if any(c["activo"] and grado(v["titulo"],c)[0] for c in cargos)})[:120]
+            reporte = bodega.correr(salida, modo=modo, hoy=fecha)
+            registrar(repo, version, fecha, reporte)
+            return reporte
+    except Exception:
+        try:
+            repo.pedir("PATCH","panel_ejecuciones",params={"id":"eq."+ejecucion["id"]},
+                       json={"estado":"fallida","resumen":{"error":"La captura requiere revisión; se conserva su historial y pendientes."}})
+        except Exception:
+            pass
+        raise
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--salida", required=True)
+    parser.add_argument("--modo", choices=["diario", "incremental", "inicial"], default="diario")
+    parser.add_argument("--prueba", action="store_true")
+    parser.add_argument("--config", help="Versión ficticia para ensayo dirigido; requiere --prueba")
+    args = parser.parse_args()
+    if args.config:
+        if not args.prueba: parser.error("--config requiere --prueba; producción lee únicamente Supabase")
+        import json
+        version = json.loads(Path(args.config).read_text())
+        with activar(version,hoy()): bodega.correr(args.salida,modo=args.modo,prueba=True)
+    else:
+        correr(args.salida, args.modo, args.prueba)
+
+
+if __name__ == "__main__":
+    main()

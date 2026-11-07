@@ -1,22 +1,43 @@
-# Search Adaptia Jobs — scraper de vacantes LATAM y España
+# Adaptia Jobs — control de búsquedas por cliente
 
-Busca y clasifica ofertas para LATAM, España y remotas mundiales, con cargos exactos, similares y cercanos. Cada noche
-intenta seleccionar **20 nuevas por cada uno de seis roles** (Product Designer, UX/UI Designer, Product Owner, Product
-Manager, AI Engineer y QA), variadas y sin repetir, en **Supabase**. La captura horaria gratuita actualiza el catálogo
-sin crear otra entrega. Se comprueban enlaces antes de nuevas selecciones; cierres, páginas generales y cobros detectados
-se apartan y lo que no puede comprobarse queda pendiente. La cobertura/volumen no se garantizan por completo.
+El operador gestiona clientes, perfiles, cargos y cupos desde una interfaz. Define país, modalidad, idioma del aviso,
+plazo de publicación, años de experiencia exigidos e inglés requerido. El objetivo diario es **120 oportunidades
+únicas distribuidas por cargo**: varios clientes compatibles pueden aprovechar el mismo cupo sin contar copias.
 
-La operación se consulta en Supabase y GitHub Actions. `ofertas` contiene una fila por oportunidad reconocida, con
-sus enlaces asociados. Las copias anteriores por portal se archivan sin perder sus datos; no cuentan para el cupo. La interfaz web y sus despliegues se retiraron por decisión
-del propietario. La búsqueda diaria no usa IA ni sesión personal de LinkedIn. Todavía no hay agente WhatsApp
-ni seguimiento individual de candidaturas. La rama histórica `publicado` conserva reportes y estado de captura,
-no un sitio web; no borrarla porque contiene inventario y memoria necesarios para continuar.
+Guardar conserva un borrador. **Programar para mañana** fija una versión para el día siguiente en Colombia. El scraper
+consulta esos cargos y lugares; cada cliente ve su subconjunto compatible. Los enlaces caducados o retirados no se
+copian. El botón **Copiar WhatsApp** prepara un mensaje en el portapapeles; el operador decide cuándo enviarlo.
+
+La búsqueda, los filtros y la afinidad funcionan con código, sin IA. Se pueden añadir cargos nuevos y revisar sus
+variantes/términos afines sugeridos mediante reglas y vocabulario público ESCO; no hay que editar un banco cerrado.
+La expansión puede necesitar corrección del operador. No se promete inferir todos los sinónimos de cualquier profesión.
+
+**Estado de esta revisión:** plataforma implementada y ensayada con datos ficticios; acceso real cerrado por defecto.
+El propietario decidió configurar el inicio de sesión más adelante. La demostración no modifica Supabase, no programa
+capturas reales y no consume Apify. El despliegue privado y la primera corrida dirigida real aún deben acreditarse.
+Hasta existir una versión de control vigente en Supabase, continúa la selección heredada de seis cargos por veinte.
+No se recupera la web histórica de Pages/Cloudflare: este panel tiene servidor privado y nueva finalidad autorizada.
+
+## Ejecutar la demostración
+
+Requiere Python 3.12 y Node 24. Desde la raíz del repositorio:
+
+```bash
+pip install -r requirements.txt
+npm --prefix web ci
+npm --prefix web run build
+python -m panel.api --demo --port 8000
+```
+
+Abrir http://localhost:8000. Los cambios ficticios persisten en /tmp/adaptia-panel-demo/config.json; se pueden borrar
+con el servidor detenido para reiniciar la demostración. **No usar --demo con datos reales.**
+Instalación privada, Docker, configuración y guía detallada: [Panel de control](docs/PANEL_CONTROL.md).
 
 ## Documentación de entrega
 
 | Para quién / tarea | Documento vigente |
 |---|---|
-| Operador y cliente: aprender a usar e interpretar resultados | [Manual del cliente](docs/GUIA_CLIENTE.md) |
+| Operador: clientes, filtros, cupos y vacantes | [Manual del cliente](docs/GUIA_CLIENTE.md) |
 | Administrador: instalar o actualizar sin perder datos | [Instalación](docs/INSTALACION.md) |
 | Configurar una vez y aplicar SQL/activación automáticamente | [Instalación automática](docs/INSTALACION_AUTOMATICA.md) |
 | Cambiar propietario/cuentas conservando historial y presupuesto | [Traspaso](docs/TRASPASO.md) |
@@ -36,7 +57,7 @@ Referencias técnicas y antecedentes:
 - Integridad de enlaces y resultados de auditoría: [`docs/CONTROL_CALIDAD_ENLACES.md`](docs/CONTROL_CALIDAD_ENLACES.md)
 - Contratos: [v1 histórico](docs/CONTRATO_DATOS_v1.md), [catálogo v2](docs/CONTRATO_DATOS_v2.md),
   [verificación v3](docs/CONTRATO_DATOS_v3.md), [consulta v4](docs/CONTRATO_DATOS_v4.md),
-  [identidad y entrega única v5](docs/CONTRATO_DATOS_v5.md) · Reglas para desarrollo: [CLAUDE.md](CLAUDE.md)
+  [identidad y entrega única v5](docs/CONTRATO_DATOS_v5.md), [control privado v6](docs/CONTRATO_DATOS_v6.md) · Reglas para desarrollo: [CLAUDE.md](CLAUDE.md)
 
 ## Cobertura y conservación
 
@@ -45,8 +66,8 @@ similares y cercanos rotan en las búsquedas; no se promete agotar todas las com
 La limpieza de 30 días solo afecta al buscador activo; no borra ofertas de Supabase. Apify busca fichas formales de
 LinkedIn con un tope de USD 5/mes; las publicaciones solo aportan una oferta si se verifica
 su ficha original. La búsqueda pagada del feed está desactivada para reservar el crédito a fichas formales.
-La meta es 20 por cada uno de seis roles (120 al día). Si un rol queda corto, hay búsquedas adicionales gratuitas
-acotadas y un reporte de los motivos. La continuidad se mide entre días distintos, conservando la memoria de entregas.
+Con el panel activo, los cupos configurados suman 120; antes se mantienen seis roles por veinte. Si un rol queda corto, hay búsquedas adicionales gratuitas
+acotadas y un reporte de los motivos. La continuidad se mide entre días distintos, conservando la memoria de entregas. El panel muestra faltantes sin relajar filtros.
 Decisiones, límites y seguimiento futuro: [`docs/COBERTURA_HISTORICO.md`](docs/COBERTURA_HISTORICO.md).
 
 El catálogo v2 permite actualizar durante el día sin crear otra entrega diaria. Conserva publicación, detección y
@@ -54,7 +75,7 @@ El catálogo v2 permite actualizar durante el día sin crear otra entrega diaria
 catálogo/estado central tras respaldar e importar el corte. Requiere configurar una vez conexión administrativa y clave
 de cifrado como Secrets. La alternativa manual conserva variables anteriores. La activación se acredita por la ejecución,
 no solo por la fusión. Repetir una entrega completa reintenta el mismo lote; las cachés siguen en GitHub.
-WhatsApp sigue pendiente de validar continuidad y definir destinatarios/confirmaciones; no hay envíos automáticos.
+La copia manual de WhatsApp está en el panel; el agente y los envíos automáticos siguen fuera del alcance.
 La programación solicita 1:17 a. m. Colombia para la nocturna y minuto 23 de cada hora para la captura; GitHub puede
 retrasar/saltar ejecuciones. El límite de USD 5 es Apify, no un precio total garantizado de todos los proveedores.
 
@@ -63,5 +84,7 @@ retrasar/saltar ejecuciones. El límite de USD 5 es Apify, no un precio total ga
 ```bash
 pip install -r requirements.txt
 python -m pytest -q
+npm --prefix web run build
+npm --prefix web test   # requiere Chromium: cd web && npx playwright install chromium
 python -m buscador.bodega --salida /tmp/prueba --prueba   # prueba en vivo de unos 5 minutos
 ```
