@@ -1,6 +1,6 @@
 # Traspaso al cliente sin perder continuidad
 
-Versión vigente: 5 de noviembre de 2026. Acompaña [GUIA_CLIENTE.md](GUIA_CLIENTE.md), [INSTALACION.md](INSTALACION.md),
+Versión vigente: revisión v6 del 6 de noviembre de 2026. Acompaña [GUIA_CLIENTE.md](GUIA_CLIENTE.md), [INSTALACION.md](INSTALACION.md),
 [OPERACION_Y_RECUPERACION.md](OPERACION_Y_RECUPERACION.md) y [ACEPTACION_Y_ESTADO.md](ACEPTACION_Y_ESTADO.md).
 La preparación preferida del destino está en [INSTALACION_AUTOMATICA.md](INSTALACION_AUTOMATICA.md): el cliente configura
 accesos una vez y no copia SQL 002/003 ni crea variables de captura. Continuidad sigue requiriendo un corte coherente.
@@ -18,9 +18,10 @@ No transferir cuentas personales ni compartir contraseñas para simular el cambi
 | Elemento | Qué se entrega o configura | Evidencia |
 |---|---|---|
 | GitHub | Código `main`, flujos, rama `publicado`, permisos y ramas protegidas | Cliente entra con su cuenta y ve las ejecuciones |
-| Supabase | Proyecto conservado o restauración de tablas/permisos; siete tablas y dos secuencias con el instalador | Conteos, referencias, reservas y lectura/escritura reales |
+| Supabase | Proyecto conservado o restauración de tablas/permisos; once tablas y dos secuencias tras SQL 009 con el instalador | Conteos, referencias, reservas y lectura/escritura reales |
 | Apify | Cuenta/organización del cliente, actor y límite | Token nuevo validado, saldo y reservas contrastados |
 | Estado de trabajo | Toda la carpeta `trabajo/` de un mismo corte | Lote, colas y presupuesto respaldados juntos |
+| Panel privado v6 | Alojamiento, origen HTTPS, operador autorizado y variables privadas del servidor | Sesión rechazada sin acceso, configuración persistente, resultados compatibles |
 | Manuales y soporte | Versiones vigentes, incidencias conocidas y responsables | Cliente completa una búsqueda/selección sin ayuda |
 
 GitHub aloja código y procesos; no mueve automáticamente los proyectos de Supabase o Apify.
@@ -28,7 +29,7 @@ GitHub aloja código y procesos; no mueve automáticamente los proyectos de Supa
 ## 2. Preparar un corte consistente
 
 1. Elegir una ventana en que no se esté enviando una selección a clientes.
-2. En Actions, deshabilitar temporalmente los flujos que escriben: **Bodega nocturna**, **Captura horaria** y
+2. Detener ediciones del panel durante el corte. En Actions, deshabilitar temporalmente los flujos que escriben: **Bodega nocturna**, **Captura horaria** y
    **Búsqueda profunda**. Esperar a que las ejecuciones en curso terminen.
 3. Guardar URL, identificador de la última ejecución, commit `main` y commit `publicado` del corte, sin registrar secretos.
 4. Respaldar todas las tablas, secuencias y la carpeta de trabajo siguiendo el manual de operación. Conservar los respaldos fuera
@@ -66,7 +67,7 @@ Hay dos caminos; no ejecutarlos ambos a ciegas:
 
 - **Conservar el proyecto:** utilizar la transferencia/propiedad de organización que permita Supabase, con accesos propios
   del cliente. Comprobar permisos y facturación y rotar la clave de servicio coordinadamente.
-- **Crear otro proyecto:** preparar su esquema con `esquema.sql` y `002_catalogo.sql`; restaurar los datos en destino
+- **Crear otro proyecto:** preparar todas las migraciones que estén instaladas en el origen (001–009 en v6); restaurar los datos en destino
   vacío y validar conteos, identidades, permisos y referencias antes de cambiar la conexión de producción.
   Si el origen tiene SQL 003, aplicar también `003_estado_operativo.sql` antes de restaurar, sin inicializar vacío.
 
@@ -74,10 +75,17 @@ Las tablas necesarias son:
 
 1. `catalogo_vacantes`: identidad, contenido, estados, tiempos y verificación de enlaces.
 2. `entregas_diarias`: registro de selección y snapshot; depende del catálogo mediante clave foránea.
-3. `ofertas`: filas históricas compatibles con v1, potencialmente varias por vacante.
+3. `ofertas`: filas compatibles con v1; desde SQL 005 hay una por vacante reconocida.
 4. Si se aplicó 003, `estado_operativo`: marcador, colas con revisiones y selecciones sin confirmar.
 5. Si se aplicó 003, `apify_reservas`: reservas de crédito anteriores y centrales; nunca reiniciarlas al traspasar.
-6. Si se usó el instalador, `adaptia_migraciones`: versiones y hashes de SQL ya aplicado. No omitirlo ni borrar su historia.
+6. Desde SQL 005, `ofertas_enlaces_historicos`: archivo íntegro de copias por portal.
+7. Desde SQL 009, `panel_configuracion`, `panel_versiones`, `panel_ejecuciones` y `panel_asignaciones`: clientes, criterios, versiones y resultados privados.
+8. Si se usó el instalador, `adaptia_migraciones`: versiones y hashes de SQL ya aplicado. No omitirlo ni borrar su historia.
+
+Con el panel, transferir también el alojamiento y sus variables SUPABASE_URL, SUPABASE_SECRET_KEY, PANEL_ORIGIN y
+PANEL_OPERATOR_EMAILS. Los Secrets de Actions no configuran ese servidor automáticamente. Auth del proveedor queda
+fuera de los cortes del proyecto: conservar o preparar el operador aparte, sin abrir datos reales en modo demo.
+La instalación de login está diferida por decisión del propietario. Seguir [PANEL_CONTROL.md](PANEL_CONTROL.md).
 
 Conservar las secuencias `ofertas_id_seq` y, tras 003, `estado_operativo_revision_seq`. La segunda evita reutilizar revisiones.
 

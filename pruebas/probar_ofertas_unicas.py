@@ -33,7 +33,7 @@ def probar_aliases(conectar, nombre):
                 insert into public.entregas_diarias(vacante_id,delivery_date,role_id,match_grade,selected_at,snapshot)
                 values('2222222222222222',current_date,'qa','exact',now(),'{"conservar":"histórico"}');""")
             antes = c.execute("select jsonb_agg(to_jsonb(c) order by id) from public.catalogo_vacantes c").fetchone()[0]
-            assert ensayar(c) == ['006','007']
+            assert ensayar(c) == ['006','007','008','009']
             assert c.execute("select jsonb_agg(to_jsonb(c) order by id) from public.catalogo_vacantes c").fetchone()[0] == antes
             assert c.execute("select count(*) from public.ofertas").fetchone()[0] == 2
             assert '006' not in migraciones.aplicadas(c)
@@ -166,6 +166,7 @@ def main():
             assert c.execute("select count(*) from public.ofertas_enlaces_historicos").fetchone()[0] == 1
             assert not c.execute("select has_table_privilege('anon','public.ofertas_enlaces_historicos','SELECT')").fetchone()[0]
             assert not c.execute("select has_function_privilege('authenticated','public.reconciliar_ofertas()','EXECUTE')").fetchone()[0]
+            assert not c.execute("select has_function_privilege('anon','public.adaptia_urls_identidad(jsonb)','EXECUTE')").fetchone()[0]
             # Una copia archivada anteriormente se reconoce por los IDs agrupados del principal.
             c.execute("""update public.catalogo_vacantes set datos=jsonb_set(datos,'{enlaces_alternativos}',
              coalesce(datos->'enlaces_alternativos','[]')||'["https://jobs.lever.co/a/adicional"]'::jsonb)
@@ -198,16 +199,28 @@ def main():
             c.execute("""insert into public.catalogo_vacantes(id,datos,status,observed_at)
              select substr(md5('volumen-'||n),1,16),jsonb_build_object(
               'enlace','https://jobs.lever.co/volumen/'||n,
+              'enlaces_alternativos',jsonb_build_array('https://jobs.lever.co/volumen/'||n||'?utm_source=fuente',
+                'https://www.linkedin.com/jobs/view/'||(9000000000::bigint+n)||'/?trk=prueba'),
               'ids_agrupados',jsonb_build_array(substr(md5('volumen-'||n),1,16)),
               'resumen',repeat('Responsabilidades y condiciones del puesto. ',50)), 'active',now()
              from generate_series(1,18000) n;""")
+            c.execute("""insert into public.ofertas(external_id,job_title,company_name,offer_url,vacante_id)
+                select 'volumen-'||n,'QA','Ensayo','https://jobs.lever.co/volumen/'||n,substr(md5('volumen-'||n),1,16)
+                from generate_series(1,300) n;
+                analyze public.catalogo_vacantes;""")
+            plan = c.execute("""explain (format json) select id from public.catalogo_vacantes
+                where public.adaptia_urls_identidad(datos) @> array['linkedin:9000000123']""").fetchone()[0]
+            assert 'catalogo_urls_identidad' in json.dumps(plan)
+            assert c.execute("""select id from public.catalogo_vacantes
+                where public.adaptia_urls_identidad(datos) @> array[public.adaptia_url_identidad('https://www.linkedin.com/jobs/view/9000000123?trk=otra')]""").fetchall() == [(c.execute("select substr(md5('volumen-123'),1,16)").fetchone()[0],)]
             with c.transaction():
-                c.execute("set local statement_timeout='8s'")
+                c.execute("set local statement_timeout='3s'")
+                c.execute("set local role service_role")
                 c.execute("select public.reconciliar_ofertas()")
             assert c.execute("select count(*) from public.ofertas where vacante_id='aaaaaaaaaaaaaaaa'").fetchone()[0] == 1
             assert 'https://jobs.lever.co/a/adicional' in c.execute("select enlaces_alternativos from public.ofertas where id=37").fetchone()[0]
         probar_aliases(conectar,nombre+"_aliases")
-        print("Identidad, archivo, repetición, referencias, concurrencia y catálogo de 18.000 filas bajo presupuesto de consulta: aprobados.")
+        print("Identidad, archivo, repetición, referencias, concurrencia y catálogo de 18.000 filas / 300 ofertas con índices y límite de tres segundos: aprobados.")
     finally:
         with conectar() as admin:
             admin.execute(sql.SQL("drop database {}").format(sql.Identifier(nombre)))

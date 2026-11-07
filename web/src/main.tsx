@@ -1,0 +1,2325 @@
+import React, { useEffect, useRef, useState } from "react";
+import { createRoot } from "react-dom/client";
+import {
+  ArrowDownToLine,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUpRight,
+  Archive,
+  BriefcaseBusiness,
+  CalendarClock,
+  Check,
+  CheckCheck,
+  ChevronDown,
+  ChevronRight,
+  Clipboard,
+  Clock3,
+  Code2,
+  Compass,
+  Copy,
+  Ellipsis,
+  ExternalLink,
+  Globe2,
+  LayoutDashboard,
+  ListFilter,
+  Loader2,
+  LogOut,
+  Menu,
+  MessageCircle,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Save,
+  Search,
+  Settings2,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  Target,
+  Users,
+  Workflow,
+  X,
+} from "lucide-react";
+import { api } from "./api";
+import type {
+  Cargo,
+  Cliente,
+  Configuracion,
+  EstadoConfig,
+  Perfil,
+  Resultados,
+  Sesion,
+  Ejecucion,
+  Vacante,
+} from "./types";
+import "./style.css";
+
+const uid = () => crypto.randomUUID();
+const colores = ["#2d7e68", "#6b91b4", "#b28b59", "#907bb1", "#b76e79"];
+const fecha = (v: string) =>
+  new Date(v + "T12:00:00").toLocaleDateString("es-CO", {
+    day: "numeric",
+    month: "long",
+  });
+const modos: Record<string, string> = {
+  remoto: "Remoto",
+  hibrido: "Híbrido",
+  presencial: "Presencial",
+  cualquiera: "Cualquier modalidad",
+};
+const grados: Record<string, string> = {
+  exact: "Cargo exacto",
+  similar: "Cargo afín",
+  close: "Cargo cercano",
+};
+const vacio: Configuracion = { clientes: [], cargos: [], perfiles: [] };
+function iniciales(nombre: string) {
+  return nombre
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((x) => x[0])
+    .join("")
+    .toUpperCase();
+}
+function perfilNuevo(cliente: string, cargo: string): Perfil {
+  return {
+    id: uid(),
+    cliente_id: cliente,
+    cargo_id: cargo,
+    activo: true,
+    paises: ["CO"],
+    modalidad: "remoto",
+    antiguedad_dias: 14,
+    idiomas: ["es", "en"],
+    ingles_maximo: "sin_filtro",
+    experiencia_min: null,
+    experiencia_max: null,
+    aceptar_experiencia_sin_dato: false,
+    aceptar_ingles_sin_dato: false,
+  };
+}
+
+function Dialog({
+  titulo,
+  subtitulo,
+  onClose,
+  children,
+  ancho = false,
+}: {
+  titulo: string;
+  subtitulo?: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  ancho?: boolean;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    ref.current?.showModal();
+    return () => ref.current?.close();
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      className={ancho ? "dialog ancho" : "dialog"}
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+    >
+      <div className="dialog-head">
+        <div>
+          <h2>{titulo}</h2>
+          {subtitulo && <p>{subtitulo}</p>}
+        </div>
+        <button className="icon" aria-label="Cerrar" onClick={onClose}>
+          <X size={20} />
+        </button>
+      </div>
+      {children}
+    </dialog>
+  );
+}
+function TagInput({
+  label,
+  values,
+  onChange,
+}: {
+  label: string;
+  values: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const [text, setText] = useState("");
+  function add() {
+    const t = text.trim();
+    if (t && !values.some((x) => x.toLowerCase() === t.toLowerCase()))
+      onChange([...values, t]);
+    setText("");
+  }
+  return (
+    <div className="field">
+      <label>{label}</label>
+      <div className="tagbox">
+        {values.map((t) => (
+          <span className="term" key={t}>
+            {t}
+            <button
+              type="button"
+              aria-label={"Quitar " + t}
+              onClick={() => onChange(values.filter((x) => x !== t))}
+            >
+              <X size={12} />
+            </button>
+          </span>
+        ))}
+        <input
+          aria-label={label}
+          placeholder="Añade un término y pulsa Enter"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          onBlur={add}
+        />
+      </div>
+    </div>
+  );
+}
+function CargoDialog({
+  cargo,
+  onClose,
+  onSave,
+  notify,
+}: {
+  cargo: Cargo | null;
+  onClose: () => void;
+  onSave: (c: Cargo) => void;
+  notify: (s: string, error?: boolean) => void;
+}) {
+  const [c, setC] = useState<Cargo>(
+    cargo
+      ? structuredClone(cargo)
+      : {
+          id: uid(),
+          nombre: "",
+          cupo: 0,
+          activo: true,
+          terminos_exactos: [],
+          terminos_similares: [],
+          terminos_excluidos: [],
+        },
+  );
+  const [busy, setBusy] = useState(false);
+  const [nota, setNota] = useState("");
+  async function expandir() {
+    setBusy(true);
+    try {
+      const r = await api<{
+        terminos_exactos: string[];
+        terminos_similares: string[];
+        fuentes: string[];
+        requiere_revision: boolean;
+      }>("/cargos/expandir", {
+        method: "POST",
+        body: JSON.stringify({ cargo: c.nombre }),
+      });
+      setC((v) => ({
+        ...v,
+        terminos_exactos: r.terminos_exactos,
+        terminos_similares: r.terminos_similares,
+      }));
+      setNota(
+        r.fuentes.join(" · ") +
+          (r.requiere_revision
+            ? ". No encontramos afines fiables; puedes añadirlos aquí."
+            : ". Revisa y ajusta las sugerencias."),
+      );
+    } catch (e) {
+      notify((e as Error).message, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Dialog
+      titulo={cargo ? "Editar cargo y cupo" : "Añadir un cargo"}
+      subtitulo="Un mismo cupo puede servir a varios clientes compatibles."
+      onClose={onClose}
+    >
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (c.nombre.trim().length < 2 || busy) return;
+          if (
+            !cargo &&
+            !c.terminos_exactos.length &&
+            !c.terminos_similares.length
+          ) {
+            await expandir();
+            return;
+          }
+          onSave({
+            ...c,
+            nombre: c.nombre.trim(),
+            terminos_exactos: c.terminos_exactos.length
+              ? c.terminos_exactos
+              : [c.nombre.trim()],
+          });
+        }}
+      >
+        <fieldset disabled={busy}>
+          <div className="form-grid">
+            <div className="field">
+              <label htmlFor="cargo-nombre">Cargo</label>
+              <input
+                id="cargo-nombre"
+                autoFocus
+                required
+                minLength={2}
+                maxLength={120}
+                value={c.nombre}
+                placeholder="Por ejemplo, Frontend"
+                onChange={(e) => setC({ ...c, nombre: e.target.value })}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="cargo-cupo">Vacantes diarias</label>
+              <input
+                id="cargo-cupo"
+                type="number"
+                min={0}
+                max={120}
+                required
+                value={c.cupo}
+                onChange={(e) => setC({ ...c, cupo: Number(e.target.value) })}
+              />
+            </div>
+          </div>
+          <div className="info-line">
+            <Compass size={18} />
+            <span>
+              La búsqueda incluye las denominaciones que definas a continuación.
+            </span>
+          </div>
+          <button
+            className="button secondary full"
+            type="button"
+            disabled={c.nombre.trim().length < 2 || busy}
+            onClick={expandir}
+          >
+            {busy ? (
+              <Loader2 className="spin" size={16} />
+            ) : (
+              <Workflow size={16} />
+            )}
+            Buscar denominaciones afines
+          </button>
+          {nota && <p className="helper note">{nota}</p>}
+          <TagInput
+            label="Denominaciones principales"
+            values={c.terminos_exactos}
+            onChange={(v) => setC({ ...c, terminos_exactos: v })}
+          />
+          <TagInput
+            label="Cargos afines"
+            values={c.terminos_similares}
+            onChange={(v) => setC({ ...c, terminos_similares: v })}
+          />
+          <TagInput
+            label="Excluir estos términos"
+            values={c.terminos_excluidos}
+            onChange={(v) => setC({ ...c, terminos_excluidos: v })}
+          />
+          <p className="helper">
+            No dependes de un listado cerrado. Puedes crear cualquier cargo y
+            revisar sus términos sin modificar código.
+          </p>
+        </fieldset>
+        <div className="dialog-actions">
+          <button type="button" className="button secondary" onClick={onClose}>
+            Cancelar
+          </button>
+          <button disabled={busy} className="button primary">
+            {cargo ? "Aplicar cambios" : "Añadir cargo"}
+            <Check size={15} />
+          </button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+function ClienteDialog({
+  cliente,
+  config,
+  paises,
+  onClose,
+  onSave,
+}: {
+  cliente: Cliente | null;
+  config: Configuracion;
+  paises: Sesion["paises"];
+  onClose: () => void;
+  onSave: (c: Cliente, p: Perfil[]) => void;
+}) {
+  const [c, setC] = useState<Cliente>(
+    cliente ? { ...cliente } : { id: uid(), nombre: "", activo: true },
+  );
+  const [ps, setPs] = useState<Perfil[]>(
+    cliente
+      ? structuredClone(
+          config.perfiles.filter((p) => p.cliente_id === cliente.id),
+        )
+      : [],
+  );
+  const [error, setError] = useState("");
+  const cargos = config.cargos.filter((c) => c.activo);
+  function patch(id: string, v: Partial<Perfil>) {
+    setPs(ps.map((p) => (p.id === id ? { ...p, ...v } : p)));
+  }
+  return (
+    <Dialog
+      ancho
+      titulo={cliente ? "Editar cliente" : "Nuevo cliente"}
+      subtitulo="Define qué oportunidades son útiles para esta persona."
+      onClose={onClose}
+    >
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!ps.length) {
+            setError("Añade al menos un perfil de búsqueda.");
+            return;
+          }
+          if (ps.some((p) => !p.paises.length || !p.idiomas.length)) {
+            setError("Selecciona al menos un país y un idioma por perfil.");
+            return;
+          }
+          if (
+            ps.some(
+              (p) =>
+                p.experiencia_min !== null &&
+                p.experiencia_max !== null &&
+                p.experiencia_min > p.experiencia_max,
+            )
+          ) {
+            setError("Revisa el rango de experiencia.");
+            return;
+          }
+          onSave(c, ps);
+        }}
+      >
+        <div className="field">
+          <label htmlFor="cliente-nombre">
+            Nombre o referencia del cliente
+          </label>
+          <input
+            id="cliente-nombre"
+            autoFocus
+            required
+            maxLength={100}
+            value={c.nombre}
+            placeholder="Nombre para identificar a tu cliente"
+            onChange={(e) => setC({ ...c, nombre: e.target.value })}
+          />
+        </div>
+        <div className="section-title">
+          <h3>Perfiles de búsqueda</h3>
+          <span className="muted">
+            {ps.length} {ps.length === 1 ? "perfil" : "perfiles"}
+          </span>
+        </div>
+        {ps.map((p, i) => (
+          <section className="profile-editor" key={p.id}>
+            <div className="profile-heading">
+              <span className="tiny-kicker">PERFIL {i + 1}</span>
+              <button
+                type="button"
+                className="text-button danger"
+                onClick={() => setPs(ps.filter((x) => x.id !== p.id))}
+              >
+                Quitar perfil
+              </button>
+            </div>
+            <div className="form-grid">
+              <div className="field">
+                <label>Cargo</label>
+                <select
+                  aria-label={"Cargo del perfil " + (i + 1)}
+                  value={p.cargo_id}
+                  onChange={(e) => patch(p.id, { cargo_id: e.target.value })}
+                >
+                  {cargos.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label>Modalidad</label>
+                <select
+                  aria-label={"Modalidad del perfil " + (i + 1)}
+                  value={p.modalidad}
+                  onChange={(e) => patch(p.id, { modalidad: e.target.value })}
+                >
+                  {Object.entries(modos).map(([v, t]) => (
+                    <option value={v} key={v}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="field">
+              <label>Desde dónde puede trabajar</label>
+              <div className="country-grid">
+                {paises.map((pais) => (
+                  <label
+                    className={
+                      "country " +
+                      (p.paises.includes(pais.codigo) ? "selected" : "")
+                    }
+                    key={pais.codigo}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={p.paises.includes(pais.codigo)}
+                      onChange={(e) =>
+                        patch(p.id, {
+                          paises: e.target.checked
+                            ? [...p.paises, pais.codigo]
+                            : p.paises.filter((x) => x !== pais.codigo),
+                        })
+                      }
+                    />
+                    {pais.nombre}
+                  </label>
+                ))}
+              </div>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() =>
+                  patch(p.id, {
+                    paises:
+                      p.paises.length === paises.length
+                        ? []
+                        : paises.map((x) => x.codigo),
+                  })
+                }
+              >
+                {p.paises.length === paises.length
+                  ? "Quitar selección"
+                  : "Seleccionar LATAM y España"}
+              </button>
+            </div>
+            <div className="form-grid">
+              <div className="field">
+                <label>Antigüedad máxima de publicación</label>
+                <select
+                  aria-label={"Antigüedad del perfil " + (i + 1)}
+                  value={p.antiguedad_dias}
+                  onChange={(e) =>
+                    patch(p.id, { antiguedad_dias: Number(e.target.value) })
+                  }
+                >
+                  {[1, 3, 7, 14, 30].map((n) => (
+                    <option key={n} value={n}>
+                      {n} {n === 1 ? "día" : "días"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label>Idioma del aviso</label>
+                <div className="check-line">
+                  {[
+                    ["es", "Español"],
+                    ["en", "Inglés"],
+                  ].map(([code, label]) => (
+                    <label key={code}>
+                      <input
+                        type="checkbox"
+                        checked={p.idiomas.includes(code)}
+                        onChange={(e) =>
+                          patch(p.id, {
+                            idiomas: e.target.checked
+                              ? [...p.idiomas, code]
+                              : p.idiomas.filter((x) => x !== code),
+                          })
+                        }
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="form-grid three">
+              <div className="field">
+                <label>Experiencia mínima exigida</label>
+                <input
+                  aria-label={"Experiencia mínima del perfil " + (i + 1)}
+                  type="number"
+                  min={0}
+                  max={40}
+                  placeholder="Sin mínimo"
+                  value={p.experiencia_min ?? ""}
+                  onChange={(e) =>
+                    patch(p.id, {
+                      experiencia_min:
+                        e.target.value === "" ? null : Number(e.target.value),
+                    })
+                  }
+                />
+              </div>
+              <div className="field">
+                <label>Experiencia máxima exigida</label>
+                <input
+                  aria-label={"Experiencia máxima del perfil " + (i + 1)}
+                  type="number"
+                  min={0}
+                  max={40}
+                  placeholder="Sin máximo"
+                  value={p.experiencia_max ?? ""}
+                  onChange={(e) =>
+                    patch(p.id, {
+                      experiencia_max:
+                        e.target.value === "" ? null : Number(e.target.value),
+                    })
+                  }
+                />
+              </div>
+              <div className="field">
+                <label>Inglés requerido: hasta</label>
+                <select
+                  aria-label={"Inglés del perfil " + (i + 1)}
+                  value={p.ingles_maximo}
+                  onChange={(e) =>
+                    patch(p.id, { ingles_maximo: e.target.value })
+                  }
+                >
+                  <option value="sin_filtro">Sin filtro</option>
+                  {["A1", "A2", "B1", "B2", "C1", "C2", "native"].map((n) => (
+                    <option value={n} key={n}>
+                      {n === "native" ? "Nativo" : n}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <p className="helper">
+              El rango filtra los años mínimos que exige la vacante. El inglés
+              requerido es independiente del idioma en que está escrito el
+              aviso.
+            </p>
+            <div className="missing-options">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={p.aceptar_experiencia_sin_dato}
+                  onChange={(e) =>
+                    patch(p.id, {
+                      aceptar_experiencia_sin_dato: e.target.checked,
+                    })
+                  }
+                />
+                Admitir experiencia no informada
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={p.aceptar_ingles_sin_dato}
+                  onChange={(e) =>
+                    patch(p.id, { aceptar_ingles_sin_dato: e.target.checked })
+                  }
+                />
+                Admitir inglés no informado
+              </label>
+            </div>
+          </section>
+        ))}
+        <button
+          type="button"
+          disabled={!cargos.length}
+          className="button secondary full dashed"
+          onClick={() => setPs([...ps, perfilNuevo(c.id, cargos[0].id)])}
+        >
+          <Plus size={16} />
+          Añadir perfil de búsqueda
+        </button>
+        {!cargos.length && (
+          <p className="helper">Primero añade un cargo en «Cargos y cupos».</p>
+        )}
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="dialog-actions">
+          <button className="button secondary" type="button" onClick={onClose}>
+            Cancelar
+          </button>
+          <button className="button primary">
+            {cliente ? "Aplicar cambios" : "Añadir cliente"}
+            <Check size={15} />
+          </button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+function App() {
+  const [sesion, setSesion] = useState<Sesion | null>(null),
+    [estado, setEstado] = useState<EstadoConfig | null>(null),
+    [draft, setDraft] = useState<Configuracion>(vacio),
+    [dirty, setDirty] = useState(false),
+    [tab, setTab] = useState("Resumen"),
+    [busy, setBusy] = useState(false),
+    [loading, setLoading] = useState(true),
+    [error, setError] = useState(""),
+    [toast, setToast] = useState<{ texto: string; error: boolean } | null>(
+      null,
+    ),
+    [menu, setMenu] = useState(false),
+    [modal, setModal] = useState<
+      "cliente" | "cargo" | "publicar" | "archivo" | "whatsapp" | null
+    >(null),
+    [editCliente, setEditCliente] = useState<Cliente | null>(null),
+    [editCargo, setEditCargo] = useState<Cargo | null>(null),
+    [archive, setArchive] = useState<{
+      tipo: "cliente" | "cargo";
+      id: string;
+      nombre: string;
+    } | null>(null),
+    [results, setResults] = useState<Resultados | null>(null),
+    [selectedClient, setSelectedClient] = useState(""),
+    [resultDate, setResultDate] = useState(""),
+    [search, setSearch] = useState(""),
+    [runs, setRuns] = useState<Ejecucion[]>([]),
+    [mensaje, setMensaje] = useState(""),
+    [copiado, setCopiado] = useState(false),
+    [email, setEmail] = useState(""),
+    [password, setPassword] = useState("");
+  const peticionResultados = useRef(0);
+  const [loadingResults, setLoadingResults] = useState(false);
+  const total = draft.cargos
+      .filter((c) => c.activo)
+      .reduce((s, c) => s + c.cupo, 0),
+    clientes = draft.clientes.filter((c) => c.activo),
+    cargos = draft.cargos.filter((c) => c.activo);
+  function notify(texto: string, error = false) {
+    setToast({ texto, error });
+  }
+  useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 6500);
+      return () => clearTimeout(t);
+    }
+  }, [toast]);
+  async function cargar() {
+    setLoading(true);
+    setError("");
+    try {
+      const s = await api<Sesion>("/session");
+      setSesion(s);
+      if (s.sesion) {
+        const [c, e] = await Promise.all([
+          api<EstadoConfig>("/config"),
+          api<Ejecucion[]>("/ejecuciones"),
+        ]);
+        setEstado(c);
+        setDraft(c.borrador);
+        setRuns(e);
+        setDirty(false);
+        setSelectedClient(
+          (v) => v || c.borrador.clientes.find((x) => x.activo)?.id || "",
+        );
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => {
+    cargar();
+    const vencer = () => {
+      setSesion((s) => (s ? { ...s, sesion: false } : s));
+      setError("Tu sesión venció. Inicia sesión otra vez.");
+      setPassword("");
+    };
+    window.addEventListener("sesion-vencida", vencer);
+    return () => window.removeEventListener("sesion-vencida", vencer);
+  }, []);
+  useEffect(() => {
+    const alerta = (e: BeforeUnloadEvent) => {
+      if (dirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", alerta);
+    return () => window.removeEventListener("beforeunload", alerta);
+  }, [dirty]);
+  async function cargarResultados() {
+    const turno = ++peticionResultados.current;
+    if (!sesion?.sesion) return;
+    setLoadingResults(true);
+    setResults(null);
+    try {
+      const r = await api<Resultados>(
+        "/resultados?" +
+          new URLSearchParams({
+            ...(selectedClient ? { cliente_id: selectedClient } : {}),
+            ...(resultDate ? { fecha: resultDate } : {}),
+          }),
+      );
+      if (turno === peticionResultados.current) setResults(r);
+    } catch (e) {
+      if (turno === peticionResultados.current)
+        notify((e as Error).message, true);
+    } finally {
+      if (turno === peticionResultados.current) setLoadingResults(false);
+    }
+  }
+  useEffect(() => {
+    cargarResultados();
+  }, [selectedClient, resultDate, sesion?.sesion]);
+  function cambiar(v: Configuracion) {
+    setDraft(v);
+    setDirty(true);
+  }
+  async function guardar() {
+    if (!estado) return null;
+    const r = await api<
+      Partial<EstadoConfig> & { revision: number; borrador: Configuracion }
+    >("/config", {
+      method: "PUT",
+      body: JSON.stringify({ revision: estado.revision, configuracion: draft }),
+    });
+    const next = { ...estado, ...r };
+    setEstado(next);
+    setDraft(next.borrador);
+    setDirty(false);
+    return next;
+  }
+  async function guardarClick() {
+    setBusy(true);
+    try {
+      await guardar();
+      notify("Borrador guardado. Puedes programarlo para mañana.");
+    } catch (e) {
+      notify((e as Error).message, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function programar() {
+    setBusy(true);
+    try {
+      const e = dirty ? await guardar() : estado;
+      if (!e) return;
+      const r = await api<{ revision: number; vigente_desde: string }>(
+        "/config/publicar",
+        { method: "POST", body: JSON.stringify({ revision: e.revision }) },
+      );
+      setEstado({
+        ...e,
+        publicada: { ...r, configuracion: structuredClone(e.borrador) },
+      });
+      setModal(null);
+      notify(
+        "Configuración programada para el " + fecha(r.vigente_desde) + ".",
+      );
+    } catch (e) {
+      notify((e as Error).message, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function abrirWhatsApp() {
+    setBusy(true);
+    try {
+      const r = await api<{ texto: string; vacantes: number }>(
+        "/whatsapp/" +
+          selectedClient +
+          (resultDate ? "?fecha=" + encodeURIComponent(resultDate) : ""),
+      );
+      if (!r.texto) {
+        notify("No hay vacantes con comprobación vigente para copiar.", true);
+        return;
+      }
+      setMensaje(r.texto);
+      setCopiado(false);
+      setModal("whatsapp");
+    } catch (e) {
+      notify((e as Error).message, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(mensaje);
+      setCopiado(true);
+      notify("Mensaje copiado. Ya puedes pegarlo en WhatsApp.");
+    } catch {
+      notify(
+        "El navegador bloqueó el portapapeles. Selecciona el mensaje y cópialo manualmente.",
+        true,
+      );
+    }
+  }
+  function go(t: string) {
+    setTab(t);
+    setMenu(false);
+    setSearch("");
+  }
+  if (loading)
+    return (
+      <div className="loading-page">
+        <span className="brand-icon">a</span>
+        <Loader2 className="spin" />
+        <p>Cargando tu espacio de búsqueda…</p>
+      </div>
+    );
+  if (!sesion?.sesion)
+    return (
+      <div className="login-page">
+        <div className="login-card">
+          <div className="brand">
+            <span className="brand-icon">a</span>adaptia
+            <span className="brand-dot">.</span>
+          </div>
+          <span className="eyebrow">CONTROL DE BÚSQUEDA</span>
+          <h1>
+            Las oportunidades correctas,
+            <br />
+            para cada persona.
+          </h1>
+          <p>Accede al espacio privado de tu empresa.</p>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setBusy(true);
+              try {
+                await api("/auth/login", {
+                  method: "POST",
+                  body: JSON.stringify({ email, password }),
+                });
+                setPassword("");
+                await cargar();
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <div className="field">
+              <label htmlFor="email">Correo del operador</label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="username"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="password">Contraseña</label>
+              <input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            {error && (
+              <p role="alert" className="form-error">
+                {error}
+              </p>
+            )}
+            <button className="button primary full" disabled={busy}>
+              {busy ? (
+                <Loader2 className="spin" size={18} />
+              ) : (
+                <ArrowRight size={18} />
+              )}
+              Iniciar sesión
+            </button>
+          </form>
+          <div className="secure-note">
+            <ShieldCheck size={15} />
+            Acceso exclusivo para el operador
+          </div>
+        </div>
+      </div>
+    );
+  if (error && !estado)
+    return (
+      <div className="loading-page">
+        <h2>No pudimos cargar el espacio</h2>
+        <p>{error}</p>
+        <button className="button primary" onClick={cargar}>
+          Volver a intentar
+        </button>
+      </div>
+    );
+  const profiles = (id: string) =>
+    draft.perfiles.filter((p) => p.cliente_id === id && p.activo);
+  const clientCount = (id: string) =>
+    new Set(
+      draft.perfiles
+        .filter(
+          (p) =>
+            p.cargo_id === id &&
+            p.activo &&
+            clientes.some((c) => c.id === p.cliente_id),
+        )
+        .map((p) => p.cliente_id),
+    ).size;
+  const shown =
+    results?.vacantes.filter((v) =>
+      (v.titulo + " " + v.empresa).toLowerCase().includes(search.toLowerCase()),
+    ) || [];
+  const nav = [
+    { t: "Resumen", i: LayoutDashboard },
+    { t: "Clientes", i: Users },
+    { t: "Cargos y cupos", i: SlidersHorizontal },
+    { t: "Vacantes", i: BriefcaseBusiness },
+    { t: "Actividad", i: Clock3 },
+  ];
+  return (
+    <div className="app-shell">
+      <aside className={"sidebar " + (menu ? "open" : "")}>
+        <a
+          className="brand"
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            go("Resumen");
+          }}
+        >
+          <span className="brand-icon">a</span>adaptia
+          <span className="brand-dot">.</span>
+        </a>
+        <div className="workspace">
+          <div className="workspace-icon">
+            <Compass size={17} />
+          </div>
+          <div>
+            <strong>Mi espacio de trabajo</strong>
+            <span>Control de búsqueda</span>
+          </div>
+          <ChevronDown size={15} />
+        </div>
+        <p className="nav-label">ESPACIO DE TRABAJO</p>
+        <nav>
+          {nav.map(({ t, i: Icon }) => (
+            <button
+              className={tab === t ? "active" : ""}
+              key={t}
+              aria-label={t}
+              onClick={() => go(t)}
+            >
+              <Icon size={19} />
+              {t}
+              {t === "Clientes" && <span>{clientes.length}</span>}
+              {tab === t && <div className="nav-dot" />}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <div className="sidebar-tip">
+            <span className="tip-icon">
+              <Target size={18} />
+            </span>
+            <strong>Más foco. Más oportunidades.</strong>
+            <p>Una búsqueda que se adapta a las personas que acompañas.</p>
+          </div>
+          <button className="nav-settings" onClick={() => go("Configuración")}>
+            <Settings2 size={18} />
+            Configuración
+          </button>
+          <div className="operator">
+            <span className="avatar dark">OP</span>
+            <div>
+              <strong>Operador</strong>
+              <span>
+                {sesion.demo ? "Espacio de demostración" : "Acceso privado"}
+              </span>
+            </div>
+            {!sesion.demo && (
+              <button
+                className="icon"
+                aria-label="Cerrar sesión"
+                onClick={async () => {
+                  await api("/auth/logout", { method: "POST" });
+                  setSesion({ ...sesion, sesion: false });
+                  setEstado(null);
+                }}
+              >
+                <LogOut size={17} />
+              </button>
+            )}
+          </div>
+        </div>
+      </aside>
+      {menu && <div className="nav-backdrop" onClick={() => setMenu(false)} />}
+      <div className="main-shell">
+        <header className="topbar">
+          <div className="breadcrumbs">
+            <button
+              className="icon mobile-menu"
+              aria-label="Abrir menú"
+              onClick={() => setMenu(!menu)}
+            >
+              <Menu size={21} />
+            </button>
+            <span>Control de búsqueda</span>
+            <ChevronRight size={13} />
+            <strong>{tab}</strong>
+          </div>
+          <div className="topbar-right">
+            {sesion.demo && (
+              <span className="demo-badge">
+                <span />
+                Demostración
+              </span>
+            )}
+            <span className="avatar small">OP</span>
+          </div>
+        </header>
+        <main className="main" inert={modal || busy ? true : undefined}>
+          {sesion.demo && (
+            <div className="demo-notice">
+              <ShieldCheck size={15} />
+              <span>
+                Estás usando datos ficticios. Los cambios de esta demostración
+                no modifican Supabase ni ejecutan búsquedas reales.
+              </span>
+            </div>
+          )}
+          <div className="page-heading">
+            <div>
+              <div className="eyebrow">TU CENTRO DE OPORTUNIDADES</div>
+              <h1>
+                {tab === "Resumen"
+                  ? "Cada búsqueda, con propósito."
+                  : tab === "Clientes"
+                    ? "Personas, no búsquedas genéricas."
+                    : tab === "Cargos y cupos"
+                      ? "Tú decides dónde buscar."
+                      : tab === "Vacantes"
+                        ? "Oportunidades para compartir."
+                        : tab === "Actividad"
+                          ? "Todo lo que ha pasado."
+                          : "Tu espacio, bajo control."}
+              </h1>
+              <p>
+                {tab === "Resumen"
+                  ? "Organiza tus clientes y prepara las oportunidades de mañana."
+                  : tab === "Clientes"
+                    ? "Configura los criterios que hacen útil una vacante para cada cliente."
+                    : tab === "Cargos y cupos"
+                      ? "Reparte las 120 vacantes diarias entre los cargos que necesitas."
+                      : tab === "Vacantes"
+                        ? "Revisa las coincidencias de cada cliente y prepara su mensaje."
+                        : tab === "Actividad"
+                          ? "Consulta el resultado de las capturas y sus pendientes."
+                          : "Información sobre la conexión y el funcionamiento del espacio."}
+              </p>
+            </div>
+            {["Resumen", "Clientes", "Cargos y cupos"].includes(tab) && (
+              <div className="heading-actions">
+                <button
+                  className="button secondary"
+                  onClick={guardarClick}
+                  disabled={!dirty || busy || total > 120}
+                >
+                  <Save size={16} />
+                  {busy ? "Guardando…" : "Guardar borrador"}
+                </button>
+                <button
+                  className="button primary"
+                  onClick={() => setModal("publicar")}
+                  disabled={busy || total !== 120}
+                >
+                  <CalendarClock size={16} />
+                  Programar para mañana
+                </button>
+              </div>
+            )}
+          </div>
+          {dirty && (
+            <div className="dirty-bar">
+              <span className="amber-dot" />
+              Tienes cambios sin guardar. La búsqueda programada no cambia hasta
+              que los confirmes.
+            </div>
+          )}
+          {tab === "Resumen" && (
+            <>
+              <section className="overview-top">
+                <div className="hero">
+                  <div className="hero-content">
+                    <span className="hero-label">
+                      <span />
+                      {estado?.publicada
+                        ? "CRITERIOS DE BÚSQUEDA CONFIRMADOS"
+                        : "PREPARA TU PRÓXIMA BÚSQUEDA"}
+                    </span>
+                    <h2>
+                      Menos ruido.
+                      <br />
+                      Más <em>coincidencias.</em>
+                    </h2>
+                    <p>
+                      Define quién está buscando, qué necesita
+                      <br className="desktop" /> y cuántas oportunidades quieres
+                      encontrar.
+                    </p>
+                    <button
+                      className="button light"
+                      onClick={() => go("Clientes")}
+                    >
+                      Gestionar clientes
+                      <ArrowUpRight size={17} />
+                    </button>
+                  </div>
+                  <div className="hero-art" aria-hidden="true">
+                    <div className="orbit one" />
+                    <div className="orbit two" />
+                    <div className="orbit three" />
+                    <div className="orbit-center">
+                      <Compass size={39} strokeWidth={1.1} />
+                    </div>
+                    <div className="floating-check">
+                      <Check size={17} />
+                    </div>
+                    <div className="floating-job">
+                      <BriefcaseBusiness size={16} />
+                    </div>
+                  </div>
+                  <div className="hero-bottom">
+                    <ShieldCheck size={14} />
+                    Búsquedas dirigidas · Sin consumo de IA
+                  </div>
+                </div>
+                <div className="quota-summary card">
+                  <div className="card-label">
+                    <span>OBJETIVO DIARIO</span>
+                    <span
+                      className={"pill " + (total === 120 ? "green" : "amber")}
+                    >
+                      {total === 120
+                        ? "Distribución completa"
+                        : "Por distribuir"}
+                    </span>
+                  </div>
+                  <div className="quota-main">
+                    <div className="quota-number">
+                      {total}
+                      <span> / 120</span>
+                    </div>
+                    <p>vacantes asignadas por cargo</p>
+                  </div>
+                  <div className="quota-track">
+                    {cargos.map((c, i) => (
+                      <span
+                        key={c.id}
+                        style={{
+                          width: (c.cupo / Math.max(total, 120)) * 100 + "%",
+                          background: colores[i % 5],
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <div className="quota-legend">
+                    {cargos.map((c, i) => (
+                      <div key={c.id}>
+                        <span style={{ background: colores[i % 5] }} />
+                        {c.nombre}
+                        <strong>{c.cupo}</strong>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    className="text-button quota-link"
+                    onClick={() => go("Cargos y cupos")}
+                  >
+                    Ajustar distribución
+                    <ArrowRight size={15} />
+                  </button>
+                </div>
+              </section>
+              <section className="stat-grid">
+                <div className="stat card">
+                  <span className="stat-icon mint">
+                    <Users size={21} />
+                  </span>
+                  <div>
+                    <span>Clientes activos</span>
+                    <strong>
+                      {clientes.length}
+                      <small>personas acompañadas</small>
+                    </strong>
+                  </div>
+                </div>
+                <div className="stat card">
+                  <span className="stat-icon blue">
+                    <BriefcaseBusiness size={21} />
+                  </span>
+                  <div>
+                    <span>Cargos en búsqueda</span>
+                    <strong>
+                      {cargos.filter((c) => c.cupo > 0).length}
+                      <small>búsquedas con foco</small>
+                    </strong>
+                  </div>
+                </div>
+                <div className="stat card">
+                  <span className="stat-icon sand">
+                    <CalendarClock size={21} />
+                  </span>
+                  <div>
+                    <span>Configuración confirmada</span>
+                    <strong className="date-stat">
+                      {estado?.publicada
+                        ? fecha(estado.publicada.vigente_desde)
+                        : "Por programar"}
+                      <small>
+                        {estado?.publicada
+                          ? "Vigente desde esta fecha"
+                          : "Guarda y programa tus criterios"}
+                      </small>
+                    </strong>
+                  </div>
+                </div>
+              </section>
+              <section className="section-block">
+                <div className="section-title">
+                  <div>
+                    <h2>
+                      Tus clientes, de un vistazo{" "}
+                      <span className="count-badge">{clientes.length}</span>
+                    </h2>
+                    <p>Cada perfil tiene sus propios criterios de búsqueda.</p>
+                  </div>
+                  <button
+                    className="text-button"
+                    onClick={() => go("Clientes")}
+                  >
+                    Ver todos
+                    <ArrowRight size={15} />
+                  </button>
+                </div>
+                <div className="client-grid">
+                  {clientes.slice(0, 3).map((c, i) => (
+                    <ClientCard
+                      key={c.id}
+                      c={c}
+                      index={i}
+                      perfiles={profiles(c.id)}
+                      cargos={draft.cargos}
+                      onEdit={() => {
+                        setEditCliente(c);
+                        setModal("cliente");
+                      }}
+                      onResults={() => {
+                        setSelectedClient(c.id);
+                        go("Vacantes");
+                      }}
+                    />
+                  ))}
+                  {!clientes.length && (
+                    <Empty
+                      icon={Users}
+                      title="Tu primer cliente empieza aquí"
+                      texto="Añade una persona y define su perfil de búsqueda."
+                      action={() => {
+                        setEditCliente(null);
+                        setModal("cliente");
+                      }}
+                      label="Añadir cliente"
+                    />
+                  )}
+                </div>
+              </section>
+              <section className="workflow-note">
+                <div className="workflow-note-icon">
+                  <Workflow size={23} />
+                </div>
+                <div>
+                  <h3>Configuras hoy. Buscas con foco mañana.</h3>
+                  <p>
+                    Las vacantes se buscan por cargo, se contrastan con cada
+                    perfil y quedan listas para compartir cuando su enlace está
+                    vigente.
+                  </p>
+                </div>
+                <ArrowUpRight size={19} />
+              </section>
+            </>
+          )}
+          {tab === "Clientes" && (
+            <>
+              <div className="toolbar">
+                <div className="search-input">
+                  <Search size={17} />
+                  <input
+                    aria-label="Buscar cliente"
+                    placeholder="Buscar un cliente…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+                <button
+                  className="button primary"
+                  onClick={() => {
+                    setEditCliente(null);
+                    setModal("cliente");
+                  }}
+                >
+                  <Plus size={17} />
+                  Nuevo cliente
+                </button>
+              </div>
+              <div className="client-grid">
+                {clientes
+                  .filter((c) =>
+                    c.nombre.toLowerCase().includes(search.toLowerCase()),
+                  )
+                  .map((c, i) => (
+                    <ClientCard
+                      key={c.id}
+                      c={c}
+                      index={i}
+                      perfiles={profiles(c.id)}
+                      cargos={draft.cargos}
+                      onEdit={() => {
+                        setEditCliente(c);
+                        setModal("cliente");
+                      }}
+                      onResults={() => {
+                        setSelectedClient(c.id);
+                        go("Vacantes");
+                      }}
+                      onArchive={() => {
+                        setArchive({
+                          tipo: "cliente",
+                          id: c.id,
+                          nombre: c.nombre,
+                        });
+                        setModal("archivo");
+                      }}
+                    />
+                  ))}
+              </div>
+              {!clientes.length && (
+                <Empty
+                  icon={Users}
+                  title="Todavía no tienes clientes"
+                  texto="Añade tu primer cliente para preparar sus criterios."
+                  action={() => {
+                    setEditCliente(null);
+                    setModal("cliente");
+                  }}
+                  label="Nuevo cliente"
+                />
+              )}
+              {draft.clientes.some((c) => !c.activo) && (
+                <details className="archived">
+                  <summary>
+                    Clientes archivados (
+                    {draft.clientes.filter((c) => !c.activo).length})
+                  </summary>
+                  {draft.clientes
+                    .filter((c) => !c.activo)
+                    .map((c) => (
+                      <div key={c.id}>
+                        {c.nombre}
+                        <button
+                          className="text-button"
+                          onClick={() =>
+                            cambiar({
+                              ...draft,
+                              clientes: draft.clientes.map((x) =>
+                                x.id === c.id ? { ...x, activo: true } : x,
+                              ),
+                            })
+                          }
+                        >
+                          Reactivar
+                        </button>
+                      </div>
+                    ))}
+                </details>
+              )}
+            </>
+          )}
+          {tab === "Cargos y cupos" && (
+            <>
+              <div
+                className={"allocation card " + (total > 120 ? "invalid" : "")}
+              >
+                <div>
+                  <span className="tiny-kicker">DISTRIBUCIÓN DIARIA</span>
+                  <h2>
+                    {total}
+                    <span> / 120 vacantes</span>
+                  </h2>
+                  <p>
+                    {total === 120
+                      ? "Tu distribución está completa. Puedes programar la búsqueda."
+                      : total < 120
+                        ? "Te faltan " +
+                          (120 - total) +
+                          " vacantes por distribuir."
+                        : "Reduce " +
+                          (total - 120) +
+                          " vacantes para respetar el objetivo diario."}
+                  </p>
+                </div>
+                <div className="allocation-right">
+                  <div className="allocation-track">
+                    <span
+                      style={{
+                        width: Math.min((total / 120) * 100, 100) + "%",
+                      }}
+                    />
+                  </div>
+                  <button
+                    className="button secondary"
+                    onClick={() => {
+                      setEditCargo(null);
+                      setModal("cargo");
+                    }}
+                  >
+                    <Plus size={16} />
+                    Añadir cargo
+                  </button>
+                </div>
+              </div>
+              <div className="role-list">
+                {cargos.map((c, i) => (
+                  <section className="role-card card" key={c.id}>
+                    <div className="role-top">
+                      <div
+                        className="role-symbol"
+                        style={{
+                          color: colores[i % 5],
+                          background: colores[i % 5] + "15",
+                        }}
+                      >
+                        {c.nombre.toLowerCase().includes("front") ? (
+                          <Code2 size={23} />
+                        ) : (
+                          <BriefcaseBusiness size={23} />
+                        )}
+                      </div>
+                      <div className="role-info">
+                        <h3>{c.nombre}</h3>
+                        <span>
+                          <Users size={13} />
+                          {clientCount(c.id)}{" "}
+                          {clientCount(c.id) === 1
+                            ? "cliente compatible"
+                            : "clientes con este cargo"}
+                        </span>
+                      </div>
+                      <button
+                        className="icon"
+                        aria-label={"Editar " + c.nombre}
+                        onClick={() => {
+                          setEditCargo(c);
+                          setModal("cargo");
+                        }}
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        className="icon"
+                        aria-label={"Archivar " + c.nombre}
+                        onClick={() => {
+                          setArchive({
+                            tipo: "cargo",
+                            id: c.id,
+                            nombre: c.nombre,
+                          });
+                          setModal("archivo");
+                        }}
+                      >
+                        <Archive size={16} />
+                      </button>
+                    </div>
+                    <div className="role-terms">
+                      <span>También buscará</span>
+                      {c.terminos_similares.slice(0, 5).map((t) => (
+                        <span className="term readonly" key={t}>
+                          {t}
+                        </span>
+                      ))}
+                      {!c.terminos_similares.length && (
+                        <span className="helper">
+                          Añade o descubre denominaciones afines.
+                        </span>
+                      )}
+                    </div>
+                    <div className="role-quota">
+                      <label htmlFor={"cupo-" + c.id}>Cupo diario</label>
+                      <input
+                        id={"cupo-" + c.id}
+                        type="range"
+                        min={0}
+                        max={120}
+                        value={c.cupo}
+                        onChange={(e) =>
+                          cambiar({
+                            ...draft,
+                            cargos: draft.cargos.map((x) =>
+                              x.id === c.id
+                                ? { ...x, cupo: Number(e.target.value) }
+                                : x,
+                            ),
+                          })
+                        }
+                      />
+                      <div className="number-wrap">
+                        <input
+                          aria-label={"Vacantes de " + c.nombre}
+                          type="number"
+                          min={0}
+                          max={120}
+                          value={c.cupo}
+                          onChange={(e) =>
+                            cambiar({
+                              ...draft,
+                              cargos: draft.cargos.map((x) =>
+                                x.id === c.id
+                                  ? {
+                                      ...x,
+                                      cupo: Math.max(
+                                        0,
+                                        Math.min(120, Number(e.target.value)),
+                                      ),
+                                    }
+                                  : x,
+                              ),
+                            })
+                          }
+                        />
+                        <span>vacantes</span>
+                      </div>
+                    </div>
+                    {c.cupo > 0 && clientCount(c.id) === 0 && (
+                      <p className="role-warning">
+                        Añade un perfil de cliente para poder programar este
+                        cargo.
+                      </p>
+                    )}
+                  </section>
+                ))}
+              </div>
+              <details className="archived">
+                <summary>
+                  Cargos archivados (
+                  {draft.cargos.filter((c) => !c.activo).length})
+                </summary>
+                {draft.cargos
+                  .filter((c) => !c.activo)
+                  .map((c) => (
+                    <div key={c.id}>
+                      {c.nombre}
+                      <button
+                        className="text-button"
+                        onClick={() =>
+                          cambiar({
+                            ...draft,
+                            cargos: draft.cargos.map((x) =>
+                              x.id === c.id ? { ...x, activo: true } : x,
+                            ),
+                          })
+                        }
+                      >
+                        Reactivar
+                      </button>
+                    </div>
+                  ))}
+              </details>
+              <div className="info-line bottom-info">
+                <ShieldCheck size={18} />
+                <p>
+                  Una vacante compartida con varios clientes cuenta una sola vez
+                  en el cupo de su cargo. Si no hay suficientes resultados
+                  válidos, se mostrará el faltante.
+                </p>
+              </div>
+            </>
+          )}
+          {tab === "Vacantes" && (
+            <>
+              <div className="results-control card">
+                <div className="field">
+                  <label htmlFor="result-cliente">
+                    MOSTRAR OPORTUNIDADES PARA
+                  </label>
+                  <select
+                    id="result-cliente"
+                    value={selectedClient}
+                    onChange={(e) => setSelectedClient(e.target.value)}
+                  >
+                    {Array.from(
+                      new Map(
+                        [...clientes, ...(results?.clientes || [])].map((c) => [
+                          c.id,
+                          c,
+                        ]),
+                      ).values(),
+                    ).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="results-count">
+                  <strong>{results?.listas || 0}</strong>
+                  <span>listas para compartir</span>
+                </div>
+                <button
+                  className="button whatsapp"
+                  disabled={
+                    !selectedClient ||
+                    !results?.listas ||
+                    busy ||
+                    loadingResults
+                  }
+                  onClick={abrirWhatsApp}
+                >
+                  <MessageCircle size={18} />
+                  Copiar WhatsApp
+                </button>
+              </div>
+              <div className="toolbar">
+                <div className="search-input">
+                  <Search size={17} />
+                  <input
+                    placeholder="Buscar por cargo o empresa…"
+                    aria-label="Buscar vacante"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+                <div className="results-tools">
+                  <select
+                    aria-label="Fecha de la captura"
+                    value={resultDate}
+                    onChange={(e) => setResultDate(e.target.value)}
+                  >
+                    <option value="">Última captura</option>
+                    {runs.map((r) => (
+                      <option key={r.id} value={r.fecha}>
+                        {fecha(r.fecha)}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="button secondary"
+                    onClick={cargarResultados}
+                  >
+                    <RefreshCw size={15} />
+                    Actualizar estado
+                  </button>
+                </div>
+              </div>
+              {results?.ejecucion && (
+                <div className="results-date">
+                  {sesion.demo ? "Captura simulada" : "Captura del"}{" "}
+                  {fecha(results.ejecucion.fecha)}
+                  <span>·</span>Solo se copian enlaces con comprobación vigente
+                </div>
+              )}
+              <div className="vacancy-grid">
+                {shown.map((v) => (
+                  <VacancyCard key={v.id} v={v} />
+                ))}
+              </div>
+              {loadingResults && (
+                <p role="status" className="helper">
+                  Consultando vacantes…
+                </p>
+              )}
+              {!loadingResults && !shown.length && (
+                <Empty
+                  icon={BriefcaseBusiness}
+                  title="Las oportunidades aparecerán aquí"
+                  texto="Después de una captura, verás las vacantes que cumplan los filtros del cliente. Un perfil nuevo empieza a participar con la próxima configuración programada."
+                />
+              )}
+            </>
+          )}
+          {tab === "Actividad" && (
+            <section className="card activity">
+              <div className="section-title">
+                <h2>Historial de capturas</h2>
+                <button
+                  className="icon"
+                  aria-label="Actualizar actividad"
+                  onClick={async () => {
+                    try {
+                      setRuns(await api("/ejecuciones"));
+                    } catch (e) {
+                      notify((e as Error).message, true);
+                    }
+                  }}
+                >
+                  <RefreshCw size={16} />
+                </button>
+              </div>
+              {!runs.length ? (
+                <Empty
+                  icon={Clock3}
+                  title="Aún no hay capturas dirigidas"
+                  texto="Programa tu configuración. La primera búsqueda con esos criterios aparecerá aquí."
+                />
+              ) : (
+                runs.map((r) => (
+                  <div className="run" key={r.id}>
+                    <span
+                      className={
+                        "run-dot " + (r.estado === "completa" ? "ok" : "")
+                      }
+                    >
+                      <CheckCheck size={19} />
+                    </span>
+                    <div>
+                      <h3>
+                        {sesion.demo
+                          ? "Captura de demostración"
+                          : "Búsqueda dirigida"}{" "}
+                        · {fecha(r.fecha)}
+                      </h3>
+                      <p>
+                        {r.resumen.vacantes || 0} oportunidades distintas de{" "}
+                        {r.resumen.meta || 120} previstas
+                      </p>
+                      {r.resumen.faltantes &&
+                        Object.entries(r.resumen.faltantes).some(
+                          ([, n]) => n > 0,
+                        ) && (
+                          <p className="form-error">
+                            {Object.entries(r.resumen.faltantes)
+                              .filter(([, n]) => n > 0)
+                              .map(([c, n]) => c + ": faltan " + n)
+                              .join(" · ")}
+                          </p>
+                        )}
+                    </div>
+                    <span
+                      className={
+                        "pill " + (r.estado === "completa" ? "green" : "amber")
+                      }
+                    >
+                      {(
+                        {
+                          completa: "Completada",
+                          parcial: "Con faltantes",
+                          fallida: "Requiere revisión",
+                          en_curso: "En curso",
+                        } as Record<string, string>
+                      )[r.estado] || r.estado}
+                    </span>
+                  </div>
+                ))
+              )}
+            </section>
+          )}
+          {tab === "Configuración" && (
+            <section className="settings-grid">
+              <div className="card settings-card">
+                <ShieldCheck size={24} />
+                <h2>
+                  {sesion.demo ? "Entorno de demostración" : "Espacio privado"}
+                </h2>
+                <p>
+                  {sesion.demo
+                    ? "Puedes explorar, añadir clientes y ajustar la distribución con datos ficticios. Los cambios se guardan solo en esta demostración."
+                    : "Los datos se guardan en el inventario privado de la empresa y solo el operador autorizado accede a ellos."}
+                </p>
+                <span className="pill green">
+                  {sesion.demo
+                    ? "Sin acceso a datos reales"
+                    : "Acceso del operador verificado"}
+                </span>
+              </div>
+              <div className="card settings-card">
+                <CalendarClock size={24} />
+                <h2>Cómo se aplican los cambios</h2>
+                <p>
+                  Guardar conserva un borrador. «Programar para mañana» confirma
+                  la configuración del siguiente día, según la hora de Colombia.
+                  Las capturas ya iniciadas conservan su versión.
+                </p>
+                <p>
+                  Los horarios automáticos pueden retrasarse. La pestaña
+                  Actividad muestra el resultado de cada captura dirigida.
+                </p>
+              </div>
+              <div className="card settings-card">
+                <MessageCircle size={24} />
+                <h2>Compartir con criterio</h2>
+                <p>
+                  El botón WhatsApp prepara un mensaje y lo copia al
+                  portapapeles. Tú decides cuándo y a quién enviarlo. No se
+                  envían mensajes automáticamente.
+                </p>
+              </div>
+              <div className="card settings-card">
+                <Compass size={24} />
+                <h2>Cargos sin un listado cerrado</h2>
+                <p>
+                  Puedes añadir cualquier cargo. Las variantes de escritura y el
+                  vocabulario ocupacional disponible ayudan a encontrar
+                  equivalentes; revisa y completa los términos desde cada cargo.
+                </p>
+                <p>No se usa IA para ejecutar las búsquedas.</p>
+              </div>
+            </section>
+          )}
+          <footer className="footer">
+            <span>
+              adaptia<span className="brand-dot">.</span>{" "}
+              <span>Oportunidades con dirección.</span>
+            </span>
+            <span>
+              <ShieldCheck size={13} />
+              {sesion.demo
+                ? "Datos ficticios · Modo demostración"
+                : "Control privado de búsqueda"}
+            </span>
+          </footer>
+        </main>
+      </div>
+      {modal === "cargo" && (
+        <CargoDialog
+          cargo={editCargo}
+          notify={notify}
+          onClose={() => setModal(null)}
+          onSave={(c) => {
+            cambiar({
+              ...draft,
+              cargos: draft.cargos.some((x) => x.id === c.id)
+                ? draft.cargos.map((x) => (x.id === c.id ? c : x))
+                : [...draft.cargos, c],
+            });
+            setModal(null);
+            notify("Cargo actualizado en el borrador.");
+          }}
+        />
+      )}
+      {modal === "cliente" && (
+        <ClienteDialog
+          cliente={editCliente}
+          config={draft}
+          paises={sesion.paises}
+          onClose={() => setModal(null)}
+          onSave={(c, ps) => {
+            cambiar({
+              ...draft,
+              clientes: draft.clientes.some((x) => x.id === c.id)
+                ? draft.clientes.map((x) => (x.id === c.id ? c : x))
+                : [...draft.clientes, c],
+              perfiles: [
+                ...draft.perfiles.filter((p) => p.cliente_id !== c.id),
+                ...ps,
+              ],
+            });
+            setModal(null);
+            notify("Perfil actualizado en el borrador.");
+          }}
+        />
+      )}
+      {modal === "publicar" && (
+        <Dialog
+          titulo="Preparar la búsqueda de mañana"
+          subtitulo="Se confirmará esta distribución y los filtros actuales de los clientes."
+          onClose={() => !busy && setModal(null)}
+        >
+          <div className="publish-list">
+            {cargos
+              .filter((c) => c.cupo > 0)
+              .map((c, i) => (
+                <div key={c.id}>
+                  <span
+                    className="color-dot"
+                    style={{ background: colores[i % 5] }}
+                  />
+                  {c.nombre}
+                  <strong>{c.cupo} vacantes</strong>
+                </div>
+              ))}
+          </div>
+          <div className="publish-total">
+            <span>Objetivo total</span>
+            <strong>{total} / 120</strong>
+          </div>
+          <p className="helper note">
+            La configuración empezará a regir mañana en Colombia. Si las fuentes
+            no ofrecen suficientes vacantes válidas, se mostrará el faltante; no
+            se rellenará con duplicados o resultados fuera de los filtros.
+          </p>
+          {sesion.demo && (
+            <p className="demo-inline">
+              Demostración: esta acción no programa una búsqueda real.
+            </p>
+          )}
+          <div className="dialog-actions">
+            <button
+              className="button secondary"
+              disabled={busy}
+              onClick={() => setModal(null)}
+            >
+              Revisar
+            </button>
+            <button
+              className="button primary"
+              disabled={busy}
+              onClick={programar}
+            >
+              {busy ? (
+                <Loader2 size={16} className="spin" />
+              ) : (
+                <CalendarClock size={16} />
+              )}
+              Confirmar configuración
+            </button>
+          </div>
+        </Dialog>
+      )}
+      {modal === "archivo" && archive && (
+        <Dialog
+          titulo={"Archivar " + archive.tipo}
+          onClose={() => setModal(null)}
+        >
+          <p className="dialog-copy">
+            «{archive.nombre}» dejará de participar en la próxima configuración.
+            Su historial se conservará.
+          </p>
+          <div className="dialog-actions">
+            <button className="button secondary" onClick={() => setModal(null)}>
+              Cancelar
+            </button>
+            <button
+              className="button danger-button"
+              onClick={() => {
+                cambiar(
+                  archive.tipo === "cliente"
+                    ? {
+                        ...draft,
+                        clientes: draft.clientes.map((c) =>
+                          c.id === archive.id ? { ...c, activo: false } : c,
+                        ),
+                      }
+                    : {
+                        ...draft,
+                        cargos: draft.cargos.map((c) =>
+                          c.id === archive.id ? { ...c, activo: false } : c,
+                        ),
+                      },
+                );
+                setModal(null);
+                notify("Archivado en el borrador. El historial se conserva.");
+              }}
+            >
+              <Archive size={16} />
+              Archivar
+            </button>
+          </div>
+        </Dialog>
+      )}
+      {modal === "whatsapp" && (
+        <Dialog
+          ancho
+          titulo="Un mensaje, más oportunidades"
+          subtitulo="Revisa el mensaje antes de copiarlo y compartirlo en WhatsApp."
+          onClose={() => setModal(null)}
+        >
+          <div className="whatsapp-preview">
+            <div>
+              <MessageCircle size={18} />
+              <strong>Vista previa del mensaje</strong>
+              <span>{results?.listas || 0} vacantes</span>
+            </div>
+            <textarea
+              aria-label="Mensaje de WhatsApp"
+              readOnly
+              value={mensaje}
+              onFocus={(e) => e.currentTarget.select()}
+            />
+          </div>
+          <p className="helper">
+            Los enlaces se vuelven a contrastar al preparar el mensaje. Copiar
+            no envía nada ni confirma una postulación.
+          </p>
+          <div className="dialog-actions">
+            <button className="button secondary" onClick={() => setModal(null)}>
+              Cerrar
+            </button>
+            <button className="button whatsapp" onClick={copiar}>
+              {copiado ? <CheckCheck size={17} /> : <Copy size={17} />}
+              {copiado ? "Mensaje copiado" : "Copiar el mensaje"}
+            </button>
+          </div>
+        </Dialog>
+      )}
+      {toast && (
+        <div
+          className={"toast " + (toast.error ? "error" : "")}
+          role={toast.error ? "alert" : "status"}
+        >
+          {toast.error ? <ShieldCheck size={18} /> : <Check size={18} />}
+          <span>{toast.texto}</span>
+          <button aria-label="Cerrar aviso" onClick={() => setToast(null)}>
+            <X size={15} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+function Empty({
+  icon: Icon,
+  title,
+  texto,
+  action,
+  label,
+}: {
+  icon: React.ComponentType<{ size: number }>;
+  title: string;
+  texto: string;
+  action?: () => void;
+  label?: string;
+}) {
+  return (
+    <div className="empty">
+      <span>
+        <Icon size={27} />
+      </span>
+      <h3>{title}</h3>
+      <p>{texto}</p>
+      {action && (
+        <button className="button primary" onClick={action}>
+          <Plus size={16} />
+          {label}
+        </button>
+      )}
+    </div>
+  );
+}
+function ClientCard({
+  c,
+  index,
+  perfiles,
+  cargos,
+  onEdit,
+  onResults,
+  onArchive,
+}: {
+  c: Cliente;
+  index: number;
+  perfiles: Perfil[];
+  cargos: Cargo[];
+  onEdit: () => void;
+  onResults: () => void;
+  onArchive?: () => void;
+}) {
+  const p = perfiles[0],
+    cargo = cargos.find((x) => x.id === p?.cargo_id);
+  return (
+    <article className="client-card card">
+      <div className="client-top">
+        <span
+          className="avatar"
+          style={{
+            background: colores[index % 5] + "18",
+            color: colores[index % 5],
+          }}
+        >
+          {iniciales(c.nombre)}
+        </span>
+        <div className="client-title">
+          <h3>{c.nombre}</h3>
+          <span>
+            {cargo?.nombre || "Sin perfil"}
+            {perfiles.length > 1 ? " + " + (perfiles.length - 1) : ""}
+          </span>
+        </div>
+        <button
+          className="icon"
+          aria-label={"Editar " + c.nombre}
+          onClick={onEdit}
+        >
+          <MoreHorizontal size={19} />
+        </button>
+      </div>
+      <div className="client-tags">
+        {p && (
+          <>
+            <span>
+              <Globe2 size={12} />
+              {p.paises.length > 3
+                ? p.paises.length + " países"
+                : p.paises.join(" · ")}
+            </span>
+            <span>{modos[p.modalidad]}</span>
+          </>
+        )}
+      </div>
+      <div className="client-details">
+        <div>
+          <Clock3 size={14} />
+          <span>Publicadas en los últimos {p?.antiguedad_dias || 14} días</span>
+        </div>
+        <div>
+          <BriefcaseBusiness size={14} />
+          <span>
+            {p?.experiencia_min === null && p?.experiencia_max === null
+              ? "Sin filtro de experiencia"
+              : (p?.experiencia_min ?? 0) +
+                "–" +
+                (p?.experiencia_max ?? 40) +
+                " años exigidos"}
+          </span>
+        </div>
+        <div>
+          <Globe2 size={14} />
+          <span>
+            {p?.idiomas
+              .map((x) => (x === "es" ? "Español" : "Inglés"))
+              .join(" / ") || "Sin idioma configurado"}
+            {p?.ingles_maximo && p.ingles_maximo !== "sin_filtro"
+              ? " · Inglés hasta " + p.ingles_maximo
+              : ""}
+          </span>
+        </div>
+      </div>
+      <div className="client-bottom">
+        <span className="status-active">
+          <span />
+          {cargo?.activo && cargo.cupo > 0 ? "Activo" : "Sin cupo"}
+        </span>
+        {onArchive && (
+          <button
+            className="icon"
+            aria-label={"Archivar " + c.nombre}
+            onClick={onArchive}
+          >
+            <Archive size={14} />
+          </button>
+        )}
+        <button className="text-button" onClick={onResults}>
+          Ver vacantes
+          <ArrowUpRight size={15} />
+        </button>
+      </div>
+    </article>
+  );
+}
+function VacancyCard({ v }: { v: Vacante }) {
+  return (
+    <article
+      className={"vacancy card " + (v.estado !== "lista" ? "unavailable" : "")}
+    >
+      <div className="vacancy-top">
+        <span className="company-avatar">{iniciales(v.empresa)}</span>
+        <div>
+          <span className="company-name">{v.empresa}</span>
+          <h3>{v.titulo}</h3>
+        </div>
+        <span className={"pill " + (v.estado === "lista" ? "green" : "amber")}>
+          {v.estado === "lista"
+            ? "Verificada"
+            : v.estado === "retirada"
+              ? "Retirada"
+              : "Por confirmar"}
+        </span>
+      </div>
+      <div className="vacancy-tags">
+        <span>
+          <Globe2 size={13} />
+          {modos[v.modalidad] || v.modalidad}
+        </span>
+        <span>{v.idioma === "es" ? "Español" : "Inglés"}</span>
+        <span>{grados[v.match_grade] || v.match_grade}</span>
+      </div>
+      <div className="vacancy-meta">
+        <span>
+          <Clock3 size={14} />
+          {v.publicada ? fecha(v.publicada) : "Fecha por confirmar"}
+        </span>
+        <span>
+          {v.experiencia !== null
+            ? v.experiencia + " años exigidos"
+            : "Experiencia no informada"}
+        </span>
+      </div>
+      <details>
+        <summary>
+          Por qué coincide
+          <ChevronDown size={13} />
+        </summary>
+        <ul>
+          {v.explicacion.map((e, i) => (
+            <li key={i}>
+              <Check size={12} />
+              {typeof e === "string"
+                ? e
+                : e.termino
+                  ? "Cargo: " + e.termino
+                  : e.regla}
+            </li>
+          ))}
+        </ul>
+        {v.motivos.length > 0 && (
+          <p className="helper">Revisar: {v.motivos.join(" · ")}</p>
+        )}
+      </details>
+      <div className="vacancy-bottom">
+        <span>
+          <ShieldCheck size={13} />
+          {v.estado === "lista"
+            ? "Enlace con comprobación vigente"
+            : "No se incluirá en el mensaje"}
+        </span>
+        {v.enlace && (
+          <a
+            href={v.enlace}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-button"
+          >
+            Ver vacante
+            <ExternalLink size={14} />
+          </a>
+        )}
+      </div>
+    </article>
+  );
+}
+
+createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);

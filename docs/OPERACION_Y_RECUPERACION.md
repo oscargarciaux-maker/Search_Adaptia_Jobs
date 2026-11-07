@@ -1,6 +1,6 @@
 # Operación, mantenimiento y recuperación
 
-Manual del administrador, actualizado el 5 de noviembre de 2026. Complementa la [guía del operador](GUIA_CLIENTE.md).
+Manual del administrador, actualizado para la revisión v6 del 6 de noviembre de 2026. Complementa la [guía del operador](GUIA_CLIENTE.md).
 No modifica la instalación por leerlo. Registrar incidentes y respaldos fuera del repositorio, sin incluir secretos.
 La extensión de [estado operativo](ACTIVAR_ESTADO_OPERATIVO.md) centraliza reservas/pendientes solo tras SQL 003 y
 `ESTADO_SUPABASE_ACTIVO=true`. Los procedimientos distinguen modo legado y central; no asumir activación por tener código.
@@ -8,11 +8,16 @@ El camino preferido es [instalación automática](INSTALACION_AUTOMATICA.md): ap
 marca privada, sin esa variable manual. Incluye respaldo cifrado subido antes de cambios y diario `adaptia_migraciones`.
 La preparación comparte la exclusión de las capturas; en este camino no hay que pausar y copiar SQL en cada actualización.
 
+El control privado se opera según [PANEL_CONTROL.md](PANEL_CONTROL.md). Vigilar revisión efectiva, estado de ejecución y
+faltantes por cargo. No copiar clientes/perfiles a la rama publicado. Las asignaciones mantienen filtros/cargo de su
+versión; la interfaz revalida contra el catálogo actual. Los respaldos con SQL 009 incluyen las cuatro tablas del panel,
+además de las siete anteriores. Auth del proveedor se gestiona aparte. No abrir el servidor real mientras login esté pendiente.
+
 ## 1. Qué comprobar cada día
 
 1. **Pruebas**: comprobar las del commit de `main` que se desplegó. Un test verde prueba ese código con sus fixtures;
    no prueba que la captura de hoy se haya ejecutado.
-2. **Bodega nocturna**: abrir la ejecución real, leer resumen y comprobar selección por los seis roles, faltantes,
+2. **Bodega nocturna**: abrir la ejecución real, leer resumen y comprobar selección por los cargos de la versión activa (seis en legado), faltantes,
    sincronización histórica, catálogo y registro de selección. `prueba=true` no acredita escritura.
 3. **Captura horaria**: comprobar que hubo un trabajo ejecutado, no omitido, y que el paso final de catálogo terminó.
 4. **Reporte y base**: comparar la hora de `publicado/datos/salud.json` con la última captura y las vistas de Supabase.
@@ -71,7 +76,7 @@ pendientes, retrasar o perder horarios; no se utiliza como una cola con conserva
 | Tablas existen pero API no accede | Grants, RLS y recarga de esquema | Revisar scripts completos; no abrir permisos anon para hacer funcionar el scraper |
 | Pendientes de sincronización | Tipo de cola y último HTTP/permiso | Corregir causa y reintentar con memoria intacta; conservar fecha e ID |
 | Filas v1 de hoy sin registro ni lote recuperable | Artefacto/estado del mismo corte y `entregas_diarias` | Recuperar el lote y completar su registro; el arranque se detiene antes de buscar para no escoger otra entrega |
-| Hay menos de 20 en un rol | Motivos, descripción, enlaces, país, no repetición y máximo por empresa | Revisar refuerzos/fuentes/alias; no rellenar con pendientes, repeticiones o cargos ajenos |
+| Un cargo no alcanza su cupo | Motivos, descripción, enlaces, país, no repetición y máximo por empresa | Revisar refuerzos/fuentes/alias; no rellenar con pendientes, repeticiones o cargos ajenos |
 | La selección histórica contiene enlaces fallidos | Reporte actual de verificación | No reenviar esas ofertas; conservar snapshot, revisar casos y esperar nuevas oportunidades |
 | Muchos 403/429/CAPTCHA de un portal | Salud de esa fuente, otros orígenes y frecuencia | Dejarlos pendientes; no declararlos cerrados, aumentar agresividad ni pedir una cookie personal |
 | Se detectó cobro o página general | URL y destino final, motivo y hora | Apartar, revisar original y documentar; no pagar para comprobar ni enviar formularios |
@@ -93,9 +98,18 @@ SQL 007 permite equivalencias recíprocas de aliases, sin aceptar referencias ex
 preparación de 006 se detuvo por esos aliases, el instalador los ordena dentro de su transacción respaldada y continúa.
 Los registros y snapshots históricos se conservan. Los errores SQL muestran código y categoría, nunca filas o URI.
 
+SQL 008 añade índices de URLs normalizadas para consultar únicamente las fichas relacionadas con las ofertas
+operativas. Conserva las reglas de identidad, ambigüedad, archivo y referencias; no desactiva la validación. Los índices
+se actualizan con las escrituras del catálogo y selección; no necesitan una tarea de refresco. Se crean sin lista de
+inserciones diferidas para que las consultas posteriores a una captura masiva no la recorran repetidamente.
+
+Un fallo final por `57014` puede ocurrir después de guardar el catálogo: consultar `catalogo.filas/enviadas/pendientes`
+y el detalle de `identidad` en salud.json. No deducir pérdida de ofertas ni cambiar contraseñas por ese código.
+El diagnóstico de 008 también cronometra una reconciliación con límite de tres segundos y revierte todo el ensayo.
+
 En **Actions → Diagnóstico → Run workflow**, rama `main`:
 
-- `ensayar_migraciones=true`: ensayo del SQL de identidad pendiente (006/007) con reversión obligatoria de toda la transacción. No instala
+- `ensayar_migraciones=true`: ensayo del SQL de identidad pendiente (006/007/008) con reversión obligatoria de toda la transacción. No instala
   versiones ni conserva reparaciones. Tiene prioridad sobre los demás modos y no consume Apify. No reemplaza al
   preparador con respaldo. Espera como máximo tres segundos por un bloqueo y treinta por consulta.
 
@@ -233,7 +247,7 @@ copia recuperable para el cliente.
    Un técnico puede usar la receta siguiente, con cliente
    PostgreSQL compatible y acceso administrativo. Los servicios son perfiles de conexión seguros propios; no pegar
    contraseñas en argumentos ni en este manual. Ver [pg_service](https://www.postgresql.org/docs/current/libpq-pgservice.html).
-   Si se usó el instalador, hay siete tablas: añadir `--table=public.adaptia_migraciones` a esa receta. Conservar sus
+   Con SQL 009 y el instalador hay once tablas. La receta siguiente incluye todas; para un esquema anterior omitir solo las inexistentes. Conservar sus
    hashes/fechas; no reinicializar el diario durante una restauración. La receta pg_dump es una alternativa técnica
    al corte cifrado, no una tarea diaria del operador.
 
@@ -243,7 +257,9 @@ ADAPTIA_RESPALDO=/ruta/privada/al/respaldo-del-corte
 pg_dump --dbname="service=adaptia_origen" --format=custom --data-only --no-owner --no-privileges \
   --table=public.catalogo_vacantes --table=public.entregas_diarias --table=public.ofertas \
   --table=public.estado_operativo --table=public.apify_reservas --table=public.estado_operativo_revision_seq \
-  --table=public.ofertas_id_seq --file="$ADAPTIA_RESPALDO/datos.dump"
+  --table=public.ofertas_id_seq --table=public.ofertas_enlaces_historicos --table=public.adaptia_migraciones \
+  --table=public.panel_configuracion --table=public.panel_versiones --table=public.panel_ejecuciones \
+  --table=public.panel_asignaciones --file="$ADAPTIA_RESPALDO/datos.dump"
 ```
 
 `adaptia_origen` referencia la conexión administrativa, TLS y credenciales fuera del código; el técnico prepara esos

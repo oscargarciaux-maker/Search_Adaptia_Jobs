@@ -29,6 +29,12 @@ def recoger(cfg, estado, hoy, trabajo):
 
     def portales():
         filas = ats.leer_lista(ats.RUTA, trabajo / "empresas_ats.csv")
+        if cfg.get("control_dirigido"):
+            from buscador import normalizar
+            empresas = {normalizar.empresa(x) for x in cfg.get("empresas_objetivo",[])}
+            filas = [f for f in filas if normalizar.empresa(f.get("empresa","")) in empresas]
+            if not filas:
+                return [], set(), {"omitida": "modo dirigido: aún no hay portales asociados a los cargos"}
         if filas:
             desplazamiento = hora * opciones.get("rotacion_empresas", 30) % len(filas)
             filas = filas[desplazamiento:] + filas[:desplazamiento]

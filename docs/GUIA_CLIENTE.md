@@ -1,9 +1,16 @@
 # Manual operativo — Adaptia Jobs
 
-El producto es un scraper automatizado que guarda y permite consultar vacantes en Supabase. La interfaz web,
-sus funciones Cloudflare y el despliegue de GitHub Pages se retiran por decisión del propietario. No se requiere
-alojamiento web ni navegador especial para que se ejecuten las búsquedas. No hay agente de WhatsApp ni seguimiento
-individual de postulaciones en esta etapa.
+La revisión v6 incorpora un panel privado para el operador. La guía de uso detallada está en [PANEL_CONTROL.md](PANEL_CONTROL.md):
+añadir clientes/perfiles, revisar cargos afines, repartir cupos, guardar, programar y copiar resultados para WhatsApp.
+El acceso real requiere configurar inicio de sesión más adelante; la demostración usa datos ficticios.
+
+La meta de 120 se reparte por cargo, no por persona: tres Product Designers pueden compartir resultados del mismo cupo
+cuando sus filtros coincidan. Los filtros pertenecen a cada perfil y pueden producir cantidades diferentes por cliente.
+No hay agente WhatsApp ni seguimiento de postulaciones. El operador copia el mensaje y lo envía manualmente.
+
+Los apartados siguientes describen también el scraper heredado y sus consultas técnicas en Supabase. **Con panel activo,
+los cargos son configurables y role_id adopta cargo:<UUID>; no hay que buscar siempre role_id=qa.** Las vistas antiguas
+no calculan los filtros privados del panel; consultar las asignaciones desde la nueva interfaz.
 
 ## 1. Dónde consultar resultados
 
@@ -43,7 +50,7 @@ se apartan conservando sus referencias. No se comprueba una postulación complet
 Publicación, primera detección, última observación y comprobación del enlace son momentos distintos. Detectada hoy
 no significa publicada hoy. Las horas terminadas en Z se expresan en UTC; Colombia está cinco horas atrás.
 
-La meta diaria es veinte nuevas por cada uno de seis roles: Product Designer, UX/UI Designer, Product Owner,
+Mientras no exista una versión vigente del panel, la meta heredada es veinte nuevas por cada uno de seis roles: Product Designer, UX/UI Designer, Product Owner,
 Product Manager, AI Engineer y QA. Las capturas horarias no crean otro lote ni reponen automáticamente cierres del
 histórico. La cifra seleccionada no equivale a oportunidades disponibles ahora. Un déficit debe mostrarse, no
 rellenarse con repeticiones, pendientes o cargos ajenos. Las ubicaciones con confianza baja quedan fuera de nuevas

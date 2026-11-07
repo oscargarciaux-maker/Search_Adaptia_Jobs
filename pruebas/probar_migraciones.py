@@ -95,7 +95,7 @@ def main():
             assert not conn.execute("select has_table_privilege('service_role','public.adaptia_migraciones','SELECT')").fetchone()[0]
             # Una migración inválida revierte también su primer ALTER correcto.
             cuerpo = "alter table public.ofertas add column prueba_fallida text; select no_existe;"
-            mala = migraciones.Migracion("008", "008_fallida.sql", sha256(cuerpo.encode()).hexdigest(), cuerpo)
+            mala = migraciones.Migracion("010", "010_fallida.sql", sha256(cuerpo.encode()).hexdigest(), cuerpo)
             plan = migraciones.planificar(conn, trabajo, raiz / "antes-fallo.enc", llave, ms + [mala])
             try:
                 migraciones.preparar(conn, trabajo, plan, ms + [mala])
@@ -103,10 +103,10 @@ def main():
             except psycopg.errors.UndefinedColumn:
                 pass
             assert not conn.execute("select 1 from information_schema.columns where table_schema='public' and table_name='ofertas' and column_name='prueba_fallida'").fetchone()
-            assert "008" not in migraciones.aplicadas(conn)
+            assert "010" not in migraciones.aplicadas(conn)
             # Dos procesos/conexiones parten del mismo corte: solo uno aplica.
             cuerpo = "alter table public.ofertas add column prueba_concurrencia text;"
-            buena = migraciones.Migracion("008", "008_correcta.sql", sha256(cuerpo.encode()).hexdigest(), cuerpo)
+            buena = migraciones.Migracion("010", "010_correcta.sql", sha256(cuerpo.encode()).hexdigest(), cuerpo)
             versiones = ms + [buena]
             plan = migraciones.planificar(conn, trabajo, raiz / "concurrencia.enc", llave, versiones)
             def intentar(_):
@@ -119,7 +119,17 @@ def main():
             with ThreadPoolExecutor(2) as ex:
                 assert sum(ex.map(intentar, range(2))) == 1
             assert len(migraciones.aplicadas(conn)) == len(ms) + 1
-            # Backup de las siete tablas y ambas secuencias; el archivo no contiene el texto en claro.
+            # El respaldo incluye también configuración privada, versión y asignación de clientes.
+            from panel.repositorio import configuracion_demo
+            control = configuracion_demo()
+            conn.execute("select public.panel_guardar(0,%s::jsonb)",(json.dumps(control),))
+            conn.execute("select public.panel_publicar(1)")
+            ejecucion_panel = conn.execute("insert into public.panel_ejecuciones(fecha,revision) values(current_date,1) returning id").fetchone()[0]
+            perfil_panel = control["perfiles"][0]
+            conn.execute("""insert into public.panel_asignaciones(ejecucion_id,cliente_id,perfil_id,cargo_id,vacante_id,match_grade,explicacion,filtros,cargo_configuracion)
+                values(%s,%s,%s,%s,'aaaaaaaaaaaaaaaa','exact','[]',%s::jsonb,%s::jsonb)""",
+                (ejecucion_panel,perfil_panel["cliente_id"],perfil_panel["id"],perfil_panel["cargo_id"],json.dumps(perfil_panel),json.dumps(control["cargos"][0])))
+            # Backup de once tablas y ambas secuencias; el archivo no contiene el texto en claro.
             conn.execute("select public.estado_guardar('ofertas','[{\"identificador\":\"pendiente\",\"revision\":0,\"payload\":{\"external_id\":\"pendiente\"}}]')")
             conn.execute("insert into public.ofertas(external_id,job_title,company_name) select 'lote-'||n,'QA','Ensayo' from generate_series(1,201) n")
             # Archivo con decimal anidado y una fusión todavía pendiente: recuperar sin aplicar limpieza al corte.
@@ -159,7 +169,7 @@ def main():
                 assert destino.execute("select tgenabled from pg_trigger where tgname='oferta_unica'").fetchone()[0] == 'O'
                 assert not destino.execute("select has_table_privilege('anon','public.estado_operativo','SELECT')").fetchone()[0]
         print("Actualización manual → automática sin perder crédito/historia, respaldo obligatorio y migradores concurrentes: aprobados.")
-        print("Copia AES-GCM y restauración: siete tablas, dos secuencias, decimales exactos, pendiente, permisos y trabajo; corrupción rechazada.")
+        print("Copia AES-GCM y restauración: once tablas, dos secuencias, decimales exactos, pendiente, permisos y trabajo; corrupción rechazada.")
 
 
 if __name__ == "__main__":

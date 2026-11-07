@@ -62,7 +62,7 @@ def ficha(pagina):
 def combinaciones(mapa, paises_activos):
     """Todas las combinaciones (familia, lugar) que se pueden buscar."""
     lugares = [(p, {"location": nombre}) for p, nombre in paises_activos] + LUGARES_EXTRA
-    return [(f["id"], cobertura.consultas(f), clave, params) for f in mapa for clave, params in lugares]
+    return [(f["id"], cobertura.consultas(f), clave, params) for f in mapa for clave, params in f.get("lugares", lugares)]
 
 
 def consulta_or(consultas, maximo=4):

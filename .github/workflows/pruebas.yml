@@ -9,6 +9,37 @@ permissions:
   contents: read
 
 jobs:
+  panel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: pip install -r requirements.txt
+      - run: npm ci
+        working-directory: web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: npm run format:check
+        working-directory: web
+      - run: npm run build
+        working-directory: web
+      - run: npm test
+        working-directory: web
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: panel-navegador
+          path: web/test-results/
+          retention-days: 7
   sql:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -51,6 +82,7 @@ jobs:
           python3 pruebas/probar_concurrencia_estado.py --docker "${{ job.services.postgres.id }}"
           python -m pruebas.probar_migraciones
           python -m pruebas.probar_ofertas_unicas
+          python -m pruebas.probar_panel
   pruebas:
     runs-on: ubuntu-latest
     timeout-minutes: 15

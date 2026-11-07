@@ -11,7 +11,7 @@ from uuid import uuid4
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from psycopg import sql
 
-TABLAS = ("catalogo_vacantes", "entregas_diarias", "ofertas", "ofertas_enlaces_historicos", "estado_operativo", "apify_reservas", "adaptia_migraciones")
+TABLAS = ("catalogo_vacantes", "entregas_diarias", "ofertas", "ofertas_enlaces_historicos", "estado_operativo", "apify_reservas", "panel_configuracion", "panel_versiones", "panel_ejecuciones", "panel_asignaciones", "adaptia_migraciones")
 SECUENCIAS = ("ofertas_id_seq", "estado_operativo_revision_seq")
 MAGIA = b"ADAPTIA1\n"
 

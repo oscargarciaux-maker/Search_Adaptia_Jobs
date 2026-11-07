@@ -5,6 +5,7 @@ Uso:  python -m buscador.bodega --salida <carpeta>  [--modo diario|inicial] [--c
 nueva, más la página y los datos publicados (ver publicar.py). El flujo bodega.yml la sube a la rama `publicado`.
 """
 import argparse
+from copy import deepcopy
 import gzip
 import json
 import os
@@ -23,7 +24,12 @@ from buscador.http import Cliente
 RAIZ = Path(__file__).resolve().parent.parent
 
 
+_config_operativa = None
+
+
 def config():
+    if _config_operativa is not None:
+        return deepcopy(_config_operativa)
     return yaml.safe_load((RAIZ / "datos" / "config.yaml").read_text(encoding="utf-8"))
 
 
@@ -127,7 +133,13 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None):
     filas_ats = ats.leer_lista(ats.RUTA, trabajo / "empresas_ats.csv")
 
     def f_ats():
-        return ats.buscar(Cliente(pausa=(0.05, 0.2)), filas_ats, limite_segundos=limite, prioritarias=prioritarias)
+        filas = filas_ats
+        if cfg.get("control_dirigido"):
+            empresas = {normalizar.empresa(x) for x in cfg.get("empresas_objetivo",[])}
+            filas = [f for f in filas if normalizar.empresa(f.get("empresa","")) in empresas]
+            if not filas:
+                return [], set(), {"omitida": "modo dirigido: aún no hay portales asociados a los cargos"}
+        return ats.buscar(Cliente(pausa=(0.05, 0.2)), filas, limite_segundos=limite, prioritarias=prioritarias)
 
     with ThreadPoolExecutor(7) as ex:
         tareas = {n: ex.submit(correr, n, f) for n, f in [("LinkedIn", f_linkedin), ("Indeed", f_indeed),
@@ -140,7 +152,7 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None):
         if not r:
             continue
         crudas.extend(r[0])
-        if n == "Tableros remotos":
+        if n == "Tableros remotos" and not cfg.get("control_dirigido"):
             empresas |= set(r[1])
     ats_crudas = resultados.get("Portales de empresas") or [[], set(), {}]
     enlaces_ats = {c["enlace"] for c in ats_crudas[0]}
@@ -468,7 +480,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
                 actual.get("rol_entrega_actual") == rol["id"] if actual["id"] in por_id_vigente else False,
                 "enlace": actual.get("enlace", ""), "enlace_directo": actual.get("enlace_directo", ""),
                 "verificacion": revision})
-        seleccion_actual["roles"][rol["id"]] = {"nombre": rol["nombre"], "meta": config_entrega["por_rol"], "vacantes": entradas}
+        seleccion_actual["roles"][rol["id"]] = {"nombre": rol["nombre"], "meta": entrega.meta_de(rol, config_entrega), "vacantes": entradas}
     reporte = {
         "fecha": hoy, "hora_utc": datetime.now(timezone.utc).strftime("%H:%M"), "modo": modo,
         "codigo_commit": os.environ.get("GITHUB_SHA", ""), "ejecucion_id": os.environ.get("GITHUB_RUN_ID", ""),

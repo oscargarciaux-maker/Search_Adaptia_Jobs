@@ -1,20 +1,22 @@
 # CLAUDE.md — Buscador de vacantes LATAM
 
-## Qué es
-Un buscador de vacantes para LATAM, España y remotas mundiales que:
-1. llena una bodega con todas las vacantes abiertas de 30 días (LinkedIn público, Indeed, portales de empresas, Get on
-   Board, tableros remotos y ofertas formales LinkedIn vía Apify);
-2. arma la **entrega diaria**: 20 vacantes nuevas (nunca entregadas) por rol —Product designer, UX/UI designer, Product
-   Owner, Product manager, AI Engineer, QA—, variadas, con las columnas del **contrato de datos v1**
-   (`docs/CONTRATO_DATOS_v1.md`), y la guarda en **Supabase** (obligatorio);
-3. permite consultar selección y disponibilidad mediante vistas privadas en Supabase.
-La interfaz web, GitHub Pages y funciones Cloudflare se retiraron por decisión del usuario. No reintroducirlos.
-Por decisión vigente del usuario, Excel no se usa: no reintroducir botón, exportador ni dependencia de hojas de cálculo.
-Los CSV de configuración de empresas y reportes técnicos no son una base de datos alternativa.
-La captura horaria gratuita actualiza catálogo y verificación sin crear otra entrega ni usar Apify. Los nuevos enlaces
-para entregar se comprueban con presupuesto y caducidad; los pendientes no se dan por válidos.
-Es un proyecto vendido por Oscar: se entrega a otra persona cambiando solo los secretos (`docs/TRASPASO.md`). Más adelante
-un bot de WhatsApp tomará 5 vacantes de Supabase y las enviará.
+## Qué es y decisión vigente
+Desde la petición del 6 de noviembre, existe un panel de control privado para el operador: clientes con perfiles,
+cargos abiertos y cupos por cargo que suman 120, filtros por país/modalidad/idioma/publicación/experiencia/inglés,
+y copia manual de WhatsApp. La retirada de la web histórica no prohíbe esta nueva plataforma expresamente solicitada.
+No reintroducir Pages/Cloudflare antiguos, Excel, agente WhatsApp ni seguimiento de candidaturas.
+Leer primero docs/PANEL_CONTROL.md y docs/CONTRATO_DATOS_v6.md. Estos prevalecen sobre restricciones históricas
+que prohibían filtrar experiencia/inglés o fijaban seis cargos. El acceso real queda cerrado hasta configurar login,
+por decisión del propietario; --demo usa datos ficticios y no toca Supabase. No abrir datos reales sin autorización.
+
+La captura heredada mantiene seis cargos por veinte hasta existir una versión privada vigente; panel.ejecutor carga
+la versión activa desde Supabase, sustituye cargos/lugares/cupos y asigna resultados compatibles por perfil.
+Búsqueda y afinidad sin IA; variantes/ESCO/términos editables para cargos nuevos. No inventar equivalentes ni un score
+personal de contratación. No persistir datos de clientes en reportes/cachés públicos de la captura.
+La configuración y asignaciones viven en Supabase; SQL 009 añade cuatro tablas privadas. UI React/Vite, API FastAPI,
+servidor con credencial de servicio; nunca compartirla al navegador. Docker y guía de despliegue sin proveedor obligatorio.
+Los cambios del borrador son explícitos; programar fija una versión desde mañana en Bogotá y conserva la de corridas iniciadas.
+
 Leer antes de trabajar `docs/GUIA_CLIENTE.md`, `docs/OPERACION_Y_RECUPERACION.md` y `docs/ACEPTACION_Y_ESTADO.md`.
 Riesgos y prioridades de mantenimiento: `docs/REVISION_FIABILIDAD.md`.
 Para reservas y pendientes centrales, leer `docs/CONTRATO_ESTADO_OPERATIVO.md` y `docs/ACTIVAR_ESTADO_OPERATIVO.md`.
@@ -22,17 +24,17 @@ Camino preferido de instalación: `docs/INSTALACION_AUTOMATICA.md`. `SUPABASE_DB
 una vez como Secrets. Preparar Supabase sube respaldo cifrado antes de SQL, registra hashes en `adaptia_migraciones`
 y activa por marca privada; no pedir copiar 002/003 ni variables manuales para este camino. No modificar SQL ya registrado:
 añadir migración. Clave administrativa limitada a preparación; no se entrega a fuentes, navegador ni logs. Tras el
-instalador los cortes contienen siete tablas y dos secuencias. Probar `python -m pruebas.probar_migraciones` solo en PG aislado.
+instalador los cortes contienen once tablas y dos secuencias. Probar `python -m pruebas.probar_migraciones` solo en PG aislado.
 SQL 003 + `ESTADO_SUPABASE_ACTIVO=true` activan el modo; no asumir que está desplegado. No volver al contador local
 como alternativa silenciosa ni vaciar reservas/colas para resolver errores. El arranque importa un corte coherente.
 `docs/PLAN.md` se conserva como diseño histórico: sus instrucciones antiguas no prevalecen sobre decisiones actuales.
 
 ## Decisiones vigentes de cobertura e integridad
 
-Leer `docs/CONTRATO_DATOS_v5.md`: una fila por vacante en `ofertas`, archivo íntegro de enlaces duplicados,
+Leer `docs/CONTRATO_DATOS_v6.md` y `docs/CONTRATO_DATOS_v5.md`: una fila por vacante en `ofertas`, archivo íntegro de enlaces duplicados,
 IDs agrupados y selección sin contar copias. No borrar archivos históricos ni snapshots para ocultar déficit.
 Leer también `docs/CONTRATO_DATOS_v4.md`: vistas privadas de disponibilidad, afinidad vigente y reporte por rol.
-SQL 004 es aditivo y automático; no modificar SQL 001–007 ni el estado histórico v1. Conservar variantes pertinentes;
+SQL 004 es aditivo y automático; no modificar SQL registrado; 008/009 de esta revisión aún requieren instalación ni el estado histórico v1. Conservar variantes pertinentes;
 desarrollo genérico no cuenta como QA/IA.
 Leer `docs/CONTRATO_DATOS_v3.md` y `docs/CONTROL_CALIDAD_ENLACES.md`: comprobar enlaces antes de nuevas entregas,
 no confundir HTTP 200 con ficha vigente ni 403 con cierre. La verificación tiene caducidad y presupuesto, no usa Apify
@@ -54,14 +56,14 @@ Apify usa curious_coder/linkedin-jobs-scraper con permisos limitados para fichas
 desactivado por defecto. Un post solo aporta una oferta si se recupera su ficha formal; sin ella sigue por verificar.
 La entrega normal comprueba Supabase antes de recoger; la validación final falla si hay déficit o sincronización pendiente.
 
-## Reglas que no se cambian sin preguntarle a Oscar
-- **Volumen antes que filtros.** Solo filtran: el cargo (mapa de cargos), 30 días de antigüedad, que siga abierta, que no
+## Reglas de integridad y modo heredado
+- **Modo heredado sin versión de panel.** Solo filtran: el cargo (mapa de cargos), 30 días de antigüedad, que siga abierta, que no
   esté repetida, que tenga un enlace comprobado para nuevas entregas y que se pueda aplicar desde el país elegido.
-  Inglés, nivel y años se muestran como columnas.
-- **Contrato v1 + ampliación v5** en la entrega: nombres y valores compatibles, una fila por vacante reconocida; lo que el aviso no dice queda vacío (nunca se
+  Inglés, nivel y años se muestran como columnas. Con panel activo, los filtros explícitos de cada perfil sí se aplican.
+- **Contrato v1 + ampliaciones v5/v6** en la entrega: nombres y valores compatibles, una fila por vacante reconocida; lo que el aviso no dice queda vacío (nunca se
   inventa: ni la moneda de un "$" solo, ni la modalidad que el aviso no dice). Un campo nuevo se agrega primero al
   contrato (versión nueva) y después al código. Solo ofertas en español o inglés.
-- **Entrega diaria:** `por_rol` nuevas por rol, nunca repetidas (`trabajo/entregadas.json`), variadas (idioma, nivel,
+- **Entrega diaria:** cupos por cargo en el panel o `por_rol` en legado, nuevas por rol, nunca repetidas (`trabajo/entregadas.json`), variadas (idioma, nivel,
   país, modalidad, fuente, máximo 2 por empresa). Países: LATAM y España (decisión de Oscar, 5 nov 2026).
 - **Solo enlaces donde se postula de verdad:** el sistema de postulación de la empresa (Greenhouse, Lever, Ashby…), su
   página de empleo o un portal donde se postula ahí mismo (LinkedIn, Indeed, Computrabajo…). Nunca agregadores ni sitios
@@ -78,7 +80,7 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
 - Si algo del plan no está claro o falta una decisión, se pregunta antes de inventar una regla.
 
 ## Cómo se trabaja
-- Un paso del plan por sesión, en una rama, con un PR que Oscar revisa y fusiona.
+- Completar el alcance autorizado en una rama, con un PR que Oscar revisa y fusiona; no auto-fusionar.
 - Pruebas obligatorias antes de cada push: `python -m pytest -q`; CI también comprueba PostgreSQL. No se requiere Node tras retirar la interfaz.
 - Prueba en vivo corta (unos 5 minutos, con internet): `python -m buscador.bodega --salida /tmp/prueba --prueba`.
 - Lo que cambia sin tocar código vive en `datos/` (mapa de cargos, países, dominios, empresas, `config.yaml`).
