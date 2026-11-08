@@ -10,6 +10,30 @@ from psycopg.conninfo import make_conninfo
 from buscador import migraciones, preparar, respaldo, supabase
 
 
+def test_perfil_revierte_y_no_imprime_contexto_privado(capsys):
+    from contextlib import nullcontext
+    from buscador import diagnostico_migraciones
+    class Fallo(diagnostico_migraciones.psycopg.errors.QueryCanceled):
+        @property
+        def diag(self):
+            return SimpleNamespace(context='with recursive aliases DATO-PRIVADO function reconciliar_ofertas() line 6')
+    class Conexion:
+        transacciones = []
+        def transaction(self, **op):
+            self.transacciones.append(op)
+            return nullcontext()
+        def execute(self, sql):
+            if sql == 'select public.reconciliar_ofertas()': raise Fallo('DATO-PRIVADO')
+            return self
+        def fetchall(self): return [('catalogo', 24000)]
+    c = Conexion()
+    diagnostico_migraciones.perfilar(c)
+    salida = capsys.readouterr().out
+    assert {'force_rollback': True} in c.transacciones
+    assert 'DATO-PRIVADO' not in salida
+    assert "'etapa': 'identidades'" in salida and "'linea': 6" in salida
+
+
 @pytest.fixture(autouse=True)
 def sin_archivos_reales_de_actions(monkeypatch):
     for k in ("GITHUB_ENV", "GITHUB_OUTPUT", "GITHUB_STEP_SUMMARY", "GITHUB_ACTIONS", "GITHUB_REF"):
@@ -18,7 +42,7 @@ def sin_archivos_reales_de_actions(monkeypatch):
 
 def test_migraciones_en_orden_y_hash_del_sql_original():
     versiones = migraciones.descubrir()
-    assert [m.version for m in versiones] == ["001", "002", "003", "004", "005", "006", "007", "008", "009"]
+    assert [m.version for m in versiones] == ["001", "002", "003", "004", "005", "006", "007", "008", "009", "010"]
     assert all(len(m.digest) == 64 for m in versiones)
     assert "begin;\n" not in versiones[1].cuerpo.lower()
     assert "begin\n" in versiones[1].cuerpo.lower()  # conserva el cuerpo PL/pgSQL

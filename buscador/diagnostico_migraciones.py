@@ -55,11 +55,12 @@ def ensayar(conn):
         conn.execute("set local statement_timeout='30s'")
         conn.execute("select pg_advisory_xact_lock(hashtextextended('adaptia.migraciones',0))")
         pendientes = migraciones.pendientes(conn, migraciones.descubrir())
-        if any(m.version not in {"006","007","008","009"} for m in pendientes):
-            raise RuntimeError("Este ensayo admite únicamente las migraciones 006/007/008/009 de esta revisión; usar el instalador respaldado para otras versiones.")
+        if any(m.version not in {"006","007","008","009","010"} for m in pendientes):
+            raise RuntimeError("Este ensayo admite únicamente las migraciones 006/007/008/009/010 de esta revisión; usar el instalador respaldado para otras versiones.")
         migraciones.aplicar(conn, pendientes)
-        if any(m.version == "008" for m in pendientes):
+        if any(m.version in {"008", "010"} for m in pendientes):
             conn.execute("set local statement_timeout='3s'")
+            conn.execute("set local role service_role")
             t0 = time.perf_counter()
             resultado = conn.execute("select public.reconciliar_ofertas()").fetchone()[0]
             print({"reconciliacion_indexada_ms":round((time.perf_counter()-t0)*1000), "resultado":resultado},flush=True)
