@@ -33,7 +33,7 @@ def probar_aliases(conectar, nombre):
                 insert into public.entregas_diarias(vacante_id,delivery_date,role_id,match_grade,selected_at,snapshot)
                 values('2222222222222222',current_date,'qa','exact',now(),'{"conservar":"histórico"}');""")
             antes = c.execute("select jsonb_agg(to_jsonb(c) order by id) from public.catalogo_vacantes c").fetchone()[0]
-            assert ensayar(c) == ['006','007','008','009']
+            assert ensayar(c) == ['006','007','008','009','010']
             assert c.execute("select jsonb_agg(to_jsonb(c) order by id) from public.catalogo_vacantes c").fetchone()[0] == antes
             assert c.execute("select count(*) from public.ofertas").fetchone()[0] == 2
             assert '006' not in migraciones.aplicadas(c)
@@ -219,6 +219,60 @@ def main():
                 c.execute("select public.reconciliar_ofertas()")
             assert c.execute("select count(*) from public.ofertas where vacante_id='aaaaaaaaaaaaaaaa'").fetchone()[0] == 1
             assert 'https://jobs.lever.co/a/adicional' in c.execute("select enlaces_alternativos from public.ofertas where id=37").fetchone()[0]
+            # El volumen por sí solo no reproducía el atasco: añadir miles de aliases recíprocos.
+            c.execute("""insert into public.catalogo_vacantes(id,datos,status,observed_at)
+             select substr(md5('grafo-'||n),1,16),jsonb_build_object('ids_agrupados',
+              jsonb_build_array(substr(md5('grafo-'||case when n%2=0 then n-1 else n+1 end),1,16))),
+              'active',now() from generate_series(1,6000) n;
+             insert into public.catalogo_vacantes(id,datos,status,observed_at)
+              values('1111111111111111',jsonb_build_object('duplicada_de',substr(md5('grafo-1'),1,16)),
+               'archived',now());
+             alter table public.ofertas disable trigger oferta_unica;
+             insert into public.ofertas(external_id,job_title,company_name,offer_url,vacante_id)
+              select 'grafo-'||n,'QA','Ensayo','https://jobs.lever.co/grafo/'||n,substr(md5('grafo-'||n),1,16)
+              from generate_series(1,2) n;
+             insert into public.ofertas(external_id,job_title,company_name,offer_url,vacante_id)
+              values('grafo-prefijo','QA','Ensayo','https://jobs.lever.co/grafo/prefijo','1111111111111111');
+             alter table public.ofertas enable trigger oferta_unica;
+             insert into public.entregas_diarias(vacante_id,delivery_date,role_id,match_grade,selected_at,snapshot)
+              values('1111111111111111',current_date,'qa','exact',now(),'{"conservar":"grafo-histórico"}');
+             analyze public.catalogo_vacantes;""")
+            with c.transaction():
+                c.execute("set local statement_timeout='3s'")
+                c.execute("set local role service_role")
+                resultado = c.execute("select public.reconciliar_ofertas()").fetchone()[0]
+            assert resultado['archivadas'] == 2
+            principal = c.execute("select least(substr(md5('grafo-1'),1,16),substr(md5('grafo-2'),1,16))").fetchone()[0]
+            assert c.execute("select count(*) from public.ofertas where vacante_id=%s", (principal,)).fetchone()[0] == 1
+            assert c.execute("select snapshot->>'conservar' from public.entregas_diarias where vacante_id='1111111111111111'").fetchone()[0] == 'grafo-histórico'
+            # Repetir no reescribe todas las filas ni aumenta el archivo.
+            antes = c.execute("select id,xmin::text from public.ofertas order by id").fetchall()
+            for _ in range(2):
+                with c.transaction():
+                    c.execute("set local statement_timeout='3s'")
+                    c.execute("set local role service_role")
+                    assert c.execute("select public.reconciliar_ofertas()->>'archivadas'").fetchone()[0] == '0'
+                assert c.execute("select id,xmin::text from public.ofertas order by id").fetchall() == antes
+            # Un prefijo explícito puede llevar a una equivalencia implícita válida; un ciclo explícito no.
+            for datos, motivo in [
+                ("""insert into public.catalogo_vacantes(id,datos,status,observed_at) values
+                 ('2222222222222222','{"duplicada_de":"3333333333333333"}','active',now()),
+                 ('3333333333333333','{"duplicada_de":"2222222222222222"}','active',now())""", 'Ciclo'),
+                ("""insert into public.catalogo_vacantes(id,datos,status,observed_at) values
+                 ('2222222222222222','{"duplicada_de":"9999999999999999"}','active',now())""", 'principal'),
+                ("""insert into public.catalogo_vacantes(id,datos,status,observed_at)
+                 select substr(md5('cadena-'||n),1,16),
+                  case when n<23 then jsonb_build_object('duplicada_de',substr(md5('cadena-'||(n+1)),1,16)) else '{}'::jsonb end,
+                  'active',now() from generate_series(1,23) n""", 'cadena')]:
+                try:
+                    with c.transaction():
+                        c.execute(datos)
+                        c.execute("select public.reconciliar_ofertas()")
+                    raise AssertionError('Se admitió una relación inválida')
+                except psycopg.errors.RaiseException as e:
+                    assert motivo.lower() in str(e).lower()
+                assert c.execute("select id,xmin::text from public.ofertas order by id").fetchall() == antes
+            print('24.000 registros, 6.000 aliases recíprocos, prefijo explícito, límite de tres segundos, archivo y repetición sin reescrituras: aprobados.')
         probar_aliases(conectar,nombre+"_aliases")
         print("Identidad, archivo, repetición, referencias, concurrencia y catálogo de 18.000 filas / 300 ofertas con índices y límite de tres segundos: aprobados.")
     finally:

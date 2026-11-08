@@ -105,11 +105,18 @@ inserciones diferidas para que las consultas posteriores a una captura masiva no
 
 Un fallo final por `57014` puede ocurrir después de guardar el catálogo: consultar `catalogo.filas/enviadas/pendientes`
 y el detalle de `identidad` en salud.json. No deducir pérdida de ofertas ni cambiar contraseñas por ese código.
-El diagnóstico de 008 también cronometra una reconciliación con límite de tres segundos y revierte todo el ensayo.
+SQL 010 corrige el recorrido de relaciones que todavía podía agotar tiempo con 008: extrae metadatos una vez,
+resuelve por clave y evita reescrituras sin cambios. Conserva validación, archivo, referencias y los índices de URLs.
+No requiere contraseñas nuevas ni SQL manual; se instala tras respaldo con el mecanismo automático existente.
+
+El diagnóstico mide primero la función instalada bajo un límite de tres segundos en una transacción revertida.
+Solo imprime conteos, duración, código y etapa reconocida; nunca el contexto SQL completo ni filas privadas.
+Después ensaya las migraciones permitidas y vuelve a medir como service_role. Todo el ensayo se revierte; un
+resultado favorable acredita la prueba, no instalación. Comprobar Preparar Supabase y la siguiente captura real.
 
 En **Actions → Diagnóstico → Run workflow**, rama `main`:
 
-- `ensayar_migraciones=true`: ensayo del SQL de identidad pendiente (006/007/008) con reversión obligatoria de toda la transacción. No instala
+- `ensayar_migraciones=true`: ensayo del SQL de identidad pendiente (006/007/008/009/010) con reversión obligatoria de toda la transacción. No instala
   versiones ni conserva reparaciones. Tiene prioridad sobre los demás modos y no consume Apify. No reemplaza al
   preparador con respaldo. Espera como máximo tres segundos por un bloqueo y treinta por consulta.
 

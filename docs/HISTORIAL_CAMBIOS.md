@@ -6,6 +6,7 @@ empieza en [GUIA_CLIENTE.md](GUIA_CLIENTE.md); los resultados observados están 
 | Revisión | Qué cambió | Consecuencia para el cliente |
 |---|---|---|
 | Control v6 — preparado para revisión | Panel privado, clientes/perfiles, cupos por cargo, versiones desde mañana, captura dirigida y copia WhatsApp | Sustituye la prohibición histórica de web y los seis cargos fijos cuando se active una versión; login y despliegue real diferidos |
+| Reconciliación SQL 010 — preparada | Recorrido de aliases por clave y actualizaciones solo si cambian; regresión con 6.000 aliases recíprocos | Corrige el atasco confirmado tras 008 sin ampliar tiempos ni ocultar alertas; necesita instalación automática y captura posterior |
 | Reconciliación SQL 008 — preparada | URLs indexadas y límite de consulta comprobado | Corrige la causa del 57014 observado; instalación y siguiente captura real pendientes |
 | Identidad v5 — requiere fusión y preparación automática | Una fila por vacante, enlaces asociados, archivo íntegro de copias antiguas y protección contra reintentos/concurrencia | Los otros portales no inflan la cantidad de oportunidades; SQL 005 reconcilia coincidencias inequívocas |
 | Operación sin interfaz web — pendiente de fusión | Se retiran frontend, Functions, Node y el despliegue de Pages; se conserva reporte y estado técnico | Consultar vacantes y disponibilidad en Supabase y ejecuciones en Actions |
