@@ -27,6 +27,7 @@ def perfilar(conn):
             conn.execute("set local statement_timeout='3s'")
             resultado = conn.execute("select public.reconciliar_ofertas()").fetchone()[0]
         print({"perfil_revertido_ms":round((time.perf_counter()-t0)*1000),"resultado":resultado}, flush=True)
+        return True
     except psycopg.Error as e:
         # El contexto completo puede contener datos. Solo reconocer nombres/etapas estáticos.
         contexto = e.diag.context or ""
@@ -37,6 +38,7 @@ def perfilar(conn):
         linea = re.search(r'function (?:public\.)?reconciliar_ofertas\(\) line (\d+)', contexto)
         print({"perfil_revertido_ms":round((time.perf_counter()-t0)*1000),"codigo":e.sqlstate,
                "etapa":etapa,"linea":int(linea[1]) if linea else None},flush=True)
+        return False
 
 
 def identidades(conn):
@@ -72,9 +74,11 @@ def main():
     try:
         with migraciones.conexion(os.environ.get("SUPABASE_DB_URL", ""),
                 supabase.base(os.environ.get("SUPABASE_URL", ""))) as conn:
-            perfilar(conn)
+            perfil_ok = perfilar(conn)
             print(identidades(conn), flush=True)
             versiones = ensayar(conn)
+            if not perfil_ok and not versiones:
+                raise RuntimeError("La consolidación instalada no superó el perfil; no hay una reparación pendiente ensayada.")
     except psycopg.Error as e:
         print("::error::" + migraciones.error_sql(e))
         raise SystemExit(1) from None

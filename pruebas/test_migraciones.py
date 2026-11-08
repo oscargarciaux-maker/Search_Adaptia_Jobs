@@ -27,11 +27,24 @@ def test_perfil_revierte_y_no_imprime_contexto_privado(capsys):
             return self
         def fetchall(self): return [('catalogo', 24000)]
     c = Conexion()
-    diagnostico_migraciones.perfilar(c)
+    assert diagnostico_migraciones.perfilar(c) is False
     salida = capsys.readouterr().out
     assert {'force_rollback': True} in c.transacciones
     assert 'DATO-PRIVADO' not in salida
     assert "'etapa': 'identidades'" in salida and "'linea': 6" in salida
+
+
+def test_diagnostico_no_da_verde_si_falla_perfil_y_no_hay_reparacion(monkeypatch, capsys):
+    from contextlib import nullcontext
+    from buscador import diagnostico_migraciones as d
+    monkeypatch.setattr(d.migraciones, 'conexion', lambda *a: nullcontext(object()))
+    monkeypatch.setattr(d, 'perfilar', lambda c: False)
+    monkeypatch.setattr(d, 'identidades', lambda c: {})
+    monkeypatch.setattr(d, 'ensayar', lambda c: [])
+    with pytest.raises(SystemExit) as error:
+        d.main()
+    assert error.value.code == 1
+    assert '::error::La consolidación instalada' in capsys.readouterr().out
 
 
 @pytest.fixture(autouse=True)

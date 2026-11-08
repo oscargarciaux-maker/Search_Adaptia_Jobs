@@ -24,7 +24,7 @@ ejecutó 010 en la base real dentro de una transacción revertida: la función a
 la corregida completó en 360 ms como service_role, con 359 filas operativas y cuatro sin identidad confirmada.
 Esas cuatro no se eliminan ni se asocian sin evidencia. El ensayo revirtió tanto SQL como datos y registro de versión.
 
-Validación local: 697 pruebas Python, PostgreSQL con 24.000 registros y 6.000 aliases recíprocos bajo tres segundos,
+Validación local: 698 pruebas Python, PostgreSQL con 24.000 registros y 6.000 aliases recíprocos bajo tres segundos,
 ciclos explícitos rechazados, prefijos explícitos válidos, principales ausentes, límites de cadenas, conservación de
 snapshots/archivo, concurrencia y repetición sin nuevas versiones físicas de filas. Instalación, rollback de migración
 y respaldo/restauración de once tablas/dos secuencias aprobados. CI comprueba también el panel sin modificarlo.
