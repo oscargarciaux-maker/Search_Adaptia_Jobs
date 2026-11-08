@@ -42,3 +42,9 @@ SQL 008 acelera la misma búsqueda por URLs con índices de expresión en catál
 no cambia los criterios de identidad y conserva la prioridad de una URL inequívoca frente al ID almacenado. Los
 índices se mantienen al escribir. Las ambigüedades, referencias externas y errores siguen deteniendo la consolidación;
 no se permite que un fallo de tiempo se presente como éxito.
+
+SQL 010 conserva este contrato y sustituye el recorrido de aliases por búsquedas por clave dentro de un grafo JSONB.
+Solo recorre identidades que tienen relaciones y extrae sus metadatos una vez. Un prefijo explícito que conduce a un
+ciclo implícito válido se conserva; los ciclos explícitos, principales ausentes y cadenas demasiado largas siguen
+abortando antes de modificar ofertas. Repetir sin cambios no reescribe las filas operativas. No añade tablas ni campos,
+no amplía el timeout de la API ni elimina comprobaciones. Los once conjuntos de datos y sus respaldos no cambian.

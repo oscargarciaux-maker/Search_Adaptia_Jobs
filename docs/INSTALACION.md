@@ -12,7 +12,7 @@ El panel nuevo se instala por separado en un servidor privado: [PANEL_CONTROL.md
 - **Continuidad de un negocio existente:** conservar historial, lote, reintentos, memoria de no repetición y reservas Apify.
   Seguir primero [TRASPASO.md](TRASPASO.md). Copiar solo el código no conserva esos datos.
 - **Instalación o actualización automática (preferida):** seguir [INSTALACION_AUTOMATICA.md](INSTALACION_AUTOMATICA.md).
-  El propietario configura accesos una vez; el programa aplica 001–009 y activa catálogo/estado central.
+  El propietario configura accesos una vez; el programa aplica 001–010 y activa catálogo/estado central.
 - **Instalación manual anterior:** se conserva como alternativa técnica en las guías de activación. No mezclarla
   con el camino automático ni repetir SQL por recibir este manual.
 

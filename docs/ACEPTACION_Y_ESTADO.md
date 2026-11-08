@@ -6,6 +6,32 @@ aprobados por haber fusionado otro PR. Instrucciones de uso: [GUIA_CLIENTE.md](G
 
 ## 1. Corte de evidencia
 
+### Fallo recurrente tras 008 — SQL 010 ensayada, instalación pendiente
+
+Las capturas [42446101328](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42446101328)
+y [42449938233](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42449938233) fallaron en
+validación por SQLSTATE 57014. En el reporte de la segunda se confirmaron 16.908 filas sincronizadas, sin pendientes
+centrales; falló la consolidación posterior. No significa 16.908 ofertas nuevas ni acreditación de toda su vigencia.
+
+El [diagnóstico 42453546438](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42453546438)
+confirmó 20.251 registros de catálogo, 360 selecciones históricas, 359 ofertas operativas y 44 filas archivadas.
+Con la función 008 instalada se agotaron tres segundos en resolución de identidades. El patrón de aliases recíprocos
+reprodujo el fallo local; las pruebas anteriores de volumen sin esas relaciones no bastaban para este caso.
+
+SQL 010 extrae metadatos una vez, resuelve las relaciones por clave y evita actualizar ofertas sin cambios. No amplía
+el timeout, añade tablas ni elimina las verificaciones. El [ensayo 42454009812](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42454009812)
+ejecutó 010 en la base real dentro de una transacción revertida: la función anterior volvió a agotar el límite;
+la corregida completó en 360 ms como service_role, con 359 filas operativas y cuatro sin identidad confirmada.
+Esas cuatro no se eliminan ni se asocian sin evidencia. El ensayo revirtió tanto SQL como datos y registro de versión.
+
+Validación local: 697 pruebas Python, PostgreSQL con 24.000 registros y 6.000 aliases recíprocos bajo tres segundos,
+ciclos explícitos rechazados, prefijos explícitos válidos, principales ausentes, límites de cadenas, conservación de
+snapshots/archivo, concurrencia y repetición sin nuevas versiones físicas de filas. Instalación, rollback de migración
+y respaldo/restauración de once tablas/dos secuencias aprobados. CI comprueba también el panel sin modificarlo.
+
+La corrección aún requiere fusión y Preparar Supabase con respaldo. Después, comprobar una reconciliación y captura
+real posteriores a la instalación antes de acreditar recuperación; el ensayo revertido no la instala ni silencia alertas.
+
 ### Control por clientes v6 — preparado para revisión, no desplegado
 
 Por petición del propietario, se implementa una nueva interfaz privada de clientes/perfiles, cargos abiertos, cupos

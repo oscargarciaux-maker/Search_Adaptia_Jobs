@@ -30,7 +30,8 @@ def perfilar(conn):
     except psycopg.Error as e:
         # El contexto completo puede contener datos. Solo reconocer nombres/etapas estáticos.
         contexto = e.diag.context or ""
-        etapas = [("with recursive aliases", "identidades"), ("with destinos", "resolver_urls"),
+        etapas = [("with recursive aliases", "identidades"), ("with metadatos", "identidades"),
+                  ("with recursive recorrido", "identidades"), ("with destinos", "resolver_urls"),
                   ("update public.ofertas", "actualizar_enlaces")]
         etapa = next((nombre for marca,nombre in etapas if marca in contexto.lower()), "sin_identificar")
         linea = re.search(r'function (?:public\.)?reconciliar_ofertas\(\) line (\d+)', contexto)

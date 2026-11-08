@@ -1,8 +1,12 @@
 # Instalación y actualizaciones automáticas
 
-Este es el camino preferido para entregar el proyecto. Sustituye copiar los SQL 001–009 y activar variables a mano.
+Este es el camino preferido para entregar el proyecto. Sustituye copiar los SQL 001–010 y activar variables a mano.
 La configuración inicial de cuentas/secretos sigue correspondiendo al propietario; las siguientes actualizaciones las
 ejecuta GitHub. Un PR incorpora código; la ejecución **Preparar Supabase** acredita la instalación de esa versión.
+
+SQL 010 es una actualización de la función de consolidación, sin tablas nuevas. Se aplica como las anteriores,
+después del respaldo cifrado; no requiere nuevos Secrets ni reiniciar memoria. El ensayo de diagnóstico con rollback
+no equivale a instalarla. Confirmar Preparar Supabase y una captura real posterior.
 
 ## Contrato de automatización
 

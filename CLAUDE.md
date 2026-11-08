@@ -34,7 +34,8 @@ como alternativa silenciosa ni vaciar reservas/colas para resolver errores. El a
 Leer `docs/CONTRATO_DATOS_v6.md` y `docs/CONTRATO_DATOS_v5.md`: una fila por vacante en `ofertas`, archivo íntegro de enlaces duplicados,
 IDs agrupados y selección sin contar copias. No borrar archivos históricos ni snapshots para ocultar déficit.
 Leer también `docs/CONTRATO_DATOS_v4.md`: vistas privadas de disponibilidad, afinidad vigente y reporte por rol.
-SQL 004 es aditivo y automático; no modificar SQL registrado; 008/009 de esta revisión aún requieren instalación ni el estado histórico v1. Conservar variantes pertinentes;
+SQL 004 es aditivo y automático; no modificar SQL registrado ni el estado histórico v1. SQL 010 optimiza el grafo de aliases;
+comprobar instalación y captura posterior antes de afirmar recuperación. Conservar variantes pertinentes;
 desarrollo genérico no cuenta como QA/IA.
 Leer `docs/CONTRATO_DATOS_v3.md` y `docs/CONTROL_CALIDAD_ENLACES.md`: comprobar enlaces antes de nuevas entregas,
 no confundir HTTP 200 con ficha vigente ni 403 con cierre. La verificación tiene caducidad y presupuesto, no usa Apify
@@ -81,7 +82,7 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
 
 ## Cómo se trabaja
 - Completar el alcance autorizado en una rama, con un PR que Oscar revisa y fusiona; no auto-fusionar.
-- Pruebas obligatorias antes de cada push: `python -m pytest -q`; CI también comprueba PostgreSQL. No se requiere Node tras retirar la interfaz.
+- Pruebas obligatorias antes de cada push: `python -m pytest -q`; CI también comprueba PostgreSQL. La interfaz nueva requiere Node 24 para compilar; CI verifica formato, compilación y recorridos Playwright.
 - Prueba en vivo corta (unos 5 minutos, con internet): `python -m buscador.bodega --salida /tmp/prueba --prueba`.
 - Lo que cambia sin tocar código vive en `datos/` (mapa de cargos, países, dominios, empresas, `config.yaml`).
 - Respuestas a Oscar en español y en lenguaje sencillo.
