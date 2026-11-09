@@ -117,6 +117,70 @@ def test_perder_calidad_retira_del_catalogo_sin_borrar_historia():
     assert pendientes[v["id"]]["reason"] == "sin descripción completa"
 
 
+def _hora(n):
+    return (datetime(2026, 11, 4, 12, tzinfo=timezone.utc) + timedelta(hours=n)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _visto(v, n):
+    return dict(v, vista_en=_hora(n), visto_ultima_vez=_hora(n)[:10])
+
+
+def _exito(enviadas):
+    def subir(rows):
+        enviadas.append([row["id"] for row in rows])
+        return {"filas": len(rows), "enviadas": len(rows), "confirmadas": [row["id"] for row in rows]}
+    return subir
+
+
+def test_volver_a_ver_una_vacante_no_reescribe_todo_el_catalogo_cada_hora():
+    vs = [oferta(i) for i in range(60)]
+    memoria, enviadas, pendientes = {}, [], {}
+    r = catalogo.sincronizar([_visto(v, 0) for v in vs], [], pendientes, _exito(enviadas), lambda p: None, _hora(0), memoria)
+    assert len(enviadas[0]) == 60 and r["sin_cambios"] == 0 and len(memoria) == 60
+    por_hora = []
+    for n in range(1, 7):  # solo cambia la marca de «vista»: cada fila se renueva una vez por rotación
+        r = catalogo.sincronizar([_visto(v, n) for v in vs], [], pendientes, _exito(enviadas), lambda p: None, _hora(n), memoria)
+        por_hora.append(enviadas[-1])
+        assert r["filas"] == r["enviadas"] == len(enviadas[-1]) and r["sin_cambios"] == 60 - len(enviadas[-1])
+    assert sorted(i for lote in por_hora for i in lote) == sorted(v["id"] for v in vs)
+    assert max(len(lote) for lote in por_hora) < 60 and not pendientes
+
+
+def test_cambio_de_contenido_cierre_o_verificacion_se_envia_en_la_hora():
+    vs = [oferta(i) for i in range(12)]
+    memoria, enviadas = {}, []
+    catalogo.sincronizar(vs, [], {}, _exito(enviadas), lambda p: None, _hora(0), memoria)
+    hora = catalogo._hora(_hora(1))
+    en_turno = {v["id"] for v in vs if int(v["id"][:8], 16) % catalogo.ROTACION_HORAS == hora % catalogo.ROTACION_HORAS}
+    verificada = dict(vs[0], verificacion={"estado": "verificada", "enlaces": [{"comprobada_en": _hora(1)}]})
+    cerrada = dict(vs[1], _descripcion="")  # deja de ser entregable: pasa a archivada
+    catalogo.sincronizar([verificada, cerrada, *vs[2:]], [], {}, _exito(enviadas), lambda p: None, _hora(1), memoria)
+    assert set(enviadas[-1]) == {vs[0]["id"], vs[1]["id"]} | en_turno
+
+
+def test_fallo_al_subir_no_marca_como_sincronizado_y_se_reintenta():
+    v = oferta()
+    memoria, pendientes = {}, {}
+    catalogo.sincronizar([v], [], pendientes, lambda rows: {"confirmadas": [], "errores": ["503"]}, lambda p: None,
+                         _hora(0), memoria)
+    assert v["id"] in pendientes and not memoria
+    enviadas = []
+    catalogo.sincronizar([v], [], pendientes, _exito(enviadas), lambda p: None, _hora(1), memoria)
+    assert enviadas == [[v["id"]]] and memoria[v["id"]][1] == _hora(1) and not pendientes
+
+
+def test_sin_memoria_o_tras_doce_horas_se_envia_completo_y_se_olvidan_retiradas():
+    vs = [oferta(i) for i in range(30)]
+    memoria, enviadas = {}, []
+    catalogo.sincronizar(vs, [], {}, _exito(enviadas), lambda p: None, _hora(0), memoria)
+    catalogo.sincronizar(vs, [], {}, _exito(enviadas), lambda p: None, _hora(12), memoria)
+    assert len(enviadas[-1]) == 30
+    catalogo.sincronizar(vs[:10], [], {}, _exito(enviadas), lambda p: None, _hora(13), memoria)
+    assert set(memoria) == {v["id"] for v in vs[:10]}
+    catalogo.sincronizar(vs, [], {}, _exito(enviadas), lambda p: None, _hora(14), {})
+    assert len(enviadas[-1]) == 30
+
+
 def test_frescura_no_confunde_fecha_desconocida_con_publicacion_reciente():
     vs = [oferta(1, publicada_en="2026-11-04T11:00:00Z"), oferta(2, fecha="2026-11-04")]
     r = tiempos.medir(vs, AHORA)
@@ -193,6 +257,8 @@ def test_captura_incremental_no_crea_lotes_ni_usa_apify(monkeypatch, tmp_path):
     assert r["modo"] == "incremental" and r["catalogo"]["activas_elegibles"] == 1
     assert archivo.read_text() == '{"anterior":"2026-11-03"}'
     assert not (trabajo / "lote_entrega.json").exists()
+    memoria = bodega._leer_json(trabajo / "catalogo_sincronizado.json.gz", {})
+    assert memoria and r["catalogo"]["enviadas"] >= 1 and set(memoria) <= {v["id"] for v in bodega._leer_json(trabajo / "bodega.json.gz", [])}
 
 
 def test_migracion_faltante_detiene_captura_antes_de_fuentes(monkeypatch, tmp_path):

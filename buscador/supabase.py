@@ -184,7 +184,21 @@ def subir_catalogo(filas, sesion=None, tabla="catalogo_vacantes"):
     return {"filas": len(filas), "enviadas": len(confirmadas), "confirmadas": confirmadas, "errores": errores}
 
 
-def reconciliar_ofertas(sesion=None):
+def reconciliar_ofertas(sesion=None, pausa=20):
+    """Un solo reintento ante cancelación por tiempo (57014): la función es transaccional e idempotente, así que un
+    intento cancelado no deja cambios. El reintento queda registrado; si también falla, el error sigue visible."""
+    resultado = _reconciliar_una_vez(sesion)
+    if not any("57014; tiempo_consulta" in str(e) for e in resultado.get("errores") or []):
+        return resultado
+    import time
+    time.sleep(pausa)
+    segundo = _reconciliar_una_vez(sesion)
+    if segundo.get("errores"):
+        return dict(segundo, errores=[*resultado["errores"], *segundo["errores"]], reintento_por_tiempo=True)
+    return dict(segundo, reintento_por_tiempo=True)
+
+
+def _reconciliar_una_vez(sesion=None):
     url, clave = credenciales()
     cabeceras = {"apikey": clave}
     if clave and clave.startswith("eyJ"):

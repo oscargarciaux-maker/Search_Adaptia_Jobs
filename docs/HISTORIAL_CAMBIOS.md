@@ -5,6 +5,7 @@ empieza en [GUIA_CLIENTE.md](GUIA_CLIENTE.md); los resultados observados están 
 
 | Revisión | Qué cambió | Consecuencia para el cliente |
 |---|---|---|
+| Captura horaria: escritura por cambios — preparado para revisión | El catálogo solo envía filas nuevas o modificadas; lo demás se renueva por rotación de ~6 h. La consolidación reintenta una vez si Supabase la corta por tiempo y lo deja anotado | Con datos reales del 9 nov: ~2.800 filas por hora en vez de ~16.000 (cada una se escribía tres veces en modo central). Hay que observar varias capturas tras la fusión para acreditar que cesan los 57014 |
 | Panel: sugerencias y plazo 21 días — preparado para revisión | Las sugerencias de un cargo solo usan oficios equivalentes del mapa (no vecinos «cercanos»); equivalentes exactos pasan a principales; plazo de 21 días | «Editor de video» ya no sugiere motion/VFX y prioriza «video editor»; solo afecta sugerencias que el operador revisa |
 | Control v6 — preparado para revisión | Panel privado, clientes/perfiles, cupos por cargo, versiones desde mañana, captura dirigida y copia WhatsApp | Sustituye la prohibición histórica de web y los seis cargos fijos cuando se active una versión; login y despliegue real diferidos |
 | Reconciliación SQL 010 — preparada | Recorrido de aliases por clave y actualizaciones solo si cambian; regresión con 6.000 aliases recíprocos | Corrige el atasco confirmado tras 008 sin ampliar tiempos ni ocultar alertas; necesita instalación automática y captura posterior |

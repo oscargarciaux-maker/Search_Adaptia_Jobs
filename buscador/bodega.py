@@ -408,8 +408,12 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     resumen_catalogo = None
     if usar_catalogo and not prueba:
         from buscador import catalogo, supabase
+        # Memoria auxiliar de lo confirmado (huellas, sin datos de clientes): evita reescribir todo el catálogo cada hora.
+        sincronizado = _leer_json(trabajo / "catalogo_sincronizado.json.gz", {})
+        sincronizado = sincronizado if isinstance(sincronizado, dict) else {}
         resumen_catalogo = catalogo.sincronizar(vacantes, retiradas, pendientes_catalogo, supabase.subir_catalogo,
-                                               guardar_catalogo)
+                                               guardar_catalogo, sincronizado=sincronizado)
+        _guardar_json(trabajo / "catalogo_sincronizado.json.gz", sincronizado, comprimido=True)
         if not resumen_catalogo.get("pendientes") and not resumen_catalogo.get("errores"):
             resumen_catalogo["identidad"] = supabase.reconciliar_ofertas()
     reintentos_centrales = {}
