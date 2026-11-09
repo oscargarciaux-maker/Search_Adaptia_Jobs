@@ -186,7 +186,7 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None):
 def limpiar(previas, crudas, hoy, dias_maximos, enlaces_ats, empresas_leidas, consulta="", retiradas=None):
     """Convierte, junta con lo anterior, quita viejas y cerradas. Devuelve (vacantes, títulos sin familia, conteos)."""
     sin_familia = Counter()
-    nuevas, descartes = [], Counter()
+    nuevas, fuera, descartes = [], [], Counter()
     def retirar(v, estado, razon):
         if retiradas is not None:
             retiradas.append((v, estado, razon))
@@ -204,11 +204,10 @@ def limpiar(previas, crudas, hoy, dias_maximos, enlaces_ats, empresas_leidas, co
                 descartes["sin enlace donde postular"] += 1
             continue
         if not v["paises"]:
-            descartes["no se puede aplicar desde LATAM"] += 1
+            fuera.append(v)
             continue
         nuevas.append(v)
     limite = (date.fromisoformat(hoy) - timedelta(days=dias_maximos)).isoformat()
-    vistas_hoy = {v["id"] for v in nuevas}
     previas_validas = []
     for v in previas:
         motivo = calidad.motivo(v["titulo"], v["enlace"], v.get("fuente", ""))
@@ -217,6 +216,16 @@ def limpiar(previas, crudas, hoy, dias_maximos, enlaces_ats, empresas_leidas, co
             retirar(v, "archived", motivo)
         else:
             previas_validas.append(vacante.reetiquetar(dict(v)))
+    # Una copia que ahora dice "fuera de la cobertura" para un enlace ya guardado es un cambio real de esa fuente:
+    # se une para reemplazar su observación anterior; si nada más respalda la vacante, sale abajo sin países.
+    conocidos = {contrato.url_limpia(u) for v in previas_validas
+                 for u in (v.get("enlace"), v.get("enlace_directo"), *v.get("_enlaces", [])) if u}
+    for v in fuera:
+        if {contrato.url_limpia(u) for u in (v["enlace"], v["enlace_directo"]) if u} & conocidos:
+            nuevas.append(v)
+        else:
+            descartes["no se puede aplicar desde LATAM"] += 1
+    vistas_hoy = {v["id"] for v in nuevas}
     todas = vacante.juntar(previas_validas + nuevas)
     ids_unidos = {v["id"] for v in todas}
     destinos = {identificador: v["id"] for v in todas for identificador in v.get("_ids_fusionados", [])}
