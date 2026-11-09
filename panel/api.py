@@ -15,7 +15,7 @@ import requests
 
 from buscador import paises
 from panel import servicio
-from panel.modelos import Credenciales, Expansion, Guardar, Publicar
+from panel.modelos import Configuracion, Credenciales, Expansion, Guardar, Publicar, VistaPrevia
 from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase
 from panel.terminos import sugerir
 
@@ -137,6 +137,14 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
     @app.post("/api/cargos/expandir")
     def expandir(body: Expansion):
         return sugerir(body.cargo)
+
+    @app.post("/api/vista-previa")
+    def vista_previa(body: VistaPrevia):
+        try:
+            cfg = Configuracion.model_validate(body.configuracion)
+        except ValueError:  # incluye ValidationError: borrador a medio editar
+            return {"incompleto": True}
+        return servicio.vista_previa(repo, cfg)
 
     @app.get("/api/ejecuciones")
     def ejecuciones():

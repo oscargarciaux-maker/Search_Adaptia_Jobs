@@ -11,7 +11,7 @@ from buscador import bodega, entrega, familias, normalizar, vacante
 from panel import afinidad, ejecutor, servicio, terminos
 from panel.api import crear_app
 from panel.modelos import Configuracion, Expansion, Perfil
-from panel.repositorio import ErrorRepositorio, RepositorioDemo, configuracion_demo, hoy
+from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase, configuracion_demo, hoy
 
 
 @pytest.fixture
@@ -317,3 +317,76 @@ def test_exclusion_de_nivel_prevalece_sobre_normalizacion_del_titulo():
     cargo = {"nombre":"Product Designer","terminos_excluidos":["junior"]}
     assert terminos.grado("Junior Product Designer",cargo)[0] is None
     assert terminos.grado("Senior Product Designer",cargo)[0] == "exacto"
+
+
+# ── Vista previa: estimación con las reglas reales, sin guardar ni exponer vacantes o clientes ──────────────────────
+
+def test_vista_previa_usa_las_mismas_reglas_que_la_seleccion():
+    # Precalcular experiencia/inglés no cambia el veredicto de ningún perfil.
+    perfiles = [Perfil.model_validate(dict(p, ingles_maximo=n, experiencia_min=a, experiencia_max=b,
+                                           aceptar_experiencia_sin_dato=s, aceptar_ingles_sin_dato=s))
+                for p in configuracion_demo()["perfiles"][:1]
+                for n in ("sin_filtro", "A2", "B2") for a, b in ((None, None), (0, 2), (3, 8)) for s in (False, True)]
+    textos = ["We require 3 years of experience. English B2 required. " * 4, "English C1 is a plus. " * 4, "Sin datos. " * 20]
+    for texto in textos:
+        for anos in (None, 1, 3, 6):
+            v = trabajo(_descripcion=texto, anos_min=anos, paises=["CO", "ES"], confianza_pais="alta")
+            ligera = afinidad.ligera(v, texto)
+            assert "_descripcion" not in ligera and "enlace" not in ligera
+            for p in perfiles:
+                assert afinidad.evaluar(ligera, p, hoy()) == afinidad.evaluar(v, p, hoy())
+
+
+def test_vista_previa_muestra_lo_que_bloquea_y_cuanto_se_gana_al_admitir_sin_dato(cfg):
+    repo = RepositorioDemo()
+    modelo = Configuracion.model_validate(cfg)
+    r = servicio.vista_previa(repo, modelo)
+    pid = str(modelo.perfiles[0].id)
+    combinada = r["perfiles"][pid]["limitantes"][0]
+    assert combinada["sugerencia"] == "Admitir experiencia e inglés no informados"
+    modelo.perfiles[0].aceptar_experiencia_sin_dato = modelo.perfiles[0].aceptar_ingles_sin_dato = True
+    despues = servicio.vista_previa(repo, modelo)["perfiles"][pid]["compatibles"]
+    assert despues == r["perfiles"][pid]["compatibles"] + combinada["vacantes"] > 0
+    assert set(r["cargos"]) == {c["id"] for c in cfg["cargos"]}
+    assert all(c["estado"] in {"alcanza", "justo", "insuficiente", "sin_cupo"} for c in r["cargos"].values())
+
+
+def test_vista_previa_api_no_guarda_ni_devuelve_vacantes_ni_clientes(cfg):
+    repo = RepositorioDemo()
+    with TestClient(crear_app(demo=True, repositorio=repo)) as c:
+        borrador = deepcopy(cfg)
+        borrador["clientes"][0]["nombre"] = "Nombre privado de prueba"
+        assert c.post("/api/vista-previa", json={"configuracion": borrador}).status_code == 403
+        r = c.post("/api/vista-previa", json={"configuracion": borrador}, headers={"Origin": "http://testserver"})
+        assert r.status_code == 200
+        assert "Nombre privado" not in r.text and "titulo" not in r.text and "example.org" not in r.text
+        assert set(r.json()["perfiles"]) == {p["id"] for p in cfg["perfiles"]}
+        assert c.get("/api/config").json()["revision"] == 1 and repo.config()["borrador"] == cfg
+        incompleto = deepcopy(cfg)
+        incompleto["perfiles"][0]["paises"] = []
+        r = c.post("/api/vista-previa", json={"configuracion": incompleto}, headers={"Origin": "http://testserver"})
+        assert r.status_code == 200 and r.json() == {"incompleto": True}
+
+
+def test_catalogo_vigente_excluye_entregadas_copias_y_rechazadas_y_se_reutiliza(monkeypatch):
+    monkeypatch.setattr("buscador.supabase.credenciales", lambda: ("https://prueba.supabase.co", "clave-ficticia"))
+    filas = {"entregas_diarias": [{"vacante_id": "a" * 16}],
+             "catalogo_vacantes": [
+                 {"id": "a" * 16, "datos": {"titulo": "QA Engineer"}, "description_full": ""},
+                 {"id": "b" * 16, "datos": {"titulo": "QA Engineer", "ids_agrupados": ["b" * 16, "a" * 16]}},
+                 {"id": "c" * 16, "datos": {"titulo": "QA Engineer", "duplicada_de": "d" * 16}},
+                 {"id": "d" * 16, "datos": {"titulo": "QA Engineer", "verificacion": {"estado": "rechazada"}}},
+                 {"id": "e" * 16, "datos": {"titulo": "QA Engineer", "anos_min": 3}, "description_full": "English B2 required."}]}
+    llamadas = []
+    def request(metodo, url, **op):
+        tabla = url.rsplit("/", 1)[1]
+        llamadas.append((tabla, op["params"]))
+        assert op["params"]["order"] in {"id", "vacante_id"} and "status" in op["params"] or tabla == "entregas_diarias"
+        return SimpleNamespace(status_code=200, content=b"x", json=lambda: filas[tabla])
+    repo = RepositorioSupabase(SimpleNamespace(request=request))
+    vacantes = repo.catalogo_vigente()["vacantes"]
+    assert [v["id"] for v in vacantes] == ["e" * 16]
+    assert vacantes[0]["_anos_minimos"] == 3 and vacantes[0]["_requisito_ingles"].startswith("en:B2")
+    n = len(llamadas)
+    repo.catalogo_vigente()
+    assert len(llamadas) == n  # reutilizado: editar el borrador no recorre otra vez Supabase

@@ -41,7 +41,7 @@ import {
   Workflow,
   X,
 } from "lucide-react";
-import { api } from "./api";
+import { api, ErrorAPI } from "./api";
 import type {
   Cargo,
   Cliente,
@@ -52,6 +52,9 @@ import type {
   Sesion,
   Ejecucion,
   Vacante,
+  EstimacionCargo,
+  EstimacionPerfil,
+  VistaPrevia,
 } from "./types";
 import "./style.css";
 
@@ -353,6 +356,159 @@ function CargoDialog({
     </Dialog>
   );
 }
+type EstadoPrevia = "listo" | "cargando" | "incompleto" | "error";
+
+// Estima con el catálogo ya guardado cuántas vacantes cumplirían el borrador. Espera a que se deje de editar.
+function useVistaPrevia(config: Configuracion | null) {
+  const [datos, setDatos] = useState<VistaPrevia | null>(null);
+  const [estado, setEstado] = useState<EstadoPrevia>("cargando");
+  const turno = useRef(0);
+  const cuerpo = config ? JSON.stringify({ configuracion: config }) : "";
+  useEffect(() => {
+    if (!cuerpo) return;
+    const mio = ++turno.current;
+    setEstado("cargando");
+    const espera = setTimeout(async () => {
+      try {
+        const r = await api<VistaPrevia>("/vista-previa", {
+          method: "POST",
+          body: cuerpo,
+        });
+        if (mio !== turno.current) return;
+        if (r.incompleto) {
+          setEstado("incompleto");
+        } else {
+          setDatos(r);
+          setEstado("listo");
+        }
+      } catch (e) {
+        if (mio === turno.current)
+          setEstado(
+            e instanceof ErrorAPI && e.status === 422 ? "incompleto" : "error",
+          );
+      }
+    }, 450);
+    return () => clearTimeout(espera);
+  }, [cuerpo]);
+  return { datos, estado };
+}
+
+const ajustesSinDato: Record<string, Partial<Perfil>> = {
+  "experiencia no informada": { aceptar_experiencia_sin_dato: true },
+  "inglés requerido sin confirmar": { aceptar_ingles_sin_dato: true },
+  "experiencia e inglés no informados": {
+    aceptar_experiencia_sin_dato: true,
+    aceptar_ingles_sin_dato: true,
+  },
+  "idioma del aviso diferente": { idiomas: ["es", "en"] },
+};
+
+function PreviewPerfil({
+  info,
+  estado,
+  onAjustar,
+}: {
+  info?: EstimacionPerfil;
+  estado: EstadoPrevia;
+  onAjustar: (cambio: Partial<Perfil>) => void;
+}) {
+  if (estado === "incompleto")
+    return (
+      <p className="preview muted-preview" role="status">
+        Completa el perfil para ver cuántas vacantes lo cumplen.
+      </p>
+    );
+  if (!info)
+    return (
+      <p className="preview muted-preview" role="status">
+        {estado === "error" ? (
+          "No se pudo estimar en este momento."
+        ) : estado === "listo" ? (
+          "Sin estimación para este perfil."
+        ) : (
+          <>
+            <Loader2 size={13} className="spin" /> Calculando vacantes
+            disponibles…
+          </>
+        )}
+      </p>
+    );
+  return (
+    <div
+      className={
+        "preview" +
+        (info.compatibles === 0 ? " warn" : "") +
+        (estado === "cargando" ? " stale" : "")
+      }
+      role="status"
+      aria-live="polite"
+    >
+      <p className="preview-main">
+        <Target size={15} />
+        <span>
+          <strong>≈ {info.compatibles}</strong>{" "}
+          {info.compatibles === 1
+            ? "vacante disponible"
+            : "vacantes disponibles"}{" "}
+          hoy cumplen este perfil
+          <span className="preview-sub">
+            {" "}
+            · {info.del_cargo} del cargo en el catálogo
+          </span>
+        </span>
+      </p>
+      {info.limitantes.length > 0 && (
+        <ul className="preview-tips">
+          {info.limitantes.slice(0, 2).map((l) => (
+            <li key={l.motivo}>
+              <span>
+                {l.sugerencia}: <strong>+{l.vacantes}</strong>
+              </span>
+              {ajustesSinDato[l.motivo] && (
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => onAjustar(ajustesSinDato[l.motivo])}
+                >
+                  Aplicar
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+const textoEstadoCargo: Record<EstimacionCargo["estado"], string> = {
+  alcanza: "alcanza para el cupo",
+  justo: "puede quedar corto",
+  insuficiente: "probable faltante",
+  sin_cupo: "sin cupo asignado",
+};
+
+function PreviewCargo({
+  info,
+  estado,
+}: {
+  info?: EstimacionCargo;
+  estado: EstadoPrevia;
+}) {
+  if (!info || estado === "incompleto") return null;
+  return (
+    <div
+      className={
+        "preview-chip " + info.estado + (estado === "cargando" ? " stale" : "")
+      }
+      title="Vacantes ya guardadas, aún no entregadas, que cumplen los filtros de algún perfil de este cargo."
+    >
+      <Target size={12} />≈ {info.disponibles} disponibles hoy ·{" "}
+      {textoEstadoCargo[info.estado]}
+    </div>
+  );
+}
+
 function ClienteDialog({
   cliente,
   config,
@@ -381,6 +537,14 @@ function ClienteDialog({
   function patch(id: string, v: Partial<Perfil>) {
     setPs(ps.map((p) => (p.id === id ? { ...p, ...v } : p)));
   }
+  const previa = useVistaPrevia({
+    ...config,
+    clientes: [
+      ...config.clientes.filter((x) => x.id !== c.id),
+      { ...c, nombre: c.nombre.trim() || "Cliente", activo: true },
+    ],
+    perfiles: [...config.perfiles.filter((p) => p.cliente_id !== c.id), ...ps],
+  });
   return (
     <Dialog
       ancho
@@ -642,6 +806,11 @@ function ClienteDialog({
                 Admitir inglés no informado
               </label>
             </div>
+            <PreviewPerfil
+              info={previa.datos?.perfiles?.[p.id]}
+              estado={previa.estado}
+              onAjustar={(cambio) => patch(p.id, cambio)}
+            />
           </section>
         ))}
         <button
@@ -708,6 +877,9 @@ function App() {
     [password, setPassword] = useState("");
   const peticionResultados = useRef(0);
   const [loadingResults, setLoadingResults] = useState(false);
+  const previaCargos = useVistaPrevia(
+    tab === "Cargos y cupos" && sesion?.sesion ? draft : null,
+  );
   const total = draft.cargos
       .filter((c) => c.activo)
       .reduce((s, c) => s + c.cupo, 0),
@@ -1537,6 +1709,10 @@ function App() {
                             ? "cliente compatible"
                             : "clientes con este cargo"}
                         </span>
+                        <PreviewCargo
+                          info={previaCargos.datos?.cargos?.[c.id]}
+                          estado={previaCargos.estado}
+                        />
                       </div>
                       <button
                         className="icon"
@@ -1631,6 +1807,9 @@ function App() {
                   </section>
                 ))}
               </div>
+              {previaCargos.datos?.nota && (
+                <p className="helper note">{previaCargos.datos.nota}</p>
+              )}
               <details className="archived">
                 <summary>
                   Cargos archivados (

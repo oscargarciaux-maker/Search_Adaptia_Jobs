@@ -6,6 +6,9 @@ El acceso real requiere configurar inicio de sesión más adelante; la demostrac
 
 La meta de 120 se reparte por cargo, no por persona: tres Product Designers pueden compartir resultados del mismo cupo
 cuando sus filtros coincidan. Los filtros pertenecen a cada perfil y pueden producir cantidades diferentes por cliente.
+Mientras se edita un perfil, el panel estima cuántas vacantes ya guardadas y aún no entregadas lo cumplirían hoy y
+qué ajuste añadiría más (por ejemplo, admitir experiencia o inglés no informados: solo ~1 de cada 4 avisos dice los
+años exigidos y ~1 de cada 8 el nivel de inglés). En «Cargos y cupos» cada cargo indica si alcanza para su cupo.
 No hay agente WhatsApp ni seguimiento de postulaciones. El operador copia el mensaje y lo envía manualmente.
 
 Los apartados siguientes describen también el scraper heredado y sus consultas técnicas en Supabase. **Con panel activo,

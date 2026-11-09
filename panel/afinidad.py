@@ -5,6 +5,17 @@ from buscador import contrato, enlaces, tiempos
 from panel.modelos import Perfil
 
 NIVELES = ["A1", "A2", "B1", "B2", "C1", "C2", "native"]
+CAMPOS_FILTRO = ("id", "titulo", "paises", "confianza_pais", "modalidad", "idioma", "publicada_en",
+                 "fecha_publicacion", "fecha_estimada", "ids_agrupados")
+
+
+def ligera(datos, descripcion=""):
+    """Solo lo que usan los filtros, con experiencia e inglés ya interpretados por las mismas funciones del motor.
+    Permite estimar sobre miles de vacantes sin conservar descripciones ni enlaces."""
+    v = {k: datos.get(k) for k in CAMPOS_FILTRO}
+    v["_anos_minimos"] = contrato.anos(descripcion, datos.get("anos_min"))[0]
+    v["_requisito_ingles"] = contrato.requisitos_idioma(descripcion, datos.get("ingles", ""))
+    return v
 
 
 def evaluar(v, perfil, hoy=None):
@@ -29,7 +40,8 @@ def evaluar(v, perfil, hoy=None):
             pruebas.append(f"Publicada hace {edad} días")
     except (ValueError, TypeError):
         motivos.append("fecha de publicación sin confirmar")
-    minimo, _ = contrato.anos(v.get("_descripcion", ""), v.get("anos_min"))
+    # La vista previa precalcula estos dos datos con las mismas funciones para no conservar descripciones.
+    minimo = v["_anos_minimos"] if "_anos_minimos" in v else contrato.anos(v.get("_descripcion", ""), v.get("anos_min"))[0]
     if p.experiencia_min is not None or p.experiencia_max is not None:
         if minimo in ("", None):
             if not p.aceptar_experiencia_sin_dato:
@@ -41,7 +53,8 @@ def evaluar(v, perfil, hoy=None):
         else:
             pruebas.append(f"Exige {minimo} años de experiencia")
     if p.ingles_maximo != "sin_filtro":
-        requisito = contrato.requisitos_idioma(v.get("_descripcion", ""), v.get("ingles", ""))
+        requisito = v["_requisito_ingles"] if "_requisito_ingles" in v else contrato.requisitos_idioma(
+            v.get("_descripcion", ""), v.get("ingles", ""))
         partes = requisito.split(":")
         nivel = partes[1] if len(partes) > 1 else ""
         obligatorio = len(partes) > 2 and partes[2] == "1"

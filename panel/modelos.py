@@ -130,6 +130,12 @@ class Publicar(Modelo):
     revision: int = Field(ge=0, strict=True)
 
 
+class VistaPrevia(Modelo):
+    """Borrador sin guardar que se quiere estimar; no se persiste. Se valida en el endpoint: mientras se edita puede
+    estar incompleto y eso no es un error del servidor."""
+    configuracion: dict
+
+
 class Expansion(Modelo):
     cargo: str = Field(min_length=2, max_length=120)
 

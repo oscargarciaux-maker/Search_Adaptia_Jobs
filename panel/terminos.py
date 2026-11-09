@@ -1,4 +1,5 @@
 """Expansión abierta sin IA: variantes, mapa opcional y vocabulario público ESCO."""
+from functools import lru_cache
 import re
 
 import requests
@@ -76,23 +77,28 @@ def sugerir(cargo, sesion=None, consultar_esco=True):
             "nota": "Revisa los términos antes de guardar; un equivalente no garantiza pertinencia de cada anuncio."}
 
 
+# Los términos de un cargo se comparan contra miles de títulos: normalizarlos una sola vez (funciones puras).
+_base = lru_cache(maxsize=32768)(normalizar.titulo_base)
+_texto = lru_cache(maxsize=32768)(normalizar.texto)
+
+
 def grado(titulo, cargo):
-    base = normalizar.titulo_base(titulo)
+    base = _base(titulo)
     if not base:
         return None, None
-    completo = normalizar.texto(titulo)
-    if any(normalizar.contiene_frase(completo, normalizar.texto(x)) for x in cargo.get("terminos_excluidos", [])):
+    completo = _texto(titulo)
+    if any(normalizar.contiene_frase(completo, _texto(x)) for x in cargo.get("terminos_excluidos", [])):
         return None, None
     for campo, valor in (("terminos_exactos", "exacto"), ("terminos_similares", "similar")):
         terminos = [cargo["nombre"], *cargo.get(campo, [])] if campo == "terminos_exactos" else cargo.get(campo, [])
         for t in terminos:
-            canon = normalizar.titulo_base(t)
+            canon = _base(t)
             if canon and normalizar.contiene_frase(base, canon):
                 return valor, {"regla": "término de cargo", "termino": t, "grado": valor}
     if len(base) >= 6:
         opciones = [cargo["nombre"], *cargo.get("terminos_exactos", []), *cargo.get("terminos_similares", [])]
         for t in opciones:
-            puntaje = fuzz.token_sort_ratio(base,normalizar.titulo_base(t))
+            puntaje = fuzz.token_sort_ratio(base, _base(t))
             if puntaje >= 90:
                 return "similar", {"regla":"similitud textual", "termino":t, "grado":"similar", "similitud_textual":round(puntaje)}
     return None, None
