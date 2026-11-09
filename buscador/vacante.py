@@ -43,11 +43,16 @@ def crear(titulo, empresa, enlace, fuente, ubicacion="", descripcion="", fecha="
             fams = [{"familia": "busqueda:" + frase, "coincidencia": "exacto"}]
     if not fams:
         return None
-    lugar = paises.elegibles(titulo, ubicacion, descripcion, remoto)
+    from buscador.contrato import url_limpia
+    ubicacion = " ".join(str(ubicacion or "").split())
+    lugares = {url_limpia(principal): {"titulo": titulo, "ubicacion": ubicacion, "remoto": remoto,
+                                       "vista_en": capturada}}
+    lugar = _evaluar_lugares(lugares, descripcion)
     texto = f"{titulo}\n{descripcion}"
     return {
         "id": huella(empresa, titulo, principal),
-        "titulo": titulo, "empresa": empresa, "ubicacion": " ".join(str(ubicacion or "").split()),
+        "titulo": titulo, "empresa": empresa, "ubicacion": ubicacion,
+        "_lugares": lugares,
         "familias": fams,
         "paises": lugar["paises"], "confianza_pais": lugar["confianza"], "modalidad": lugar["modalidad"],
         "nota_pais": lugar["nota"],
@@ -66,20 +71,56 @@ def crear(titulo, empresa, enlace, fuente, ubicacion="", descripcion="", fecha="
     }
 
 
-def reetiquetar(v):
+def _evaluar_lugares(lugares, descripcion):
+    """Elegibilidad combinada de todas las observaciones de ubicación con la descripción guardada de la vacante."""
+    return paises.combinar([paises.elegibles(o.get("titulo", ""), o.get("ubicacion", ""), descripcion,
+                                             o.get("remoto")) for o in lugares.values()])
+
+
+def _lugares(v):
+    """Observaciones de ubicación por enlace: {enlace: {titulo, ubicacion, remoto, vista_en}}. Las vacantes guardadas
+    antes de existir este campo tienen una sola, la ubicación que mostraban."""
+    if v.get("_lugares"):
+        return v["_lugares"]
+    from buscador.contrato import url_limpia
+    clave = url_limpia(v.get("enlace") or "") or v.get("id", "")
+    return {clave: {"titulo": v.get("titulo", ""), "ubicacion": v.get("ubicacion", ""),
+                    "remoto": True if v.get("modalidad") == "remoto" else None, "vista_en": v.get("vista_en", "")}}
+
+
+def _aplicar_lugar(v, lugar):
+    v.update(paises=lugar["paises"], modalidad=lugar["modalidad"], confianza_pais=lugar["confianza"],
+             nota_pais=lugar["nota"])
+
+
+def reetiquetar(v, publicada=False):
     """Vuelve a leer de la descripción guardada las etiquetas de texto, así un arreglo en `etiquetas` también llega a
-    las vacantes de noches anteriores."""
+    las vacantes de noches anteriores.
+
+    Los países se recalculan desde todas las observaciones de ubicación guardadas, no desde la última copia vista.
+    `publicada=True`: datos públicos del catálogo, que no traen esas observaciones ni el origen de la fecha; se conservan
+    los países, la modalidad y la fecha que calculó la bodega en vez de rehacerlos con menos evidencia."""
     desc = v.get("_descripcion", "")
     v["familias"] = familias.clasificar(v["titulo"], desc)
     if desc:
         v["ingles"], v["anos_min"], v["salario"] = etiquetas.ingles(desc), etiquetas.anos_min(desc), etiquetas.salario(desc)
-    if "greenhouse" in v.get("fuente", "").lower() and not v.get("_fecha_publicacion_origen"):
+    if publicada:
+        return v
+    if "greenhouse" in v.get("fuente", "").lower() and v.get("_fecha_publicacion_origen") is None:
         # Las versiones anteriores confundían updated_at con publicación. No certificar esa fecha histórica.
+        # "" indica una fecha aportada por otra fuente al juntar copias: esa sí es real.
         v["fecha_publicacion"], v["publicada_en"], v["fecha_estimada"] = "", "", True
-    lugar = paises.elegibles(v["titulo"], v.get("ubicacion", ""), desc,
-                             True if v.get("modalidad") == "remoto" else None)
-    v.update(paises=lugar["paises"], modalidad=lugar["modalidad"], confianza_pais=lugar["confianza"], nota_pais=lugar["nota"])
+    v["_lugares"] = _lugares(v)
+    _aplicar_lugar(v, _evaluar_lugares(v["_lugares"], desc))
     return v
+
+
+def _origen_fecha(v):
+    """Origen de la fecha de una copia; None solo para una fecha histórica de Greenhouse sin origen conocido."""
+    origen = v.get("_fecha_publicacion_origen")
+    if origen is None and "greenhouse" not in v.get("fuente", "").lower():
+        return ""
+    return origen
 
 
 def _rango_enlace(v):
@@ -87,8 +128,11 @@ def _rango_enlace(v):
 
 
 def unir(a, b):
-    """Une dos copias del mismo aviso: LinkedIn como enlace principal, el original como directo, países sumados,
-    la fecha más antigua conocida y la descripción más larga."""
+    """Une dos copias del mismo aviso: LinkedIn como enlace principal, el original como directo, la fecha real más
+    antigua conocida y la descripción más larga.
+
+    Los países salen de todas las observaciones de ubicación (una por enlace; la más reciente de cada enlace refleja
+    un cambio real) y una ubicación incierta no degrada otra confirmada (`paises.combinar`)."""
     larga, corta = (a, b) if len(a.get("_descripcion", "")) >= len(b.get("_descripcion", "")) else (b, a)
     v = dict(larga)
     v["id"] = a["id"]  # conserva referencias existentes al completar una oferta
@@ -96,16 +140,25 @@ def unir(a, b):
     v["enlace"] = next((u for u in todos if enlaces.es_linkedin(u)), "") or enlaces.mejor(todos)
     v["enlace_directo"] = enlaces.mejor([u for u in todos if u != v["enlace"] and not enlaces.es_linkedin(u)])
     v["tipo_enlace"] = enlaces.tipo(v["enlace_directo"] or v["enlace"])
-    v["paises"] = sorted(set(a["paises"]) | set(b["paises"]))
-    confianzas = ["alta", "media", "baja"]
-    v["confianza_pais"] = max(a["confianza_pais"], b["confianza_pais"], key=confianzas.index)
-    if v["confianza_pais"] == "baja":
-        v["nota_pais"] = "confirmar países: fuentes con ubicación incierta"
+    lugares = dict(_lugares(a))
+    for clave, observacion in _lugares(b).items():
+        if clave not in lugares or observacion.get("vista_en", "") >= lugares[clave].get("vista_en", ""):
+            lugares[clave] = observacion
+    v["_lugares"] = lugares
+    if not any(o.get("ubicacion", "") == v.get("ubicacion", "") for o in lugares.values()):
+        # La misma fuente cambió la ubicación de ese enlace: mostrar la vigente, no la reemplazada.
+        _, vigente = max(lugares.items(), key=lambda par: (par[1].get("vista_en", ""), par[0]))
+        v["ubicacion"] = vigente.get("ubicacion", "")
+    _aplicar_lugar(v, _evaluar_lugares(lugares, v.get("_descripcion", "")))
     v["_enlaces"] = sorted(set(todos + a.get("_enlaces", []) + b.get("_enlaces", [])))
     v["_ids_fusionados"] = sorted({a["id"], b["id"], *a.get("_ids_fusionados", []), *b.get("_ids_fusionados", [])})
-    fechas = [x["fecha_publicacion"] for x in (a, b) if x["fecha_publicacion"] and not x.get("fecha_estimada")]
-    if fechas:
-        v["fecha_publicacion"], v["fecha_estimada"] = min(fechas), False
+    reales = [x for x in (a, b) if x["fecha_publicacion"] and not x.get("fecha_estimada")]
+    if reales:
+        v["fecha_publicacion"], v["fecha_estimada"] = min(x["fecha_publicacion"] for x in reales), False
+        # El origen viaja con la fecha elegida: si se perdiera, la siguiente captura la volvería «estimada».
+        origenes = [_origen_fecha(x) for x in reales if x["fecha_publicacion"] == v["fecha_publicacion"]]
+        v["_fecha_publicacion_origen"] = next((o for o in origenes if o),
+                                              next((o for o in origenes if o is not None), None))
     else:
         v["fecha_publicacion"] = min(x["fecha_publicacion"] or "9999" for x in (a, b)).replace("9999", "")
     v["visto_primera_vez"] = min(a["visto_primera_vez"], b["visto_primera_vez"])

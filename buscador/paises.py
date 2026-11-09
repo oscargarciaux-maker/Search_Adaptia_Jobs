@@ -152,6 +152,46 @@ def modalidad(titulo, ubicacion, descripcion="", remoto=None):
     return "presencial" if t.strip() else "sin dato"
 
 
+CONFIANZAS = ("alta", "media", "baja")
+MODALIDADES = ("hibrido", "remoto", "presencial", "sin dato")  # explícitas antes que la presencial por defecto
+NOTA_INCIERTA = "confirmar países: fuentes con ubicación incierta"
+
+
+def ordenar(codigos):
+    """Códigos sin repetir en el orden de `datos/paises.yaml`: el mismo conjunto siempre se guarda igual."""
+    orden = {c: i for i, c in enumerate(datos()["codigos"])}
+    return sorted(set(codigos), key=lambda c: (orden.get(c, len(orden)), c))
+
+
+def combinar(resultados):
+    """Elegibilidad de una vacante vista en varias observaciones (fuentes o enlaces), sin degradar la evidencia.
+
+    Una observación con ubicación confirmada (confianza alta o media) no se mezcla con una incierta (baja): la incierta
+    no suma países ni rebaja la confianza. Las confirmadas suman sus países; la confianza es la de la observación más
+    fuerte que respalda todo el conjunto, o la más débil de las que aportan si ninguna lo respalda sola. Si todas son
+    inciertas se suman y la nota solo cambia cuando difieren. El resultado no depende del orden de las observaciones."""
+    resultados = [r for r in resultados if r]
+    if not resultados:
+        return None
+    confirmados = [r for r in resultados if r["confianza"] in ("alta", "media")]
+    base = confirmados or resultados
+    aportan = [r for r in base if r["paises"]] or base
+    union = ordenar(p for r in aportan for p in r["paises"])
+    rango = lambda r: (CONFIANZAS.index(r["confianza"]), r["nota"])  # noqa: E731
+    respaldo = sorted((r for r in aportan if set(r["paises"]) >= set(union)), key=rango)
+    notas = sorted({r["nota"] for r in aportan})
+    if not confirmados:
+        confianza, nota = "baja", notas[0] if len(notas) == 1 else NOTA_INCIERTA
+    elif respaldo:
+        confianza, nota = respaldo[0]["confianza"], respaldo[0]["nota"]
+    else:
+        confianza = max((r["confianza"] for r in aportan), key=CONFIANZAS.index)
+        nota = notas[0] if len(notas) == 1 else ""
+    modos = {r["modalidad"] for r in resultados}
+    modo = next((m for m in MODALIDADES if m in modos), sorted(modos)[0])
+    return {"paises": union, "modalidad": modo, "confianza": confianza, "nota": nota}
+
+
 def elegibles(titulo, ubicacion, descripcion="", remoto=None):
     """Países desde los que se puede aplicar, con modalidad, confianza y una nota corta."""
     d = datos()

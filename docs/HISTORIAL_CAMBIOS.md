@@ -5,6 +5,7 @@ empieza en [GUIA_CLIENTE.md](GUIA_CLIENTE.md); los resultados observados están 
 
 | Revisión | Qué cambió | Consecuencia para el cliente |
 |---|---|---|
+| Evidencia estable entre capturas — preparada para revisión | Observaciones de ubicación por enlace, combinación sin degradar confirmadas por inciertas, origen de fecha conservado y panel sin recálculo con datos públicos | Una vacante ya no entra y sale de los filtros de país/plazo según la copia vista esa hora; comprobar la captura horaria posterior a la fusión |
 | Control v6 — preparado para revisión | Panel privado, clientes/perfiles, cupos por cargo, versiones desde mañana, captura dirigida y copia WhatsApp | Sustituye la prohibición histórica de web y los seis cargos fijos cuando se active una versión; login y despliegue real diferidos |
 | Reconciliación SQL 010 — preparada | Recorrido de aliases por clave y actualizaciones solo si cambian; regresión con 6.000 aliases recíprocos | Corrige el atasco confirmado tras 008 sin ampliar tiempos ni ocultar alertas; necesita instalación automática y captura posterior |
 | Reconciliación SQL 008 — preparada | URLs indexadas y límite de consulta comprobado | Corrige la causa del 57014 observado; instalación y siguiente captura real pendientes |
