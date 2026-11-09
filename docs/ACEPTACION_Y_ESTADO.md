@@ -6,6 +6,36 @@ aprobados por haber fusionado otro PR. Instrucciones de uso: [GUIA_CLIENTE.md](G
 
 ## 1. Corte de evidencia
 
+### Fallo intermitente tras 010 — SQL 011 preparada, instalación pendiente
+
+Con 010 instalada (Preparar Supabase del 8 nov, 23:33 UTC), 5 de las 12 capturas horarias siguientes con ese commit
+fallaron en validación por SQLSTATE 57014. Las que se revisaron
+([42615728712](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42615728712),
+[42643058567](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42643058567),
+[42654616779](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42654616779)) guardaron y
+publicaron el catálogo; falló solo la consolidación posterior. El
+[diagnóstico 42666556083](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42666556083)
+(perfil revertido, 9 nov 17:38 UTC) midió 22.236 registros de catálogo, 600 selecciones, 599 ofertas y 44 archivadas;
+la función instalada agotó 3.122 ms en la etapa de identidades (línea 7: leer `datos` de todo el catálogo). Informó
+además 11 ciclos implícitos sin referencia explícita, que la función ya resuelve por el menor ID.
+
+Causa: 010 lee y descomprime `datos` de todas las filas en cada corrida. Su costo crece con el catálogo, que no se
+borra, y con las versiones muertas que dejaba la reescritura horaria completa (PR #26 la reduce). En un PostgreSQL 16
+local con datos de tamaño real tomados del inventario del 9 nov (mediana de `datos` 1,6 KB): 010 tardó 574 ms con
+22.236 filas en caché y 1.157 ms con 66.708; con seis reescrituras sin limpieza el catálogo pasó de 76 a 494 MB.
+
+SQL 011 recorre solo las identidades que pueden decidir una oferta (su vacante y las que comparten enlace) y todas
+las referencias explícitas, con índices: clave primaria, `ids_agrupados` sin lista pendiente de GIN y un índice por
+expresión para `duplicada_de`. Desactiva JIT dentro de la función. Conserva aristas, rechazos de ciclos explícitos,
+principales ausentes y cadenas explícitas largas en todo el catálogo, archivo y escrituras solo si cambian. Ya no
+detecta una cadena de más de 20 eslabones formada solo por aliases implícitos que no toque ninguna oferta. En el mismo
+PostgreSQL local, con 66.708 filas, 5.550 referencias explícitas y 30 copias por consolidar: 291 ms frente a 1.157 ms
+de 010, con el mismo resultado y el mismo estado final de `ofertas` y del archivo. `probar_ofertas_unicas`,
+`probar_migraciones` y `probar_panel` aprobados en local.
+
+Pendiente: fusión, Preparar Supabase con respaldo y varias capturas horarias posteriores sin 57014 antes de acreditar
+recuperación. El tiempo medido en local no equivale al de la instancia de Supabase.
+
 ### Fallo recurrente tras 008 — SQL 010 ensayada, instalación pendiente
 
 Las capturas [42446101328](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42446101328)
