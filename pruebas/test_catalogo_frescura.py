@@ -359,6 +359,7 @@ def reconciliacion_de_integracion_simulada(monkeypatch):
 
 def test_revisar_estonia_del_inventario_y_conservar_historico():
     v = dict(oferta(), titulo="Product Owner", ubicacion="Tartu, Condado de Tartu, Estonia", paises=paises.datos()["codigos"], modalidad="remoto", confianza_pais="baja")
+    v.pop("_lugares")  # registro guardado antes de existir las observaciones de ubicación
     original = deepcopy(v)
     retiradas = []
     salida, _, _ = bodega.limpiar([v], [], HOY, 30, set(), set(), retiradas=retiradas)

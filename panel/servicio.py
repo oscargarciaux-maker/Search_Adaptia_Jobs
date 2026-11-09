@@ -85,7 +85,10 @@ def resultados(repo, cliente_id=None, fecha=None):
     for row in r["filas"]:
         v = row.get("catalogo_vacantes") or {}
         datos = v.get("datos") or {}
-        actual = vacante.reetiquetar(dict(datos, _descripcion=v.get("description_full") or datos.get("_descripcion", "")))
+        # Los datos públicos no traen las observaciones de ubicación ni el origen de la fecha: conservar lo que calculó
+        # la bodega en vez de rehacerlo con menos evidencia.
+        actual = vacante.reetiquetar(dict(datos, _descripcion=v.get("description_full") or datos.get("_descripcion", "")),
+                                     publicada=True)
         filtros = evaluar(actual, row["filtros"], hoy())
         afinidad_cargo,_ = grado(actual["titulo"],row["cargo_configuracion"])
         if not afinidad_cargo:

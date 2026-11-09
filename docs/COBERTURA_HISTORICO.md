@@ -115,8 +115,19 @@ Controles actuales de calidad y primera corrida: [`CALIDAD_ARRANQUE.md`](CALIDAD
 - Ya no se unen ofertas únicamente por empresa y título sin nivel. Se une por enlace compartido o por empresa,
   título completo, ubicación y contenido iguales. Se conservan identificadores existentes al completar una oferta.
   La deduplicación es conservadora: puede dejar copias con textos distintos para no perder puestos diferentes.
-- Se conservan aliases de enlaces internamente. Los países combinados mantienen la confianza menos segura de las
-  fuentes; no se convierte una lista dudosa en confirmada por mezclarla con un país conocido.
+- Se conservan aliases de enlaces internamente. Desde el 9 nov 2026 (inventarios horarios que alternaban países y
+  fechas) cada vacante guarda internamente una observación de ubicación por enlace (`_lugares`: título, ubicación,
+  remoto y hora vista) y los países se recalculan desde todas ellas en cada captura, no desde la última copia vista.
+  Una observación confirmada (confianza alta o media) no se mezcla con una incierta: la incierta no suma países ni
+  rebaja la confianza. Las confirmadas suman países y conservan la confianza de la observación más fuerte que respalda
+  todo el conjunto (si ninguna lo respalda sola, la más débil de las que aportan). Nunca se convierte una lista dudosa
+  en confirmada por mezclarla con un país conocido: sin observación confirmada, la vacante sigue con confianza baja.
+  Una observación más reciente del mismo enlace reemplaza a la anterior, así un cambio real se refleja; si el mismo
+  enlace pasa a una ubicación fuera de cobertura y nada más la respalda, la vacante se archiva sin países.
+- La fecha real conocida conserva su origen al juntar copias; una copia sin fecha no la vuelve «estimada». Solo una
+  fecha histórica de Greenhouse sin origen registrado (versiones que usaban `updated_at`) sigue sin certificarse hasta
+  que el portal vuelva a mostrar `first_published`. El panel no rehace país ni fecha desde los datos públicos del
+  catálogo, que no traen esa evidencia interna: usa lo que calculó la bodega.
 - Las descripciones pueden conservar hasta 30.000 caracteres, según el contrato. Lever incorpora requisitos y beneficios;
   SmartRecruiters pagina su listado y, junto a Workable, intenta completar descripciones con consultas de detalle acotadas.
   Un fallo del detalle no equivale a una oferta cerrada. Un listado incompleto no se toma como evidencia de cierre.
