@@ -5,7 +5,9 @@ from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
-from threading import RLock
+import random
+from threading import Lock, RLock
+import time
 from uuid import NAMESPACE_DNS, uuid5
 from zoneinfo import ZoneInfo
 
@@ -34,6 +36,7 @@ class RepositorioSupabase:
         self.cabeceras = {"apikey": clave, "Content-Type": "application/json"}
         if clave.startswith("eyJ"):
             self.cabeceras["Authorization"] = "Bearer " + clave
+        self._catalogo, self._lock_catalogo = None, Lock()
 
     def pedir(self, metodo, ruta, **op):
         try:
@@ -69,6 +72,39 @@ class RepositorioSupabase:
 
     def ejecuciones(self):
         return self.pedir("GET", "panel_ejecuciones", params={"order": "fecha.desc", "limit": 30})
+
+    def _paginas(self, ruta, clave, params, tamano=500):
+        ultimo = ""
+        while True:
+            lote = self.pedir("GET", ruta, params={**params, "order": clave, "limit": tamano,
+                                                    **({clave: "gt." + ultimo} if ultimo else {})})
+            yield from lote
+            if len(lote) < tamano:
+                return
+            ultimo = lote[-1][clave]
+
+    def catalogo_vigente(self, vigencia=1800):
+        """Vacantes activas, sin copias, sin enlaces rechazados y nunca entregadas; reducidas a lo que usan los filtros.
+        Se reutiliza durante `vigencia` segundos para que estimar no recorra el catálogo en cada cambio del borrador."""
+        from panel.afinidad import ligera
+        with self._lock_catalogo:
+            if self._catalogo and time.monotonic() - self._catalogo[0] < vigencia:
+                return self._catalogo[1]
+            entregadas = {f["vacante_id"] for f in self._paginas("entregas_diarias", "vacante_id",
+                                                                 {"select": "vacante_id"}, 1000)}
+            vacantes = []
+            for f in self._paginas("catalogo_vacantes", "id",
+                                   {"status": "eq.active", "select": "id,datos,description_full"}):
+                d = dict(f.get("datos") or {}, id=f["id"])
+                if d.get("duplicada_de") or (d.get("verificacion") or {}).get("estado") == "rechazada":
+                    continue
+                if {f["id"], *(d.get("ids_agrupados") or [])} & entregadas:
+                    continue
+                vacantes.append(ligera(d, f.get("description_full") or ""))
+            resultado = {"vacantes": vacantes,
+                         "actualizado": datetime.now(timezone.utc).isoformat(timespec="minutes")}
+            self._catalogo = (time.monotonic(), resultado)
+            return resultado
 
     def resultados(self, cliente_id, fecha=None):
         ejecuciones = self.pedir("GET", "panel_ejecuciones",
@@ -157,6 +193,34 @@ class RepositorioDemo:
                                         "configuracion": deepcopy(self.estado["borrador"])}
             self._guardar()
             return {"revision": revision, "vigente_desde": manana}
+
+    def catalogo_vigente(self):
+        """Catálogo ficticio estable con proporciones parecidas a las reales: pocos avisos dicen años o nivel de inglés."""
+        from panel.afinidad import ligera
+        if getattr(self, "_catalogo", None):
+            return self._catalogo
+        azar = random.Random(20261109)
+        titulos = ["Product Designer", "UX Designer", "UI Designer", "Interaction Designer", "Senior Product Designer",
+                   "Frontend Developer", "Frontend Engineer", "Desarrollador Frontend", "QA Engineer",
+                   "Software Tester", "Analista de pruebas", "QA Automation Engineer", "Data Analyst",
+                   "Backend Engineer", "Product Manager", "Editor de video", "Community Manager", "DevOps Engineer"]
+        grupos = [["CO"], ["MX"], ["ES"], ["AR", "CL", "CO", "MX", "PE"], ["CO", "ES", "MX"], ["BR"]]
+        base = datetime.fromisoformat(hoy())
+        vacantes = []
+        for n in range(900):
+            anos = azar.choice([1, 2, 3, 4, 5, 6, 8]) if azar.random() < 0.26 else None
+            nivel = azar.choice(["B1", "B2", "C1"]) if azar.random() < 0.12 else ""
+            texto = (f"English {nivel} " + ("is a plus." if azar.random() < 0.3 else "required.")) if nivel else ""
+            datos = {"id": uuid5(NAMESPACE_DNS, "adaptia.demo.catalogo." + str(n)).hex[:16],
+                     "titulo": azar.choice(titulos), "paises": azar.choice(grupos),
+                     "confianza_pais": azar.choice(["alta", "alta", "media", "baja"]),
+                     "modalidad": azar.choice(["remoto", "remoto", "hibrido", "presencial"]),
+                     "idioma": azar.choice(["es", "en", "en"]), "fecha_estimada": azar.random() < 0.1,
+                     "fecha_publicacion": (base - timedelta(days=azar.randint(0, 29))).date().isoformat(),
+                     "anos_min": anos, "ingles": ""}
+            vacantes.append(ligera(datos, texto))
+        self._catalogo = {"vacantes": vacantes, "actualizado": self.creada.isoformat(timespec="minutes")}
+        return self._catalogo
 
     def ejecuciones(self):
         return [{"id": id_demo("ejecucion"), "fecha": hoy(), "revision": 1, "estado": "completa",

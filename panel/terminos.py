@@ -1,4 +1,5 @@
 """Expansión abierta sin IA: variantes, mapa opcional y vocabulario público ESCO."""
+from functools import lru_cache
 import re
 
 import requests
@@ -23,11 +24,22 @@ def variantes(cargo):
 def sugerir(cargo, sesion=None, consultar_esco=True):
     base = normalizar.titulo_base(cargo)
     exactos, similares, evidencia = variantes(cargo), [], []
-    # El mapa existente es una ayuda, nunca un requisito para aceptar un cargo nuevo.
-    for f in familias.mapa_base():
-        if base == normalizar.texto(f["id"]) or any(base == x for g in familias.GRADOS for x in f["_titulos"][g]):
-            similares += [*f.get("exactos", []), *f.get("similares", [])]
-            evidencia.append("Equivalentes del mapa existente")
+    # El mapa existente es una ayuda, nunca un requisito para aceptar un cargo nuevo. Solo aportan las familias donde
+    # el cargo es título exacto o similar; «cercano» señala un oficio vecino (motion designer para editor de video),
+    # no un equivalente. Se usa el grado más fuerte encontrado para no mezclar oficios distintos.
+    coincidencias = []
+    for orden, f in enumerate(familias.mapa_base()):
+        nivel = 0 if base == normalizar.texto(f["id"]) else next(
+            (i for i, g in enumerate(("exacto", "similar")) if base in f["_titulos"][g]), None)
+        if nivel is not None:
+            coincidencias.append((nivel, orden, f))
+    mejor = min((n for n, _, _ in coincidencias), default=None)
+    for nivel, _, f in sorted(coincidencias, key=lambda x: x[:2]):
+        if nivel == mejor:
+            (exactos if nivel == 0 else similares).extend(f.get("exactos", []))
+            similares.extend(f.get("similares", []))
+    if coincidencias:
+        evidencia.append("Equivalentes del mapa existente")
     if consultar_esco:
         try:
             cli = sesion or requests.Session()
@@ -53,35 +65,40 @@ def sugerir(cargo, sesion=None, consultar_esco=True):
                 break
         except (requests.RequestException, ValueError, AttributeError, TypeError):
             evidencia.append("ESCO no disponible; puedes completar términos desde la interfaz")
-    claves = {normalizar.titulo_base(x) for x in exactos}
-    limpios = []
-    for x in similares:
-        if isinstance(x, str) and 2 <= len(x) <= 120 and normalizar.titulo_base(x) not in claves:
-            claves.add(normalizar.titulo_base(x))
-            limpios.append(x)
-    return {"terminos_exactos": exactos[:30], "terminos_similares": limpios[:30],
-            "fuentes": evidencia or ["Variantes de escritura"],
+    claves, principales, limpios = set(), [], []
+    for destino, terminos in ((principales, exactos), (limpios, similares)):
+        for x in terminos:
+            if isinstance(x, str) and 2 <= len(x) <= 120 and normalizar.titulo_base(x) not in claves:
+                claves.add(normalizar.titulo_base(x))
+                destino.append(x)
+    return {"terminos_exactos": principales[:30], "terminos_similares": limpios[:30],
+            "fuentes": list(dict.fromkeys(evidencia)) or ["Variantes de escritura"],
             "requiere_revision": not limpios,
             "nota": "Revisa los términos antes de guardar; un equivalente no garantiza pertinencia de cada anuncio."}
 
 
+# Los términos de un cargo se comparan contra miles de títulos: normalizarlos una sola vez (funciones puras).
+_base = lru_cache(maxsize=32768)(normalizar.titulo_base)
+_texto = lru_cache(maxsize=32768)(normalizar.texto)
+
+
 def grado(titulo, cargo):
-    base = normalizar.titulo_base(titulo)
+    base = _base(titulo)
     if not base:
         return None, None
-    completo = normalizar.texto(titulo)
-    if any(normalizar.contiene_frase(completo, normalizar.texto(x)) for x in cargo.get("terminos_excluidos", [])):
+    completo = _texto(titulo)
+    if any(normalizar.contiene_frase(completo, _texto(x)) for x in cargo.get("terminos_excluidos", [])):
         return None, None
     for campo, valor in (("terminos_exactos", "exacto"), ("terminos_similares", "similar")):
         terminos = [cargo["nombre"], *cargo.get(campo, [])] if campo == "terminos_exactos" else cargo.get(campo, [])
         for t in terminos:
-            canon = normalizar.titulo_base(t)
+            canon = _base(t)
             if canon and normalizar.contiene_frase(base, canon):
                 return valor, {"regla": "término de cargo", "termino": t, "grado": valor}
     if len(base) >= 6:
         opciones = [cargo["nombre"], *cargo.get("terminos_exactos", []), *cargo.get("terminos_similares", [])]
         for t in opciones:
-            puntaje = fuzz.token_sort_ratio(base,normalizar.titulo_base(t))
+            puntaje = fuzz.token_sort_ratio(base, _base(t))
             if puntaje >= 90:
                 return "similar", {"regla":"similitud textual", "termino":t, "grado":"similar", "similitud_textual":round(puntaje)}
     return None, None

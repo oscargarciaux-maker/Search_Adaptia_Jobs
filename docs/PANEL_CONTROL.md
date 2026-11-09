@@ -24,6 +24,10 @@ Ambas se aplican por el instalador automático tras el respaldo; no hace falta c
 3. En **Clientes → Nuevo cliente**, usar un nombre o referencia interna. No se necesita teléfono ni contraseña del cliente.
 4. Añadir uno o más perfiles y elegir el cargo, los países desde los que puede trabajar, modalidad, plazo de publicación,
    idioma del aviso, experiencia e inglés. Un cliente puede tener varios perfiles.
+   Debajo de cada perfil aparece una **estimación**: cuántas vacantes ya guardadas y aún no entregadas cumplirían hoy
+   ese perfil, y qué ajuste sumaría más (con «Aplicar» para admitir datos no informados). En **Cargos y cupos** cada
+   cargo muestra «alcanza para el cupo», «puede quedar corto» o «probable faltante». Usa las mismas reglas de la
+   selección, no busca en internet ni guarda nada; un cargo nuevo empieza bajo porque todavía no se ha buscado.
 5. **Guardar borrador** conserva los cambios; todavía no cambia la búsqueda confirmada. Una advertencia muestra cambios
    sin guardar. Si otra ventana guardó antes, se rechaza la revisión antigua: recargar y revisar antes de guardar otra vez.
 6. **Programar para mañana** muestra la distribución, guarda los cambios pendientes y confirma una versión inmutable.
@@ -86,7 +90,7 @@ El historial puede seguir sumando 120 mientras algunas oportunidades ya no está
 | panel/modelos.py | Reglas de configuración y límites: referencias, países, rangos, cupos y publicación |
 | panel/terminos.py | Variantes ortográficas, términos editables y consulta opcional al vocabulario público ESCO |
 | panel/afinidad.py | Comprobaciones explicables de país, modo, publicación, idioma, experiencia e inglés |
-| panel/servicio.py | Resultados según catálogo actual y texto WhatsApp; excluye enlaces/criterios vencidos |
+| panel/servicio.py | Resultados según catálogo actual, texto WhatsApp y estimación previa por perfil/cargo; excluye enlaces/criterios vencidos |
 | panel/repositorio.py | Lectura/escritura Supabase; repositorio ficticio separado exclusivamente para demo |
 | panel/ejecutor.py | Carga la versión diaria, prepara búsquedas dirigidas, ejecuta el motor y asigna por perfil |
 | buscador | Fuentes, extracción, identidad, comprobación de enlaces, presupuesto y sincronización |

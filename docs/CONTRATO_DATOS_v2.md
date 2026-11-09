@@ -31,6 +31,14 @@ hay que mostrar `last_seen_at` y la salud de la captura. La tabla tiene RLS y ac
 La actualización conserva la primera detección conocida, no acepta observaciones anteriores a las ya guardadas y no
 reabre un cierre con una vacante que no se volvió a ver después de ese cierre. La entrega v1 no sobrescribe su contenido.
 
+Ritmo de escritura (9 nov 2026): cada captura envía las filas nuevas o cuyo contenido cambió (datos, estado, fechas
+de publicación, verificación de enlaces, descripción). Volver a ver una vacante sin cambios solo actualiza
+`last_seen_at`/`observed_at` por rotación: cada fila se renueva aproximadamente cada 6 horas y como máximo a las 12.
+Por eso `observed_at` es el momento del último envío de esa fila, no de cada captura. Ningún filtro ni vista usa esas
+marcas para decidir vigencia; los enlaces siguen exigiendo comprobación de menos de seis horas en `verificacion`.
+La memoria de huellas vive en `trabajo/catalogo_sincronizado.json.gz` (sin datos de clientes); si se pierde, la
+siguiente captura vuelve a enviar todo el catálogo.
+
 ## Entrega diaria e idempotencia
 
 Cada fecha de Bogotá tiene un lote por rol. Una repetición puede reintentar pendientes y completar plazas faltantes,

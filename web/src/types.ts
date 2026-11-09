@@ -77,3 +77,26 @@ export type Sesion = {
   sesion: boolean;
   paises: { codigo: string; nombre: string }[];
 };
+export type Limitante = {
+  motivo: string;
+  vacantes: number;
+  sugerencia: string;
+};
+export type EstimacionPerfil = {
+  compatibles: number;
+  del_cargo: number;
+  limitantes: Limitante[];
+};
+export type EstimacionCargo = {
+  disponibles: number;
+  del_cargo: number;
+  cupo: number;
+  estado: "alcanza" | "justo" | "insuficiente" | "sin_cupo";
+};
+export type VistaPrevia = {
+  incompleto?: boolean;
+  catalogo?: { vacantes: number; actualizado: string };
+  perfiles?: Record<string, EstimacionPerfil>;
+  cargos?: Record<string, EstimacionCargo>;
+  nota?: string;
+};

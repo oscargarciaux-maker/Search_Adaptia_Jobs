@@ -27,6 +27,15 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await dialog.getByLabel("Cargo del perfil 1").selectOption({ label: "QA" });
   await dialog.getByLabel("Antigüedad del perfil 1").selectOption("7");
   await dialog.getByLabel("Experiencia máxima del perfil 1").fill("4");
+  // Vista previa: estima con el catálogo y permite admitir datos no informados.
+  await expect(dialog.getByText("hoy cumplen este perfil")).toBeVisible();
+  const aplicar = dialog.getByRole("button", { name: "Aplicar", exact: true });
+  if (await aplicar.count()) {
+    await aplicar.first().click();
+    await expect(
+      dialog.getByLabel("Admitir experiencia no informada"),
+    ).toBeChecked();
+  }
   await dialog
     .getByRole("button", { name: "Añadir cliente", exact: true })
     .click();
@@ -61,6 +70,7 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
     page.getByRole("button", { name: "Programar para mañana", exact: true }),
   ).toBeDisabled();
   await page.getByLabel("Vacantes de QA", { exact: true }).fill("30");
+  await expect(page.getByText(/disponibles hoy/).first()).toBeVisible();
   await page.route("**/api/cargos/expandir", (route) =>
     route.fulfill({
       json: {
