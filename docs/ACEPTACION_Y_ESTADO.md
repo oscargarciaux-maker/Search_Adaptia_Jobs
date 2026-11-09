@@ -33,8 +33,14 @@ PostgreSQL local, con 66.708 filas, 5.550 referencias explícitas y 30 copias po
 de 010, con el mismo resultado y el mismo estado final de `ofertas` y del archivo. `probar_ofertas_unicas`,
 `probar_migraciones` y `probar_panel` aprobados en local.
 
+El [ensayo 42721937224](https://github.com/oscargarciaux-maker/Search_Adaptia_Jobs/actions/runs/42721937224)
+(9 nov 23:37 UTC, rama del PR, transacción revertida, límite de 3 s como service_role) midió en la base real
+22.533 registros de catálogo: la función 010 instalada volvió a agotar 3.216 ms en identidades, ya con la escritura por
+cambios de PR #26; la 011 completó en 274 ms con 599 filas únicas, 4 sin identificar y 0 archivadas, lo mismo que
+informó la captura de las 23:03 UTC. El ensayo revirtió SQL, índices y datos, y no registró la versión.
+
 Pendiente: fusión, Preparar Supabase con respaldo y varias capturas horarias posteriores sin 57014 antes de acreditar
-recuperación. El tiempo medido en local no equivale al de la instancia de Supabase.
+recuperación.
 
 ### Fallo recurrente tras 008 — SQL 010 ensayada, instalación pendiente
 
