@@ -528,7 +528,7 @@ function ClienteDialog({
                     patch(p.id, { antiguedad_dias: Number(e.target.value) })
                   }
                 >
-                  {[1, 3, 7, 14, 30].map((n) => (
+                  {[1, 3, 7, 14, 21, 30].map((n) => (
                     <option key={n} value={n}>
                       {n} {n === 1 ? "día" : "días"}
                     </option>

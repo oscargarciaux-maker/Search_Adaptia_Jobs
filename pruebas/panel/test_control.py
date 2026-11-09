@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from buscador import bodega, entrega, familias, vacante
+from buscador import bodega, entrega, familias, normalizar, vacante
 from panel import afinidad, ejecutor, servicio, terminos
 from panel.api import crear_app
 from panel.modelos import Configuracion, Expansion, Perfil
@@ -163,6 +163,17 @@ def test_esco_proporciona_equivalentes_de_un_cargo_no_mapeado():
     r = terminos.sugerir("Neuroergonomics Researcher", SimpleNamespace(get=get))
     assert "Investigador de neuroergonomía" in r["terminos_similares"]
     assert not r["requiere_revision"]
+
+
+def test_sugerencias_del_mapa_priorizan_el_oficio_y_no_mezclan_cercanos():
+    # «Editor de video» aparece como cercano en motion/animación, audio o redes: esos oficios no son equivalentes.
+    r = terminos.sugerir("Editor de video", consultar_esco=False)
+    claves = {normalizar.titulo_base(x) for x in r["terminos_exactos"] + r["terminos_similares"]}
+    assert {"video editor", "editor audiovisual"} <= {normalizar.titulo_base(x) for x in r["terminos_exactos"]}
+    assert "postproductor" in claves
+    assert not claves & {"motion designer", "animador", "vfx artist", "community manager"}
+    assert r["fuentes"] == ["Equivalentes del mapa existente"]
+    assert len(claves) == len(r["terminos_exactos"]) + len(r["terminos_similares"])
 
 
 def test_entrada_de_expansion_no_envia_contactos_a_fuentes_externas():
