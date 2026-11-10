@@ -33,7 +33,7 @@ def probar_aliases(conectar, nombre):
                 insert into public.entregas_diarias(vacante_id,delivery_date,role_id,match_grade,selected_at,snapshot)
                 values('2222222222222222',current_date,'qa','exact',now(),'{"conservar":"histórico"}');""")
             antes = c.execute("select jsonb_agg(to_jsonb(c) order by id) from public.catalogo_vacantes c").fetchone()[0]
-            assert ensayar(c) == ['006','007','008','009','010']
+            assert ensayar(c) == ['006','007','008','009','010','011']
             assert c.execute("select jsonb_agg(to_jsonb(c) order by id) from public.catalogo_vacantes c").fetchone()[0] == antes
             assert c.execute("select count(*) from public.ofertas").fetchone()[0] == 2
             assert '006' not in migraciones.aplicadas(c)
@@ -211,6 +211,11 @@ def main():
             plan = c.execute("""explain (format json) select id from public.catalogo_vacantes
                 where public.adaptia_urls_identidad(datos) @> array['linkedin:9000000123']""").fetchone()[0]
             assert 'catalogo_urls_identidad' in json.dumps(plan)
+            # 011: los pasos del recorrido consultan ids_agrupados por clave, sin lista pendiente de GIN que recorrer.
+            assert 'fastupdate=off' in c.execute("select reloptions from pg_class where relname='catalogo_ids_agrupados'").fetchone()[0]
+            plan = c.execute("""explain (format json) select id from public.catalogo_vacantes
+                where nullif(datos->>'duplicada_de','') is not null""").fetchone()[0]
+            assert 'catalogo_duplicada_de' in json.dumps(plan)
             assert c.execute("""select id from public.catalogo_vacantes
                 where public.adaptia_urls_identidad(datos) @> array[public.adaptia_url_identidad('https://www.linkedin.com/jobs/view/9000000123?trk=otra')]""").fetchall() == [(c.execute("select substr(md5('volumen-123'),1,16)").fetchone()[0],)]
             with c.transaction():
