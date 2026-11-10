@@ -31,7 +31,7 @@ def perfilar(conn):
     except psycopg.Error as e:
         # El contexto completo puede contener datos. Solo reconocer nombres/etapas estáticos.
         contexto = e.diag.context or ""
-        etapas = [("with recursive aliases", "identidades"), ("with metadatos", "identidades"),
+        etapas = [("with recursive aliases", "identidades"), ("with metadatos", "identidades"), ("with semillas", "identidades"),
                   ("with recursive recorrido", "identidades"), ("with destinos", "resolver_urls"),
                   ("update public.ofertas", "actualizar_enlaces")]
         etapa = next((nombre for marca,nombre in etapas if marca in contexto.lower()), "sin_identificar")
@@ -58,10 +58,10 @@ def ensayar(conn):
         conn.execute("set local statement_timeout='30s'")
         conn.execute("select pg_advisory_xact_lock(hashtextextended('adaptia.migraciones',0))")
         pendientes = migraciones.pendientes(conn, migraciones.descubrir())
-        if any(m.version not in {"006","007","008","009","010"} for m in pendientes):
-            raise RuntimeError("Este ensayo admite únicamente las migraciones 006/007/008/009/010 de esta revisión; usar el instalador respaldado para otras versiones.")
+        if any(m.version not in {"006","007","008","009","010","011"} for m in pendientes):
+            raise RuntimeError("Este ensayo admite únicamente las migraciones 006/007/008/009/010/011 de esta revisión; usar el instalador respaldado para otras versiones.")
         migraciones.aplicar(conn, pendientes)
-        if any(m.version in {"008", "010"} for m in pendientes):
+        if any(m.version in {"008", "010", "011"} for m in pendientes):
             conn.execute("set local statement_timeout='3s'")
             conn.execute("set local role service_role")
             t0 = time.perf_counter()

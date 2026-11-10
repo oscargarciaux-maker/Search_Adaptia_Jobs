@@ -35,6 +35,7 @@ Leer `docs/CONTRATO_DATOS_v6.md` y `docs/CONTRATO_DATOS_v5.md`: una fila por vac
 IDs agrupados y selección sin contar copias. No borrar archivos históricos ni snapshots para ocultar déficit.
 Leer también `docs/CONTRATO_DATOS_v4.md`: vistas privadas de disponibilidad, afinidad vigente y reporte por rol.
 SQL 004 es aditivo y automático; no modificar SQL registrado ni el estado histórico v1. SQL 010 optimiza el grafo de aliases;
+SQL 011 lo recorre solo desde ofertas y referencias explícitas con índices (010 leía todo el catálogo y agotaba 3 s);
 comprobar instalación y captura posterior antes de afirmar recuperación. Conservar variantes pertinentes;
 desarrollo genérico no cuenta como QA/IA.
 Leer `docs/CONTRATO_DATOS_v3.md` y `docs/CONTROL_CALIDAD_ENLACES.md`: comprobar enlaces antes de nuevas entregas,
