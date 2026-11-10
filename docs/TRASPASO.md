@@ -2,6 +2,7 @@
 
 Versión vigente: revisión v6 del 6 de noviembre de 2026. Acompaña [GUIA_CLIENTE.md](GUIA_CLIENTE.md), [INSTALACION.md](INSTALACION.md),
 [OPERACION_Y_RECUPERACION.md](OPERACION_Y_RECUPERACION.md) y [ACEPTACION_Y_ESTADO.md](ACEPTACION_Y_ESTADO.md).
+**Camino recomendado:** [ENTREGA_AL_CLIENTE.md](ENTREGA_AL_CLIENTE.md) y el flujo *Traspaso a otro Supabase*, que copia, restaura y comprueba en un paso y detiene el origen hasta cambiar los secretos. Este documento conserva el detalle técnico.
 La preparación preferida del destino está en [INSTALACION_AUTOMATICA.md](INSTALACION_AUTOMATICA.md): el cliente configura
 accesos una vez y no copia SQL 002/003 ni crea variables de captura. Continuidad sigue requiriendo un corte coherente.
 

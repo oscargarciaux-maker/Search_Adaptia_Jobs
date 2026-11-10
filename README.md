@@ -40,6 +40,7 @@ Instalación privada, Docker, configuración y guía detallada: [Panel de contro
 | Operador: clientes, filtros, cupos y vacantes | [Manual del cliente](docs/GUIA_CLIENTE.md) |
 | Administrador: instalar o actualizar sin perder datos | [Instalación](docs/INSTALACION.md) |
 | Configurar una vez y aplicar SQL/activación automáticamente | [Instalación automática](docs/INSTALACION_AUTOMATICA.md) |
+| **Entregar al cliente: pruebas manuales, traspaso a su Supabase y primera semana** | [Entrega al cliente](docs/ENTREGA_AL_CLIENTE.md) |
 | Cambiar propietario/cuentas conservando historial y presupuesto | [Traspaso](docs/TRASPASO.md) |
 | Operar, resolver incidentes, respaldar y restaurar | [Operación y recuperación](docs/OPERACION_Y_RECUPERACION.md) |
 | Decidir qué está comprobado y qué falta antes de aceptar/automatizar | [Aceptación y estado](docs/ACEPTACION_Y_ESTADO.md) |
