@@ -1,0 +1,66 @@
+name: Traspaso a otro Supabase
+
+# Copia todo el historial al proyecto Supabase de destino (por ejemplo, el de pago del cliente) y comprueba que coincida.
+# Antes: guardar en Secrets SUPABASE_URL_DESTINO y SUPABASE_DB_URL_DESTINO (Session pooler, puerto 5432, del destino).
+# El destino debe ser un proyecto nuevo y vacío, distinto del de la página web; si no, el traspaso se niega.
+# Después: cambiar SUPABASE_URL, SUPABASE_SECRET_KEY y SUPABASE_DB_URL por los del destino. Mientras tanto, las
+# capturas se detienen solas para no escribir en dos bases. Guía paso a paso: docs/ENTREGA_AL_CLIENTE.md
+on:
+  workflow_dispatch:
+    inputs:
+      confirmar:
+        description: "Escribe TRASPASAR para copiar todo al Supabase de destino"
+        required: true
+      ensayo:
+        description: "Ensayo: copiar y comprobar sin detener la base actual (usar un proyecto de prueba vacío)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publicar
+  cancel-in-progress: false
+
+jobs:
+  traspaso:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Confirmar
+        if: ${{ inputs.confirmar != 'TRASPASAR' }}
+        run: |
+          echo "::error::Escribe TRASPASAR (en mayúsculas) para confirmar el traspaso."
+          exit 1
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Traer el estado de trabajo (rama publicado)
+        run: |
+          if git ls-remote --exit-code --heads origin publicado; then
+            git clone --depth 1 --branch publicado "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" salida
+            rm -rf salida/.git
+          else
+            mkdir -p salida
+          fi
+      - name: Copiar, restaurar y comprobar
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_URL_DESTINO: ${{ secrets.SUPABASE_URL_DESTINO }}
+          SUPABASE_DB_URL_DESTINO: ${{ secrets.SUPABASE_DB_URL_DESTINO }}
+          SUPABASE_BACKUP_KEY: ${{ secrets.SUPABASE_BACKUP_KEY }}
+        run: python -m buscador.traspaso --fase traspaso --salida salida --privado privado ${{ inputs.ensayo && '--ensayo' || '' }}
+      - name: Conservar la copia cifrada del traspaso
+        if: ${{ always() && hashFiles('privado/respaldos/*.enc') != '' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: respaldo-traspaso-${{ github.run_id }}
+          path: privado/respaldos/*.enc
+          if-no-files-found: error
+          retention-days: 90
