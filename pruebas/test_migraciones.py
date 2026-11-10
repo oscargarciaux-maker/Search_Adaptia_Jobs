@@ -209,6 +209,7 @@ def test_rest_sin_confirmar_no_activa_captura(monkeypatch, tmp_path):
     monkeypatch.setenv("SUPABASE_BACKUP_KEY", secrets.token_urlsafe(32))
     monkeypatch.setattr(supabase, "credenciales", lambda: ("https://proyecto.supabase.co", "prueba"))
     monkeypatch.setattr(migraciones, "conexion", lambda *a: nullcontext(None))
+    monkeypatch.setattr(preparar.traspaso, "trasladada", lambda conn: None)  # base no trasladada
     monkeypatch.setattr(migraciones, "preparar", lambda *a, **k: {"aplicadas": [], "vigentes": 3, "presupuesto": {"mes": "2026-11", "reservas": {}}})
     def sin_confirmar(*a): raise RuntimeError("REST no confirmó")
     monkeypatch.setattr(preparar, "comprobar_rest", sin_confirmar)
@@ -226,7 +227,7 @@ def test_rest_sin_confirmar_no_activa_captura(monkeypatch, tmp_path):
 
 def test_respaldo_se_sube_antes_de_aplicar_sql():
     texto = (migraciones.RAIZ / ".github/actions/preparar-supabase/action.yml").read_text()
-    assert texto.index("--fase respaldo") < texto.index("uses: actions/upload-artifact@v4") < texto.index("--fase aplicar")
+    assert texto.index("--fase respaldo") < texto.index("uses: actions/upload-artifact@v6") < texto.index("--fase aplicar")
     assert "continue-on-error" not in texto
 
 

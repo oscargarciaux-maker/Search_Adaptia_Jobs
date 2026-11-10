@@ -51,7 +51,7 @@ runs:
       run: python -m buscador.preparar --fase respaldo --modo "${{ inputs.modo }}" ${{ inputs.prueba == 'true' && '--prueba' || '' }} ${{ inputs.manual == 'true' && '--manual' || '' }}
     - name: Conservar respaldo antes de cambiar SQL
       if: ${{ always() && hashFiles('privado/respaldos/*.enc') != '' }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: respaldo-instalacion-${{ github.run_id }}-${{ github.job }}-${{ github.run_attempt }}
         path: privado/respaldos/*.enc

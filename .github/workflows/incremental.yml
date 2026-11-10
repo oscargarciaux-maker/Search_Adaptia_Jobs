@@ -22,8 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -58,7 +58,7 @@ jobs:
         run: python -m panel.ejecutor --salida salida --modo incremental ${{ inputs.prueba && '--prueba' || '' }}
       - name: Conservar estado de recuperación
         if: ${{ always() && !inputs.prueba && steps.preparar.outputs.ejecutar == 'true' && hashFiles('salida/trabajo/estado.json') != '' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: estado-captura-${{ github.run_id }}
           path: salida/trabajo/
@@ -77,3 +77,12 @@ jobs:
       - name: Comprobar sincronización del catálogo
         if: ${{ !inputs.prueba && steps.preparar.outputs.ejecutar == 'true' }}
         run: python -m buscador.validacion --salida salida --catalogo
+      - name: Avisar
+        if: always()
+        env:
+          AVISO: ${{ secrets.AVISO_CAPTURA_URL }}
+        run: |
+          if [ -n "$AVISO" ] && [ "${{ inputs.prueba }}" != "true" ]; then
+            if [ "${{ job.status }}" = "success" ]; then curl -fsS -m 10 --retry 3 "$AVISO" >/dev/null || true
+            else curl -fsS -m 10 --retry 3 "$AVISO/fail" >/dev/null || true; fi
+          fi

@@ -3,11 +3,15 @@ name: Bodega nocturna
 # Usa la versión activa del panel (o seis cargos por veinte en legado), conserva catálogo y entrega en Supabase.
 # La rama publicado contiene estado y reportes técnicos, sin interfaz privada.
 # Cada noche a la 1:17 de Bogotá (6:17 UTC). A mano: Actions > Bodega nocturna > Run workflow.
+# Segunda pasada a las 7:17 de Bogotá (12:17 UTC): solo trabaja si la nocturna no llegó a la meta, no confirmó Supabase
+# o no corrió; completa el mismo lote del día (no elige otro) y no supera el tope diario de Apify ya reservado.
+# Aviso opcional: secreto AVISO_NOCTURNA_URL (ping de Healthchecks u otro servicio similar).
 #   modo "inicial": olvida la rotación y pide 30 días a cada combinación (para la primera vez o tras un cambio grande)
 #   prueba: presupuestos mínimos (unos 5 minutos), para comprobar que todo funciona
 on:
   schedule:
     - cron: "17 6 * * *"
+    - cron: "17 12 * * *"
   workflow_dispatch:
     inputs:
       modo:
@@ -32,8 +36,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 95
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -48,7 +52,17 @@ jobs:
           fi
           # No mostrar el reporte viejo como resultado de una primera corrida fallida.
           rm -f salida/datos/salud.json
+      - name: Decidir si hace falta la pasada de la mañana
+        id: decidir
+        run: |
+          if [ "${{ github.event.schedule }}" = "17 12 * * *" ]; then
+            python -m buscador.validacion --salida salida --hace-falta-completar >> "$GITHUB_OUTPUT"
+          else
+            echo "ejecutar=true" >> "$GITHUB_OUTPUT"
+          fi
+          cat "$GITHUB_OUTPUT"
       - name: Preparar base y estado automáticamente
+        if: ${{ steps.decidir.outputs.ejecutar == 'true' }}
         uses: ./.github/actions/preparar-supabase
         with:
           conexion: ${{ secrets.SUPABASE_DB_URL }}
@@ -60,6 +74,7 @@ jobs:
           captura: ${{ vars.CAPTURA_HORARIA_ACTIVA }}
           central: ${{ vars.ESTADO_SUPABASE_ACTIVO }}
       - name: Buscar y limpiar
+        if: ${{ steps.decidir.outputs.ejecutar == 'true' }}
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
           BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
@@ -68,7 +83,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python -m panel.ejecutor --salida salida --modo "${{ inputs.modo || 'diario' }}" ${{ inputs.prueba && '--prueba' || '' }}
       - name: Publicar en la rama publicado
-        if: ${{ !inputs.prueba }}
+        if: ${{ steps.decidir.outputs.ejecutar == 'true' && !inputs.prueba }}
         working-directory: salida
         run: |
           git init -q
@@ -79,17 +94,17 @@ jobs:
           git commit -qm "Bodega $(date -u +%Y-%m-%dT%H:%MZ)"
           git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" publicado
       - name: Conservar estado para diagnóstico y recuperación
-        if: ${{ always() && !inputs.prueba && hashFiles('salida/trabajo/estado.json') != '' }}
-        uses: actions/upload-artifact@v4
+        if: ${{ steps.decidir.outputs.ejecutar == 'true' && always() && !inputs.prueba && hashFiles('salida/trabajo/estado.json') != '' }}
+        uses: actions/upload-artifact@v6
         with:
           name: estado-bodega-${{ github.run_id }}
           path: salida/trabajo/
           retention-days: 14
       - name: Comprobar meta y sincronización
-        if: ${{ !inputs.prueba }}
+        if: ${{ steps.decidir.outputs.ejecutar == 'true' && !inputs.prueba }}
         run: python -m buscador.validacion --salida salida
       - name: Resumen
-        if: always()
+        if: ${{ always() && steps.decidir.outputs.ejecutar == 'true' }}
         run: |
           test -f salida/datos/salud.json && python -c "
           import json; s=json.load(open('salida/datos/salud.json'))
@@ -104,3 +119,12 @@ jobs:
               listas=sum(v.get('catalog_status')=='active' and v.get('afinidad_vigente') is True and (v.get('verificacion') or {}).get('estado')=='verificada' for v in r.get('vacantes',[]))
               print('{}: {} listas; {} faltantes vigentes frente a la meta'.format(r['nombre'],listas,max(0,r.get('meta',20)-listas)))
           " >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Avisar
+        if: always()
+        env:
+          AVISO: ${{ secrets.AVISO_NOCTURNA_URL }}
+        run: |
+          if [ -n "$AVISO" ] && [ "${{ inputs.prueba }}" != "true" ]; then
+            if [ "${{ job.status }}" = "success" ]; then curl -fsS -m 10 --retry 3 "$AVISO" >/dev/null || true
+            else curl -fsS -m 10 --retry 3 "$AVISO/fail" >/dev/null || true; fi
+          fi

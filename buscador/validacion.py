@@ -47,11 +47,29 @@ def errores_catalogo(reporte):
     return fallos
 
 
+def hace_falta_completar(trabajo, hoy):
+    """Segunda pasada de la mañana: solo si la nocturna de hoy no cumplió la meta, no confirmó Supabase o no corrió."""
+    try:
+        dia = json.loads((Path(trabajo) / "metricas_entrega.json").read_text(encoding="utf-8")).get(hoy)
+    except (OSError, ValueError, AttributeError):
+        return True
+    return not (isinstance(dia, dict) and dia.get("meta_cumplida") and dia.get("registro_confirmado")
+                and not dia.get("pendientes_supabase"))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--salida", required=True)
     ap.add_argument("--catalogo", action="store_true")
+    ap.add_argument("--hace-falta-completar", action="store_true",
+                    help="Imprime ejecutar=true/false para GITHUB_OUTPUT según el día de hoy en Bogotá")
     args = ap.parse_args()
+    if args.hace_falta_completar:
+        from datetime import datetime, timedelta, timezone
+        hoy = datetime.now(timezone(timedelta(hours=-5))).date().isoformat()
+        falta = hace_falta_completar(Path(args.salida) / "trabajo", hoy)
+        print(f"ejecutar={'true' if falta else 'false'}")
+        return
     reporte = json.loads((Path(args.salida) / "datos/salud.json").read_text(encoding="utf-8"))
     fallos = errores_catalogo(reporte) if args.catalogo else errores(reporte)
     for mensaje in fallos:

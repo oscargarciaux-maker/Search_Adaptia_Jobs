@@ -10,7 +10,7 @@ from uuid import uuid4
 import requests
 import psycopg
 
-from buscador import migraciones, respaldo, supabase
+from buscador import migraciones, respaldo, supabase, traspaso
 
 
 def marca(sesion=None):
@@ -34,6 +34,26 @@ def marca(sesion=None):
         return payload
     except (requests.RequestException, ValueError, KeyError, IndexError):
         raise RuntimeError("No se pudo comprobar la instalación automática por REST; revisar conexión/permisos, sin volver al modo local.") from None
+
+
+TRASLADADA = ("Esta base se trasladó a otro proyecto Supabase: las capturas se detienen para no escribir en dos bases. "
+              "Cambia SUPABASE_URL, SUPABASE_SECRET_KEY y SUPABASE_DB_URL por los del destino (ver docs/ENTREGA_AL_CLIENTE.md).")
+
+
+def trasladada_rest(sesion=None):
+    """Misma comprobación que por conexión directa, para instalaciones sin SUPABASE_DB_URL."""
+    url, clave = supabase.credenciales()
+    if not url or not clave: return False
+    cab = {"apikey": clave}
+    if clave.startswith("eyJ"): cab["Authorization"] = f"Bearer {clave}"
+    try:
+        r = (sesion or requests.Session()).get(url + "/rest/v1/estado_operativo", timeout=30, headers=cab,
+            params={"cola": "eq.control", "identificador": "eq." + traspaso.MARCA[1], "select": "identificador", "limit": 1})
+        datos = r.json()
+        if r.status_code == 404: return False
+        return r.status_code == 200 and isinstance(datos, list) and bool(datos)
+    except (requests.RequestException, ValueError):
+        return False  # la comprobación de marca() ya detiene ante un fallo de conexión
 
 
 def comprobar_rest(huellas):
@@ -71,6 +91,7 @@ def correr(args):
     if not dsn:
         if args.modo == "instalar":
             raise RuntimeError("Configuración inicial pendiente: guardar SUPABASE_DB_URL y SUPABASE_BACKUP_KEY en Secrets una vez.")
+        if trasladada_rest(): raise RuntimeError(TRASLADADA)
         instalada = marca()
         if instalada and instalada != {"migraciones": {m.version: m.digest for m in migraciones.descubrir()}}:
             raise RuntimeError("Hay una actualización de base pendiente: configurar SUPABASE_DB_URL para aplicarla automáticamente.")
@@ -88,6 +109,7 @@ def correr(args):
     privado.mkdir(mode=0o700, parents=True, exist_ok=True)
     plan_archivo = privado / "plan.json"
     with migraciones.conexion(dsn, url) as conn:
+        if traspaso.trasladada(conn): raise RuntimeError(TRASLADADA)
         if args.fase == "respaldo":
             copia = privado / "respaldos" / ("corte-" + uuid4().hex + ".enc")
             plan = migraciones.planificar(conn, Path(args.salida) / "trabajo", copia, llave)

@@ -20,7 +20,7 @@ Los cambios del borrador son explícitos; programar fija una versión desde mañ
 Leer antes de trabajar `docs/GUIA_CLIENTE.md`, `docs/OPERACION_Y_RECUPERACION.md` y `docs/ACEPTACION_Y_ESTADO.md`.
 Riesgos y prioridades de mantenimiento: `docs/REVISION_FIABILIDAD.md`.
 Para reservas y pendientes centrales, leer `docs/CONTRATO_ESTADO_OPERATIVO.md` y `docs/ACTIVAR_ESTADO_OPERATIVO.md`.
-Camino preferido de instalación: `docs/INSTALACION_AUTOMATICA.md`. `SUPABASE_DB_URL` y `SUPABASE_BACKUP_KEY` se configuran
+Entrega al cliente y traspaso a su Supabase: `docs/ENTREGA_AL_CLIENTE.md` y flujo `traspaso.yml` (destino vacío y propio; el origen trasladado detiene las capturas). Camino preferido de instalación: `docs/INSTALACION_AUTOMATICA.md`. `SUPABASE_DB_URL` y `SUPABASE_BACKUP_KEY` se configuran
 una vez como Secrets. Preparar Supabase sube respaldo cifrado antes de SQL, registra hashes en `adaptia_migraciones`
 y activa por marca privada; no pedir copiar 002/003 ni variables manuales para este camino. No modificar SQL ya registrado:
 añadir migración. Clave administrativa limitada a preparación; no se entrega a fuentes, navegador ni logs. Tras el
