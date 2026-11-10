@@ -1,0 +1,60 @@
+name: Copia de seguridad semanal
+
+# Copia cifrada de las tablas del sistema, sus secuencias y la carpeta de trabajo. Se conserva 90 días en Actions.
+# Complementa (no sustituye) las copias diarias que Supabase incluye en sus planes de pago.
+# Usa SUPABASE_DB_URL y SUPABASE_BACKUP_KEY; sin la clave de cifrado la copia no se puede leer: guardarla aparte.
+# Domingos 5:41 a. m. de Bogotá (10:41 UTC). A mano: Actions > Copia de seguridad semanal > Run workflow.
+on:
+  schedule:
+    - cron: "41 10 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publicar
+  cancel-in-progress: false
+
+jobs:
+  respaldo:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Traer el estado de trabajo (rama publicado)
+        run: |
+          if git ls-remote --exit-code --heads origin publicado; then
+            git clone --depth 1 --branch publicado "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" salida
+            rm -rf salida/.git
+          else
+            mkdir -p salida
+          fi
+      - name: Crear copia cifrada
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_BACKUP_KEY: ${{ secrets.SUPABASE_BACKUP_KEY }}
+        run: python -m buscador.traspaso --fase respaldo --salida salida --privado privado
+      - name: Conservar la copia 90 días
+        uses: actions/upload-artifact@v6
+        with:
+          name: respaldo-semanal-${{ github.run_id }}
+          path: privado/respaldos/*.enc
+          if-no-files-found: error
+          retention-days: 90
+      - name: Avisar
+        if: always()
+        env:
+          AVISO: ${{ secrets.AVISO_RESPALDO_URL }}
+        run: |
+          if [ -n "$AVISO" ]; then
+            if [ "${{ job.status }}" = "success" ]; then curl -fsS -m 10 --retry 3 "$AVISO" >/dev/null || true
+            else curl -fsS -m 10 --retry 3 "$AVISO/fail" >/dev/null || true; fi
+          fi
