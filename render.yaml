@@ -1,0 +1,20 @@
+# Panel privado en Render (opcional; el Dockerfile sirve para cualquier alojamiento de contenedores).
+# Render → New → Blueprint → elegir este repositorio. Pedirá los cuatro valores marcados con sync: false.
+# Guía paso a paso: docs/ENTREGA_AL_CLIENTE.md §5. El plan gratuito se duerme sin uso y tarda ~1 min en despertar.
+services:
+  - type: web
+    name: adaptia-panel
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: PANEL_ORIGIN
+        sync: false
+      - key: PANEL_OPERATOR_EMAILS
+        sync: false

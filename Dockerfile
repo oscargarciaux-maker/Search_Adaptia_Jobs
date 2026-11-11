@@ -21,5 +21,6 @@ COPY --from=web /build/dist ./web/dist
 RUN chmod -R a+rX /app
 USER operador
 EXPOSE 8000
-HEALTHCHECK --interval=30s --timeout=5s CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"
-CMD ["python", "-m", "panel.api", "--host", "0.0.0.0", "--port", "8000"]
+HEALTHCHECK --interval=30s --timeout=5s CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/api/health' % os.environ.get('PORT', '8000'), timeout=3)"
+# El puerto sale de PORT si el alojamiento lo define (Render, Railway, Cloud Run); si no, 8000.
+CMD ["python", "-m", "panel.api", "--host", "0.0.0.0"]
