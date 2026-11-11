@@ -237,8 +237,10 @@ def juntar(vacantes):
 
 def publica(v):
     """La vacante sin los campos internos (la descripción completa no se publica)."""
-    from buscador.contrato import url_limpia
+    from buscador.contrato import requisitos_idioma, url_limpia
     salida = {k: v.get(k) for k in CAMPOS_PUBLICOS}
+    # Contrato v7: inglés exigido ya interpretado, para que el panel estime sin descargar descripciones.
+    salida["requisito_ingles"] = requisitos_idioma(v.get("_descripcion", ""), v.get("ingles", ""))
     salida["enlaces_alternativos"] = sorted({url_limpia(u) for u in
         [v.get("enlace"), v.get("enlace_directo"), *v.get("_enlaces", [])] if u})
     salida["ids_agrupados"] = sorted({v["id"], *v.get("_ids_fusionados", [])})

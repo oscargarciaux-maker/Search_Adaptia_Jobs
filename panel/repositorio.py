@@ -6,7 +6,7 @@ import json
 import os
 from pathlib import Path
 import random
-from threading import Lock, RLock
+from threading import Lock, RLock, Thread
 import time
 from uuid import NAMESPACE_DNS, uuid5
 from zoneinfo import ZoneInfo
@@ -36,7 +36,7 @@ class RepositorioSupabase:
         self.cabeceras = {"apikey": clave, "Content-Type": "application/json"}
         if clave.startswith("eyJ"):
             self.cabeceras["Authorization"] = "Bearer " + clave
-        self._catalogo, self._lock_catalogo = None, Lock()
+        self._catalogo, self._lock_catalogo, self._lock_carga, self._refrescando = None, Lock(), Lock(), False
 
     def pedir(self, metodo, ruta, **op):
         try:
@@ -83,28 +83,55 @@ class RepositorioSupabase:
                 return
             ultimo = lote[-1][clave]
 
+    # Solo los campos que usan los filtros, leídos dentro de `datos`: ~1 MB en vez de descargar descripciones completas.
+    CAMPOS_ESTIMACION = ("id,titulo:datos->>titulo,paises:datos->paises,confianza_pais:datos->>confianza_pais,"
+        "modalidad:datos->>modalidad,idioma:datos->>idioma,publicada_en:datos->>publicada_en,"
+        "fecha_publicacion:datos->>fecha_publicacion,fecha_estimada:datos->fecha_estimada,"
+        "ids_agrupados:datos->ids_agrupados,anos_min:datos->anos_min,ingles:datos->>ingles,"
+        "requisito_ingles:datos->requisito_ingles,duplicada_de:datos->>duplicada_de,"
+        "verificacion:datos->verificacion->>estado")
+
+    def _leer_catalogo(self):
+        from panel.afinidad import ligera
+        entregadas = {f["vacante_id"] for f in self._paginas("entregas_diarias", "vacante_id",
+                                                             {"select": "vacante_id"}, 1000)}
+        vacantes = []
+        for d in self._paginas("catalogo_vacantes", "id", {"status": "eq.active", "select": self.CAMPOS_ESTIMACION}, 1000):
+            if d.get("duplicada_de") or d.get("verificacion") == "rechazada":
+                continue
+            if {d["id"], *(d.get("ids_agrupados") or [])} & entregadas:
+                continue
+            vacantes.append(ligera(d))
+        return {"vacantes": vacantes, "actualizado": datetime.now(timezone.utc).isoformat(timespec="minutes")}
+
+    def _refrescar(self):
+        with self._lock_carga:  # una sola lectura a la vez; quien llega después usa el resultado
+            try:
+                actual = self._catalogo
+                if actual and time.monotonic() - actual[0] < 60:
+                    return actual[1]
+                resultado = self._leer_catalogo()
+                self._catalogo = (time.monotonic(), resultado)
+                return resultado
+            finally:
+                self._refrescando = False
+
     def catalogo_vigente(self, vigencia=1800):
         """Vacantes activas, sin copias, sin enlaces rechazados y nunca entregadas; reducidas a lo que usan los filtros.
-        Se reutiliza durante `vigencia` segundos para que estimar no recorra el catálogo en cada cambio del borrador."""
-        from panel.afinidad import ligera
+        Solo la primera lectura hace esperar: después se responde con la copia en memoria y, si tiene más de `vigencia`
+        segundos, se renueva en segundo plano."""
         with self._lock_catalogo:
-            if self._catalogo and time.monotonic() - self._catalogo[0] < vigencia:
-                return self._catalogo[1]
-            entregadas = {f["vacante_id"] for f in self._paginas("entregas_diarias", "vacante_id",
-                                                                 {"select": "vacante_id"}, 1000)}
-            vacantes = []
-            for f in self._paginas("catalogo_vacantes", "id",
-                                   {"status": "eq.active", "select": "id,datos,description_full"}):
-                d = dict(f.get("datos") or {}, id=f["id"])
-                if d.get("duplicada_de") or (d.get("verificacion") or {}).get("estado") == "rechazada":
-                    continue
-                if {f["id"], *(d.get("ids_agrupados") or [])} & entregadas:
-                    continue
-                vacantes.append(ligera(d, f.get("description_full") or ""))
-            resultado = {"vacantes": vacantes,
-                         "actualizado": datetime.now(timezone.utc).isoformat(timespec="minutes")}
-            self._catalogo = (time.monotonic(), resultado)
-            return resultado
+            actual = self._catalogo
+            if actual and time.monotonic() - actual[0] >= vigencia and not self._refrescando:
+                self._refrescando = True
+                Thread(target=self._refrescar_silencioso, daemon=True).start()
+        return actual[1] if actual else self._refrescar()
+
+    def _refrescar_silencioso(self):
+        try:
+            self._refrescar()
+        except Exception:  # se conserva la copia anterior; el siguiente uso lo reintenta
+            pass
 
     def resultados(self, cliente_id, fecha=None):
         ejecuciones = self.pedir("GET", "panel_ejecuciones",
