@@ -101,3 +101,21 @@ export type VistaPrevia = {
   cargos?: Record<string, EstimacionCargo>;
   nota?: string;
 };
+export type EstimacionEnVivo = {
+  incompleto?: boolean;
+  ocupado?: boolean;
+  espera?: number;
+  error?: string;
+  compatibles?: number;
+  del_cargo?: number;
+  nuevas?: number;
+  ya_entregadas?: number;
+  avisos?: number;
+  limitantes?: Limitante[];
+  fuentes?: Record<
+    string,
+    { avisos?: number; busquedas?: number; fallidas?: number; error?: boolean }
+  >;
+  segundos?: number;
+  nota?: string;
+};

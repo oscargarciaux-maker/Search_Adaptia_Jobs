@@ -53,6 +53,7 @@ import type {
   Ejecucion,
   Vacante,
   EstimacionCargo,
+  EstimacionEnVivo,
   EstimacionPerfil,
   VistaPrevia,
 } from "./types";
@@ -517,6 +518,116 @@ function PreviewPerfil({
   );
 }
 
+function EnVivo({
+  config,
+  perfilId,
+  onAjustar,
+}: {
+  config: Configuracion;
+  perfilId: string;
+  onAjustar: (cambio: Partial<Perfil>) => void;
+}) {
+  const [r, setR] = useState<EstimacionEnVivo | null>(null);
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState("");
+  async function estimar() {
+    setCargando(true);
+    setError("");
+    try {
+      const x = await api<EstimacionEnVivo>("/estimacion-en-vivo", {
+        method: "POST",
+        body: JSON.stringify({ configuracion: config, perfil_id: perfilId }),
+      });
+      if (x.incompleto) setError("Completa el perfil antes de buscar.");
+      else if (x.ocupado || x.espera || x.error)
+        setError(x.nota || x.error || "");
+      else setR(x);
+    } catch {
+      setError("No se pudo buscar en este momento. Inténtalo más tarde.");
+    } finally {
+      setCargando(false);
+    }
+  }
+  const fallo =
+    r?.fuentes &&
+    Object.entries(r.fuentes)
+      .filter(([, f]) => f.error || (f.busquedas && f.fallidas === f.busquedas))
+      .map(([n]) => n);
+  return (
+    <div className="live">
+      <button
+        type="button"
+        className="button secondary small"
+        disabled={cargando}
+        onClick={estimar}
+      >
+        {cargando ? (
+          <Loader2 size={14} className="spin" />
+        ) : (
+          <Search size={14} />
+        )}
+        {cargando
+          ? "Buscando en LinkedIn y Get on Board… (hasta 30 s)"
+          : r
+            ? "Repetir búsqueda en vivo"
+            : "Estimar con búsqueda en vivo"}
+      </button>
+      {error && (
+        <p className="live-note" role="status">
+          {error}
+        </p>
+      )}
+      {r && !cargando && (
+        <div className="live-result" role="status" aria-live="polite">
+          <p className="preview-main">
+            <Target size={15} />
+            <span>
+              <strong>≈ {r.compatibles}</strong>{" "}
+              {r.compatibles === 1
+                ? "encontrada ahora en las fuentes cumple"
+                : "encontradas ahora en las fuentes cumplen"}{" "}
+              este perfil
+              <span className="preview-sub">
+                {" "}
+                · {r.nuevas} aún no guardadas · {r.del_cargo} del cargo en{" "}
+                {r.avisos} avisos revisados
+                {r.ya_entregadas ? ` · ${r.ya_entregadas} ya entregadas` : ""}
+              </span>
+            </span>
+          </p>
+          {!!r.limitantes?.length && (
+            <ul className="preview-tips">
+              {r.limitantes.slice(0, 2).map((l) => (
+                <li key={l.motivo}>
+                  <span>
+                    {l.sugerencia}: <strong>+{l.vacantes}</strong>
+                  </span>
+                  {ajustesSinDato[l.motivo] && (
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() => onAjustar(ajustesSinDato[l.motivo])}
+                    >
+                      Aplicar
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {!!fallo?.length && (
+            <p className="live-note">
+              {fallo.join(" y ")} no respondió esta vez; el número puede quedar
+              corto.
+            </p>
+          )}
+          <p className="live-note">{r.nota}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const textoEstadoCargo: Record<EstimacionCargo["estado"], string> = {
   alcanza: "alcanza para el cupo",
   justo: "puede quedar corto",
@@ -573,14 +684,15 @@ function ClienteDialog({
   function patch(id: string, v: Partial<Perfil>) {
     setPs(ps.map((p) => (p.id === id ? { ...p, ...v } : p)));
   }
-  const previa = useVistaPrevia({
+  const borrador: Configuracion = {
     ...config,
     clientes: [
       ...config.clientes.filter((x) => x.id !== c.id),
       { ...c, nombre: c.nombre.trim() || "Cliente", activo: true },
     ],
     perfiles: [...config.perfiles.filter((p) => p.cliente_id !== c.id), ...ps],
-  });
+  };
+  const previa = useVistaPrevia(borrador);
   return (
     <Dialog
       ancho
@@ -893,6 +1005,11 @@ function ClienteDialog({
             <PreviewPerfil
               info={previa.datos?.perfiles?.[p.id]}
               estado={previa.estado}
+              onAjustar={(cambio) => patch(p.id, cambio)}
+            />
+            <EnVivo
+              config={borrador}
+              perfilId={p.id}
               onAjustar={(cambio) => patch(p.id, cambio)}
             />
           </section>

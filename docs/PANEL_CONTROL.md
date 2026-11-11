@@ -22,12 +22,19 @@ Ambas se aplican por el instalador automático tras el respaldo; no hace falta c
    variantes y vocabulario disponible. Al guardar un cargo nuevo sin términos, primero se muestran sugerencias para
    revisarlas; después se confirma. Se puede escribir cualquier cargo y añadir términos sin modificar código.
 3. En **Clientes → Nuevo cliente**, usar un nombre o referencia interna. No se necesita teléfono ni contraseña del cliente.
-4. Añadir uno o más perfiles y elegir el cargo, los países desde los que puede trabajar, modalidad, plazo de publicación,
-   idioma del aviso, experiencia e inglés. Un cliente puede tener varios perfiles.
+4. Añadir uno o más perfiles y elegir el cargo, **el país donde vive**, **las modalidades que acepta** (remoto, híbrido,
+   presencial; una o varias), plazo de publicación, idioma del aviso, experiencia e inglés. Remoto incluye toda vacante
+   remota abierta a su país (LATAM, Latinoamérica, mundial, España abierta a LATAM, listas que lo nombran); híbrido y
+   presencial, solo con oficina en su país o en los opcionales «También se mudaría a…». Reglas: CONTRATO_DATOS_v8.md.
+   Un cliente puede tener varios perfiles.
    Debajo de cada perfil aparece una **estimación**: cuántas vacantes ya guardadas y aún no entregadas cumplirían hoy
    ese perfil, y qué ajuste sumaría más (con «Aplicar» para admitir datos no informados). En **Cargos y cupos** cada
    cargo muestra «alcanza para el cupo», «puede quedar corto» o «probable faltante». Usa las mismas reglas de la
    selección, no busca en internet ni guarda nada; un cargo nuevo empieza bajo porque todavía no se ha buscado.
+   **Estimar con búsqueda en vivo** hace, solo al pulsarlo, una búsqueda corta (hasta 30 s) en LinkedIn público y
+   Get on Board, sin Apify ni cookies, aplica los mismos filtros y descuenta las ya entregadas. Es una muestra: la
+   búsqueda nocturna revisa más páginas y portales. Para no exponer la IP del servidor a bloqueos de LinkedIn, solo
+   corre una a la vez y el mismo perfil espera 2 minutos entre repeticiones; ante un bloqueo no insiste.
 5. **Guardar borrador** conserva los cambios; todavía no cambia la búsqueda confirmada. Una advertencia muestra cambios
    sin guardar. Si otra ventana guardó antes, se rechaza la revisión antigua: recargar y revisar antes de guardar otra vez.
 6. **Programar para mañana** muestra la distribución, guarda los cambios pendientes y confirma una versión inmutable.
@@ -90,7 +97,7 @@ El historial puede seguir sumando 120 mientras algunas oportunidades ya no está
 | panel/modelos.py | Reglas de configuración y límites: referencias, países, rangos, cupos y publicación |
 | panel/terminos.py | Variantes ortográficas, términos editables y consulta opcional al vocabulario público ESCO |
 | panel/afinidad.py | Comprobaciones explicables de país, modo, publicación, idioma, experiencia e inglés |
-| panel/servicio.py | Resultados según catálogo actual, texto WhatsApp y estimación previa por perfil/cargo; excluye enlaces/criterios vencidos |
+| panel/servicio.py | Resultados según catálogo actual, texto WhatsApp, estimación previa por perfil/cargo y estimación en vivo (fuentes públicas, sin Apify); excluye enlaces/criterios vencidos |
 | panel/repositorio.py | Lectura/escritura Supabase; repositorio ficticio separado exclusivamente para demo |
 | panel/ejecutor.py | Carga la versión diaria, prepara búsquedas dirigidas, ejecuta el motor y asigna por perfil |
 | buscador | Fuentes, extracción, identidad, comprobación de enlaces, presupuesto y sincronización |

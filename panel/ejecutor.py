@@ -20,6 +20,20 @@ def validar_version(version):
         raise RuntimeError("La configuración privada no es válida; revísala en el panel. No se muestran datos de clientes.") from None
 
 
+def lugares_perfil(p, nombres=None):
+    """Contrato v8: su país (remoto si lo acepta), las remotas regionales y, con híbrido/presencial, sus oficinas."""
+    nombres = nombres or {x["codigo"]: x["nombre"] for x in paises.datos()["paises"]}
+    lugares = {}
+    if "remoto" in p.modalidades:
+        lugares["REMOTO_" + p.vive_en] = {"location": nombres[p.vive_en], "f_WT": "2"}
+        lugares["REMOTO"] = {"location": "Latin America", "f_WT": "2"}
+        lugares["REMOTO_MUNDO"] = {"location": "Worldwide", "f_WT": "2"}
+    if {"hibrido", "presencial"} & set(p.modalidades):
+        for codigo in p.paises_oficina:
+            lugares[codigo] = {"location": nombres[codigo]}
+    return lugares
+
+
 def preparar(version, fecha):
     cfg = validar_version(version)
     mapa, roles = [], []
@@ -32,15 +46,8 @@ def preparar(version, fecha):
         if not raw["terminos_exactos"]:
             raw["terminos_exactos"] = sugerir(c.nombre, consultar_esco=False)["terminos_exactos"]
         lugares = {}
-        for p in perfiles:  # contrato v8: su país, remotas regionales y países extra presenciales
-            oficina = {"hibrido", "presencial"} & set(p.modalidades)
-            if "remoto" in p.modalidades:
-                lugares["REMOTO_" + p.vive_en] = {"location": nombres[p.vive_en], "f_WT": "2"}
-                lugares["REMOTO"] = {"location": "Latin America", "f_WT": "2"}
-                lugares["REMOTO_MUNDO"] = {"location": "Worldwide", "f_WT": "2"}
-            if oficina:
-                for codigo in p.paises_oficina:
-                    lugares[codigo] = {"location": nombres[codigo]}
+        for p in perfiles:
+            lugares.update(lugares_perfil(p, nombres))
         rid = "cargo:" + str(c.id)
         mapa.append({"id": rid, "nombre": c.nombre, "consultas": [c.nombre, *raw["terminos_exactos"], *raw["terminos_similares"]],
             "exactos": raw["terminos_exactos"], "similares": raw["terminos_similares"], "cercanos": [],

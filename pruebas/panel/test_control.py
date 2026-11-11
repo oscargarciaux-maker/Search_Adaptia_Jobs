@@ -477,3 +477,113 @@ def test_api_muestra_perfiles_v6_ya_convertidos():
                    "publicada": {"configuracion": {"perfiles": [dict(antiguo)]}}})
     for p in (estado["borrador"]["perfiles"][0], estado["publicada"]["configuracion"]["perfiles"][0]):
         assert p["vive_en"] == "MX" and p["paises_presenciales_extra"] == ["CO"] and len(p["modalidades"]) == 3
+
+
+# ── Estimación con búsqueda en vivo ────────────────────────────────────────────────────────────────────────────────
+
+@pytest.fixture
+def en_vivo(monkeypatch):
+    monkeypatch.setattr(servicio, "_ULTIMA", {})
+    from buscador.fuentes import linkedin_apify, publicaciones_apify
+
+    def prohibido(*a, **k):
+        raise AssertionError("la estimación en vivo nunca usa Apify")
+    monkeypatch.setattr(linkedin_apify, "buscar", prohibido)
+    monkeypatch.setattr(publicaciones_apify, "buscar", prohibido)
+
+
+def _crudo(titulo, ubicacion, n, remoto=None, dias=1):
+    texto = "We design digital products with a collaborative team and research users every week. " * 3
+    return {"titulo": titulo, "empresa": f"Empresa {n}", "ubicacion": ubicacion, "descripcion": texto,
+            "fecha": (date.fromisoformat(hoy()) - timedelta(days=dias)).isoformat(),
+            "enlace": f"https://www.linkedin.com/jobs/view/{4100000000 + n}", "remoto": remoto, "fuente": "LinkedIn"}
+
+
+def test_en_vivo_aplica_cargo_y_filtros_del_perfil_y_no_devuelve_vacantes(cfg, en_vivo):
+    cfg["perfiles"][0].update(vive_en="MX", modalidades=["remoto"], experiencia_min=None, experiencia_max=None,
+                              ingles_maximo="sin_filtro", antiguedad_dias=14)
+    crudas = [_crudo("Product Designer", "Remote - LATAM", 1, True),
+              _crudo("UX Designer", "Remote - Worldwide", 2, True),
+              _crudo("Product Designer", "Remote - Worldwide", 2, True),  # mismo enlace: se cuenta una vez
+              _crudo("Product Designer", "Bogotá, Colombia", 3),            # presencial en otro país
+              _crudo("Product Designer", "Remote - LATAM", 4, True, dias=20),  # fuera del plazo
+              _crudo("Contador", "Remote - LATAM", 5, True)]                 # otro cargo
+    llamadas = []
+
+    def fuentes(cargo, perfil, limite):
+        llamadas.append((cargo["nombre"], perfil.vive_en, limite))
+        return crudas, {"LinkedIn": {"avisos": len(crudas)}}
+    c = Configuracion.model_validate(cfg)
+    r = servicio.estimacion_en_vivo(RepositorioDemo(), c, cfg["perfiles"][0]["id"], fuentes=fuentes)
+    assert llamadas == [("Product Designer", "MX", servicio.LIMITE_SEGUNDOS)]
+    assert r["del_cargo"] == 4 and r["compatibles"] == 2 and r["nuevas"] == 2
+    assert [l["motivo"] for l in r["limitantes"]] == ["publicación fuera del plazo"]  # Bogotá falla dos filtros
+    assert "vacantes" not in r and "Es una muestra" in r["nota"]
+
+
+def test_en_vivo_espera_entre_busquedas_del_mismo_perfil_y_una_a_la_vez(cfg, en_vivo):
+    c = Configuracion.model_validate(cfg)
+    reloj = iter([100.0, 101.0, 150.0, 230.0, 231.0])
+    vacias = lambda *a: ([], {})
+    pid = cfg["perfiles"][0]["id"]
+    assert "compatibles" in servicio.estimacion_en_vivo(RepositorioDemo(), c, pid, fuentes=vacias, reloj=lambda: next(reloj))
+    r = servicio.estimacion_en_vivo(RepositorioDemo(), c, pid, fuentes=vacias, reloj=lambda: next(reloj))
+    assert r["espera"] == 71 and "compatibles" not in r
+    assert "compatibles" in servicio.estimacion_en_vivo(RepositorioDemo(), c, pid, fuentes=vacias, reloj=lambda: next(reloj))
+    servicio._EN_CURSO.acquire()
+    try:
+        assert servicio.estimacion_en_vivo(RepositorioDemo(), c, cfg["perfiles"][1]["id"], fuentes=vacias)["ocupado"]
+    finally:
+        servicio._EN_CURSO.release()
+
+
+def test_en_vivo_excluye_ya_entregadas(cfg, en_vivo):
+    cfg["perfiles"][0].update(vive_en="CO", modalidades=["remoto"], experiencia_min=None, experiencia_max=None,
+                              ingles_maximo="sin_filtro")
+    crudas = [_crudo("Product Designer", "Remote - LATAM", n, True) for n in (1, 2)]
+    entregada = vacante.crear(**{k: crudas[0][k] for k in ("titulo", "empresa", "enlace")}, fuente="LinkedIn")["id"]
+    repo = RepositorioDemo()
+    repo._catalogo = {"vacantes": [], "entregadas": {entregada}, "actualizado": "x"}
+    r = servicio.estimacion_en_vivo(repo, Configuracion.model_validate(cfg), cfg["perfiles"][0]["id"],
+                                    fuentes=lambda *a: (crudas, {}))
+    assert r["ya_entregadas"] == 1 and r["compatibles"] == 1
+
+
+def test_fuentes_publicas_respetan_limite_sin_reintentar_429(cfg, monkeypatch):
+    from buscador.fuentes import getonbrd, linkedin_publico
+    vistos = {}
+
+    def li(cliente, mapa, activos, estado, presupuesto, **k):
+        vistos["li"] = (presupuesto, k["limite_segundos"], k["max_dias"], k["max_paginas"], dict(mapa[0]["lugares"]))
+        cliente.get("https://www.linkedin.com/x")
+        return [], {"busquedas": 1}
+
+    def gob(cliente, consultas):
+        vistos["gob"] = consultas
+        raise RuntimeError("caída")
+
+    class Falso:
+        def __init__(self, **k): pass
+        def get(self, url, params=None, reintentar_429=True, **k):
+            vistos["reintentar"] = reintentar_429
+    monkeypatch.setattr(linkedin_publico, "buscar", li)
+    monkeypatch.setattr(getonbrd, "buscar", gob)
+    monkeypatch.setattr("buscador.http.Cliente", Falso)
+    p = Perfil.model_validate({**cfg["perfiles"][0], "vive_en": "MX", "modalidades": ["remoto"], "antiguedad_dias": 7})
+    cargo = cfg["cargos"][0]
+    _, fuentes = servicio.fuentes_publicas(cargo, p, 25)
+    presupuesto, limite, dias, paginas, lugares = vistos["li"]
+    assert limite < 25 and dias == 7 and paginas == 1 and presupuesto == len(lugares)
+    assert set(lugares) == {"REMOTO_MX", "REMOTO", "REMOTO_MUNDO"} and vistos["reintentar"] is False
+    assert fuentes["Get on Board"] == {"error": True} and "LinkedIn" in fuentes
+
+
+def test_api_en_vivo_en_demo_no_sale_a_internet(monkeypatch):
+    monkeypatch.setattr(servicio, "_ULTIMA", {})
+    monkeypatch.setattr(servicio, "fuentes_publicas", lambda *a: (_ for _ in ()).throw(AssertionError("internet")))
+    api = TestClient(crear_app(demo=True, repositorio=RepositorioDemo()))
+    cfg = api.get("/api/config").json()["borrador"]
+    r = api.post("/api/estimacion-en-vivo", json={"configuracion": cfg, "perfil_id": cfg["perfiles"][0]["id"]},
+                 headers={"origin": "http://testserver"}).json()
+    assert r["fuentes"] == {"Demostración": {"avisos": r["avisos"], "busquedas": 0, "fallidas": 0}}
+    assert r["del_cargo"] >= r["compatibles"] >= 0

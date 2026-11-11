@@ -102,7 +102,8 @@ class RepositorioSupabase:
             if {d["id"], *(d.get("ids_agrupados") or [])} & entregadas:
                 continue
             vacantes.append(ligera(d))
-        return {"vacantes": vacantes, "actualizado": datetime.now(timezone.utc).isoformat(timespec="minutes")}
+        return {"vacantes": vacantes, "entregadas": entregadas,
+                "actualizado": datetime.now(timezone.utc).isoformat(timespec="minutes")}
 
     def _refrescar(self):
         with self._lock_carga:  # una sola lectura a la vez; quien llega después usa el resultado
@@ -248,6 +249,23 @@ class RepositorioDemo:
             vacantes.append(ligera(datos, texto))
         self._catalogo = {"vacantes": vacantes, "actualizado": self.creada.isoformat(timespec="minutes")}
         return self._catalogo
+
+    def fuentes_en_vivo(self, cargo, perfil, limite_segundos):
+        """Demostración: avisos ficticios en vez de consultar LinkedIn o Get on Board (no sale a internet)."""
+        azar = random.Random(cargo["nombre"] + perfil.vive_en + ",".join(perfil.modalidades))
+        lugares = ["Remote - LATAM", "Remote - Worldwide", "Remoto, " + perfil.vive_en, "Remote - Brazil",
+                   "Madrid, Spain", "Ciudad de México, México", "Bogotá, Colombia", "Remote - United States"]
+        terminos = [cargo["nombre"], *cargo["terminos_exactos"], *cargo["terminos_similares"]][:4]
+        crudas = []
+        for n in range(azar.randint(18, 34)):
+            descripcion = ("We require %d years of experience. " % azar.randint(1, 7) if azar.random() < 0.3 else "")
+            descripcion += ("English B2 required. " if azar.random() < 0.15 else "") + "Equipo de producto digital. " * 3
+            crudas.append({"titulo": azar.choice(terminos), "empresa": "Empresa ficticia %02d" % n,
+                           "ubicacion": azar.choice(lugares), "descripcion": descripcion,
+                           "fecha": (datetime.fromisoformat(hoy()) - timedelta(days=azar.randint(0, 25))).date().isoformat(),
+                           "enlace": "https://www.linkedin.com/jobs/view/%d" % (4000000000 + azar.randint(0, 10**8)),
+                           "remoto": True if azar.random() < 0.5 else None, "fuente": "Demostración"})
+        return crudas, {"Demostración": {"avisos": len(crudas), "busquedas": 0, "fallidas": 0}}
 
     def ejecuciones(self):
         return [{"id": id_demo("ejecucion"), "fecha": hoy(), "revision": 1, "estado": "completa",

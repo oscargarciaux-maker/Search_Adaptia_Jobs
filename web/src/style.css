@@ -2911,3 +2911,27 @@ h1 {
   color: #718362;
   margin-bottom: 8px;
 }
+.live {
+  margin-top: 10px;
+}
+.live .button.small {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  padding: 7px 11px;
+}
+.live-result {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #f3f5fa;
+  border: 1px solid #e0e5ef;
+  font-size: 12px;
+}
+.live-note {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #6f7d73;
+}

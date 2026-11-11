@@ -42,6 +42,14 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await expect(dialog.getByText("Seleccionar LATAM y España")).toHaveCount(0);
   await dialog.getByLabel("Presencial en el perfil 1").check();
   await expect(dialog.getByText("También se mudaría a…")).toBeVisible();
+  // Estimación en vivo: en demostración usa avisos ficticios y no sale a internet.
+  await dialog
+    .getByRole("button", { name: "Estimar con búsqueda en vivo" })
+    .click();
+  await expect(
+    dialog.getByText(/encontradas? ahora en las fuentes cumplen?/),
+  ).toBeVisible();
+  await expect(dialog.getByText(/Es una muestra/)).toBeVisible();
   // Vista previa: estima con el catálogo y permite admitir datos no informados.
   await expect(dialog.getByText(/cumplen? este perfil/)).toBeVisible();
   const aplicar = dialog.getByRole("button", { name: "Aplicar", exact: true });

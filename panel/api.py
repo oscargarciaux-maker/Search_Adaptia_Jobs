@@ -15,7 +15,7 @@ import requests
 
 from buscador import paises
 from panel import servicio
-from panel.modelos import Configuracion, Credenciales, Expansion, Guardar, Perfil, Publicar, VistaPrevia
+from panel.modelos import Configuracion, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia
 from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase
 from panel.terminos import sugerir
 
@@ -165,6 +165,14 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         except ValueError:  # incluye ValidationError: borrador a medio editar
             return {"incompleto": True}
         return servicio.vista_previa(repo, cfg)
+
+    @app.post("/api/estimacion-en-vivo")
+    def en_vivo(body: EnVivo):
+        try:
+            cfg = Configuracion.model_validate(body.configuracion)
+        except ValueError:
+            return {"incompleto": True}
+        return servicio.estimacion_en_vivo(repo, cfg, body.perfil_id)
 
     @app.get("/api/ejecuciones")
     def ejecuciones():

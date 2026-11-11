@@ -167,6 +167,12 @@ class Publicar(Modelo):
     revision: int = Field(ge=0, strict=True)
 
 
+class EnVivo(Modelo):
+    """Borrador sin guardar y el perfil que se quiere estimar con una búsqueda corta en las fuentes públicas."""
+    configuracion: dict
+    perfil_id: str = Field(min_length=1, max_length=64)
+
+
 class VistaPrevia(Modelo):
     """Borrador sin guardar que se quiere estimar; no se persiste. Se valida en el endpoint: mientras se edita puede
     estar incompleto y eso no es un error del servidor."""
