@@ -13,8 +13,9 @@ export type Perfil = {
   cliente_id: string;
   cargo_id: string;
   activo: boolean;
-  paises: string[];
-  modalidad: string;
+  vive_en: string;
+  modalidades: string[];
+  paises_presenciales_extra: string[];
   antiguedad_dias: number;
   idiomas: string[];
   ingles_maximo: string;

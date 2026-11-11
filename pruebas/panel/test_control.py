@@ -263,7 +263,7 @@ def test_cambio_de_titulo_actual_invalida_asignacion_historica():
 
 def test_reparto_considera_clientes_sin_cubrir_dentro_del_mismo_cargo(cfg):
     p1, p2 = deepcopy(cfg["perfiles"][:2])
-    p1["paises"], p2["paises"] = ["CO"], ["ES"]
+    p1["vive_en"], p2["vive_en"] = "CO", "ES"
     candidatas = [(trabajo(id=str(i), empresa="Empresa " + str(i), paises=[pais], confianza_pais="alta"), "exacto")
                   for i, pais in enumerate(["CO"] * 5 + ["ES"] * 5)]
     elegidas = entrega.variadas(candidatas, 4, 2, hoy(), perfiles=[p1, p2])
@@ -363,7 +363,7 @@ def test_vista_previa_api_no_guarda_ni_devuelve_vacantes_ni_clientes(cfg):
         assert set(r.json()["perfiles"]) == {p["id"] for p in cfg["perfiles"]}
         assert c.get("/api/config").json()["revision"] == 1 and repo.config()["borrador"] == cfg
         incompleto = deepcopy(cfg)
-        incompleto["perfiles"][0]["paises"] = []
+        incompleto["perfiles"][0]["modalidades"] = []
         r = c.post("/api/vista-previa", json={"configuracion": incompleto}, headers={"Origin": "http://testserver"})
         assert r.status_code == 200 and r.json() == {"incompleto": True}
 
@@ -415,3 +415,65 @@ def test_ingles_precalculado_en_el_catalogo_da_el_mismo_veredicto():
         ligera = afinidad.ligera(datos)
         for p in perfiles:
             assert afinidad.evaluar(ligera, p, hoy()) == afinidad.evaluar(v, p, hoy())
+
+
+# ── Contrato v8: país de residencia y modalidades ──────────────────────────────────────────────────────────────────
+
+def _vacante_en(ubicacion, titulo="Product Designer"):
+    from buscador import paises as geo
+    lugar = geo.elegibles(titulo, ubicacion, "", None)
+    return trabajo(paises=lugar["paises"], modalidad=lugar["modalidad"], confianza_pais=lugar["confianza"])
+
+
+@pytest.mark.parametrize("ubicacion,esperado", [
+    ("Remote - LATAM", True), ("Remoto Latinoamérica", True), ("Madrid, Spain (Remote, open to LATAM)", True),
+    ("Remote - Mexico, Colombia, Argentina", True), ("Remote - Worldwide", True),
+    ("Remote - South America", False), ("Remoto, Brazil", False), ("Bogotá, Colombia", False),
+])
+def test_vive_en_mexico_y_acepta_remoto_recibe_las_remotas_abiertas_a_mexico(ubicacion, esperado):
+    p = Perfil.model_validate({"id": str(uuid4()), "cliente_id": str(uuid4()), "cargo_id": str(uuid4()),
+                               "vive_en": "MX", "modalidades": ["remoto"]})
+    assert afinidad.evaluar(_vacante_en(ubicacion), p, hoy())["compatible"] is esperado
+
+
+def test_presencial_solo_en_su_pais_o_en_los_que_se_mudaria():
+    base = {"id": str(uuid4()), "cliente_id": str(uuid4()), "cargo_id": str(uuid4()), "vive_en": "MX",
+            "modalidades": ["presencial", "hibrido"]}
+    bogota, cdmx = _vacante_en("Bogotá, Colombia"), _vacante_en("Ciudad de México, México")
+    assert bogota["modalidad"] == "presencial" and cdmx["modalidad"] == "presencial"
+    p = Perfil.model_validate(base)
+    assert afinidad.evaluar(cdmx, p, hoy())["compatible"]
+    r = afinidad.evaluar(bogota, p, hoy())
+    assert not r["compatible"] and "oficina en otro país" in r["motivos"]
+    assert afinidad.evaluar(bogota, Perfil.model_validate({**base, "paises_presenciales_extra": ["CO"]}), hoy())["compatible"]
+    # Solo presencial: una remota abierta a México no entra.
+    assert not afinidad.evaluar(_vacante_en("Remote - LATAM"), p, hoy())["compatible"]
+
+
+@pytest.mark.parametrize("antiguo,vive,mods,extra", [
+    ({"paises": ["MX"], "modalidad": "remoto"}, "MX", ["remoto"], []),
+    ({"paises": ["CO", "PE", "ES"], "modalidad": "cualquiera"}, "CO", ["remoto", "hibrido", "presencial"], ["PE", "ES"]),
+    ({"paises": ["NI"], "modalidad": "presencial"}, "NI", ["presencial"], []),
+])
+def test_perfiles_v6_se_leen_como_v8_sin_migracion(antiguo, vive, mods, extra):
+    p = Perfil.model_validate({"id": str(uuid4()), "cliente_id": str(uuid4()), "cargo_id": str(uuid4()), **antiguo})
+    assert (p.vive_en, p.modalidades, p.paises_presenciales_extra) == (vive, mods, extra)
+    assert "paises" not in p.model_dump() and "modalidad" not in p.model_dump()
+
+
+def test_busqueda_dirigida_por_residencia_y_remotas_regionales(cfg):
+    cfg["perfiles"][0].update(vive_en="MX", modalidades=["remoto", "presencial"], paises_presenciales_extra=["CO"])
+    mapa, _, _ = ejecutor.preparar({"configuracion": cfg}, hoy())
+    lugares = dict(next(m for m in mapa if m["id"] == "cargo:" + cfg["perfiles"][0]["cargo_id"])["lugares"])
+    assert lugares["REMOTO_MX"]["f_WT"] == "2" and lugares["REMOTO"]["location"] == "Latin America"
+    assert "REMOTO_MUNDO" in lugares and "MX" in lugares and "CO" in lugares
+
+
+def test_api_muestra_perfiles_v6_ya_convertidos():
+    from panel.api import a_v8
+    antiguo = {"id": str(uuid4()), "cliente_id": str(uuid4()), "cargo_id": str(uuid4()),
+               "paises": ["MX", "CO"], "modalidad": "cualquiera"}
+    estado = a_v8({"revision": 3, "borrador": {"perfiles": [dict(antiguo)]},
+                   "publicada": {"configuracion": {"perfiles": [dict(antiguo)]}}})
+    for p in (estado["borrador"]["perfiles"][0], estado["publicada"]["configuracion"]["perfiles"][0]):
+        assert p["vive_en"] == "MX" and p["paises_presenciales_extra"] == ["CO"] and len(p["modalidades"]) == 3

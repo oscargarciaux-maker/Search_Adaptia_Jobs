@@ -27,12 +27,19 @@ def evaluar(v, perfil, hoy=None):
     p = perfil if isinstance(perfil, Perfil) else Perfil.model_validate(perfil)
     hoy = date.fromisoformat(hoy) if isinstance(hoy, str) else hoy or date.today()
     motivos, pruebas = [], []
-    if not set(v.get("paises") or []) & set(p.paises) or v.get("confianza_pais") not in {"alta", "media"}:
-        motivos.append("país sin elegibilidad confirmada")
-    else:
-        pruebas.append("Ubicación compatible")
-    if p.modalidad != "cualquiera" and v.get("modalidad") != p.modalidad:
+    # Contrato v8: remoto → que admita postular desde su país; híbrido/presencial → oficina en su país o en los extra.
+    modo, paises_v = v.get("modalidad"), set(v.get("paises") or [])
+    todas = {"remoto", "hibrido", "presencial"} <= set(p.modalidades)
+    if modo in ("remoto", "hibrido", "presencial") and modo not in p.modalidades or (modo not in ("remoto", "hibrido", "presencial") and not todas):
         motivos.append("modalidad diferente")
+    if v.get("confianza_pais") not in {"alta", "media"}:
+        motivos.append("país sin elegibilidad confirmada")
+    elif modo in ("hibrido", "presencial") and not paises_v & set(p.paises_oficina):
+        motivos.append("oficina en otro país")
+    elif modo not in ("hibrido", "presencial") and p.vive_en not in paises_v:
+        motivos.append("no admite postular desde su país")
+    else:
+        pruebas.append("Remota abierta a su país" if modo == "remoto" else "Ubicación compatible")
     if v.get("idioma") not in p.idiomas:
         motivos.append("idioma del aviso diferente")
     publicada = tiempos.instante(v.get("publicada_en"))

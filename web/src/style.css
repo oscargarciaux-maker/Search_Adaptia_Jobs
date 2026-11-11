@@ -2891,3 +2891,23 @@ h1 {
   background: #f6e8cc;
   color: #7e5f25;
 }
+
+.field.plain legend {
+  font-size: 11px;
+  font-weight: 550;
+  color: #718362;
+  margin-bottom: 6px;
+}
+.field-help {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #7d926a;
+}
+.mudanza summary {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 550;
+  color: #718362;
+  margin-bottom: 8px;
+}

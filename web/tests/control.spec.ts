@@ -32,6 +32,16 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await dialog.getByLabel("Cargo del perfil 1").selectOption({ label: "QA" });
   await dialog.getByLabel("Antigüedad del perfil 1").selectOption("7");
   await dialog.getByLabel("Experiencia máxima del perfil 1").fill("4");
+  // Contrato v8: país de residencia y varias modalidades, sin las 21 casillas.
+  await dialog
+    .getByLabel("País de residencia del perfil 1")
+    .selectOption({ label: "México" });
+  await expect(
+    dialog.getByText(/Remoto incluye vacantes de LATAM/),
+  ).toBeVisible();
+  await expect(dialog.getByText("Seleccionar LATAM y España")).toHaveCount(0);
+  await dialog.getByLabel("Presencial en el perfil 1").check();
+  await expect(dialog.getByText("También se mudaría a…")).toBeVisible();
   // Vista previa: estima con el catálogo y permite admitir datos no informados.
   await expect(dialog.getByText(/cumplen? este perfil/)).toBeVisible();
   const aplicar = dialog.getByRole("button", { name: "Aplicar", exact: true });

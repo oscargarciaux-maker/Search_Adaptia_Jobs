@@ -171,7 +171,7 @@ def configuracion_demo():
     for i, c in enumerate(clientes):
         cargo = cargos[0 if i < 3 else i - 2]
         perfiles.append({"id": id_demo("perfil" + str(i)), "cliente_id": c["id"], "cargo_id": cargo["id"],
-            "paises": ["CO"] if i != 1 else ["ES"], "modalidad": "remoto", "antiguedad_dias": 14,
+            "vive_en": "CO" if i != 1 else "ES", "modalidades": ["remoto"], "antiguedad_dias": 14,
             "idiomas": ["es", "en"], "ingles_maximo": "B2", "experiencia_min": 0, "experiencia_max": 5,
             "aceptar_experiencia_sin_dato": False, "aceptar_ingles_sin_dato": False, "activo": True})
     return Configuracion(clientes=clientes, cargos=cargos, perfiles=perfiles).model_dump(mode="json")

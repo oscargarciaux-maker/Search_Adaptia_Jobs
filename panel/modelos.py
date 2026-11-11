@@ -59,8 +59,11 @@ class Perfil(Modelo):
     cliente_id: UUID
     cargo_id: UUID
     activo: bool = True
-    paises: list[str] = Field(default_factory=lambda: list(paises.datos()["codigos"]), min_length=1, max_length=21)
-    modalidad: Literal["remoto", "hibrido", "presencial", "cualquiera"] = "remoto"
+    # Contrato v8: dónde vive y qué modalidades acepta (docs/CONTRATO_DATOS_v8.md).
+    vive_en: str = "CO"
+    modalidades: list[Literal["remoto", "hibrido", "presencial"]] = Field(default_factory=lambda: ["remoto"],
+                                                                        min_length=1, max_length=3)
+    paises_presenciales_extra: list[str] = Field(default_factory=list, max_length=21)
     antiguedad_dias: int = Field(default=14, ge=1, le=30)
     idiomas: list[Literal["es", "en"]] = Field(default_factory=lambda: ["es", "en"], min_length=1, max_length=2)
     ingles_maximo: Literal["sin_filtro", "A1", "A2", "B1", "B2", "C1", "C2", "native"] = "sin_filtro"
@@ -69,17 +72,51 @@ class Perfil(Modelo):
     aceptar_experiencia_sin_dato: bool = False
     aceptar_ingles_sin_dato: bool = False
 
-    @field_validator("paises")
+    @model_validator(mode="before")
+    @classmethod
+    def desde_v6(cls, datos):
+        """Perfiles guardados con v6 (paises + modalidad) se leen como v8 sin migración SQL."""
+        if not isinstance(datos, dict) or ("paises" not in datos and "modalidad" not in datos):
+            return datos
+        datos = dict(datos)
+        antiguos = list(dict.fromkeys(datos.pop("paises", None) or []))
+        modalidad = datos.pop("modalidad", None)
+        if antiguos and "vive_en" not in datos:
+            datos["vive_en"] = antiguos[0]
+            datos.setdefault("paises_presenciales_extra", antiguos[1:])
+        if modalidad and "modalidades" not in datos:
+            datos["modalidades"] = ["remoto", "hibrido", "presencial"] if modalidad == "cualquiera" else [modalidad]
+        return datos
+
+    @field_validator("vive_en")
+    @classmethod
+    def residencia(cls, v):
+        if v not in paises.datos()["codigos"]:
+            raise ValueError("La cobertura actual es LATAM y España.")
+        return v
+
+    @field_validator("paises_presenciales_extra")
     @classmethod
     def cobertura(cls, vs):
         if not set(vs) <= set(paises.datos()["codigos"]):
             raise ValueError("La cobertura actual es LATAM y España.")
         return list(dict.fromkeys(vs))
 
+    @field_validator("modalidades")
+    @classmethod
+    def sin_repetir(cls, vs):
+        return list(dict.fromkeys(vs))
+
+    @property
+    def paises_oficina(self):
+        """Países donde aceptaría trabajo híbrido o presencial."""
+        return list(dict.fromkeys([self.vive_en, *self.paises_presenciales_extra]))
+
     @model_validator(mode="after")
     def rango(self):
         if self.experiencia_min is not None and self.experiencia_max is not None and self.experiencia_min > self.experiencia_max:
             raise ValueError("El mínimo de experiencia no puede superar al máximo.")
+        self.paises_presenciales_extra = [c for c in self.paises_presenciales_extra if c != self.vive_en]
         return self
 
 

@@ -11,7 +11,7 @@ SUGERENCIAS = {
     "experiencia no informada": "Admitir experiencia no informada",
     "inglés requerido sin confirmar": "Admitir inglés no informado",
     "publicación fuera del plazo": "Ampliar la antigüedad de publicación",
-    "país sin elegibilidad confirmada": "Añadir más países",
+    "oficina en otro país": "Añadir países a los que se mudaría",
     "modalidad diferente": "Aceptar otra modalidad",
     "idioma del aviso diferente": "Aceptar avisos en español e inglés",
     "experiencia fuera del rango": "Ampliar el rango de experiencia",

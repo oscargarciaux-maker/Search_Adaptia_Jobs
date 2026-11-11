@@ -69,7 +69,6 @@ const modos: Record<string, string> = {
   remoto: "Remoto",
   hibrido: "Híbrido",
   presencial: "Presencial",
-  cualquiera: "Cualquier modalidad",
 };
 const grados: Record<string, string> = {
   exact: "Cargo exacto",
@@ -128,8 +127,9 @@ function perfilNuevo(cliente: string, cargo: string): Perfil {
     cliente_id: cliente,
     cargo_id: cargo,
     activo: true,
-    paises: ["CO"],
-    modalidad: "remoto",
+    vive_en: "CO",
+    modalidades: ["remoto"],
+    paises_presenciales_extra: [],
     antiguedad_dias: 14,
     idiomas: ["es", "en"],
     ingles_maximo: "sin_filtro",
@@ -595,8 +595,10 @@ function ClienteDialog({
             setError("Añade al menos un perfil de búsqueda.");
             return;
           }
-          if (ps.some((p) => !p.paises.length || !p.idiomas.length)) {
-            setError("Selecciona al menos un país y un idioma por perfil.");
+          if (ps.some((p) => !p.modalidades.length || !p.idiomas.length)) {
+            setError(
+              "Selecciona al menos una modalidad y un idioma por perfil.",
+            );
             return;
           }
           if (
@@ -661,63 +663,109 @@ function ClienteDialog({
                 </select>
               </div>
               <div className="field">
-                <label>Modalidad</label>
+                <label htmlFor={"vive-" + p.id}>¿En qué país vive?</label>
                 <select
-                  aria-label={"Modalidad del perfil " + (i + 1)}
-                  value={p.modalidad}
-                  onChange={(e) => patch(p.id, { modalidad: e.target.value })}
+                  id={"vive-" + p.id}
+                  aria-label={"País de residencia del perfil " + (i + 1)}
+                  value={p.vive_en}
+                  onChange={(e) =>
+                    patch(p.id, {
+                      vive_en: e.target.value,
+                      paises_presenciales_extra:
+                        p.paises_presenciales_extra.filter(
+                          (x) => x !== e.target.value,
+                        ),
+                    })
+                  }
                 >
-                  {Object.entries(modos).map(([v, t]) => (
-                    <option value={v} key={v}>
-                      {t}
+                  {paises.map((pais) => (
+                    <option key={pais.codigo} value={pais.codigo}>
+                      {pais.nombre}
                     </option>
                   ))}
                 </select>
               </div>
             </div>
-            <div className="field">
-              <label>Desde dónde puede trabajar</label>
-              <div className="country-grid">
-                {paises.map((pais) => (
-                  <label
-                    className={
-                      "country " +
-                      (p.paises.includes(pais.codigo) ? "selected" : "")
-                    }
-                    key={pais.codigo}
-                  >
+            <fieldset className="field plain">
+              <legend>¿Qué modalidades acepta?</legend>
+              <div className="check-line">
+                {Object.entries(modos).map(([v, t]) => (
+                  <label key={v}>
                     <input
                       type="checkbox"
-                      checked={p.paises.includes(pais.codigo)}
+                      aria-label={t + " en el perfil " + (i + 1)}
+                      checked={p.modalidades.includes(v)}
                       onChange={(e) =>
                         patch(p.id, {
-                          paises: e.target.checked
-                            ? [...p.paises, pais.codigo]
-                            : p.paises.filter((x) => x !== pais.codigo),
+                          modalidades: e.target.checked
+                            ? [...p.modalidades, v]
+                            : p.modalidades.filter((x) => x !== v),
                         })
                       }
                     />
-                    {pais.nombre}
+                    {t}
                   </label>
                 ))}
               </div>
-              <button
-                className="text-button"
-                type="button"
-                onClick={() =>
-                  patch(p.id, {
-                    paises:
-                      p.paises.length === paises.length
-                        ? []
-                        : paises.map((x) => x.codigo),
-                  })
-                }
+              <p className="field-help">
+                {p.modalidades.includes("remoto")
+                  ? "Remoto incluye vacantes de LATAM, España o del mundo abiertas a su país. "
+                  : ""}
+                {p.modalidades.some((m) => m !== "remoto")
+                  ? "Híbrido y presencial: solo con oficina en su país o en los que elija abajo."
+                  : ""}
+              </p>
+            </fieldset>
+            {p.modalidades.some((m) => m !== "remoto") && (
+              <details
+                className="field mudanza"
+                open={p.paises_presenciales_extra.length > 0}
               >
-                {p.paises.length === paises.length
-                  ? "Quitar selección"
-                  : "Seleccionar LATAM y España"}
-              </button>
-            </div>
+                <summary>
+                  También se mudaría a…{" "}
+                  <span className="muted">
+                    {p.paises_presenciales_extra.length
+                      ? p.paises_presenciales_extra.length +
+                        (p.paises_presenciales_extra.length === 1
+                          ? " país"
+                          : " países")
+                      : "opcional"}
+                  </span>
+                </summary>
+                <div className="country-grid">
+                  {paises
+                    .filter((pais) => pais.codigo !== p.vive_en)
+                    .map((pais) => (
+                      <label
+                        className={
+                          "country " +
+                          (p.paises_presenciales_extra.includes(pais.codigo)
+                            ? "selected"
+                            : "")
+                        }
+                        key={pais.codigo}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={p.paises_presenciales_extra.includes(
+                            pais.codigo,
+                          )}
+                          onChange={(e) =>
+                            patch(p.id, {
+                              paises_presenciales_extra: e.target.checked
+                                ? [...p.paises_presenciales_extra, pais.codigo]
+                                : p.paises_presenciales_extra.filter(
+                                    (x) => x !== pais.codigo,
+                                  ),
+                            })
+                          }
+                        />
+                        {pais.nombre}
+                      </label>
+                    ))}
+                </div>
+              </details>
+            )}
             <div className="form-grid">
               <div className="field">
                 <label>Antigüedad máxima de publicación</label>
@@ -1485,6 +1533,7 @@ function App() {
                       index={i}
                       perfiles={profiles(c.id)}
                       cargos={draft.cargos}
+                      paises={sesion.paises}
                       onEdit={() => {
                         setEditCliente(c);
                         setModal("cliente");
@@ -1546,6 +1595,7 @@ function App() {
                       index={i}
                       perfiles={profiles(c.id)}
                       cargos={draft.cargos}
+                      paises={sesion.paises}
                       onEdit={() => {
                         setEditCliente(c);
                         setModal("cliente");
@@ -2231,6 +2281,7 @@ function ClientCard({
   index,
   perfiles,
   cargos,
+  paises,
   onEdit,
   onResults,
   onArchive,
@@ -2239,6 +2290,7 @@ function ClientCard({
   index: number;
   perfiles: Perfil[];
   cargos: Cargo[];
+  paises: Sesion["paises"];
   onEdit: () => void;
   onResults: () => void;
   onArchive?: () => void;
@@ -2277,11 +2329,12 @@ function ClientCard({
           <>
             <span>
               <Globe2 size={12} />
-              {p.paises.length > 3
-                ? p.paises.length + " países"
-                : p.paises.join(" · ")}
+              Vive en{" "}
+              {paises.find((x) => x.codigo === p.vive_en)?.nombre || p.vive_en}
+              {p.paises_presenciales_extra.length > 0 &&
+                " · +" + p.paises_presenciales_extra.length}
             </span>
-            <span>{modos[p.modalidad]}</span>
+            <span>{p.modalidades.map((m) => modos[m]).join(" · ")}</span>
           </>
         )}
       </div>

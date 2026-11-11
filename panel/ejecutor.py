@@ -32,21 +32,22 @@ def preparar(version, fecha):
         if not raw["terminos_exactos"]:
             raw["terminos_exactos"] = sugerir(c.nombre, consultar_esco=False)["terminos_exactos"]
         lugares = {}
-        for p in perfiles:
-            for codigo in p.paises:
-                if p.modalidad in ("cualquiera", "hibrido", "presencial"):
-                    lugares[codigo] = {"location": nombres[codigo]}
-                if p.modalidad in ("cualquiera", "remoto"):
-                    lugares["REMOTO_" + codigo] = {"location": nombres[codigo], "f_WT": "2"}
-            if p.modalidad in ("cualquiera", "remoto"):
+        for p in perfiles:  # contrato v8: su país, remotas regionales y países extra presenciales
+            oficina = {"hibrido", "presencial"} & set(p.modalidades)
+            if "remoto" in p.modalidades:
+                lugares["REMOTO_" + p.vive_en] = {"location": nombres[p.vive_en], "f_WT": "2"}
+                lugares["REMOTO"] = {"location": "Latin America", "f_WT": "2"}
                 lugares["REMOTO_MUNDO"] = {"location": "Worldwide", "f_WT": "2"}
+            if oficina:
+                for codigo in p.paises_oficina:
+                    lugares[codigo] = {"location": nombres[codigo]}
         rid = "cargo:" + str(c.id)
         mapa.append({"id": rid, "nombre": c.nombre, "consultas": [c.nombre, *raw["terminos_exactos"], *raw["terminos_similares"]],
             "exactos": raw["terminos_exactos"], "similares": raw["terminos_similares"], "cercanos": [],
             "excluir": raw["terminos_excluidos"], "herramientas": [], "lugares": list(lugares.items()),
             "_control_cargo": raw,
-            "paises_objetivo": sorted({x for p in perfiles for x in p.paises}),
-            "solo_remoto": all(p.modalidad == "remoto" for p in perfiles)})
+            "paises_objetivo": sorted({x for p in perfiles for x in p.paises_oficina}),
+            "solo_remoto": all(p.modalidades == ["remoto"] for p in perfiles)})
         roles.append({"id": rid, "nombre": c.nombre, "familias": [rid], "cupo": c.cupo,
                       "_perfiles": [p.model_dump(mode="json") for p in perfiles], "_hoy": fecha})
     configuracion = {"por_rol": 20, "roles": roles, "preferir_remotas": True, "max_por_empresa": 2,

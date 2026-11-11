@@ -31,7 +31,7 @@ como alternativa silenciosa ni vaciar reservas/colas para resolver errores. El a
 
 ## Decisiones vigentes de cobertura e integridad
 
-Leer `docs/CONTRATO_DATOS_v7.md` (inglés exigido precalculado para estimar), `docs/CONTRATO_DATOS_v6.md` y `docs/CONTRATO_DATOS_v5.md`: una fila por vacante en `ofertas`, archivo íntegro de enlaces duplicados,
+Leer `docs/CONTRATO_DATOS_v8.md` (perfil por país de residencia y modalidades), `docs/CONTRATO_DATOS_v7.md` (inglés exigido precalculado para estimar), `docs/CONTRATO_DATOS_v6.md` y `docs/CONTRATO_DATOS_v5.md`: una fila por vacante en `ofertas`, archivo íntegro de enlaces duplicados,
 IDs agrupados y selección sin contar copias. No borrar archivos históricos ni snapshots para ocultar déficit.
 Leer también `docs/CONTRATO_DATOS_v4.md`: vistas privadas de disponibilidad, afinidad vigente y reporte por rol.
 SQL 004 es aditivo y automático; no modificar SQL registrado ni el estado histórico v1. SQL 010 optimiza el grafo de aliases;
