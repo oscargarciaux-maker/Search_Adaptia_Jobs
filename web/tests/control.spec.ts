@@ -13,6 +13,11 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await expect(
     page.getByRole("heading", { name: "Cada búsqueda, con propósito." }),
   ).toBeVisible();
+  await expect(page.getByText("Mi espacio de trabajo")).toHaveCount(0);
+  await expect(page.getByText("Menos ruido.")).toHaveCount(0);
+  await expect(
+    page.getByText(/guarda tus cambios y los aplica desde la búsqueda/),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Clientes", exact: true }).click();
   await page
     .getByRole("button", { name: "Nuevo cliente", exact: true })
@@ -28,7 +33,7 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await dialog.getByLabel("Antigüedad del perfil 1").selectOption("7");
   await dialog.getByLabel("Experiencia máxima del perfil 1").fill("4");
   // Vista previa: estima con el catálogo y permite admitir datos no informados.
-  await expect(dialog.getByText("hoy cumplen este perfil")).toBeVisible();
+  await expect(dialog.getByText(/cumplen? este perfil/)).toBeVisible();
   const aplicar = dialog.getByRole("button", { name: "Aplicar", exact: true });
   if (await aplicar.count()) {
     await aplicar.first().click();
@@ -70,7 +75,7 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
     page.getByRole("button", { name: "Programar para mañana", exact: true }),
   ).toBeDisabled();
   await page.getByLabel("Vacantes de QA", { exact: true }).fill("30");
-  await expect(page.getByText(/disponibles hoy/).first()).toBeVisible();
+  await expect(page.getByText(/guardadas sin entregar/).first()).toBeVisible();
   await page.route("**/api/cargos/expandir", (route) =>
     route.fulfill({
       json: {

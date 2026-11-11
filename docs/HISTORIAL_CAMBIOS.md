@@ -5,6 +5,7 @@ empieza en [GUIA_CLIENTE.md](GUIA_CLIENTE.md); los resultados observados están 
 
 | Revisión | Qué cambió | Consecuencia para el cliente |
 |---|---|---|
+| Panel: limpieza y claridad — preparado para revisión | Sin «Mi espacio de trabajo», tarjetas promocionales ni página de Configuración; ayuda y estado Guardar/Programar; confirmación con fecha; estado vacío de Vacantes con su motivo; estimación rotulada «guardadas aún no entregadas» | Menos ruido y menos dudas: Programar ya guarda; se ve cuándo empieza la primera búsqueda del cliente |
 | Estimación rápida del panel (contrato v7) — preparado para revisión | `requisito_ingles` precalculado en el catálogo; el panel lee solo campos de filtro, se precarga al arrancar y se renueva en segundo plano | La estimación ya no descarga ~40 MB de descripciones (ahora ~2,5 MB); solo la primera lectura tras arrancar hace esperar |
 | Panel en Render — preparado para revisión | `render.yaml` (plan gratuito) y el panel usa el puerto `PORT` del alojamiento | El operador puede instalar el panel con sus datos reales rellenando cuatro valores; ver ENTREGA_AL_CLIENTE.md §5 |
 | Entrega al cliente — preparado para revisión | Traspaso en un paso a otro Supabase (con ensayo), pasada de la mañana si faltan vacantes, copia cifrada semanal 90 días, avisos opcionales por Healthchecks y acciones de GitHub en Node 24 | El día de la entrega se copia y comprueba todo y la base antigua se detiene sola; ver ENTREGA_AL_CLIENTE.md |

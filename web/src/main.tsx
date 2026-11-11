@@ -86,6 +86,42 @@ function iniciales(nombre: string) {
     .join("")
     .toUpperCase();
 }
+function hoyBogota() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+  }).format(new Date());
+}
+function manana() {
+  const d = new Date(hoyBogota() + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+// Por qué no hay vacantes: sin configuración, a la espera de la primera búsqueda o sin coincidencias.
+function vacioVacantes(estado: EstadoConfig | null, r: Resultados | null) {
+  if (!estado?.publicada)
+    return {
+      title: "Programa la configuración para empezar",
+      texto:
+        "Las vacantes de cada cliente aparecen después de la primera búsqueda nocturna con su configuración. Ve a «Cargos y cupos» y pulsa «Programar para mañana».",
+    };
+  const desde = estado.publicada.vigente_desde;
+  if (!r?.ejecucion || r.ejecucion.fecha < desde)
+    return {
+      title: "Aún no hay búsqueda para este cliente",
+      texto:
+        "La primera búsqueda con tu configuración será el " +
+        fecha(desde) +
+        " a la 1:17 a. m. (hora Colombia). Después aparecerán aquí sus vacantes.",
+    };
+  return {
+    title: "La búsqueda no encontró vacantes para este cliente",
+    texto:
+      "La búsqueda del " +
+      fecha(r.ejecucion.fecha) +
+      " no trajo vacantes que cumplan los filtros de este cliente. Revisa sus filtros en «Clientes» con la estimación.",
+  };
+}
+
 function perfilNuevo(cliente: string, cargo: string): Perfil {
   return {
     id: uid(),
@@ -448,9 +484,9 @@ function PreviewPerfil({
         <span>
           <strong>≈ {info.compatibles}</strong>{" "}
           {info.compatibles === 1
-            ? "vacante disponible"
-            : "vacantes disponibles"}{" "}
-          hoy cumplen este perfil
+            ? "vacante guardada aún no entregada"
+            : "vacantes guardadas aún no entregadas"}{" "}
+          cumple{info.compatibles === 1 ? "" : "n"} este perfil
           <span className="preview-sub">
             {" "}
             · {info.del_cargo} del cargo en el catálogo
@@ -503,7 +539,7 @@ function PreviewCargo({
       }
       title="Vacantes ya guardadas, aún no entregadas, que cumplen los filtros de algún perfil de este cargo."
     >
-      <Target size={12} />≈ {info.disponibles} disponibles hoy ·{" "}
+      <Target size={12} />≈ {info.disponibles} guardadas sin entregar ·{" "}
       {textoEstadoCargo[info.estado]}
     </div>
   );
@@ -1185,17 +1221,6 @@ function App() {
           <span className="brand-icon">a</span>adaptia
           <span className="brand-dot">.</span>
         </a>
-        <div className="workspace">
-          <div className="workspace-icon">
-            <Compass size={17} />
-          </div>
-          <div>
-            <strong>Mi espacio de trabajo</strong>
-            <span>Control de búsqueda</span>
-          </div>
-          <ChevronDown size={15} />
-        </div>
-        <p className="nav-label">ESPACIO DE TRABAJO</p>
         <nav>
           {nav.map(({ t, i: Icon }) => (
             <button
@@ -1212,17 +1237,6 @@ function App() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="sidebar-tip">
-            <span className="tip-icon">
-              <Target size={18} />
-            </span>
-            <strong>Más foco. Más oportunidades.</strong>
-            <p>Una búsqueda que se adapta a las personas que acompañas.</p>
-          </div>
-          <button className="nav-settings" onClick={() => go("Configuración")}>
-            <Settings2 size={18} />
-            Configuración
-          </button>
           <div className="operator">
             <span className="avatar dark">OP</span>
             <div>
@@ -1258,8 +1272,6 @@ function App() {
             >
               <Menu size={21} />
             </button>
-            <span>Control de búsqueda</span>
-            <ChevronRight size={13} />
             <strong>{tab}</strong>
           </div>
           <div className="topbar-right">
@@ -1308,7 +1320,7 @@ function App() {
                       : tab === "Vacantes"
                         ? "Revisa las coincidencias de cada cliente y prepara su mensaje."
                         : tab === "Actividad"
-                          ? "Consulta el resultado de las capturas y sus pendientes."
+                          ? "Cada noche: cuántas vacantes trajo la búsqueda con tu configuración y qué cargos quedaron cortos."
                           : "Información sobre la conexión y el funcionamiento del espacio."}
               </p>
             </div>
@@ -1333,61 +1345,30 @@ function App() {
               </div>
             )}
           </div>
-          {dirty && (
-            <div className="dirty-bar">
-              <span className="amber-dot" />
-              Tienes cambios sin guardar. La búsqueda programada no cambia hasta
-              que los confirmes.
+          {["Resumen", "Clientes", "Cargos y cupos"].includes(tab) && (
+            <div className={"flow-status" + (dirty ? " pending" : "")}>
+              <span className="flow-pill">
+                {dirty
+                  ? "Cambios sin guardar"
+                  : estado?.publicada &&
+                      estado.publicada.revision === estado.revision
+                    ? "Programado desde el " +
+                      fecha(estado.publicada.vigente_desde)
+                    : estado?.revision
+                      ? "Borrador guardado, sin programar"
+                      : "Sin configuración programada"}
+              </span>
+              <span>
+                <strong>Programar para mañana</strong> guarda tus cambios y los
+                aplica desde la búsqueda de la 1:17 a. m. (hora Colombia).{" "}
+                <strong>Guardar borrador</strong> solo los conserva, sin cambiar
+                la próxima búsqueda.
+              </span>
             </div>
           )}
           {tab === "Resumen" && (
             <>
-              <section className="overview-top">
-                <div className="hero">
-                  <div className="hero-content">
-                    <span className="hero-label">
-                      <span />
-                      {estado?.publicada
-                        ? "CRITERIOS DE BÚSQUEDA CONFIRMADOS"
-                        : "PREPARA TU PRÓXIMA BÚSQUEDA"}
-                    </span>
-                    <h2>
-                      Menos ruido.
-                      <br />
-                      Más <em>coincidencias.</em>
-                    </h2>
-                    <p>
-                      Define quién está buscando, qué necesita
-                      <br className="desktop" /> y cuántas oportunidades quieres
-                      encontrar.
-                    </p>
-                    <button
-                      className="button light"
-                      onClick={() => go("Clientes")}
-                    >
-                      Gestionar clientes
-                      <ArrowUpRight size={17} />
-                    </button>
-                  </div>
-                  <div className="hero-art" aria-hidden="true">
-                    <div className="orbit one" />
-                    <div className="orbit two" />
-                    <div className="orbit three" />
-                    <div className="orbit-center">
-                      <Compass size={39} strokeWidth={1.1} />
-                    </div>
-                    <div className="floating-check">
-                      <Check size={17} />
-                    </div>
-                    <div className="floating-job">
-                      <BriefcaseBusiness size={16} />
-                    </div>
-                  </div>
-                  <div className="hero-bottom">
-                    <ShieldCheck size={14} />
-                    Búsquedas dirigidas · Sin consumo de IA
-                  </div>
-                </div>
+              <section className="overview-top solo">
                 <div className="quota-summary card">
                   <div className="card-label">
                     <span>OBJETIVO DIARIO</span>
@@ -1527,20 +1508,6 @@ function App() {
                     />
                   )}
                 </div>
-              </section>
-              <section className="workflow-note">
-                <div className="workflow-note-icon">
-                  <Workflow size={23} />
-                </div>
-                <div>
-                  <h3>Configuras hoy. Buscas con foco mañana.</h3>
-                  <p>
-                    Las vacantes se buscan por cargo, se contrastan con cada
-                    perfil y quedan listas para compartir cuando su enlace está
-                    vigente.
-                  </p>
-                </div>
-                <ArrowUpRight size={19} />
               </section>
             </>
           )}
@@ -1942,8 +1909,7 @@ function App() {
               {!loadingResults && !shown.length && (
                 <Empty
                   icon={BriefcaseBusiness}
-                  title="Las oportunidades aparecerán aquí"
-                  texto="Después de una captura, verás las vacantes que cumplan los filtros del cliente. Un perfil nuevo empieza a participar con la próxima configuración programada."
+                  {...vacioVacantes(estado, results)}
                 />
               )}
             </>
@@ -1951,7 +1917,7 @@ function App() {
           {tab === "Actividad" && (
             <section className="card activity">
               <div className="section-title">
-                <h2>Historial de capturas</h2>
+                <h2>Resultado de cada búsqueda nocturna</h2>
                 <button
                   className="icon"
                   aria-label="Actualizar actividad"
@@ -2022,58 +1988,6 @@ function App() {
                   </div>
                 ))
               )}
-            </section>
-          )}
-          {tab === "Configuración" && (
-            <section className="settings-grid">
-              <div className="card settings-card">
-                <ShieldCheck size={24} />
-                <h2>
-                  {sesion.demo ? "Entorno de demostración" : "Espacio privado"}
-                </h2>
-                <p>
-                  {sesion.demo
-                    ? "Puedes explorar, añadir clientes y ajustar la distribución con datos ficticios. Los cambios se guardan solo en esta demostración."
-                    : "Los datos se guardan en el inventario privado de la empresa y solo el operador autorizado accede a ellos."}
-                </p>
-                <span className="pill green">
-                  {sesion.demo
-                    ? "Sin acceso a datos reales"
-                    : "Acceso del operador verificado"}
-                </span>
-              </div>
-              <div className="card settings-card">
-                <CalendarClock size={24} />
-                <h2>Cómo se aplican los cambios</h2>
-                <p>
-                  Guardar conserva un borrador. «Programar para mañana» confirma
-                  la configuración del siguiente día, según la hora de Colombia.
-                  Las capturas ya iniciadas conservan su versión.
-                </p>
-                <p>
-                  Los horarios automáticos pueden retrasarse. La pestaña
-                  Actividad muestra el resultado de cada captura dirigida.
-                </p>
-              </div>
-              <div className="card settings-card">
-                <MessageCircle size={24} />
-                <h2>Compartir con criterio</h2>
-                <p>
-                  El botón WhatsApp prepara un mensaje y lo copia al
-                  portapapeles. Tú decides cuándo y a quién enviarlo. No se
-                  envían mensajes automáticamente.
-                </p>
-              </div>
-              <div className="card settings-card">
-                <Compass size={24} />
-                <h2>Cargos sin un listado cerrado</h2>
-                <p>
-                  Puedes añadir cualquier cargo. Las variantes de escritura y el
-                  vocabulario ocupacional disponible ayudan a encontrar
-                  equivalentes; revisa y completa los términos desde cada cargo.
-                </p>
-                <p>No se usa IA para ejecutar las búsquedas.</p>
-              </div>
             </section>
           )}
           <footer className="footer">
@@ -2154,9 +2068,15 @@ function App() {
             <strong>{total} / 120</strong>
           </div>
           <p className="helper note">
-            La configuración empezará a regir mañana en Colombia. Si las fuentes
-            no ofrecen suficientes vacantes válidas, se mostrará el faltante; no
-            se rellenará con duplicados o resultados fuera de los filtros.
+            Al confirmar se guardan tus cambios y esta configuración se usa
+            desde la búsqueda del <strong>{fecha(manana())}</strong> a la 1:17
+            a. m. (hora Colombia). La de esta noche, si ya empezó, conserva la
+            anterior.
+            {!estado?.publicada &&
+              " Es tu primera configuración: desde entonces dejan de buscarse los seis cargos fijos anteriores; solo se buscarán los cargos de esta lista."}{" "}
+            Si las fuentes no ofrecen suficientes vacantes válidas, verás el
+            faltante; no se rellena con duplicados ni con vacantes fuera de los
+            filtros.
           </p>
           {sesion.demo && (
             <p className="demo-inline">
