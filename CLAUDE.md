@@ -120,7 +120,8 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
   plan/corte cifrado confirmado, migraciones transaccionales, versiones y activación sin variables. El horario consulta
   la marca incluso si no existe la variable antigua. Respaldo previo a cambios no equivale a backups periódicos.
 - **Búsqueda profunda** (`profunda.yml`): un cargo a pedido, en vivo. **Diagnóstico** (`diagnostico.yml`).
-- Skills del proyecto: `nueva-familia`, `ampliar-mapa`, `diagnostico`, `nueva-fuente` (leen archivos cortos, no la bodega).
+- Skills del proyecto: `nueva-familia`, `ampliar-mapa`, `diagnostico`, `nueva-fuente` (leen archivos cortos, no la bodega),
+  `auditor-ux` (auditoría UX/accesibilidad con capturas en modo demo; no implementa sin aprobación).
 - Instalación y traspaso: `docs/INSTALACION.md`, `docs/TRASPASO.md`.
 
 ## Estado
