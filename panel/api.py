@@ -179,7 +179,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--demo", action="store_true", help="Solo datos ficticios, sin Supabase ni secretos")
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", default=8000, type=int)
+    parser.add_argument("--port", default=int(os.environ.get("PORT", "8000")), type=int,
+                        help="Puerto; por defecto PORT del alojamiento (Render, etc.) o 8000")
     args = parser.parse_args()
     import uvicorn
     uvicorn.run(crear_app(demo=args.demo), host=args.host, port=args.port, log_level="info")

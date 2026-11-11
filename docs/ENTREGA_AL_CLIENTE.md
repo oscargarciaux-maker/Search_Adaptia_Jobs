@@ -103,11 +103,33 @@ Abrir http://localhost:8000. Probar: crear un cliente con un perfil, ver la esti
 pulsar **Aplicar** en una sugerencia, añadir un cargo nuevo (por ejemplo «Editor de video») y revisar sus sugerencias,
 programar para mañana y copiar el mensaje de WhatsApp.
 
-**Instalarlo para el cliente** (pendiente de decidir alojamiento y correo del operador): el repositorio ya incluye el
-`Dockerfile`. En un servicio de contenedores como Render: *New → Web Service*, conectar el repositorio, elegir Docker y
-configurar `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (del proyecto del cliente), `PANEL_ORIGIN` (por ejemplo
-`https://panel.adaptiajobs.com`) y `PANEL_OPERATOR_EMAILS`. Después crear el usuario del operador en Supabase
-(Authentication → Users → Add user) y apuntar el subdominio. Detalle completo: [PANEL_CONTROL.md](PANEL_CONTROL.md) §7.
+**Instalarlo con tus datos reales en Render (plan gratuito)** — unos 20 minutos, una sola vez:
+
+1. Entrar en render.com y registrarse con GitHub. Para la entrega definitiva conviene que la cuenta sea del cliente.
+2. **New → Blueprint** → elegir el repositorio `Search_Adaptia_Jobs`. Render lee `render.yaml` y pide cuatro valores:
+   - `SUPABASE_URL`: el mismo valor del secreto de GitHub (Supabase → Project Settings → Data API → Project URL).
+   - `SUPABASE_SECRET_KEY`: la *secret key* del proyecto (Supabase → Project Settings → API Keys), la misma de GitHub.
+   - `PANEL_ORIGIN`: `https://adaptia-panel.onrender.com`. Si Render asigna otra dirección (por ejemplo con un sufijo),
+     copiar la que muestre y cambiar este valor en *Environment*; el panel se reinicia solo.
+   - `PANEL_OPERATOR_EMAILS`: el correo con el que vas a entrar.
+3. **Apply** y esperar a que termine (5–10 minutos la primera vez).
+4. En Supabase → **Authentication → Users → Add user → Create new user**: el mismo correo, una contraseña y marcar
+   **Auto Confirm User**.
+5. Recomendado: en Supabase → Authentication → Sign In / Providers, desactivar el registro de usuarios nuevos.
+6. Abrir la dirección del panel e iniciar sesión.
+
+El plan gratuito se duerme tras unos minutos sin uso: la primera visita puede tardar ~1 minuto. La primera estimación de
+vacantes también tarda unos segundos mientras lee el catálogo. Detalle técnico: [PANEL_CONTROL.md](PANEL_CONTROL.md) §7.
+
+**Cómo cambiar las vacantes que llegan**
+
+1. **Cargos y cupos**: crear los cargos que quieres (revisar sus denominaciones) y repartir exactamente 120.
+2. **Clientes**: cada cargo con cupo necesita al menos un perfil de cliente con sus filtros. Mira la estimación
+   «≈ N vacantes disponibles hoy» y usa «Aplicar» si un filtro deja muy pocas.
+3. **Programar para mañana**. La versión rige desde el día siguiente en Colombia: si programas antes de la 1:17 a. m.,
+   la búsqueda de esa madrugada ya la usa.
+4. Desde ese momento **los seis cargos fijos actuales dejan de usarse**: si quieres conservar alguno, créalo en el panel.
+5. Al día siguiente, en **Vacantes**, revisa lo que llegó para cada cliente; en **Actividad**, si faltó algo.
 
 ## 6. El día de la entrega — en este orden
 
