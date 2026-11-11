@@ -9,12 +9,17 @@ CAMPOS_FILTRO = ("id", "titulo", "paises", "confianza_pais", "modalidad", "idiom
                  "fecha_publicacion", "fecha_estimada", "ids_agrupados")
 
 
-def ligera(datos, descripcion=""):
+def ligera(datos, descripcion=None):
     """Solo lo que usan los filtros, con experiencia e inglés ya interpretados por las mismas funciones del motor.
-    Permite estimar sobre miles de vacantes sin conservar descripciones ni enlaces."""
+    Permite estimar sobre miles de vacantes sin conservar descripciones ni enlaces. Los años mínimos no dependen del
+    texto; el inglés exigido viene calculado en el catálogo (contrato v7). Si falta y no hay descripción, se usa el
+    nivel guardado tratándolo como obligatorio: la estimación puede quedar corta, nunca inflada."""
     v = {k: datos.get(k) for k in CAMPOS_FILTRO}
-    v["_anos_minimos"] = contrato.anos(descripcion, datos.get("anos_min"))[0]
-    v["_requisito_ingles"] = contrato.requisitos_idioma(descripcion, datos.get("ingles", ""))
+    v["_anos_minimos"] = contrato.anos("", datos.get("anos_min"))[0]
+    if descripcion is None and datos.get("requisito_ingles") is not None:
+        v["_requisito_ingles"] = datos["requisito_ingles"]
+    else:
+        v["_requisito_ingles"] = contrato.requisitos_idioma(descripcion or "", datos.get("ingles", ""))
     return v
 
 

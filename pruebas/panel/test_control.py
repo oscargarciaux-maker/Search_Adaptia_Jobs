@@ -368,25 +368,50 @@ def test_vista_previa_api_no_guarda_ni_devuelve_vacantes_ni_clientes(cfg):
         assert r.status_code == 200 and r.json() == {"incompleto": True}
 
 
-def test_catalogo_vigente_excluye_entregadas_copias_y_rechazadas_y_se_reutiliza(monkeypatch):
+def test_catalogo_vigente_lee_solo_campos_de_filtro_y_excluye_entregadas_copias_y_rechazadas(monkeypatch):
     monkeypatch.setattr("buscador.supabase.credenciales", lambda: ("https://prueba.supabase.co", "clave-ficticia"))
+    # PostgREST devuelve los campos ya extraídos de `datos` (select con ->/->>), sin descripción.
     filas = {"entregas_diarias": [{"vacante_id": "a" * 16}],
              "catalogo_vacantes": [
-                 {"id": "a" * 16, "datos": {"titulo": "QA Engineer"}, "description_full": ""},
-                 {"id": "b" * 16, "datos": {"titulo": "QA Engineer", "ids_agrupados": ["b" * 16, "a" * 16]}},
-                 {"id": "c" * 16, "datos": {"titulo": "QA Engineer", "duplicada_de": "d" * 16}},
-                 {"id": "d" * 16, "datos": {"titulo": "QA Engineer", "verificacion": {"estado": "rechazada"}}},
-                 {"id": "e" * 16, "datos": {"titulo": "QA Engineer", "anos_min": 3}, "description_full": "English B2 required."}]}
+                 {"id": "a" * 16, "titulo": "QA Engineer"},
+                 {"id": "b" * 16, "titulo": "QA Engineer", "ids_agrupados": ["b" * 16, "a" * 16]},
+                 {"id": "c" * 16, "titulo": "QA Engineer", "duplicada_de": "d" * 16},
+                 {"id": "d" * 16, "titulo": "QA Engineer", "verificacion": "rechazada"},
+                 {"id": "e" * 16, "titulo": "QA Engineer", "anos_min": 3, "requisito_ingles": "en:B2:0"},
+                 {"id": "f" * 16, "titulo": "QA Engineer", "ingles": "intermedio", "requisito_ingles": None}]}
     llamadas = []
     def request(metodo, url, **op):
         tabla = url.rsplit("/", 1)[1]
         llamadas.append((tabla, op["params"]))
-        assert op["params"]["order"] in {"id", "vacante_id"} and "status" in op["params"] or tabla == "entregas_diarias"
+        assert "description_full" not in op["params"]["select"]
         return SimpleNamespace(status_code=200, content=b"x", json=lambda: filas[tabla])
     repo = RepositorioSupabase(SimpleNamespace(request=request))
     vacantes = repo.catalogo_vigente()["vacantes"]
-    assert [v["id"] for v in vacantes] == ["e" * 16]
-    assert vacantes[0]["_anos_minimos"] == 3 and vacantes[0]["_requisito_ingles"].startswith("en:B2")
+    assert [v["id"] for v in vacantes] == ["e" * 16, "f" * 16]
+    assert vacantes[0]["_anos_minimos"] == 3 and vacantes[0]["_requisito_ingles"] == "en:B2:0"
+    # Fila aún sin el campo v7: nivel guardado tratado como obligatorio (estimación conservadora).
+    assert vacantes[1]["_requisito_ingles"] == "en:B1:1"
     n = len(llamadas)
     repo.catalogo_vigente()
     assert len(llamadas) == n  # reutilizado: editar el borrador no recorre otra vez Supabase
+    # Vencida: responde al instante con la copia y renueva en segundo plano.
+    repo._catalogo = (repo._catalogo[0] - 4000, repo._catalogo[1])
+    assert repo.catalogo_vigente()["vacantes"] == vacantes
+    import time as _t
+    for _ in range(100):
+        if not repo._refrescando: break
+        _t.sleep(0.02)
+    assert len(llamadas) > n and _t.monotonic() - repo._catalogo[0] < 60
+
+
+def test_ingles_precalculado_en_el_catalogo_da_el_mismo_veredicto():
+    perfiles = [Perfil.model_validate(dict(p, ingles_maximo=n, aceptar_ingles_sin_dato=s))
+                for p in configuracion_demo()["perfiles"][:1] for n in ("sin_filtro", "A2", "B1", "B2", "C1") for s in (False, True)]
+    for texto in ["English B2 required. " * 4, "English C1 is a plus. " * 4, "Advanced English is preferred. " * 4, "Sin datos. " * 20]:
+        v = trabajo(_descripcion=texto, paises=["CO", "ES"], confianza_pais="alta")
+        v["ingles"] = __import__("buscador.etiquetas", fromlist=["ingles"]).ingles(texto)
+        datos = vacante.publica(v)
+        assert "requisito_ingles" in datos
+        ligera = afinidad.ligera(datos)
+        for p in perfiles:
+            assert afinidad.evaluar(ligera, p, hoy()) == afinidad.evaluar(v, p, hoy())

@@ -30,6 +30,15 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         raise RuntimeError("El acceso real permanece cerrado: configura origen HTTPS y operador autorizado.")
     repo = repositorio or (RepositorioDemo(os.environ.get("PANEL_DEMO_FILE", "/tmp/adaptia-panel-demo/config.json")) if demo else RepositorioSupabase())
     intentos = defaultdict(deque)
+    if not demo and hasattr(repo, "catalogo_vigente"):
+        # Preparar la estimación al arrancar para que la primera visita no espere la lectura del catálogo.
+        def precargar():
+            try:
+                repo.catalogo_vigente()
+            except Exception:
+                pass
+        import threading
+        threading.Thread(target=precargar, daemon=True).start()
     app.state.repo, app.state.demo = repo, demo
 
     @app.middleware("http")
