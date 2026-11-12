@@ -46,6 +46,7 @@ apify:
   actor_publicaciones: "harvestapi/linkedin-post-search"
   publicaciones_por_dia: 0  # reservar el crédito gratuito para fichas de empleo
   actor_linkedin: "curious_coder/linkedin-jobs-scraper"
+  rescate_busquedas: 4         # modo panel: búsquedas dirigidas a perfiles con menos de 5 (≈60 % del crédito diario)
   build_linkedin: "1.7.18"
   ofertas_por_busqueda: 10
   tope_consulta_usd: 0.025

@@ -80,7 +80,7 @@ def entrada(actor, consultas, params, dias, maximo):
 
 def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=20, presupuesto=60, max_dias=30,
            token=None, reloj=time.monotonic, limite_segundos=None, prioritarias=(), control_gasto=None,
-           tope_consulta_usd=0.025, build="0.0.61"):
+           tope_consulta_usd=0.025, build="0.0.61", ordenar=True):
     """Ofertas formales: reparto de consultas, esquema real del actor y crédito reservado antes de iniciar."""
     token = token or os.environ.get("APIFY_TOKEN", "")
     if not token or not actor:
@@ -88,7 +88,8 @@ def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=20, pres
     from datetime import datetime
     inicio = reloj()
     control_gasto = control_gasto or Presupuesto({}, hoy)
-    pendientes = cobertura.repartir(combinaciones, estado, hoy, prioritarias)[:presupuesto]
+    # `ordenar=False`: el rescate ya las trae en orden de urgencia (perfiles con más déficit primero).
+    pendientes = (cobertura.repartir(combinaciones, estado, hoy, prioritarias) if ordenar else list(combinaciones))[:presupuesto]
     crudas, ejecuciones, descartes = [], [], {}
     por_familia, por_lugar = {}, {}
     for familia, consultas, lugar, params in pendientes:
@@ -113,6 +114,8 @@ def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=20, pres
         ejecuciones.append(stats)
         por_familia[familia] = por_familia.get(familia, 0) + 1
         por_lugar[lugar] = por_lugar.get(lugar, 0) + 1
+        if stats.get("clave_invalida"):
+            break  # con la clave rechazada, ninguna otra búsqueda puede funcionar
         if stats.get("error"):
             continue
         for item in items:
@@ -139,6 +142,9 @@ def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=20, pres
                     "tope_mes_usd": control_gasto.mensual, "tope_diario_usd": round(control_gasto.diario, 6)}
     if not ejecuciones:
         resumen["omitida"] = "presupuesto diario/mensual reservado o tiempo agotado"
+    elif any(e.get("clave_invalida") for e in ejecuciones):
+        resumen["clave_invalida"] = True
+        resumen["error"] = "Apify rechazó la clave (APIFY_TOKEN): reemplazarla por la vigente en los secretos de GitHub"
     elif any(e.get("error") for e in ejecuciones) and not crudas:
         resumen["error"] = "Apify no produjo ofertas: revisar sus ejecuciones y crédito disponible"
     return crudas, resumen

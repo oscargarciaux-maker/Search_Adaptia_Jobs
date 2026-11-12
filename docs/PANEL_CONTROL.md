@@ -31,6 +31,7 @@ Ambas se aplican por el instalador automático tras el respaldo; no hace falta c
    ese perfil, y qué ajuste sumaría más (con «Aplicar» para admitir datos no informados). En **Cargos y cupos** cada
    cargo muestra «alcanza para el cupo», «puede quedar corto» o «probable faltante». Usa las mismas reglas de la
    selección, no busca en internet ni guarda nada; un cargo nuevo empieza bajo porque todavía no se ha buscado.
+   **Rescate hasta 5 (contrato v11):** si aun así falta, se admiten avisos con hasta 2 años de diferencia, hasta 4 por empresa, vacantes de días anteriores que esa persona nunca recibió y búsquedas de Apify dirigidas a ella.
    **Mínimo por perfil (contrato v9):** si un cliente no llega a 5 vacantes en el día, se completa dentro del cupo con avisos que no dicen años o inglés y luego con los «Cargos cercanos» del cargo (o remotas abiertas a su país si solo pidió presencial). En «Vacantes» se marcan «Ampliada»; el mensaje de WhatsApp no cambia. Dos cargos con los mismos términos se reparten las vacantes: la estimación lo avisa.
    **Estimar con búsqueda en vivo** hace, solo al pulsarlo, una búsqueda corta (hasta 30 s) en LinkedIn público y
    Get on Board, sin Apify ni cookies, aplica los mismos filtros y descuenta las ya entregadas. Es una muestra: la

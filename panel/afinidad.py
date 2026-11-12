@@ -26,9 +26,13 @@ def ligera(datos, descripcion=None):
 # Contrato v9: niveles de ampliación para que cada perfil reciba un mínimo diario. País, idioma, plazo, enlace y los
 # requisitos que el aviso sí declara nunca se amplían.
 MINIMO_POR_PERFIL = 5
-AMPLIACIONES = ("sin_dato", "cargo_cercano", "remota_cercana")
+# Orden de uso; los dos últimos son el «último recurso» que aprobó Oscar el 12 nov (contrato v11).
+AMPLIACIONES = ("sin_dato", "cargo_cercano", "remota_cercana", "experiencia_cercana", "empresa_4")
 ETIQUETAS_AMPLIACION = {"sin_dato": "aviso sin años o inglés informados", "cargo_cercano": "cargo cercano",
-                        "remota_cercana": "remota abierta a su país"}
+                        "remota_cercana": "remota abierta a su país",
+                        "experiencia_cercana": "experiencia cercana (±2 años)",
+                        "empresa_4": "más vacantes de la misma empresa"}
+TOPE_EMPRESA_AMPLIADO = 4
 
 
 def relajado(perfil, nivel):
@@ -39,6 +43,12 @@ def relajado(perfil, nivel):
         if "remoto" in p.modalidades:
             return None
         cambio["modalidades"] = [*p.modalidades, "remoto"]
+    if nivel in ("experiencia_cercana", "empresa_4"):
+        # El aviso sí dice años: se admiten hasta 2 de diferencia con el rango del perfil (nunca país, idioma ni plazo).
+        if p.experiencia_min is not None:
+            cambio["experiencia_min"] = max(0, p.experiencia_min - 2)
+        if p.experiencia_max is not None:
+            cambio["experiencia_max"] = min(40, p.experiencia_max + 2)
     return p.model_copy(update=cambio)
 
 
