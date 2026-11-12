@@ -192,3 +192,17 @@ class Expansion(Modelo):
 class Credenciales(Modelo):
     email: str = Field(min_length=3,max_length=254)
     password: str = Field(min_length=1,max_length=256)
+
+
+class AjustesAlertas(Modelo):
+    """Contrato v10: a quién y qué alertas por correo. Se guarda aparte de la configuración versionada."""
+    destinatarios: list[str] = Field(default_factory=list, max_length=5)
+    tipos: list[Literal["exito", "pocas_vacantes", "fallo"]] = Field(
+        default_factory=lambda: ["exito", "pocas_vacantes", "fallo"])
+
+    @model_validator(mode="after")
+    def correos(self):
+        from buscador.alertas import configuracion_valida
+        limpio = configuracion_valida(self.model_dump())
+        self.destinatarios, self.tipos = limpio["destinatarios"], limpio["tipos"]
+        return self

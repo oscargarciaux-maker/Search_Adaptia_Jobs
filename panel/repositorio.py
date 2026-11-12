@@ -59,6 +59,16 @@ class RepositorioSupabase:
     def guardar(self, revision, configuracion):
         return self.pedir("POST", "rpc/panel_guardar", json={"p_revision": revision, "p_configuracion": configuracion})
 
+    def ajuste(self, clave, defecto=None):
+        filas = self.pedir("GET", "panel_ajustes", params={"clave": "eq." + clave, "select": "valor", "limit": 1})
+        return filas[0]["valor"] if filas else defecto
+
+    def guardar_ajuste(self, clave, valor):
+        self.pedir("POST", "panel_ajustes", params={"on_conflict": "clave"},
+                   headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
+                   json={"clave": clave, "valor": valor, "actualizado_en": datetime.now(timezone.utc).isoformat()})
+        return valor
+
     def publicar(self, revision):
         actual = self.config()
         if actual["revision"] != revision:
@@ -191,6 +201,16 @@ class RepositorioDemo:
     def config(self):
         with self.lock:
             return deepcopy(self.estado)
+
+    def ajuste(self, clave, defecto=None):
+        with self.lock:
+            return deepcopy(self.estado.get("ajustes", {}).get(clave, defecto))
+
+    def guardar_ajuste(self, clave, valor):
+        with self.lock:
+            self.estado.setdefault("ajustes", {})[clave] = deepcopy(valor)
+            self._guardar()
+        return valor
 
     def _guardar(self):
         if self.archivo:

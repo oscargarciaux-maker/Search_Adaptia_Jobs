@@ -2986,3 +2986,27 @@ h1 {
 .funnel thead th:first-child {
   text-align: left;
 }
+.alerts {
+  margin-bottom: 18px;
+  display: grid;
+  gap: 12px;
+}
+.alerts h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.alerts-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

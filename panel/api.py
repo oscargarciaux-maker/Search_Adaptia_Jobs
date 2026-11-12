@@ -15,7 +15,7 @@ import requests
 
 from buscador import paises
 from panel import servicio
-from panel.modelos import Configuracion, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia
+from panel.modelos import AjustesAlertas, Configuracion, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia
 from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase
 from panel.terminos import sugerir
 
@@ -173,6 +173,31 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         except ValueError:
             return {"incompleto": True}
         return servicio.estimacion_en_vivo(repo, cfg, body.perfil_id)
+
+    @app.get("/api/ajustes/alertas")
+    def leer_alertas():
+        valor = AjustesAlertas.model_validate(repo.ajuste("alertas", {}) or {}).model_dump()
+        return {**valor, "envio_configurado": demo or bool(os.environ.get("RESEND_API_KEY") and
+                                                             os.environ.get("ALERTAS_REMITENTE"))}
+
+    @app.put("/api/ajustes/alertas")
+    def guardar_alertas(body: AjustesAlertas):
+        return repo.guardar_ajuste("alertas", body.model_dump())
+
+    @app.post("/api/alertas/prueba")
+    def probar_alertas():
+        from buscador import alertas
+        destinatarios = AjustesAlertas.model_validate(repo.ajuste("alertas", {}) or {}).destinatarios
+        if not destinatarios:
+            raise HTTPException(422, "Guarda al menos un correo antes de probar.")
+        if demo:
+            return {"enviado": False, "nota": "Demostración: no se envía ningún correo."}
+        ok = alertas.enviar(destinatarios, "Adaptia · correo de prueba",
+                            "<p>Las alertas de búsqueda llegarán a este correo.</p>",
+                            "Las alertas de búsqueda llegarán a este correo.")
+        if not ok:
+            raise HTTPException(503, "No se pudo enviar: revisa RESEND_API_KEY y ALERTAS_REMITENTE en el alojamiento.")
+        return {"enviado": True, "nota": f"Correo de prueba enviado a {len(destinatarios)} destinatario(s)."}
 
     @app.get("/api/ejecuciones")
     def ejecuciones():

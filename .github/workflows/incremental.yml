@@ -77,6 +77,15 @@ jobs:
       - name: Comprobar sincronización del catálogo
         if: ${{ !inputs.prueba && steps.preparar.outputs.ejecutar == 'true' }}
         run: python -m buscador.validacion --salida salida --catalogo
+      - name: Alertas por correo
+        if: ${{ always() && !inputs.prueba && steps.preparar.outputs.ejecutar == 'true' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERTAS_REMITENTE: ${{ vars.ALERTAS_REMITENTE }}
+          PANEL_ORIGIN: ${{ vars.PANEL_URL }}
+        run: python -m buscador.alertas --salida salida --modo horaria --resultado ${{ job.status }}
       - name: Avisar
         if: always()
         env:

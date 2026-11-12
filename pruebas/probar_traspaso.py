@@ -107,7 +107,7 @@ def main():
                     raise AssertionError("Se aceptó repetir sobre un destino ocupado")
                 except RuntimeError:
                     pass
-    print("Traspaso: destino ajeno rechazado, fallo sin restos, once tablas/secuencias idénticas, destino operativo y origen detenido: aprobados.")
+    print("Traspaso: destino ajeno rechazado, fallo sin restos, doce tablas/secuencias idénticas, destino operativo y origen detenido: aprobados.")
 
 
 if __name__ == "__main__":

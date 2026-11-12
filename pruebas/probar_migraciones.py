@@ -130,7 +130,9 @@ def main():
             conn.execute("""insert into public.panel_asignaciones(ejecucion_id,cliente_id,perfil_id,cargo_id,vacante_id,match_grade,explicacion,filtros,cargo_configuracion)
                 values(%s,%s,%s,%s,'aaaaaaaaaaaaaaaa','exact','[]',%s::jsonb,%s::jsonb)""",
                 (ejecucion_panel,perfil_panel["cliente_id"],perfil_panel["id"],perfil_panel["cargo_id"],json.dumps(perfil_panel),json.dumps(control["cargos"][0])))
-            # Backup de once tablas y ambas secuencias; el archivo no contiene el texto en claro.
+            conn.execute("""insert into public.panel_ajustes(clave,valor)
+                values('alertas','{"destinatarios":["operador@example.org"],"tipos":["fallo"]}')""")
+            # Backup de doce tablas y ambas secuencias; el archivo no contiene el texto en claro.
             conn.execute("select public.estado_guardar('ofertas','[{\"identificador\":\"pendiente\",\"revision\":0,\"payload\":{\"external_id\":\"pendiente\"}}]')")
             conn.execute("insert into public.ofertas(external_id,job_title,company_name) select 'lote-'||n,'QA','Ensayo' from generate_series(1,201) n")
             # Archivo con decimal anidado y una fusión todavía pendiente: recuperar sin aplicar limpieza al corte.
@@ -170,7 +172,7 @@ def main():
                 assert destino.execute("select tgenabled from pg_trigger where tgname='oferta_unica'").fetchone()[0] == 'O'
                 assert not destino.execute("select has_table_privilege('anon','public.estado_operativo','SELECT')").fetchone()[0]
         print("Actualización manual → automática sin perder crédito/historia, respaldo obligatorio y migradores concurrentes: aprobados.")
-        print("Copia AES-GCM y restauración: once tablas, dos secuencias, decimales exactos, pendiente, permisos y trabajo; corrupción rechazada.")
+        print("Copia AES-GCM y restauración: doce tablas, dos secuencias, decimales exactos, pendiente, permisos y trabajo; corrupción rechazada.")
 
 
 if __name__ == "__main__":

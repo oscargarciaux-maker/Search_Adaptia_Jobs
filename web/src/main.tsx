@@ -24,6 +24,7 @@ import {
   ListFilter,
   Loader2,
   LogOut,
+  Mail,
   Menu,
   MessageCircle,
   MoreHorizontal,
@@ -688,6 +689,141 @@ function PreviewCargo({
         </span>
       )}
     </div>
+  );
+}
+
+type AjustesAlertas = {
+  destinatarios: string[];
+  tipos: string[];
+  envio_configurado?: boolean;
+};
+const tiposAlerta: [string, string][] = [
+  ["exito", "Búsqueda completa"],
+  ["pocas_vacantes", "Pocas vacantes"],
+  ["fallo", "Fallos"],
+];
+
+function AvisosCorreo({
+  notify,
+}: {
+  notify: (s: string, error?: boolean) => void;
+}) {
+  const [a, setA] = useState<AjustesAlertas | null>(null);
+  const [texto, setTexto] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+  useEffect(() => {
+    api<AjustesAlertas>("/ajustes/alertas")
+      .then((r) => {
+        setA(r);
+        setTexto(r.destinatarios.join(", "));
+      })
+      .catch(() => setA({ destinatarios: [], tipos: [] }));
+  }, []);
+  if (!a) return null;
+  async function guardar() {
+    setOcupado(true);
+    try {
+      const r = await api<AjustesAlertas>("/ajustes/alertas", {
+        method: "PUT",
+        body: JSON.stringify({
+          destinatarios: texto
+            .split(/[,;\s]+/)
+            .map((x) => x.trim())
+            .filter(Boolean),
+          tipos: a!.tipos,
+        }),
+      });
+      setA({ ...a!, ...r });
+      setTexto(r.destinatarios.join(", "));
+      notify("Avisos por correo guardados.");
+    } catch (e) {
+      notify((e as Error).message, true);
+    } finally {
+      setOcupado(false);
+    }
+  }
+  async function probar() {
+    setOcupado(true);
+    try {
+      const r = await api<{ nota: string }>("/alertas/prueba", {
+        method: "POST",
+      });
+      notify(r.nota);
+    } catch (e) {
+      notify((e as Error).message, true);
+    } finally {
+      setOcupado(false);
+    }
+  }
+  return (
+    <section className="card activity alerts">
+      <div className="section-title">
+        <h2>
+          <Mail size={18} /> Avisos por correo
+        </h2>
+      </div>
+      <p className="helper">
+        Recibe un correo cuando la búsqueda se completa, cuando quedan pocas
+        vacantes (tras la pasada de la mañana) o si algo falla. No incluye datos
+        de tus clientes.
+      </p>
+      <div className="field">
+        <label htmlFor="alertas-correos">Correos que reciben los avisos</label>
+        <input
+          id="alertas-correos"
+          type="text"
+          inputMode="email"
+          autoComplete="email"
+          placeholder="nombre@empresa.com, otra@empresa.com"
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+        />
+      </div>
+      <fieldset className="check-line">
+        <legend className="sr-only">Qué avisos enviar</legend>
+        {tiposAlerta.map(([v, t]) => (
+          <label key={v}>
+            <input
+              type="checkbox"
+              checked={a.tipos.includes(v)}
+              onChange={(e) =>
+                setA({
+                  ...a,
+                  tipos: e.target.checked
+                    ? [...a.tipos, v]
+                    : a.tipos.filter((x) => x !== v),
+                })
+              }
+            />
+            {t}
+          </label>
+        ))}
+      </fieldset>
+      {a.envio_configurado === false && (
+        <p className="form-error">
+          Falta configurar el envío (RESEND_API_KEY y ALERTAS_REMITENTE). Los
+          correos guardados se usarán en cuanto esté listo.
+        </p>
+      )}
+      <div className="alerts-actions">
+        <button
+          type="button"
+          className="button secondary"
+          disabled={ocupado || !a.destinatarios.length}
+          onClick={probar}
+        >
+          Enviar correo de prueba
+        </button>
+        <button
+          type="button"
+          className="button primary"
+          disabled={ocupado}
+          onClick={guardar}
+        >
+          Guardar avisos
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -2169,6 +2305,7 @@ function App() {
               )}
             </>
           )}
+          {tab === "Actividad" && <AvisosCorreo notify={notify} />}
           {tab === "Actividad" && (
             <section className="card activity">
               <div className="section-title">

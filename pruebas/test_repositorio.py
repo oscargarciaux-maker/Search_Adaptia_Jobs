@@ -18,6 +18,7 @@ CLAVES = re.compile(r"ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|apify_ap
 CORREO = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z0-9.-]*[A-Za-z]{2,}")
 # Direcciones técnicas que no son de una persona (p. ej. el usuario de GitHub Actions al publicar)
 CORREOS_PERMITIDOS = {"41898282+github-actions[bot]@users.noreply.github.com"}
+DOMINIOS_DE_EJEMPLO = ("@example.org", "@example.com", "@example.net")
 
 
 def archivos_del_repositorio():
@@ -43,7 +44,8 @@ def test_ningun_archivo_trae_claves_ni_correos():
             continue  # archivos binarios (imágenes, datos comprimidos)
         if CLAVES.search(texto):
             problemas.append(f"{ruta.relative_to(RAIZ)}: parece una clave")
-        for correo in set(CORREO.findall(texto)) - CORREOS_PERMITIDOS:
+        # Los dominios reservados para documentación (RFC 2606) no son datos de nadie.
+        for correo in {c for c in CORREO.findall(texto) if not c.lower().endswith(DOMINIOS_DE_EJEMPLO)} - CORREOS_PERMITIDOS:
             problemas.append(f"{ruta.relative_to(RAIZ)}: correo {correo}")
     assert not problemas, "\n".join(problemas)
 

@@ -24,14 +24,14 @@ Entrega al cliente y traspaso a su Supabase: `docs/ENTREGA_AL_CLIENTE.md` y fluj
 una vez como Secrets. Preparar Supabase sube respaldo cifrado antes de SQL, registra hashes en `adaptia_migraciones`
 y activa por marca privada; no pedir copiar 002/003 ni variables manuales para este camino. No modificar SQL ya registrado:
 añadir migración. Clave administrativa limitada a preparación; no se entrega a fuentes, navegador ni logs. Tras el
-instalador los cortes contienen once tablas y dos secuencias. Probar `python -m pruebas.probar_migraciones` solo en PG aislado.
+instalador los cortes contienen doce tablas y dos secuencias. Probar `python -m pruebas.probar_migraciones` solo en PG aislado.
 SQL 003 + `ESTADO_SUPABASE_ACTIVO=true` activan el modo; no asumir que está desplegado. No volver al contador local
 como alternativa silenciosa ni vaciar reservas/colas para resolver errores. El arranque importa un corte coherente.
 `docs/PLAN.md` se conserva como diseño histórico: sus instrucciones antiguas no prevalecen sobre decisiones actuales.
 
 ## Decisiones vigentes de cobertura e integridad
 
-Leer `docs/CONTRATO_DATOS_v9.md` (mínimo de 5 por perfil con ampliación marcada; comprobación 24 h para seleccionar y 6 h para compartir), `docs/CONTRATO_DATOS_v8.md` (perfil por país de residencia y modalidades), `docs/CONTRATO_DATOS_v7.md` (inglés exigido precalculado para estimar), `docs/CONTRATO_DATOS_v6.md` y `docs/CONTRATO_DATOS_v5.md`: una fila por vacante en `ofertas`, archivo íntegro de enlaces duplicados,
+Leer `docs/CONTRATO_DATOS_v10.md` (ajustes privados `panel_ajustes`, SQL 012, y alertas por correo con Resend sin datos de clientes), `docs/CONTRATO_DATOS_v9.md` (mínimo de 5 por perfil con ampliación marcada; comprobación 24 h para seleccionar y 6 h para compartir), `docs/CONTRATO_DATOS_v8.md` (perfil por país de residencia y modalidades), `docs/CONTRATO_DATOS_v7.md` (inglés exigido precalculado para estimar), `docs/CONTRATO_DATOS_v6.md` y `docs/CONTRATO_DATOS_v5.md`: una fila por vacante en `ofertas`, archivo íntegro de enlaces duplicados,
 IDs agrupados y selección sin contar copias. No borrar archivos históricos ni snapshots para ocultar déficit.
 Leer también `docs/CONTRATO_DATOS_v4.md`: vistas privadas de disponibilidad, afinidad vigente y reporte por rol.
 SQL 004 es aditivo y automático; no modificar SQL registrado ni el estado histórico v1. SQL 010 optimiza el grafo de aliases;
