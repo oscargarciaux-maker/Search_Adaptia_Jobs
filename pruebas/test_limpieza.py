@@ -29,7 +29,8 @@ def test_elegir_exige_huella_y_numeros_validos(tmp_path):
     h = limpieza.huella(filas)
     assert limpieza.elegir(filas, h) == {1, 2}
     assert limpieza.elegir(filas, h, conservar="2", borrar_tambien="3") == {1, 3}
-    for args in (("otra",), (h, "3"), (h, "", "1")):
+    assert limpieza.elegir(filas, h, borrar_tambien="1,3") == {1, 2, 3}  # una propuesta repetida aquí no estorba
+    for args in (("otra",), (h, "3"), (h, "", "9"), (h, "1", "1")):
         with pytest.raises(SystemExit):
             limpieza.elegir(filas, *args)
 
@@ -51,3 +52,23 @@ def test_codigos_finales_y_nombres_en_espanol():
     assert paises.elegibles("QA", "Bogotá, CO")["paises"] == ["CO"]
     assert paises.elegibles("QA", "Conshohocken, PA")["confianza"] == "baja"  # PA: Panamá o Pensilvania
     assert paises.elegibles("QA", "Watford, Inglaterra, Reino Unido")["paises"] == []
+
+
+@pytest.mark.parametrize("ubicacion, esperado", [
+    ("MX MX", ["MX"]), ("Remote - MX", ["MX"]), ("Bo", ["BO"]), ("Mumbai, IND", []), ("Remote - USA", []),
+    ("Buenos Aires Buenos Aires", ["AR"]), ("Área metropolitana de Bogotá D.C.", ["CO"]),
+    ("Las Rozas de Madrid", ["ES"]), ("Santiago de Compostela", ["ES"]), ("Sant Cugat del Vallès", ["ES"]),
+    ("Gurugram", []), ("United Arab Emirates", []),
+])
+def test_v14_codigos_sueltos_ciudades_y_repeticiones(ubicacion, esperado):
+    assert paises.elegibles("QA", ubicacion, "", True)["paises"] == esperado
+
+
+def test_v14_ambiguas_siguen_por_confirmar():
+    assert paises.elegibles("QA", "Granada", "", True)["confianza"] == "baja"  # España o Nicaragua
+    assert paises.elegibles("QA", "Remote Remoto", "", True)["confianza"] == "baja"  # no dice el país
+
+
+def test_v14_trabajar_en_el_pais_es_el_pais_del_aviso():
+    r = paises.elegibles("QA", "Bogotá, Colombia", "Must be authorized to work in the country.")
+    assert r["paises"] == ["CO"] and r["confianza"] == "alta"

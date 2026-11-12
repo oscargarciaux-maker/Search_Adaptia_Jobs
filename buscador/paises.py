@@ -203,31 +203,81 @@ _ISO_EXTRANJEROS = set("""us ca gb uk ie fr de it pl ro pt nl be lu ch at se no 
     th vn ph id au nz""".split())
 _ESTADOS_EEUU = set("""AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC
     ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC""".split())
-_CODIGO_FINAL = re.compile(r",\s*([A-Za-z]{2})\s*$")
+_CODIGO_FINAL = re.compile(r"(?:,|\s[-–]|^)\s*([A-Za-z]{2}|[A-Z]{3})\s*$")
+_SOLO_CODIGOS = re.compile(r"^\s*([A-Za-z]{2}|[A-Z]{3})(?:\s+\1)*\s*$")
+# Contrato v14: códigos de tres letras (ISO 3166 alfa-3), solo en mayúsculas para no confundirlos con palabras.
+_ISO3 = {"ARG": "AR", "BOL": "BO", "BRA": "BR", "CHL": "CL", "COL": "CO", "CRI": "CR", "CUB": "CU", "DOM": "DO",
+         "ECU": "EC", "ESP": "ES", "GTM": "GT", "HND": "HN", "MEX": "MX", "NIC": "NI", "PAN": "PA", "PER": "PE",
+         "PRI": "PR", "PRY": "PY", "SLV": "SV", "URY": "UY", "VEN": "VE"}
+_ISO3_EXTRANJEROS = set("""USA GBR IND CAN FRA DEU ITA POL ROU PRT NLD BEL CHE AUT SWE NOR DNK FIN IRL CZE HUN GRC TUR
+    ISR ARE SAU EGY MAR ZAF NGA KEN PAK BGD LKA NPL CHN HKG TWN JPN KOR SGP MYS THA VNM PHL IDN AUS NZL UKR RUS KAZ
+    GEO""".split())
+
+
+def _sin_repeticion(texto):
+    """«Buenos Aires Buenos Aires» → «Buenos Aires»: algunas fuentes repiten la ubicación pegada."""
+    anterior = None
+    while anterior != texto:
+        anterior, texto = texto, re.sub(r"\b(\w[\w ]*?\w)(?:\s+\1\b)+", r"\1", texto)
+    return texto
 
 
 def _expandir_codigos(ubicacion):
-    """Cambia un código final por el nombre del país (cubierto) o por «pais extranjero». En mayúsculas, un código que
-    también es estado de EE. UU. (CO, AR, PA) solo se lee como país si la ciudad es de ese país; si no, se deja."""
+    """Cambia un código de país por su nombre (cubierto) o por «pais extranjero».
+
+    Vale para la ubicación entera («MX», «MX MX», «Bo») y para el final de cada tramo, tras una coma o un guion
+    («Bucharest, ro», «Remote - MX», «Mumbai, IND»). En mayúsculas tras una ciudad, un código que también es estado de
+    EE. UU. (CO, AR, PA) solo se lee como país si la ciudad es de ese país; si no, se deja «por confirmar»."""
     d = datos()
     nombres = {p["codigo"]: p["nombre"] for p in d["paises"]}
+
+    def por_codigo(codigo, ciudad):
+        if len(codigo) == 3:
+            if codigo in _ISO3:
+                return nombres[_ISO3[codigo]]
+            return "pais extranjero" if codigo in _ISO3_EXTRANJEROS else None
+        mayus = codigo.upper()
+        if ciudad and codigo.isupper() and mayus in _ESTADOS_EEUU:
+            if mayus in nombres:
+                es_de = mayus in d["ciudades"].get(ciudad, []) or _pais_por_nombre(ciudad, [mayus])
+                return nombres[mayus] if es_de else None
+            return "pais extranjero"
+        if mayus in nombres:
+            return nombres[mayus]
+        return "pais extranjero" if codigo.lower() in _ISO_EXTRANJEROS else None
+
     partes = []
     for parte in re.split(r"([;|])", str(ubicacion or "")):
-        m = _CODIGO_FINAL.search(parte)
-        if m:
-            codigo, ciudad = m.group(1), normalizar.texto(parte[:m.start()])
-            es_ciudad_de = lambda c: c in d["ciudades"].get(ciudad, []) or _pais_por_nombre(ciudad, [c])  # noqa: E731
-            if codigo.islower() or codigo.upper() not in _ESTADOS_EEUU:
-                if codigo.upper() in nombres:
-                    parte = parte[:m.start()] + ", " + nombres[codigo.upper()]
-                elif codigo.lower() in _ISO_EXTRANJEROS:
-                    parte = parte[:m.start()] + ", pais extranjero"
-            elif codigo in nombres and es_ciudad_de(codigo):
-                parte = parte[:m.start()] + ", " + nombres[codigo]
-            elif codigo not in nombres:
-                parte = parte[:m.start()] + ", pais extranjero"
+        solo = _SOLO_CODIGOS.match(parte)
+        m = None if solo else _CODIGO_FINAL.search(parte)
+        if solo:
+            nombre = por_codigo(solo.group(1), "")
+            parte = nombre or parte
+        elif m:
+            ciudad = normalizar.texto(parte[:m.start()])
+            nombre = por_codigo(m.group(1), ciudad)
+            if nombre:
+                parte = parte[:m.start()] + ", " + nombre
         partes.append(parte)
     return "".join(partes)
+
+
+def _ciudad_dentro(texto, ciudades):
+    """Contrato v14: una ciudad conocida dentro de un texto más largo («Área metropolitana de Bogotá D.C.»,
+    «Las Rozas de Madrid»). Solo si todas las ciudades halladas son de un único país cubierto."""
+    frases = [f for f in ciudades if f not in _CIUDADES_AMBIGUAS and (" " in f or len(f) >= 6)
+              and normalizar.contiene_frase(texto, f)]
+    frases = [f for f in frases if not any(f != otra and normalizar.contiene_frase(otra, f) for otra in frases)]
+    hallados = {c for f in frases for c in ciudades[f]}
+    return sorted(hallados) if len(hallados) == 1 else []
+
+
+# Nombres de ciudad que existen en varios países (o son también nombre de persona): nunca deciden solos dentro de un
+# texto largo. Siguen valiendo cuando la ubicación es exactamente esa ciudad o trae el país.
+_CIUDADES_AMBIGUAS = {"santiago", "cordoba", "valencia", "granada", "merida", "leon", "victoria", "trujillo", "colon",
+                      "concepcion", "guadalajara", "cartagena", "san jose", "santa cruz", "san juan", "la paz",
+                      "san pedro", "santa ana", "salamanca", "toledo", "rosario", "sucre", "santa fe", "providencia",
+                      "san miguel", "san isidro", "san francisco", "santa marta", "barcelona", "palma"}
 
 
 def elegibles(titulo, ubicacion, descripcion="", remoto=None):
@@ -240,12 +290,14 @@ def elegibles(titulo, ubicacion, descripcion="", remoto=None):
     desc = normalizar.texto(descripcion)[:30000]
     mod = modalidad(titulo, ubicacion, descripcion, remoto)
     # El título no puede convertir una oficina de otro país en una ubicación permitida.
-    geografia = normalizar.texto(ubicacion)
+    geografia = _sin_repeticion(normalizar.texto(ubicacion))
     nombres_pais = [codigo for codigo,nombres in d["nombres_pais"] if _nombra(geografia,nombres)]
     ciudad_sola = normalizar.texto(_REMOTO.sub(" ",_HIBRIDO.sub(" ",_PRESENCIAL.sub(" ",geografia))))
     ciudad_sola = re.sub(r"^(?:area metropolitana de |region metropolitana de |greater )", "", ciudad_sola)
     ciudad_sola = re.sub(r" (?:y alrededores|and surrounding areas|metropolitan area|area)$", "", ciudad_sola)
     ciudades = d["ciudades"].get(ciudad_sola,[])
+    if not nombres_pais and not ciudades and not _nombra(ciudad_sola, d["fuera"]):
+        ciudades = _ciudad_dentro(ciudad_sola, d["ciudades"])
     nombrados = nombres_pais or ciudades
     es_latam = _nombra(ambito, d["toda_latam"])
     es_mundo = _nombra(ambito, d["mundo"])
@@ -271,6 +323,10 @@ def elegibles(titulo, ubicacion, descripcion="", remoto=None):
         r_paises = _paises_nombrados(restringe)
         if r_paises:
             return r_paises
+        # «Authorized to work in the country»: el país es el del propio aviso, si la ubicación lo nombra.
+        if nombrados and re.match(r"(?:and |y )?(?:authorized to work in |autorizad[oa] para trabajar en )?"
+                                  r"(?:(?:the|this|that|el|este|dicho) )?(?:country|pais)\b", restringe):
+            return nombrados
         region = subregion(restringe)
         if region:
             return region
@@ -285,6 +341,13 @@ def elegibles(titulo, ubicacion, descripcion="", remoto=None):
         return None
     limites = [interpretar(texto) for texto in restricciones if texto]
     if any(valor is None for valor in limites):
+        # Contrato v14: una frase de residencia solo puede restringir más. Si la ubicación ya es solo extranjera
+        # (o solo de un país sin cobertura, como Brasil), no se vuelve «por confirmar» por no entender la frase.
+        if not es_latam and not es_mundo:
+            if nombrados and not any(c in todos for c in nombrados):
+                return r(nombrados, "alta", "")
+            if fuera and not nombres_pais and not ciudades:
+                return r([], "alta", "fuera de LATAM y España")
         return r(todos, "baja", "restricción de residencia sin confirmar")
     if mod != "remoto":
         if nombrados and not (fuera and not nombres_pais):

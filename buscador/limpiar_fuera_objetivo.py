@@ -158,8 +158,11 @@ def elegir(filas, huella_revisada, conservar="", borrar_tambien=""):
     if conservar - propuestas:
         raise SystemExit(f"En «conservar» hay números que no están entre las propuestas: {sorted(conservar - propuestas)}. "
                          "No se cambió nada.")
-    if extra - a_revisar:
-        raise SystemExit(f"En «borrar_tambien» hay números que no están en «para revisar»: {sorted(extra - a_revisar)}. "
+    if extra - a_revisar - propuestas:  # un número de las propuestas aquí no estorba: ya se iba a borrar
+        raise SystemExit(f"En «borrar_tambien» hay números que no están en el listado: {sorted(extra - a_revisar - propuestas)}. "
+                         "No se cambió nada.")
+    if conservar & extra:
+        raise SystemExit(f"Estos números están a la vez en «conservar» y en «borrar_tambien»: {sorted(conservar & extra)}. "
                          "No se cambió nada.")
     return (propuestas - conservar) | extra
 
@@ -220,14 +223,20 @@ def main():
     a = p.parse_args()
     if a.aplicar and a.confirmar != "BORRAR":
         raise SystemExit("Para aplicar escribe BORRAR en «confirmar». No se cambió nada.")
+    aviso = ""
+    if not a.aplicar and (a.huella or a.conservar or a.borrar_tambien or a.confirmar):
+        aviso = ("Escribiste datos para borrar pero NO marcaste la casilla «aplicar»: esta ejecución solo revisó y no "
+                 "borró nada. Para borrar, vuelve a lanzarla marcando «aplicar».")
     from buscador.migraciones import conexion
     with conexion(os.environ.get("SUPABASE_DB_URL", ""), os.environ.get("SUPABASE_URL", "")) as conn:
         datos_resumen = correr(conn, a.carpeta, a.aplicar, a.huella, a.conservar, a.borrar_tambien)
+    if aviso:
+        print("AVISO:", aviso)
     print(json.dumps(datos_resumen, ensure_ascii=False, indent=2))
     destino = os.environ.get("GITHUB_STEP_SUMMARY")
     if destino:
         with open(destino, "a", encoding="utf-8") as f:
-            f.write("## Vacantes fuera del objetivo\n\n"
+            f.write(("> ⚠️ **" + aviso + "**\n\n" if aviso else "") + "## Vacantes fuera del objetivo\n\n"
                     f"- Modo: **{datos_resumen['modo']}**\n"
                     f"- Propuestas para borrar: **{datos_resumen['propuestas_para_borrar']}**\n"
                     f"- Para revisar a mano: **{datos_resumen['para_revisar_a_mano']}**\n"

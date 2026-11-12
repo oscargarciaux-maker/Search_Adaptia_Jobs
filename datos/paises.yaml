@@ -10,7 +10,8 @@ paises:
     nombre: Argentina
     nombres: [argentina]
     gentilicios: [argentino, argentina, argentinos]
-    ciudades: [buenos aires, cordoba, rosario, mendoza, la plata, mar del plata, tucuman, caba]
+    ciudades: [buenos aires, cordoba, rosario, mendoza, la plata, mar del plata, tucuman, caba,
+              ciudad autonoma de buenos aires, gran buenos aires]
     utc: -3
   - codigo: BO
     nombre: Bolivia
@@ -37,7 +38,8 @@ paises:
     nombres: [colombia]
     gentilicios: [colombiano, colombiana, colombianos]
     ciudades: [bogota, medellin, cali, barranquilla, cartagena, bucaramanga, pereira, manizales, cucuta, ibague,
-               santa marta, villavicencio, envigado, itagui, sabaneta, chia, mosquera, capital district]
+               santa marta, villavicencio, envigado, itagui, sabaneta, chia, mosquera, capital district, bogota d c,
+               bogota dc, bogota d.c.]
     utc: -5
   - codigo: CR
     nombre: Costa Rica
@@ -136,7 +138,15 @@ paises:
     nombres: [espana, spain]
     gentilicios: [espanol, espanola, spanish citizen]
     ciudades: [madrid, barcelona, sevilla, seville, bilbao, malaga, zaragoza, alicante, palma de mallorca, las palmas,
-               murcia, valladolid, a coruna, vigo, pamplona, pamplona/iruna]  # sin Valencia ni Granada: también son de VE y NI
+               murcia, valladolid, a coruna, la coruna, vigo, pamplona, pamplona/iruna, valencia/valencia,
+               alicante, alicante/alacant, alacant, santiago de compostela, sant cugat del valles, sant just desvern,
+               parets del valles, palau-solita i plegamans, terrassa, sabadell, badalona, l'hospitalet de llobregat,
+               hospitalet de llobregat, cornella de llobregat, el prat de llobregat, mataro, granollers, tordera,
+               girona, tarragona, lleida, reus, pozuelo de alarcon, las rozas de madrid, las rozas, getafe,
+               alcobendas, majadahonda, boadilla del monte, tres cantos, leganes, mostoles, alcala de henares,
+               rivas-vaciamadrid, san sebastian de los reyes, donostia, san sebastian, vitoria-gasteiz, vitoria gasteiz,
+               santander, oviedo, gijon, burgos, cadiz, jerez de la frontera, almeria, castellon de la plana,
+               molina de segura, elche, cartagena murcia, palma de mallorca, ibiza, tenerife, santa cruz de tenerife]  # sin Valencia ni Granada: también son de VE y NI
     utc: 1
 
 # Palabras que abren una vacante remota a toda LATAM
@@ -188,4 +198,9 @@ fuera_de_latam: [united states, us, usa, u.s., u.s.a, estados unidos, eeuu, ee.u
                  kuala lumpur, tailandia, bangkok, bangladesh, daca, nepal, katmandu, sri lanka, egipto, new cairo,
                  marruecos, rabat, arabia saudi, arabia saudita, riad, emiratos arabes unidos,
                  abu dabi, dubai, catar, qatar, doha, sudafrica, nigeria, kenia, ghana, turquia, estambul,
-                 nueva zelanda, pais extranjero]
+                 nueva zelanda, delhi, nueva delhi, new delhi, delhi hq, gurugram, gurgaon, bombay, mumbai, mohali,
+                 hyderabad, pune, chennai, noida, kolkata, indianapolis, san diego, orlando, filadelfia, philadelphia,
+                 minneapolis, salt lake city, honolulu, cincinnati, palo alto, sunnyvale, mountain view, menlo park,
+                 redmond, pittsburgh, phoenix, las vegas, detroit, nashville, charlotte, raleigh, columbus,
+                 kansas city, baltimore, sacramento, tokyo, sydney, melbourne, brisbane, perth, krakow, warsaw,
+                 tbilisi, kuwait, kuwait city, thailand, kazakhstan, almaty, united arab emirates, pais extranjero]
