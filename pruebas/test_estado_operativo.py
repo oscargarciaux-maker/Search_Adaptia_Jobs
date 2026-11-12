@@ -162,7 +162,7 @@ def test_003_faltante_detiene_antes_de_capturar(monkeypatch, tmp_path):
     monkeypatch.setattr(supabase, "exigir_catalogo", lambda: None)
     def falla(*a, **k): raise RuntimeError("Falta 003")
     monkeypatch.setattr(Central, "__init__", falla)
-    monkeypatch.setattr(incremental, "recoger", lambda *a: pytest.fail("No iniciar captura"))
+    monkeypatch.setattr(incremental, "recoger", lambda *a, **k: pytest.fail("No iniciar captura"))
     with pytest.raises(RuntimeError, match="003"):
         bodega.correr(tmp_path, modo="incremental", hoy=HOY)
 
@@ -185,7 +185,7 @@ def test_horaria_recupera_colas_y_seleccion_sin_gastar_ni_crear_entrega(monkeypa
     monkeypatch.setattr(entrega, "correr", lambda *a, **k: pytest.fail("No crear otra entrega"))
     from buscador.fuentes import linkedin_apify
     monkeypatch.setattr(linkedin_apify, "buscar", lambda *a, **k: pytest.fail("No usar Apify en la horaria"))
-    monkeypatch.setattr(incremental, "recoger", lambda *a: ([], set(), set(), {}))
+    monkeypatch.setattr(incremental, "recoger", lambda *a, **k: ([], set(), set(), {}))
     monkeypatch.setattr(bodega, "limpiar", lambda *a, **k: ([v], Counter(), Counter()))
     cfg = bodega.config()
     cfg["verificacion_enlaces"] = {"vacantes_por_captura": 0, "segundos_captura": 0}

@@ -32,6 +32,7 @@ class Cargo(Modelo):
     terminos_exactos: list[str] = Field(default_factory=list, max_length=30)
     terminos_similares: list[str] = Field(default_factory=list, max_length=30)
     terminos_excluidos: list[str] = Field(default_factory=list, max_length=30)
+    terminos_cercanos: list[str] = Field(default_factory=list, max_length=30)  # contrato v9: solo para ampliar
 
     @field_validator("nombre")
     @classmethod
@@ -41,7 +42,7 @@ class Cargo(Modelo):
             raise ValueError("Escribe un cargo, sin enlaces ni datos de contacto.")
         return v
 
-    @field_validator("terminos_exactos", "terminos_similares", "terminos_excluidos")
+    @field_validator("terminos_exactos", "terminos_similares", "terminos_excluidos", "terminos_cercanos")
     @classmethod
     def terminos_validos(cls, vs):
         salida = []

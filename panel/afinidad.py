@@ -23,6 +23,31 @@ def ligera(datos, descripcion=None):
     return v
 
 
+# Contrato v9: niveles de ampliación para que cada perfil reciba un mínimo diario. País, idioma, plazo, enlace y los
+# requisitos que el aviso sí declara nunca se amplían.
+MINIMO_POR_PERFIL = 5
+AMPLIACIONES = ("sin_dato", "cargo_cercano", "remota_cercana")
+ETIQUETAS_AMPLIACION = {"sin_dato": "aviso sin años o inglés informados", "cargo_cercano": "cargo cercano",
+                        "remota_cercana": "remota abierta a su país"}
+
+
+def relajado(perfil, nivel):
+    """Copia del perfil con lo que admite el nivel de ampliación, o None si el nivel no aplica a ese perfil."""
+    p = perfil if isinstance(perfil, Perfil) else Perfil.model_validate(perfil)
+    cambio = {"aceptar_experiencia_sin_dato": True, "aceptar_ingles_sin_dato": True}
+    if nivel == "remota_cercana":
+        if "remoto" in p.modalidades:
+            return None
+        cambio["modalidades"] = [*p.modalidades, "remoto"]
+    return p.model_copy(update=cambio)
+
+
+def evaluar_ampliada(v, perfil, hoy, nivel):
+    """Evaluación con el perfil relajado del nivel; el título cercano lo decide quien llama (grado del cargo)."""
+    p = relajado(perfil, nivel)
+    return evaluar(v, p, hoy) if p else {"compatible": False, "motivos": ["ampliación no aplicable"], "pruebas": []}
+
+
 def evaluar(v, perfil, hoy=None):
     p = perfil if isinstance(perfil, Perfil) else Perfil.model_validate(perfil)
     hoy = date.fromisoformat(hoy) if isinstance(hoy, str) else hoy or date.today()

@@ -243,7 +243,7 @@ def test_captura_incremental_no_crea_lotes_ni_usa_apify(monkeypatch, tmp_path):
     monkeypatch.setattr(linkedin_apify, "buscar", prohibido)
     crudas = [{"titulo": "UX Designer", "empresa": "Empresa", "enlace": "https://jobs.lever.co/a/1",
                 "fuente": "Lever", "descripcion": TEXTO, "ubicacion": "Remote - LATAM"}]
-    monkeypatch.setattr(incremental, "recoger", lambda *a: (crudas, set(), set(), {}))
+    monkeypatch.setattr(incremental, "recoger", lambda *a, **k: (crudas, set(), set(), {}))
     cfg = bodega.config()
     cfg["verificacion_enlaces"] = {"vacantes_por_captura": 0, "segundos_captura": 0}
     monkeypatch.setattr(bodega, "config", lambda: cfg)
@@ -265,7 +265,7 @@ def test_migracion_faltante_detiene_captura_antes_de_fuentes(monkeypatch, tmp_pa
     monkeypatch.setattr(supabase, "exigir_conexion", lambda: None)
     def falta(): raise RuntimeError("Aplicar 002_catalogo.sql")
     monkeypatch.setattr(supabase, "exigir_catalogo", falta)
-    monkeypatch.setattr(incremental, "recoger", lambda *a: pytest.fail("No debe iniciar fuentes"))
+    monkeypatch.setattr(incremental, "recoger", lambda *a, **k: pytest.fail("No debe iniciar fuentes"))
     with pytest.raises(RuntimeError, match="002_catalogo"):
         bodega.correr(tmp_path, modo="incremental", hoy=HOY)
 

@@ -64,7 +64,7 @@ def _fecha_de(v):
     return v.get("fecha_publicacion") or v.get("visto_primera_vez") or ""
 
 
-def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None):
+def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previas=None):
     """Corre las fuentes en paralelo (cada una con su cliente y su parte del estado). Devuelve
     (crudas, empresas para probar, enlaces de portales leídos, empresas cuyos portales se leyeron, salud)."""
     p = cfg["presupuestos"]
@@ -95,9 +95,18 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None):
         return resultado
 
     def f_linkedin():
-        return linkedin_publico.buscar(Cliente(pausa=tuple(p["pausa_linkedin"])), mapa, activos, estado["linkedin"],
-                                       p["linkedin_busquedas"], hoy=hoy, max_fichas=p["linkedin_fichas"],
-                                       max_dias=cfg["dias_maximos"], limite_segundos=limite, prioritarias=prioritarias)
+        t0 = time.monotonic()
+        cliente = Cliente(pausa=tuple(p["pausa_linkedin"]))
+        crudas, stats = linkedin_publico.buscar(cliente, mapa, activos, estado["linkedin"],
+                                                p["linkedin_busquedas"], hoy=hoy, max_fichas=p["linkedin_fichas"],
+                                                max_dias=cfg["dias_maximos"], limite_segundos=limite,
+                                                prioritarias=prioritarias)
+        if previas and p.get("linkedin_relectura", 0) and not solo_mapa:
+            extra, stats["relectura"] = linkedin_publico.completar_descripciones(
+                cliente, previas, p["linkedin_relectura"], hoy=hoy, max_dias=cfg["dias_maximos"],
+                limite_segundos=max(0, limite - (time.monotonic() - t0)), prioritarias=prioritarias)
+            crudas = crudas + extra
+        return crudas, stats
 
     def f_indeed():
         return indeed.buscar(mapa, [c for c, _ in activos], estado["indeed"], p["indeed_busquedas"], hoy=hoy,
@@ -331,7 +340,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     solo = None
     if modo == "incremental":
         from buscador import incremental
-        crudas, enlaces_ats, leidas, salud = incremental.recoger(cfg, estado, hoy, trabajo)
+        crudas, enlaces_ats, leidas, salud = incremental.recoger(cfg, estado, hoy, trabajo, previas=previas)
     elif consulta:
         # Búsqueda profunda: las familias que coinciden con el texto, o una familia temporal con el texto tal cual
         base = normalizar.titulo_base(consulta)
@@ -346,7 +355,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
                                                                 remotos_cache=estado.get("remotos_cache", {})),
                                                       hoy, trabajo, solo_mapa=solo, **argumentos_central)
     else:
-        crudas, enlaces_ats, leidas, salud = recoger(cfg, estado, hoy, trabajo, **argumentos_central)
+        crudas, enlaces_ats, leidas, salud = recoger(cfg, estado, hoy, trabajo, previas=previas, **argumentos_central)
     retiradas = []
     vacantes, sin_familia, descartes = limpiar(previas, crudas, hoy, cfg["dias_maximos"], enlaces_ats, leidas,
                                                consulta=consulta or "", retiradas=retiradas)
@@ -457,6 +466,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
                 if central:
                     central.guardar_lote(lote)
                 return r
+        entregadas_antes = dict(entregadas)
         resumen_entrega = entrega.correr(vacantes, entregadas if not prueba else dict(entregadas), hoy, capturada,
                                          salida / "datos" / "entregas", subir=None if prueba else supabase.subir,
                                          pendientes=pendientes_v1,
@@ -472,6 +482,10 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
             historico_entregas = entrega.registrar_medicion(historial, resumen_entrega, hoy)
             _guardar_json(trabajo / "metricas_entrega.json", historial)
         resumen_entrega["fecha"] = hoy
+        try:
+            resumen_entrega["embudo"] = entrega.embudo(vacantes, entregadas_antes, hoy, resumen=resumen_entrega)
+        except Exception as e:  # noqa: BLE001 — el diagnóstico nunca detiene la entrega
+            resumen_entrega["embudo"] = {"error": f"{type(e).__name__}"}
     # El lote histórico conserva su snapshot; el estado actual se evalúa aparte con el catálogo y la caché.
     lote_actual = _leer_json(trabajo / "lote_entrega.json", {})
     if lote_actual.get("fecha") == hoy:

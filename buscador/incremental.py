@@ -7,7 +7,7 @@ from buscador.fuentes import ats, indeed, linkedin_publico
 from buscador.http import Cliente
 
 
-def recoger(cfg, estado, hoy, trabajo):
+def recoger(cfg, estado, hoy, trabajo, previas=None):
     opciones = cfg.get("incremental", {})
     limite = opciones.get("minutos_por_fuente", 2) * 60
     prioritarias = {f for r in entrega.config()["roles"] for f in r["familias"]}
@@ -17,10 +17,20 @@ def recoger(cfg, estado, hoy, trabajo):
     estado.setdefault("indeed", {})
 
     def linkedin():
-        return linkedin_publico.buscar(Cliente(pausa=(0.5, 1), espera_429=(5, 10), timeout=15), mapa, [],
+        import time
+        t0 = time.monotonic()
+        cliente = Cliente(pausa=(0.5, 1), espera_429=(5, 10), timeout=15)
+        crudas, stats = linkedin_publico.buscar(cliente, mapa, [],
             estado["linkedin"], opciones.get("linkedin_busquedas", 24), hoy=hoy, max_dias=2,
             max_fichas=opciones.get("linkedin_fichas", 48), max_paginas=1,
             limite_segundos=limite, prioritarias=prioritarias, desfase_terminos=hora * 4)
+        if previas and opciones.get("linkedin_relectura", 0):
+            # Lo guardado sin descripción no se puede entregar: aprovechar cada hora para completarlo.
+            extra, stats["relectura"] = linkedin_publico.completar_descripciones(
+                cliente, previas, opciones["linkedin_relectura"], hoy=hoy, max_dias=cfg.get("dias_maximos", 21),
+                limite_segundos=max(0, limite - (time.monotonic() - t0)), prioritarias=prioritarias)
+            crudas = crudas + extra
+        return crudas, stats
 
     def fuente_indeed():
         return indeed.buscar(mapa, cfg["paises_activos"], estado["indeed"], opciones.get("indeed_busquedas", 6),

@@ -43,6 +43,8 @@ def rol_de(v, roles):
     mejor = None
     for orden, rol in enumerate(roles):
         en_rol = [grados[f] for f in rol["familias"] if f in grados]
+        if "_perfiles" in rol:
+            en_rol = [g for g in en_rol if g != "cercano"]  # oficios vecinos: solo para ampliar (contrato v9)
         if not en_rol:
             continue
         if rol.get("titulo") and not any(normalizar.contiene_frase(titulo, normalizar.texto(p)) for p in rol["titulo"]):
@@ -118,6 +120,53 @@ def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False, 
     return elegidas
 
 
+def _motivo_general(v, entregadas, desde, cfg, omitir_verificacion=False):
+    """Reglas que nunca se amplían: no entregada antes, frescura, enlace comprobado y contrato (idioma, país, texto)."""
+    if any(h in entregadas for h in huellas(v)):
+        return "ya entregada"
+    if (v.get("visto_primera_vez") or "") < desde:
+        return "fuera de frescura"
+    revision = v.get("verificacion")
+    if not omitir_verificacion and revision is not None and revision.get("estado") != "verificada":
+        return "enlaces sin comprobar o rechazados"
+    return contrato.entregable(v, tuple(cfg.get("idiomas", ["es", "en"])))
+
+
+def ampliar(rol, elegidas, libres, cuantas, max_por_empresa, hoy):
+    """Contrato v9: si un perfil del cargo tiene menos del mínimo diario de vacantes que cumplen sus filtros, se completa
+    por niveles (sin dato → cargo cercano → remota abierta a su país) con vacantes que nadie tomó, dentro del cupo.
+    Cada añadida lleva `_ampliacion` con su nivel; `libres` pierde las que se usan."""
+    perfiles = rol.get("_perfiles") or []
+    if not perfiles or len(elegidas) >= cuantas:
+        return elegidas
+    from panel.afinidad import AMPLIACIONES, MINIMO_POR_PERFIL, evaluar, evaluar_ampliada
+    elegidas = list(elegidas)
+    empresas = Counter(normalizar.empresa(v["empresa"]) for v, _ in elegidas)
+    def estrictas(p):
+        return sum(1 for v, _ in elegidas if evaluar(v, p, hoy)["compatible"] or
+                   (v.get("_ampliacion") and evaluar_ampliada(v, p, hoy, v["_ampliacion"])["compatible"]))
+    def grado_en_rol(v):
+        grados = {f["familia"]: f["coincidencia"] for f in v.get("familias", [])}
+        return min((grados[f] for f in rol["familias"] if f in grados), key=GRADOS.index, default=None)
+    for nivel in AMPLIACIONES:
+        permitidos = ("exacto", "similar", "cercano") if nivel != "sin_dato" else ("exacto", "similar")
+        for p in perfiles:
+            falta = MINIMO_POR_PERFIL - estrictas(p)
+            while falta > 0 and len(elegidas) < cuantas:
+                opciones = [(GRADOS.index(g), -(int((v.get("fecha_publicacion") or "0000-00-00").replace("-", "") or 0)), i, v, g)
+                            for i, v in enumerate(libres) if (g := grado_en_rol(v)) in permitidos
+                            and empresas[normalizar.empresa(v["empresa"])] < max_por_empresa
+                            and evaluar_ampliada(v, p, hoy, nivel)["compatible"]]
+                if not opciones:
+                    break
+                *_, i, v, g = min(opciones, key=lambda x: x[:3])
+                libres.pop(i)
+                elegidas.append((dict(v, _ampliacion=nivel), g))
+                empresas[normalizar.empresa(v["empresa"])] += 1
+                falta -= 1
+    return elegidas
+
+
 def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificacion=False):
     """{rol_id: [(vacante, grado)]} con las vacantes nuevas de cada rol, y un resumen por rol."""
     cfg = cfg or config()
@@ -127,11 +176,15 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificac
     desde = (date.fromisoformat(hoy) - timedelta(days=cfg.get("dias_frescura", 14))).isoformat()
     por_rol, motivos = {r["id"]: [] for r in roles}, Counter()
     descartes_rol = {r["id"]: Counter() for r in roles}
+    panel = any("_perfiles" in r for r in roles)
+    libres = []  # pasan las reglas generales pero ningún perfil las acepta tal cual: material para ampliar
     for v in vacante.juntar(vacantes):
         if any(h in incluidas for h in huellas(v)):
             continue
         rol, grado = rol_de(v, roles)
         if not rol:
+            if panel and not _motivo_general(v, entregadas, desde, cfg, omitir_verificacion):
+                libres.append(v)
             continue
         if any(h in entregadas for h in huellas(v)):
             motivos["ya entregada"] += 1
@@ -157,6 +210,14 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificac
         candidatas = por_rol[rol["id"]]
         salida[rol["id"]] = variadas(candidatas, meta_de(rol, cfg), cfg.get("max_por_empresa", 2), hoy,
                                       cfg.get("preferir_remotas", False), iniciales.get(rol["id"], []), perfiles=rol.get("_perfiles",[]))
+    if panel:
+        tomadas = {v["id"] for lista in salida.values() for v, _ in lista}
+        libres += [v for lista in por_rol.values() for v, _ in lista if v["id"] not in tomadas]
+        for rol in roles:
+            salida[rol["id"]] = ampliar(rol, salida[rol["id"]], libres, meta_de(rol, cfg),
+                                        cfg.get("max_por_empresa", 2), hoy)
+    for rol in roles:
+        candidatas = por_rol[rol["id"]]
         elegidas = [v for v, _ in salida[rol["id"]]]
         unicas = len(vacante.juntar(elegidas))
         empresas = Counter(normalizar.empresa(v["empresa"]) for v, _ in candidatas + list(iniciales.get(rol["id"], [])))
@@ -174,9 +235,55 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificac
             "empresas_disponibles": len(empresas),
             "capacidad_con_tope_empresa": capacidad,
             "limitadas_por_empresa": sum(empresas.values()) - capacidad,
-            "reserva_sin_entregar": len(candidatas) + len(iniciales.get(rol["id"], [])) - len(elegidas),
+            "reserva_sin_entregar": max(0, len(candidatas) + len(iniciales.get(rol["id"], [])) - len(elegidas)),
+            "ampliadas": dict(Counter(v["_ampliacion"] for v in elegidas if v.get("_ampliacion"))),
         }
     return salida, {"roles": resumen, "descartadas": dict(motivos)}
+
+
+ETAPAS_EMBUDO = ("encontradas", "con_descripcion", "entregables", "nuevas", "enlace_comprobado", "cumplen_filtros")
+PERDIDA = {"con_descripcion": "sin descripción completa (no se sabe el idioma)",
+           "entregables": "país o idioma sin confirmar",
+           "nuevas": "ya entregadas antes o vistas hace demasiado",
+           "enlace_comprobado": "enlace sin comprobar a tiempo",
+           "cumplen_filtros": "no cumplen los filtros de ningún perfil del cargo"}
+
+
+def embudo(vacantes, entregadas, hoy, cfg=None, resumen=None):
+    """Por cargo: cuántas vacantes sobreviven a cada paso hasta la entrega y dónde se pierden más. Solo cuentas por
+    cargo y motivo, sin datos de clientes. `resumen` (de `elegir`/`correr`) aporta entregadas y ampliadas."""
+    cfg = cfg or config()
+    roles = cfg["roles"]
+    desde = (date.fromisoformat(hoy) - timedelta(days=cfg.get("dias_frescura", 14))).isoformat()
+    idiomas = tuple(cfg.get("idiomas", ["es", "en"]))
+    salida = {r["id"]: {"nombre": r["nombre"], **{e: 0 for e in ETAPAS_EMBUDO}} for r in roles}
+    for v in vacantes:
+        grados = {f["familia"]: f["coincidencia"] for f in v.get("familias", [])}
+        propios = [r for r in roles if any(grados.get(f) in ("exacto", "similar") for f in r["familias"])]
+        if not propios:
+            continue
+        pasos = ["encontradas"]
+        if len(v.get("_descripcion") or "") >= 200:
+            pasos.append("con_descripcion")
+            if not contrato.entregable(dict(v, verificacion=None), idiomas):
+                pasos.append("entregables")
+                if not any(h in entregadas for h in huellas(v)) and (v.get("visto_primera_vez") or "") >= desde:
+                    pasos.append("nuevas")
+                    if (v.get("verificacion") or {}).get("estado") == "verificada":
+                        pasos.append("enlace_comprobado")
+        asignado = rol_de(v, roles)[0] if "enlace_comprobado" in pasos else None
+        for r in propios:
+            for e in pasos:
+                salida[r["id"]][e] += 1
+            if asignado is r:
+                salida[r["id"]]["cumplen_filtros"] += 1
+    for rid, e in salida.items():
+        r = ((resumen or {}).get("roles") or {}).get(rid, {})
+        e["entregadas"], e["ampliadas"] = r.get("entregadas", 0), sum((r.get("ampliadas") or {}).values())
+        caidas = {etapa: e[anterior] - e[etapa] for anterior, etapa in zip(ETAPAS_EMBUDO, ETAPAS_EMBUDO[1:])}
+        mayor = max(caidas, key=caidas.get) if any(caidas.values()) else None
+        e["principal_perdida"] = PERDIDA[mayor] if mayor else ""
+    return salida
 
 
 def filas_de(elegidas, roles, hoy, capturada):

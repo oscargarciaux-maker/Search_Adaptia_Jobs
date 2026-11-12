@@ -209,3 +209,46 @@ def test_limpiar_vuelve_a_leer_el_salario_de_las_previas():
     previa["salario"] = "$300M"  # como quedó con el código anterior
     vacantes, _, _ = bodega.limpiar([previa], [], hoy, 30, enlaces_ats=set(), empresas_leidas=set())
     assert vacantes[0]["salario"] == ""
+
+
+def test_relectura_completa_descripciones_guardadas_y_la_union_las_conserva():
+    """El 11 nov la mitad del inventario no tenía descripción y por eso no se podía entregar."""
+    hoy = "2026-11-11"
+    sin_texto = vacante.crear("Product Designer", "Acme", "https://www.linkedin.com/jobs/view/4100000001", "LinkedIn",
+                              "Remote - LATAM", fecha="2026-11-10", hoy=hoy, remoto=True)
+    otra = vacante.crear("Contador", "Beta", "https://www.linkedin.com/jobs/view/4100000002", "LinkedIn",
+                         "Bogotá, Colombia", fecha="2026-11-10", hoy=hoy) or dict(sin_texto, id="x", titulo="Contador",
+                         enlace="https://www.linkedin.com/jobs/view/4100000002", familias=[])
+    vieja = dict(sin_texto, id="y", enlace="https://www.linkedin.com/jobs/view/4100000003", fecha_publicacion="2026-09-01",
+                 visto_ultima_vez="2026-09-02")
+    texto = "We design digital products with a collaborative team and research users every week. " * 4
+    pedidas = []
+
+    class Cliente:
+        def get(self, url, params=None):
+            pedidas.append(url)
+            return type("R", (), {"status_code": 200,
+                                  "text": f'<div class="show-more-less-html__markup">{texto}</div>'})()
+    prioritarias = {f["familia"] for f in sin_texto["familias"]}
+    crudas, stats = linkedin_publico.completar_descripciones(Cliente(), [otra, vieja, sin_texto], 5, hoy=hoy,
+                                                              max_dias=21, prioritarias=prioritarias)
+    assert pedidas[0].endswith("4100000001")  # primero los cargos prioritarios
+    assert not any(u.endswith("4100000003") for u in pedidas)  # fuera de plazo
+    assert stats["con_descripcion"] == len(crudas) >= 1
+    vacantes, _, _ = bodega.limpiar([sin_texto], crudas, hoy, 30, set(), set())
+    unida = next(v for v in vacantes if v["enlace"] == sin_texto["enlace"])
+    assert len(unida["_descripcion"]) >= 200 and unida["idioma"] == "en" and unida["id"] == sin_texto["id"]
+
+
+def test_relectura_se_detiene_ante_bloqueos_seguidos():
+    v = vacante.crear("Product Designer", "Acme", "https://www.linkedin.com/jobs/view/4100000001", "LinkedIn",
+                      "Remote - LATAM", fecha="2026-11-10", hoy="2026-11-11", remoto=True)
+    previas = [dict(v, id=str(i), enlace=f"https://www.linkedin.com/jobs/view/41000000{i:02}") for i in range(10)]
+    pedidas = []
+
+    class Bloqueado:
+        def get(self, url, params=None):
+            pedidas.append(url)
+            return type("R", (), {"status_code": 429, "text": ""})()
+    _, stats = linkedin_publico.completar_descripciones(Bloqueado(), previas, 50, hoy="2026-11-11")
+    assert len(pedidas) == 4 and stats["bloqueos_seguidos"] == 4

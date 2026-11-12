@@ -5,7 +5,8 @@ import threading
 import time
 
 from buscador import contrato, vacante
-from panel.afinidad import enlace_utilizable, evaluar
+from panel.afinidad import (AMPLIACIONES, ETIQUETAS_AMPLIACION, MINIMO_POR_PERFIL, enlace_utilizable, evaluar,
+                            evaluar_ampliada)
 from panel.repositorio import hoy
 from panel.terminos import grado, sugerir
 
@@ -24,16 +25,35 @@ SIN_DATO = {"experiencia no informada", "inglés requerido sin confirmar"}
 _POR_CARGO = {}
 
 
-def _del_cargo(catalogo, cargo):
-    """Vacantes del catálogo que corresponden al cargo. Editar filtros de un perfil no cambia este resultado, así que se
-    reutiliza mientras no cambien el catálogo ni los términos del cargo."""
+def _del_cargo(catalogo, cargo, cercanas=False):
+    """Vacantes del catálogo que corresponden al cargo (o, con `cercanas`, solo las de sus oficios vecinos). Editar
+    filtros de un perfil no cambia este resultado, así que se reutiliza mientras no cambien el catálogo ni los términos."""
     clave = (catalogo["actualizado"], len(catalogo["vacantes"]), cargo["nombre"], tuple(cargo["terminos_exactos"]),
-             tuple(cargo["terminos_similares"]), tuple(cargo["terminos_excluidos"]))
+             tuple(cargo["terminos_similares"]), tuple(cargo["terminos_excluidos"]),
+             tuple(cargo.get("terminos_cercanos", [])), cercanas)
     if clave not in _POR_CARGO:
         if len(_POR_CARGO) > 200:
             _POR_CARGO.clear()
-        _POR_CARGO[clave] = [v for v in catalogo["vacantes"] if grado(v.get("titulo") or "", cargo)[0]]
+        if cercanas:
+            _POR_CARGO[clave] = [v for v in catalogo["vacantes"]
+                                 if grado(v.get("titulo") or "", cargo, cercanos=True)[0] == "cercano"]
+        else:
+            _POR_CARGO[clave] = [v for v in catalogo["vacantes"] if grado(v.get("titulo") or "", cargo)[0]]
     return _POR_CARGO[clave]
+
+
+def _ampliables(del_cargo, cercanas, p, fecha, ya):
+    """Cuántas más recibiría el perfil por ampliación (contrato v9), sin pasar del mínimo diario."""
+    if len(ya) >= MINIMO_POR_PERFIL:
+        return 0
+    extra = set()
+    for nivel in AMPLIACIONES:
+        for v in (del_cargo if nivel == "sin_dato" else del_cargo + cercanas):
+            if v["id"] not in ya and v["id"] not in extra and evaluar_ampliada(v, p, fecha, nivel)["compatible"]:
+                extra.add(v["id"])
+                if len(ya) + len(extra) >= MINIMO_POR_PERFIL:
+                    return len(extra)
+    return len(extra)
 
 
 def _contar(vacantes, p, fecha):
@@ -61,7 +81,7 @@ def vista_previa(repo, cfg, fecha=None):
     fecha = fecha or hoy()
     catalogo = repo.catalogo_vigente()
     clientes = {c.id for c in cfg.clientes if c.activo}
-    perfiles, cargos = {}, {}
+    perfiles, cargos, anteriores = {}, {}, []
     for c in cfg.cargos:
         if not c.activo:
             continue
@@ -75,11 +95,17 @@ def vista_previa(repo, cfg, fecha=None):
                 continue
             ids, limitantes = _contar(del_cargo, p, fecha)
             disponibles |= ids
-            perfiles[str(p.id)] = {"compatibles": len(ids), "del_cargo": len(del_cargo), "limitantes": limitantes}
+            perfiles[str(p.id)] = {"compatibles": len(ids), "del_cargo": len(del_cargo), "limitantes": limitantes,
+                                   "ampliables": _ampliables(del_cargo, _del_cargo(catalogo, raw, cercanas=True), p, fecha, ids)}
         n = len(disponibles)
         estado = ("sin_cupo" if not c.cupo else "alcanza" if n >= c.cupo else "justo" if n * 2 >= c.cupo
                   else "insuficiente")
-        cargos[str(c.id)] = {"disponibles": n, "del_cargo": len(del_cargo), "cupo": c.cupo, "estado": estado}
+        # Cada vacante va a un solo cargo: si coincide igual de bien con uno anterior de la lista, se lo lleva ese.
+        propios = {v["id"] for v in del_cargo}
+        solapes = [{"cargo": nombre, "vacantes": len(propios & ids)} for nombre, ids in anteriores if propios & ids]
+        anteriores.append((c.nombre, propios))
+        cargos[str(c.id)] = {"disponibles": n, "del_cargo": len(del_cargo), "cupo": c.cupo, "estado": estado,
+                             "solapes": solapes}
     return {"catalogo": {"vacantes": len(catalogo["vacantes"]), "actualizado": catalogo["actualizado"]},
             "perfiles": perfiles, "cargos": cargos,
             "nota": "Estimación con vacantes ya guardadas y aún no entregadas. La búsqueda dirigida de mañana "
@@ -197,8 +223,9 @@ def resultados(repo, cliente_id=None, fecha=None):
         # la bodega en vez de rehacerlo con menos evidencia.
         actual = vacante.reetiquetar(dict(datos, _descripcion=v.get("description_full") or datos.get("_descripcion", "")),
                                      publicada=True)
-        filtros = evaluar(actual, row["filtros"], hoy())
-        afinidad_cargo,_ = grado(actual["titulo"],row["cargo_configuracion"])
+        ampliacion = next((e["ampliacion"] for e in row.get("explicacion") or [] if isinstance(e, dict) and e.get("ampliacion")), "")
+        filtros = evaluar_ampliada(actual, row["filtros"], hoy(), ampliacion) if ampliacion else evaluar(actual, row["filtros"], hoy())
+        afinidad_cargo,_ = grado(actual["titulo"],row["cargo_configuracion"], cercanos=ampliacion == "cargo_cercano")
         if not afinidad_cargo:
             filtros["compatible"] = False
             filtros["motivos"].append("el título actual no corresponde al cargo configurado")
@@ -212,7 +239,7 @@ def resultados(repo, cliente_id=None, fecha=None):
             "experiencia": datos.get("anos_min"), "match_grade": row["match_grade"],
             "explicacion": row["explicacion"], "cargo_id": row["cargo_id"], "enlace": enlace,
             "estado": "lista" if enlace else "retirada" if v.get("status") != "active" else "por_confirmar",
-            "motivos": filtros["motivos"]}
+            "motivos": filtros["motivos"], "ampliacion": ETIQUETAS_AMPLIACION.get(ampliacion, "")}
         if clave in vistas:
             salida[salida.index(vistas[clave])] = ficha
         else:

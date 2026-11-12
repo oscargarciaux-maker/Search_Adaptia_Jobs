@@ -163,11 +163,40 @@ def test_un_enlace_malo_no_contamina_el_bueno_ni_sale_en_filas():
 def test_cache_no_renueva_hora_y_caduca_y_compara_titulo():
     v = oferta()
     cache = {v["enlace"]: resultado(v["enlace"])}
-    ve.anotar(v, cache, AHORA + timedelta(hours=5))
+    ve.anotar(v, cache, AHORA + timedelta(hours=23))
     assert v["verificacion"]["comprobada_en"] == cache[v["enlace"]]["comprobada_en"]
-    ve.anotar(v, cache, AHORA + timedelta(hours=6))
+    assert v["verificacion"]["estado"] == "verificada"  # sirve para seleccionar
+    assert not ve.vigente(cache[v["enlace"]], v["titulo"], AHORA + timedelta(hours=7), ve.VIGENCIA_COMPARTIR)
+    ve.anotar(v, cache, AHORA + timedelta(hours=24))
     assert v["verificacion"]["estado"] == "pendiente"
     assert not ve.vigente(cache[v["enlace"]], "QA Engineer", AHORA)
+    bloqueo = resultado(v["enlace"], estado="pendiente")
+    assert not ve.vigente(bloqueo, v["titulo"], AHORA + timedelta(minutes=31))
+
+
+def test_cola_de_seleccion_va_mas_alla_del_cupo_y_salta_lo_ya_comprobado(monkeypatch):
+    cfg = dict(entrega.config(), roles=[entrega.config()["roles"][1]], por_rol=2)
+    monkeypatch.setattr(entrega, "config", lambda: cfg)
+    vs = [oferta(i) for i in range(1, 8)]
+    for v in vs:
+        v["verificacion"] = {"estado": "pendiente"}
+    cache = {vs[0]["enlace"]: resultado(vs[0]["enlace"], ahora=datetime.now(timezone.utc))}  # ya comprobada
+    cola = ve.cola_de_seleccion(vs, {}, "2026-11-05", cache, {}, maximo=4)
+    ids = [v["id"] for v in cola]
+    assert len(ids) == len(set(ids)) and len(ids) >= 5  # más allá del cupo de 2
+    sin_comprobar = [v for v in cola if not ve.vigente(cache.get(v["enlace"], {}), v["titulo"], datetime.now(timezone.utc))]
+    assert len(sin_comprobar) >= 4
+
+
+def test_lote_del_dia_se_recomprueba_con_el_plazo_para_compartir(monkeypatch):
+    registrada = oferta(1)
+    hace7h = datetime.now(timezone.utc) - timedelta(hours=7)
+    cache = {registrada["enlace"]: resultado(registrada["enlace"], ahora=hace7h)}
+    lote = {"fecha": "2026-11-05", "elegidas": {"ux-ui-designer": [(dict(registrada), "exacto")]}}
+    pedidas = []
+    monkeypatch.setattr(ve, "comprobar", lambda u, t, **op: pedidas.append(u) or resultado(u, ahora=op["ahora"]))
+    ve.preparar([registrada], {}, "2026-11-05", cache, lote=lote, incremental=True, cfg={"vacantes_por_captura": 6})
+    assert registrada["enlace"] in pedidas
 
 
 def test_presupuesto_no_aprueba_las_ofertas_no_revisadas():
@@ -241,7 +270,7 @@ def test_cierre_confirmado_se_guarda_sin_borrar_snapshot_historico(monkeypatch, 
     archivo.write_text(original)
     monkeypatch.setattr(supabase, "exigir_conexion", lambda: None)
     monkeypatch.setattr(supabase, "exigir_catalogo", lambda: None)
-    monkeypatch.setattr(incremental, "recoger", lambda *a: ([dict(titulo=v["titulo"], empresa=v["empresa"],
+    monkeypatch.setattr(incremental, "recoger", lambda *a, **k: ([dict(titulo=v["titulo"], empresa=v["empresa"],
         enlace=v["enlace"], fuente="Lever", ubicacion="Remote LATAM", descripcion=TEXTO)] if en_inventario else [], set(), set(), {}))
     monkeypatch.setattr(ve, "comprobar", lambda u, t, **op:
         resultado(u, estado="rechazada", ahora=op["ahora"], motivo="vacante cerrada"))

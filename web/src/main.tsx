@@ -53,6 +53,7 @@ import type {
   Ejecucion,
   Vacante,
   EstimacionCargo,
+  Embudo,
   EstimacionEnVivo,
   EstimacionPerfil,
   VistaPrevia,
@@ -252,6 +253,7 @@ function CargoDialog({
           terminos_exactos: [],
           terminos_similares: [],
           terminos_excluidos: [],
+          terminos_cercanos: [],
         },
   );
   const [busy, setBusy] = useState(false);
@@ -262,6 +264,7 @@ function CargoDialog({
       const r = await api<{
         terminos_exactos: string[];
         terminos_similares: string[];
+        terminos_cercanos?: string[];
         fuentes: string[];
         requiere_revision: boolean;
       }>("/cargos/expandir", {
@@ -272,6 +275,9 @@ function CargoDialog({
         ...v,
         terminos_exactos: r.terminos_exactos,
         terminos_similares: r.terminos_similares,
+        terminos_cercanos: r.terminos_cercanos?.length
+          ? r.terminos_cercanos
+          : v.terminos_cercanos || [],
       }));
       setNota(
         r.fuentes.join(" · ") +
@@ -370,6 +376,16 @@ function CargoDialog({
             values={c.terminos_similares}
             onChange={(v) => setC({ ...c, terminos_similares: v })}
           />
+          <TagInput
+            label="Cargos cercanos (solo si faltan vacantes)"
+            values={c.terminos_cercanos || []}
+            onChange={(v) => setC({ ...c, terminos_cercanos: v })}
+          />
+          <p className="helper">
+            Si un cliente no llega a 5 vacantes en el día, se completan primero
+            con avisos que no dicen años o inglés y luego con estos oficios
+            vecinos. En «Vacantes» aparecen marcadas como «Ampliada».
+          </p>
           <TagInput
             label="Excluir estos términos"
             values={c.terminos_excluidos}
@@ -491,6 +507,9 @@ function PreviewPerfil({
           <span className="preview-sub">
             {" "}
             · {info.del_cargo} del cargo en el catálogo
+            {info.compatibles < 5 && !!info.ampliables && (
+              <> · +{info.ampliables} con ampliación hasta llegar a 5</>
+            )}
           </span>
         </span>
       </p>
@@ -652,7 +671,70 @@ function PreviewCargo({
     >
       <Target size={12} />≈ {info.disponibles} guardadas sin entregar ·{" "}
       {textoEstadoCargo[info.estado]}
+      {!!info.solapes?.length && (
+        <span className="overlap">
+          {" "}
+          · comparte{" "}
+          {info.solapes
+            .map((s) => s.vacantes + " vacantes con «" + s.cargo + "»")
+            .join(", ")}
+          : cada vacante va al primero de la lista. Mejor un solo cargo con
+          varios perfiles.
+        </span>
+      )}
     </div>
+  );
+}
+
+const etapasEmbudo: [keyof Embudo, string][] = [
+  ["encontradas", "Encontradas"],
+  ["con_descripcion", "Con descripción"],
+  ["entregables", "País e idioma confirmados"],
+  ["nuevas", "Nuevas"],
+  ["enlace_comprobado", "Enlace comprobado"],
+  ["cumplen_filtros", "Cumplen filtros"],
+  ["entregadas", "Entregadas"],
+];
+
+function EmbudoCargos({ embudo }: { embudo: Record<string, Embudo> }) {
+  return (
+    <details className="funnel">
+      <summary>Dónde se pierden las vacantes de cada cargo</summary>
+      <div className="funnel-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Cargo</th>
+              {etapasEmbudo.map(([k, t]) => (
+                <th key={k}>{t}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {Object.entries(embudo).map(([cargo, e]) => (
+              <tr key={cargo}>
+                <th scope="row">
+                  {cargo}
+                  {e.principal_perdida && (
+                    <span className="muted">
+                      Mayor pérdida: {e.principal_perdida}
+                    </span>
+                  )}
+                </th>
+                {etapasEmbudo.map(([k]) => (
+                  <td key={k}>
+                    {e[k] as number}
+                    {k === "entregadas" && e.ampliadas > 0 && (
+                      <span className="muted"> ({e.ampliadas} ampliadas)</span>
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
   );
 }
 
@@ -2137,6 +2219,15 @@ function App() {
                               .join(" · ")}
                           </p>
                         )}
+                      {!!r.resumen.ampliadas && (
+                        <p className="helper">
+                          {r.resumen.ampliadas} asignaciones entraron por
+                          ampliación para que cada cliente llegue a 5.
+                        </p>
+                      )}
+                      {r.resumen.embudo && (
+                        <EmbudoCargos embudo={r.resumen.embudo} />
+                      )}
                     </div>
                     <span
                       className={
@@ -2531,6 +2622,14 @@ function VacancyCard({ v }: { v: Vacante }) {
         </span>
         <span>{v.idioma === "es" ? "Español" : "Inglés"}</span>
         <span>{grados[v.match_grade] || v.match_grade}</span>
+        {v.ampliacion && (
+          <span
+            className="amplified"
+            title="Entró para completar el mínimo de 5 vacantes de este perfil. No aparece en el mensaje de WhatsApp."
+          >
+            Ampliada: {v.ampliacion}
+          </span>
+        )}
       </div>
       <div className="vacancy-meta">
         <span>
@@ -2549,16 +2648,18 @@ function VacancyCard({ v }: { v: Vacante }) {
           <ChevronDown size={13} />
         </summary>
         <ul>
-          {v.explicacion.map((e, i) => (
-            <li key={i}>
-              <Check size={12} />
-              {typeof e === "string"
-                ? e
-                : e.termino
-                  ? "Cargo: " + e.termino
-                  : e.regla}
-            </li>
-          ))}
+          {v.explicacion
+            .filter((e) => typeof e === "string" || !e.ampliacion)
+            .map((e, i) => (
+              <li key={i}>
+                <Check size={12} />
+                {typeof e === "string"
+                  ? e
+                  : e.termino
+                    ? "Cargo: " + e.termino
+                    : e.regla}
+              </li>
+            ))}
         </ul>
         {v.motivos.length > 0 && (
           <p className="helper">Revisar: {v.motivos.join(" · ")}</p>

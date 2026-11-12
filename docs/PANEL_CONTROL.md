@@ -31,6 +31,7 @@ Ambas se aplican por el instalador automático tras el respaldo; no hace falta c
    ese perfil, y qué ajuste sumaría más (con «Aplicar» para admitir datos no informados). En **Cargos y cupos** cada
    cargo muestra «alcanza para el cupo», «puede quedar corto» o «probable faltante». Usa las mismas reglas de la
    selección, no busca en internet ni guarda nada; un cargo nuevo empieza bajo porque todavía no se ha buscado.
+   **Mínimo por perfil (contrato v9):** si un cliente no llega a 5 vacantes en el día, se completa dentro del cupo con avisos que no dicen años o inglés y luego con los «Cargos cercanos» del cargo (o remotas abiertas a su país si solo pidió presencial). En «Vacantes» se marcan «Ampliada»; el mensaje de WhatsApp no cambia. Dos cargos con los mismos términos se reparten las vacantes: la estimación lo avisa.
    **Estimar con búsqueda en vivo** hace, solo al pulsarlo, una búsqueda corta (hasta 30 s) en LinkedIn público y
    Get on Board, sin Apify ni cookies, aplica los mismos filtros y descuenta las ya entregadas. Es una muestra: la
    búsqueda nocturna revisa más páginas y portales. Para no exponer la IP del servidor a bloqueos de LinkedIn, solo
@@ -39,7 +40,7 @@ Ambas se aplican por el instalador automático tras el respaldo; no hace falta c
    sin guardar. Si otra ventana guardó antes, se rechaza la revisión antigua: recargar y revisar antes de guardar otra vez.
 6. **Programar para mañana** muestra la distribución, guarda los cambios pendientes y confirma una versión inmutable.
    Entra en vigor al día siguiente según Bogotá. Se exige un perfil activo por cada cargo con cupo positivo.
-7. En **Actividad**, comprobar la captura y sus faltantes. No se inventan vacantes ni se completan cupos con duplicados,
+7. En **Actividad**, comprobar la captura y sus faltantes. «Dónde se pierden las vacantes de cada cargo» muestra el embudo: encontradas → con descripción → país e idioma confirmados → nuevas → enlace comprobado → cumplen filtros → entregadas, con la mayor pérdida. No se inventan vacantes ni se completan cupos con duplicados,
    ubicaciones ajenas o enlaces pendientes. Si las fuentes no ofrecen suficientes resultados, se indica el déficit.
 
 Archivar un cliente o cargo lo retira de la siguiente configuración que se programe. Conserva versiones, asignaciones

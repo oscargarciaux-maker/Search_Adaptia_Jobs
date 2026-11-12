@@ -34,10 +34,12 @@ def sugerir(cargo, sesion=None, consultar_esco=True):
         if nivel is not None:
             coincidencias.append((nivel, orden, f))
     mejor = min((n for n, _, _ in coincidencias), default=None)
+    cercanos = []
     for nivel, _, f in sorted(coincidencias, key=lambda x: x[:2]):
         if nivel == mejor:
             (exactos if nivel == 0 else similares).extend(f.get("exactos", []))
             similares.extend(f.get("similares", []))
+            cercanos.extend(f.get("cercanos", []))  # oficios vecinos: solo para ampliar (contrato v9)
     if coincidencias:
         evidencia.append("Equivalentes del mapa existente")
     if consultar_esco:
@@ -71,7 +73,12 @@ def sugerir(cargo, sesion=None, consultar_esco=True):
             if isinstance(x, str) and 2 <= len(x) <= 120 and normalizar.titulo_base(x) not in claves:
                 claves.add(normalizar.titulo_base(x))
                 destino.append(x)
-    return {"terminos_exactos": principales[:30], "terminos_similares": limpios[:30],
+    vecinos = []
+    for x in cercanos:
+        if isinstance(x, str) and 2 <= len(x) <= 120 and normalizar.titulo_base(x) not in claves:
+            claves.add(normalizar.titulo_base(x))
+            vecinos.append(x)
+    return {"terminos_exactos": principales[:30], "terminos_similares": limpios[:30], "terminos_cercanos": vecinos[:30],
             "fuentes": list(dict.fromkeys(evidencia)) or ["Variantes de escritura"],
             "requiere_revision": not limpios,
             "nota": "Revisa los términos antes de guardar; un equivalente no garantiza pertinencia de cada anuncio."}
@@ -82,7 +89,9 @@ _base = lru_cache(maxsize=32768)(normalizar.titulo_base)
 _texto = lru_cache(maxsize=32768)(normalizar.texto)
 
 
-def grado(titulo, cargo):
+def grado(titulo, cargo, cercanos=False):
+    """(grado, evidencia). `cercanos=True` reconoce además los oficios vecinos del cargo (contrato v9), que solo
+    sirven para ampliar a un perfil que no llega al mínimo."""
     base = _base(titulo)
     if not base:
         return None, None
@@ -101,4 +110,9 @@ def grado(titulo, cargo):
             puntaje = fuzz.token_sort_ratio(base, _base(t))
             if puntaje >= 90:
                 return "similar", {"regla":"similitud textual", "termino":t, "grado":"similar", "similitud_textual":round(puntaje)}
+    if cercanos:
+        for t in cargo.get("terminos_cercanos", []):
+            canon = _base(t)
+            if canon and normalizar.contiene_frase(base, canon):
+                return "cercano", {"regla": "cargo cercano", "termino": t, "grado": "cercano"}
     return None, None
