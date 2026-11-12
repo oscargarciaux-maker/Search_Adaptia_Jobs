@@ -9,6 +9,8 @@ cuando sus filtros coincidan. Los filtros pertenecen a cada perfil y pueden prod
 Mientras se edita un perfil, el panel estima cuántas vacantes ya guardadas y aún no entregadas lo cumplirían hoy y
 qué ajuste añadiría más (por ejemplo, admitir experiencia o inglés no informados: solo ~1 de cada 4 avisos dice los
 años exigidos y ~1 de cada 8 el nivel de inglés). En «Cargos y cupos» cada cargo indica si alcanza para su cupo.
+Si a una persona le faltan vacantes para llegar a 5, pueden aparecer **posts de LinkedIn** de quien está contratando su cargo, con la etiqueta «Post» (en el panel) o «📣 Post» (en WhatsApp): no tienen formulario de postulación, se contacta a quien publicó por mensaje o por el correo que deja. Van siempre al final y nunca reemplazan vacantes formales.
+
 Nada se envía solo. Cada mañana, en «Mensajes», cada cliente con WhatsApp y aceptación tiene su mensaje listo: «Abrir en WhatsApp» abre su chat con el texto escrito para revisarlo y enviarlo. No hay seguimiento de postulaciones.
 
 Los apartados siguientes describen también el scraper heredado y sus consultas técnicas en Supabase. **Con panel activo,

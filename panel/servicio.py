@@ -229,7 +229,9 @@ def resultados(repo, cliente_id=None, fecha=None):
         if not afinidad_cargo:
             filtros["compatible"] = False
             filtros["motivos"].append("el título actual no corresponde al cargo configurado")
-        enlace = enlace_utilizable(row) if filtros["compatible"] and not contrato.entregable(actual) else ""
+        es_post = actual.get("tipo") == "post"  # contrato v11: post de LinkedIn sin ficha formal, con su etiqueta
+        no_apta = contrato.entregable_post(actual) if es_post else contrato.entregable(actual)
+        enlace = enlace_utilizable(row) if filtros["compatible"] and not no_apta else ""
         clave = row["vacante_id"]
         if clave in vistas and (vistas[clave]["estado"] == "lista" or not enlace):
             continue
@@ -240,7 +242,8 @@ def resultados(repo, cliente_id=None, fecha=None):
             "explicacion": row["explicacion"], "cargo_id": row["cargo_id"], "enlace": enlace,
             "cargo_nombre": (row.get("cargo_configuracion") or {}).get("nombre", ""),
             "estado": "lista" if enlace else "retirada" if v.get("status") != "active" else "por_confirmar",
-            "motivos": filtros["motivos"], "ampliacion": ETIQUETAS_AMPLIACION.get(ampliacion, "")}
+            "motivos": filtros["motivos"], "ampliacion": ETIQUETAS_AMPLIACION.get(ampliacion, "") if not es_post else "",
+            "tipo": "post" if es_post else "", "contacto": (datos.get("contacto") or {}) if es_post else {}}
         if clave in vistas:
             salida[salida.index(vistas[clave])] = ficha
         else:
@@ -252,11 +255,11 @@ def resultados(repo, cliente_id=None, fecha=None):
 
 def whatsapp(repo, cliente_id, fecha=None):
     r = resultados(repo, cliente_id, fecha)
-    listas = [v for v in r["vacantes"] if v["estado"] == "lista"]
+    from panel import borradores
+    listas = borradores.con_posts([v for v in r["vacantes"] if v["estado"] == "lista"])
     if not listas:
         return {"texto": "", "vacantes": 0, "nota": "No hay vacantes con filtros y enlace vigentes para copiar."}
     # Misma plantilla humana que los borradores diarios (contrato v10): cargo y lista, sin enumerar filtros.
-    from panel import borradores
     grupos = {}
     for v in listas:
         grupos.setdefault(v.get("cargo_nombre") or "tu perfil", []).append(v)

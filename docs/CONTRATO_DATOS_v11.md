@@ -34,3 +34,59 @@ se detiene, `salud.json` la marca `clave_invalida` y se envía la alerta de **fa
 
 `salud.json` y el resumen del panel solo llevan conteos por cargo: `perfiles_bajo_minimo` y `faltan_para_minimo`, más
 `reutilizadas` en la ejecución del panel. Nunca ids de perfil ni datos de clientes.
+
+## Segunda parte: posts de LinkedIn etiquetados «Post»
+
+Decisión de Oscar (12 nov 2026): muchos posts de quien contrata no tienen ficha ni enlace de postulación, pero permiten
+contactar directamente a quien publica (mensaje en LinkedIn o correo). Se aceptan como **último recurso**, siempre con la
+etiqueta «Post». **Modifica** la regla anterior («un post solo aporta una oferta si se recupera su ficha formal»): esa
+regla sigue valiendo para `ofertas` y el cupo; un post sin ficha solo puede llegar como «Post».
+
+### Cuándo se buscan
+
+Solo en modo panel, con `APIFY_TOKEN`, después del rescate formal (punto 6) y solo si algún perfil sigue bajo 5. Actor
+`apify.actor_publicaciones` (`harvestapi/linkedin-post-search`, sin cookies ni sesión), hasta `apify.posts_rescate`
+(30) posts al día (≈ USD 0,06) con lo que quede del crédito diario. Consultas: `(hiring OR contratando OR vacante OR
+buscamos) "<término del cargo>"`, máx. 6, primero los cargos con más déficit. El feed antiguo
+(`publicaciones_por_dia`) sigue en 0.
+
+### Filtro estricto, sin IA
+
+Un post entra solo si cumple todo:
+
+1. Anuncia una contratación (`CONTRATA`) y pide hacer algo: postular, enviar el CV, escribir, comentar (`ACCION`) o
+   trae un enlace.
+2. No es basura (`RUIDO`, `A_FUTURO`): personas que buscan empleo (#OpenToWork, «busco trabajo», «en búsqueda de
+   nuevas oportunidades», «open to new opportunities», también en el titular del autor), cursos, webinars y eventos,
+   «banco de talento», «base de datos», «talent pool/community», «futuras oportunidades», «te contactaremos», «deja tu
+   CV para…», o listas de más de 3 enlaces (vacantes de terceros).
+3. Nombra un cargo del mapa (exacto o similar), la empresa (autor empresa o «at/en <Empresa>» en su titular), un país
+   activo o trabajo remoto con ubicación positiva, y está en español o inglés.
+4. Tiene fecha dentro del plazo (`dias_maximos`) y forma de contacto: el perfil de LinkedIn del autor (`/in/` o
+   `/company/`) o un correo del texto.
+
+Si el post enlaza una ficha formal de LinkedIn que se puede leer, se entrega **esa ficha** como vacante normal (sin
+etiqueta). Si no, queda como post.
+
+### Campos
+
+- Catálogo (`catalogo_vacantes`, sin SQL nuevo): id `post-<huella>`, `datos.tipo = "post"`, `datos.contacto =
+  {perfil, correo}` (solo lo que el post muestra), fuente `LinkedIn (post)`, enlace al post, cargo nombrado, ubicación,
+  fecha y `verificacion` con la hora en que Apify lo leyó. Solo los posts llevan `tipo` y `contacto`: el resto del
+  catálogo no cambia.
+- `contrato.entregable` rechaza siempre un post («no es una oferta formal»): nunca va a `ofertas`, a
+  `entregas_diarias` ni al cupo de 120. `contrato.entregable_post` aplica las reglas de arriba.
+- Asignación (`panel_asignaciones.explicacion`): `{"tipo": "post"}` (y `{"ampliacion": "sin_dato"}` si el post no dice
+  años o inglés). Se asigna solo a perfiles bajo 5 y solo hasta completar 5, nunca dos veces a la misma persona.
+- Vigencia: un post no tiene estado de cierre; su lectura vale **24 h** para compartir (las fichas siguen con 6 h). El
+  panel solo considera posts leídos en los 2 últimos días.
+- Privacidad: los posts traen el perfil o correo de quien publica; viven solo en Supabase privado, nunca en `trabajo/`,
+  `salud.json` ni la rama `publicado` (allí solo conteos por motivo de descarte).
+
+### Cómo se muestra
+
+- Panel, «Vacantes»: etiqueta azul «Post» y botón «Contactar a quien publicó» (abre el post); el correo, si existe,
+  en «Por qué coincide». No cuenta en la vista previa de «Estimar».
+- WhatsApp (borrador y «Copiar WhatsApp»): primero las vacantes formales; los posts van al final, solo completan hasta 5
+  y se escriben así: `📣 Post · <Cargo> · <Empresa>` / `Escríbele por mensaje a quien publicó: <enlace>` / `O al
+  correo: <correo>`, con una frase que explica qué significa 📣 Post.

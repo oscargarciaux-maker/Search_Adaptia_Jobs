@@ -25,6 +25,7 @@ import {
   Loader2,
   LogOut,
   Mail,
+  Megaphone,
   Menu,
   MessageCircle,
   MoreHorizontal,
@@ -3040,7 +3041,9 @@ function VacancyCard({ v }: { v: Vacante }) {
         </div>
         <span className={"pill " + (v.estado === "lista" ? "green" : "amber")}>
           {v.estado === "lista"
-            ? "Verificada"
+            ? v.tipo === "post"
+              ? "Vigente"
+              : "Verificada"
             : v.estado === "retirada"
               ? "Retirada"
               : "Por confirmar"}
@@ -3053,6 +3056,15 @@ function VacancyCard({ v }: { v: Vacante }) {
         </span>
         <span>{v.idioma === "es" ? "Español" : "Inglés"}</span>
         <span>{grados[v.match_grade] || v.match_grade}</span>
+        {v.tipo === "post" && (
+          <span
+            className="post-tag"
+            title="Publicación de LinkedIn de quien contrata, sin ficha formal. Completa el mínimo de 5 y se contacta por mensaje o correo."
+          >
+            <Megaphone size={13} />
+            Post
+          </span>
+        )}
         {v.ampliacion && (
           <span
             className="amplified"
@@ -3080,7 +3092,9 @@ function VacancyCard({ v }: { v: Vacante }) {
         </summary>
         <ul>
           {v.explicacion
-            .filter((e) => typeof e === "string" || !e.ampliacion)
+            .filter(
+              (e) => typeof e === "string" || Boolean(e.termino || e.regla),
+            )
             .map((e, i) => (
               <li key={i}>
                 <Check size={12} />
@@ -3095,13 +3109,18 @@ function VacancyCard({ v }: { v: Vacante }) {
         {v.motivos.length > 0 && (
           <p className="helper">Revisar: {v.motivos.join(" · ")}</p>
         )}
+        {v.tipo === "post" && v.contacto?.correo && (
+          <p className="helper">Correo en el post: {v.contacto.correo}</p>
+        )}
       </details>
       <div className="vacancy-bottom">
         <span>
           <ShieldCheck size={13} />
-          {v.estado === "lista"
-            ? "Enlace con comprobación vigente"
-            : "No se incluirá en el mensaje"}
+          {v.estado !== "lista"
+            ? "No se incluirá en el mensaje"
+            : v.tipo === "post"
+              ? "Post leído en las últimas 24 h"
+              : "Enlace con comprobación vigente"}
         </span>
         {v.enlace && (
           <a
@@ -3110,7 +3129,7 @@ function VacancyCard({ v }: { v: Vacante }) {
             rel="noopener noreferrer"
             className="text-button"
           >
-            Ver vacante
+            {v.tipo === "post" ? "Contactar a quien publicó" : "Ver vacante"}
             <ExternalLink size={14} />
           </a>
         )}

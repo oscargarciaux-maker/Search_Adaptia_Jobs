@@ -132,7 +132,8 @@ def enlace_utilizable(row, ahora=None):
         if not fecha or e.get("estado") != "verificada":
             continue
         edad = (ahora - datetime.fromisoformat(fecha.replace("Z", "+00:00"))).total_seconds()
-        if 0 <= edad < 6 * 3600:
+        # Contrato v11: un post se comprueba al leerlo y no tiene estado de cierre; vale 24 h para compartir.
+        if 0 <= edad < (24 if datos.get("tipo") == "post" else 6) * 3600:
             url = contrato.url_limpia(e.get("url", ""))
             originales = {contrato.url_limpia(x) for x in
                           [datos.get("enlace"), datos.get("enlace_directo"), *datos.get("enlaces_alternativos", [])] if x}

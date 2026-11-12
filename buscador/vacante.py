@@ -71,6 +71,40 @@ def crear(titulo, empresa, enlace, fuente, ubicacion="", descripcion="", fecha="
     }
 
 
+def crear_post(titulo, empresa, enlace, ubicacion="", texto="", fecha="", remoto=None, contacto=None, hoy=None,
+               capturada=None):
+    """Contrato v11 (segunda parte): publicación de LinkedIn que anuncia una vacante sin ficha formal. Mismas etiquetas
+    que una vacante (familias, países, idioma, fecha) y `tipo="post"`. No pasa por `crear`: ese camino la rechaza con
+    razón (un post no es una ficha), y así nunca entra al inventario, al cupo ni a `ofertas`."""
+    from buscador.contrato import url_limpia
+    h = enlaces.host(enlace)
+    if not (titulo and empresa and texto) or not (h == "linkedin.com" or h.endswith(".linkedin.com")):
+        return None
+    fams = familias.clasificar(titulo, texto)
+    if not fams:
+        return None
+    capturada = tiempos.instante(capturada) or tiempos.ahora()
+    hoy = hoy or date.today().isoformat()
+    principal = url_limpia(enlace)
+    lugares = {principal: {"titulo": titulo, "ubicacion": ubicacion, "remoto": remoto, "vista_en": capturada}}
+    lugar = _evaluar_lugares(lugares, texto)
+    return {
+        "id": "post-" + huella(empresa, titulo, principal), "tipo": "post", "contacto": contacto or {},
+        "titulo": titulo, "empresa": empresa, "ubicacion": ubicacion, "_lugares": lugares, "familias": fams,
+        "paises": lugar["paises"], "confianza_pais": lugar["confianza"], "modalidad": lugar["modalidad"],
+        "nota_pais": lugar["nota"], "idioma": etiquetas.idioma(f"{titulo}\n{texto}"), "ingles": etiquetas.ingles(texto),
+        "nivel": normalizar.nivel(titulo), "anos_min": etiquetas.anos_min(texto), "salario": etiquetas.salario(texto),
+        "herramientas": [], "fecha_publicacion": (fecha or "")[:10], "fecha_estimada": not fecha,
+        "publicada_en": tiempos.instante(fecha), "detectada_en": capturada, "vista_en": capturada,
+        "visto_primera_vez": hoy, "visto_ultima_vez": hoy, "fuente": "LinkedIn (post)", "fuentes": ["LinkedIn (post)"],
+        "enlace": principal, "enlace_directo": "", "tipo_enlace": "post",
+        "resumen": " ".join(texto.split())[:300], "_descripcion": texto[:15000],
+        # Apify acaba de leer el post completo: esa lectura es la comprobación de que existe (contrato v11).
+        "verificacion": {"estado": "verificada", "motivo": "post leído al capturarlo",
+                         "enlaces": [{"url": principal, "estado": "verificada", "comprobada_en": capturada}]},
+    }
+
+
 def _evaluar_lugares(lugares, descripcion):
     """Elegibilidad combinada de todas las observaciones de ubicación con la descripción guardada de la vacante."""
     return paises.combinar([paises.elegibles(o.get("titulo", ""), o.get("ubicacion", ""), descripcion,
@@ -244,4 +278,6 @@ def publica(v):
     salida["enlaces_alternativos"] = sorted({url_limpia(u) for u in
         [v.get("enlace"), v.get("enlace_directo"), *v.get("_enlaces", [])] if u})
     salida["ids_agrupados"] = sorted({v["id"], *v.get("_ids_fusionados", [])})
+    if v.get("tipo") == "post":  # solo los posts llevan estos campos: el resto del catálogo no cambia de huella
+        salida.update(tipo="post", contacto=v.get("contacto") or {})
     return salida

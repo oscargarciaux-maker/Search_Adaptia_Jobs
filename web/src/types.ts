@@ -67,13 +67,21 @@ export type Vacante = {
   match_grade: string;
   explicacion: (
     | string
-    | { regla?: string; termino?: string; ampliacion?: string }
+    | {
+        regla?: string;
+        termino?: string;
+        ampliacion?: string;
+        tipo?: string;
+        reutilizada?: string;
+      }
   )[];
   cargo_id: string;
   enlace: string;
   estado: string;
   motivos: string[];
   ampliacion?: string;
+  tipo?: string;
+  contacto?: { perfil?: string; correo?: string };
 };
 export type Resultados = {
   ejecucion: Ejecucion | null;

@@ -253,6 +253,8 @@ def correo(descripcion):
 # ── Filas ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 def entregable(v, idiomas=("es", "en")):
     """Motivo por el que la vacante no puede ir en la entrega, o '' si puede."""
+    if v.get("tipo") == "post":
+        return "post de LinkedIn: no es una oferta formal"  # contrato v11: nunca cupo ni `ofertas`
     if not v.get("titulo") or not v.get("empresa") or v.get("empresa") == EMPRESA_DESCONOCIDA:
         return "sin empresa"
     motivo = calidad.motivo(v["titulo"], v.get("enlace", ""), v.get("fuente", ""))
@@ -268,6 +270,27 @@ def entregable(v, idiomas=("es", "en")):
         return "elegibilidad regional por confirmar"
     if (v.get("verificacion") or {}).get("estado") == "rechazada":
         return "enlaces rechazados: " + v["verificacion"].get("motivo", "sin destino válido")
+    return ""
+
+
+def entregable_post(v, idiomas=("es", "en")):
+    """Contrato v11: motivo por el que un post no puede mostrarse a un perfil con déficit, o '' si puede. Exige lo que
+    un post sí puede decir (cargo, empresa, idioma, ubicación positiva, fecha, forma de contacto); no exige ficha."""
+    if v.get("tipo") != "post":
+        return "no es un post"
+    if not v.get("titulo") or not v.get("empresa"):
+        return "sin cargo o empresa"
+    if len(v.get("_descripcion") or v.get("resumen") or "") < 80:
+        return "post demasiado corto"
+    if v.get("idioma") not in idiomas:
+        return "idioma fuera del contrato"
+    if not v.get("paises") or v.get("confianza_pais") not in {"alta", "media"} or v.get("nota_pais") == "por zona horaria":
+        return "elegibilidad regional por confirmar"
+    if not v.get("fecha_publicacion") or v.get("fecha_estimada"):
+        return "fecha de publicación sin confirmar"
+    contacto = v.get("contacto") or {}
+    if not (contacto.get("perfil") or contacto.get("correo")):
+        return "sin forma de contacto"
     return ""
 
 

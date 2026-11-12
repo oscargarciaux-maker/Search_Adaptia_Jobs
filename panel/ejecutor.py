@@ -162,6 +162,60 @@ def _reutilizar(repo, cfg, fecha, estrictas, filas, fila):
     return añadidas
 
 
+DIAS_POSTS = 2  # un post se comparte el día en que se leyó o el siguiente (su comprobación vale 24 h)
+
+
+def _posts(repo, cfg, fecha, estrictas, filas, fila):
+    """Contrato v11 (segunda parte): a cada perfil que sigue bajo el mínimo se le asignan posts de LinkedIn del cargo,
+    solo hasta completar el mínimo. Cumplen sus filtros (los datos que el post no dice se admiten como «sin dato»,
+    igual que una ampliación) y esa persona nunca los recibió. No cuentan en el cupo ni van a `ofertas`."""
+    from buscador import contrato, vacante as vacante_mod
+    bajos = [(c, p) for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id))
+             if estrictas.get(p.id, 0) < MINIMO_POR_PERFIL]
+    if not bajos:
+        return 0
+    desde = (datetime.fromisoformat(fecha) - timedelta(days=DIAS_POSTS)).date().isoformat()
+    posts = _paginas(repo, "catalogo_vacantes", {"status": "eq.active", "datos->>tipo": "eq.post",
+                                                 "observed_at": f"gte.{desde}", "select": "id,datos,description_full",
+                                                 "order": "observed_at.desc"}, maximo=1000)
+    candidatos = []
+    for row in posts:
+        datos = vacante_mod.reetiquetar(dict(row.get("datos") or {}, _descripcion=row.get("description_full") or ""),
+                                        publicada=True)
+        if datos.get("tipo") == "post" and not contrato.entregable_post(datos):
+            candidatos.append({"vacante_id": row["id"], "snapshot": datos})
+    if not candidatos:
+        return 0
+    ids = ",".join(str(p.id) for _, p in bajos)
+    vistas_por_perfil = {}
+    for r in _paginas(repo, "panel_asignaciones", {"perfil_id": f"in.({ids})", "select": "perfil_id,vacante_id"}):
+        vistas_por_perfil.setdefault(r["perfil_id"], set()).add(r["vacante_id"])
+    for f in filas:
+        vistas_por_perfil.setdefault(f["perfil_id"], set()).add(f["vacante_id"])
+    añadidos = 0
+    for cargo, p in bajos:
+        raw = cargo.model_dump(mode="json")
+        vistas = vistas_por_perfil.setdefault(str(p.id), set())
+        for row in candidatos:
+            if estrictas.get(p.id, 0) >= MINIMO_POR_PERFIL:
+                break
+            afinidad, _ = grado(row["snapshot"]["titulo"], raw, cercanos=True)
+            if row["vacante_id"] in vistas or not afinidad:
+                continue
+            match, extra = evaluar(row["snapshot"], p, fecha), [{"tipo": "post"}]
+            if not match["compatible"]:
+                match = evaluar_ampliada(row["snapshot"], p, fecha, "sin_dato")
+                extra.append({"ampliacion": "sin_dato"})
+                if not match["compatible"]:
+                    continue
+            vistas.add(row["vacante_id"])
+            estrictas[p.id] = estrictas.get(p.id, 0) + 1
+            filas.append(fila(dict(row, match_grade=entrega.GRADO_CONTRATO.get(afinidad, "close")), p, str(cargo.id),
+                              match["pruebas"], extra))
+            añadidos += 1
+    return añadidos
+
+
 def registrar(repo, version, fecha, reporte=None):
     """Reconstruible desde la selección confirmada, incluso tras perder el proceso anterior."""
     ejecucion = iniciar(repo, version, fecha)
@@ -196,10 +250,14 @@ def registrar(repo, version, fecha, reporte=None):
         if match["compatible"]:
             estrictas[p.id] = estrictas.get(p.id, 0) + 1
             filas.append(fila(row, p, cargo_id, match["pruebas"], [{"ampliacion": nivel}]))
-    reutilizadas = 0
+    reutilizadas = posts = 0
     try:
         reutilizadas = _reutilizar(repo, cfg, fecha, estrictas, filas, fila)
     except Exception:  # noqa: BLE001 — completar con días anteriores nunca impide registrar lo del día
+        pass
+    try:
+        posts = _posts(repo, cfg, fecha, estrictas, filas, fila)
+    except Exception:  # noqa: BLE001 — los posts son el último recurso; nunca impiden registrar lo del día
         pass
     for inicio in range(0, len(filas), 250):
         repo.pedir("POST", "panel_asignaciones", params={"on_conflict": "ejecucion_id,perfil_id,vacante_id"},
@@ -212,7 +270,7 @@ def registrar(repo, version, fecha, reporte=None):
               "resumen": {"vacantes": sum(conteos.values()), "meta": 120, "faltantes": faltantes,
                           "asignaciones": len(filas),
                           "ampliadas": sum(any(isinstance(e, dict) and e.get("ampliacion") for e in f["explicacion"]) for f in filas),
-                          "reutilizadas": reutilizadas,
+                          "reutilizadas": reutilizadas, "posts": posts,
                           "perfiles_bajo_minimo": sum(1 for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id))
                                                       if estrictas.get(p.id, 0) < MINIMO_POR_PERFIL),
                           **({"embudo": embudo} if (embudo := _embudo_por_nombre(reporte) or

@@ -2940,6 +2940,12 @@ h1 {
   border-color: #ecd9ae;
   color: #7a5a17;
 }
+.vacancy-tags .post-tag {
+  background: #eaf1fb;
+  border-color: #b9cdea;
+  color: #1d4a85;
+  font-weight: 600;
+}
 .preview-chip .overlap {
   font-weight: 400;
 }

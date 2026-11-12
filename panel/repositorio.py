@@ -134,7 +134,7 @@ class RepositorioSupabase:
         "fecha_publicacion:datos->>fecha_publicacion,fecha_estimada:datos->fecha_estimada,"
         "ids_agrupados:datos->ids_agrupados,anos_min:datos->anos_min,ingles:datos->>ingles,"
         "requisito_ingles:datos->requisito_ingles,duplicada_de:datos->>duplicada_de,"
-        "verificacion:datos->verificacion->>estado")
+        "verificacion:datos->verificacion->>estado,tipo:datos->>tipo")
 
     def _leer_catalogo(self):
         from panel.afinidad import ligera
@@ -142,8 +142,8 @@ class RepositorioSupabase:
                                                              {"select": "vacante_id"}, 1000)}
         vacantes = []
         for d in self._paginas("catalogo_vacantes", "id", {"status": "eq.active", "select": self.CAMPOS_ESTIMACION}, 1000):
-            if d.get("duplicada_de") or d.get("verificacion") == "rechazada":
-                continue
+            if d.get("duplicada_de") or d.get("verificacion") == "rechazada" or d.get("tipo") == "post":
+                continue  # un post (contrato v11) no es una vacante formal: no cuenta para estimar
             if {d["id"], *(d.get("ids_agrupados") or [])} & entregadas:
                 continue
             vacantes.append(ligera(d))
@@ -414,4 +414,22 @@ class RepositorioDemo:
                         "explicacion": coincidencia["pruebas"], "filtros": p, "cargo_configuracion": cargo,
                         "catalogo_vacantes": {"id": identificador, "status": "active", "datos": v,
                                              "description_full": v["_descripcion"]}})
+            if cargo["nombre"] == "QA":
+                # Contrato v11: un post ficticio para ver la etiqueta «Post» en la demostración. En producción solo
+                # llega a perfiles con menos de 5 vacantes, así que el mensaje de WhatsApp de este perfil no lo incluye.
+                url = "https://www.linkedin.com/posts/ejemplo_hiring-qa-activity-7000000000000000001"
+                texto = ("Estamos contratando QA Engineer para trabajar remoto desde Colombia. Pruebas manuales y "
+                         "automatizadas. Si te interesa, escríbeme por mensaje o envía tu CV.")
+                v = {"id": "post-demo-qa", "tipo": "post", "titulo": "QA Engineer", "empresa": "Lumen",
+                     "contacto": {"perfil": "https://www.linkedin.com/in/ejemplo"}, "ubicacion": "Colombia",
+                     "paises": ["CO"], "confianza_pais": "alta", "modalidad": "remoto", "idioma": "es",
+                     "fecha_publicacion": hoy(), "fecha_estimada": False, "anos_min": None, "_descripcion": texto,
+                     "enlace": url, "enlace_directo": "", "enlaces_alternativos": [url],
+                     "verificacion": {"estado": "verificada", "enlaces": [{"url": url, "estado": "verificada",
+                        "comprobada_en": self.creada.isoformat()}]}}
+                filas.append({"id": id_demo(p["id"] + v["id"]), "cliente_id": cliente_id, "perfil_id": p["id"],
+                    "cargo_id": cargo["id"], "vacante_id": v["id"], "match_grade": "exact",
+                    "explicacion": [{"tipo": "post"}, {"ampliacion": "sin_dato"}], "filtros": p,
+                    "cargo_configuracion": cargo,
+                    "catalogo_vacantes": {"id": v["id"], "status": "active", "datos": v, "description_full": texto}})
         return {"ejecucion": self.ejecuciones()[0], "filas": filas, "clientes": cfg["clientes"]}
