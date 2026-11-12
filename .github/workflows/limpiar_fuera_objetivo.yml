@@ -1,16 +1,28 @@
-name: Limpiar portugués y Brasil
+name: Revisar y limpiar vacantes fuera del objetivo
 
-# Limpieza única del contrato v12 (docs/CONTRATO_DATOS_v12.md): retira de `ofertas` las vacantes en portugués o solo
-# para Brasil y las archiva en el catálogo. Primero lanzarla sin cambiar nada (simulación) y revisar el resumen; luego
-# lanzarla otra vez marcando «aplicar» y escribiendo BORRAR. Antes de aplicar guarda una copia cifrada (90 días).
-# A mano: Actions > Limpiar portugués y Brasil > Run workflow.
+# Contrato v13 (docs/CONTRATO_DATOS_v13.md). Paso 1: lanzarla sin marcar «aplicar». No cambia nada: deja el listado en
+# Artifacts → listado-para-revisar (abrir revision.html) y una huella en el resumen. Paso 2: tras revisar, lanzarla otra
+# vez con «aplicar», la huella, los números a conservar (si los hay), los de «revisar» que también quieras borrar y
+# BORRAR. Antes de aplicar guarda una copia cifrada de las tablas (90 días).
 on:
   workflow_dispatch:
     inputs:
       aplicar:
-        description: "Aplicar los cambios (sin marcar: solo simula y no cambia nada)"
+        description: "Aplicar (sin marcar: solo genera el listado para revisar)"
         type: boolean
         default: false
+      huella:
+        description: "Huella del listado que revisaste (sale en el resumen de la revisión)"
+        type: string
+        default: ""
+      conservar:
+        description: "Números de «Propuestas para borrar» que NO quieres borrar (separados por comas)"
+        type: string
+        default: ""
+      borrar_tambien:
+        description: "Números de «Para revisar a mano» que SÍ quieres borrar (separados por comas)"
+        type: string
+        default: ""
       confirmar:
         description: "Para aplicar, escribe BORRAR"
         type: string
@@ -39,9 +51,10 @@ jobs:
         if: inputs.aplicar
         env:
           CONFIRMAR: ${{ inputs.confirmar }}
+          HUELLA: ${{ inputs.huella }}
         run: |
-          if [ "$CONFIRMAR" != "BORRAR" ]; then
-            echo "::error::Para aplicar escribe BORRAR en «confirmar». No se cambió nada."
+          if [ "$CONFIRMAR" != "BORRAR" ] || [ -z "$HUELLA" ]; then
+            echo "::error::Para aplicar escribe BORRAR en «confirmar» y copia la huella del listado revisado. No se cambió nada."
             exit 1
           fi
       - name: Traer el estado de trabajo (rama publicado)
@@ -68,14 +81,26 @@ jobs:
           path: privado/respaldos/*.enc
           if-no-files-found: error
           retention-days: 90
-      - name: Limpiar (o simular)
+      - name: Revisar (o aplicar)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           CONFIRMAR: ${{ inputs.confirmar }}
+          HUELLA: ${{ inputs.huella }}
+          CONSERVAR: ${{ inputs.conservar }}
+          BORRAR_TAMBIEN: ${{ inputs.borrar_tambien }}
         run: |
           if [ "${{ inputs.aplicar }}" = "true" ]; then
-            python -m buscador.limpiar_idioma_pais --aplicar --confirmar "$CONFIRMAR"
+            python -m buscador.limpiar_fuera_objetivo --aplicar --confirmar "$CONFIRMAR" --huella "$HUELLA" \
+              --conservar "$CONSERVAR" --borrar-tambien "$BORRAR_TAMBIEN"
           else
-            python -m buscador.limpiar_idioma_pais
+            python -m buscador.limpiar_fuera_objetivo
           fi
+      - name: Guardar el listado para revisar (30 días)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: listado-para-revisar
+          path: revision/
+          if-no-files-found: ignore
+          retention-days: 30

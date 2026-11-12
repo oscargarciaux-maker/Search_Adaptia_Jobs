@@ -173,4 +173,19 @@ fuera_de_latam: [united states, us, usa, u.s., u.s.a, estados unidos, eeuu, ee.u
                  italy, poland, romania, ukraine, india, bangalore, bengaluru, pakistan, philippines, manila, apac,
                  asia, australia, new zealand, singapore, japan, israel, uae, dubai, south africa, nigeria, kenya,
                  egypt, new york, san francisco, california, texas, florida, miami, seattle, boston, chicago, austin,
-                 los angeles, toronto, vancouver, atlanta, denver, washington]
+                 los angeles, toronto, vancouver, atlanta, denver, washington,
+                 # Contrato v13: como los escribe LinkedIn en español (eran «ubicación por confirmar»)
+                 reino unido, inglaterra, escocia, gales, irlanda, irlanda del norte, londres, edimburgo, manchester,
+                 birmingham, bristol, watford, francia, isla de francia, gran este, nueva aquitania, occitania,
+                 auvernia, estrasburgo, burdeos, lyon, toulouse, grenoble, montpellier, marsella, nantes, lille,
+                 italia, lombardia, milan, lacio, turin, polonia, varsovia, mazovia, cracovia, poznan, wroclaw, gdansk,
+                 rumania, bucarest, bucharest, cluj, iasi, timisoara, ucrania, lviv, kiev, kyiv, portugal,
+                 alemania, munich, hamburgo, frankfurt, colonia alemania, suecia, noruega, estados unidos de america,
+                 nueva york, dallas, houston, nueva jersey, carolina del norte, canada, montreal, quebec, ontario,
+                 singapur, vietnam, ho chi minh, ciudad ho chi minh, hanoi, filipinas, cebu, macati, manila,
+                 region de la capital nacional, china, shanghai, pekin, beijing, shenzhen, hong kong, taiwan, taipei,
+                 japon, tokio, osaka, corea del sur, seul, seoul, south korea, indonesia, yakarta, jakarta, malasia,
+                 kuala lumpur, tailandia, bangkok, bangladesh, daca, nepal, katmandu, sri lanka, egipto, new cairo,
+                 marruecos, rabat, arabia saudi, arabia saudita, riad, emiratos arabes unidos,
+                 abu dabi, dubai, catar, qatar, doha, sudafrica, nigeria, kenia, ghana, turquia, estambul,
+                 nueva zelanda, pais extranjero]

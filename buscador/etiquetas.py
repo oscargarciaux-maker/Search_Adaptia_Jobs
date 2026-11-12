@@ -17,17 +17,26 @@ _PT = {"em", "uma", "um", "da", "das", "ao", "aos", "pelo", "pela", "seu", "sua"
        "desejavel", "conhecimento", "conhecimentos", "trabalho", "trabalhar", "pessoas", "solucoes", "desenvolvimento",
        "atividades", "mais", "muito", "onde", "ate", "isso", "essa", "esse", "processo"}
 assert not _ES & _PT  # una palabra que se escribe igual en los dos idiomas no decide
+# Contrato v13: otros idiomas frecuentes en el inventario (Francia, Alemania, Italia). Solo palabras propias.
+_FR = {"les", "des", "du", "et", "vous", "nous", "est", "pour", "avec", "dans", "sur", "une", "votre", "notre", "poste",
+       "equipe", "au", "aux", "chez", "nos", "vos", "sont", "etes", "sera", "ainsi"}
+_DE = {"und", "der", "die", "das", "wir", "sie", "mit", "fur", "ihre", "unsere", "bei", "auf", "ist", "sind", "einen",
+       "eine", "ein", "oder", "werden", "zur", "zum", "uber", "kenntnisse", "erfahrung", "aufgaben"}
+_IT = {"il", "di", "che", "per", "con", "della", "delle", "degli", "nel", "nella", "sono", "siamo", "lavoro", "esperienza",
+       "conoscenza", "azienda", "gli", "dei", "alla", "anche", "nostro", "nostra", "ricerca"}
+_OTROS = {"fr": _FR - _ES - _EN - _PT, "de": _DE - _ES - _EN - _PT, "it": _IT - _ES - _EN - _PT}
 
 
 def idioma(texto):
-    """'es', 'en' o 'pt' según las palabras más comunes del aviso; '' si no hay texto."""
+    """'es', 'en', 'pt', 'fr', 'de' o 'it' según las palabras propias más frecuentes; '' si no hay texto."""
     palabras = re.findall(r"[a-z]+", normalizar.sin_tildes(texto).lower()[:6000])
     if not palabras:
         return ""
     es = sum(p in _ES for p in palabras)
     en = sum(p in _EN for p in palabras)
     pt = sum(p in _PT for p in palabras)
-    mejor = max((en, "en"), (es, "es"), (pt, "pt"))
+    otros = [(sum(p in conjunto for p in palabras), codigo) for codigo, conjunto in _OTROS.items()]
+    mejor = max([(en, "en"), (es, "es"), (pt, "pt")] + [(n * 0.9, c) for n, c in otros])
     return mejor[1] if mejor[0] > 0 else ""
 
 
