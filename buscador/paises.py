@@ -50,11 +50,15 @@ def datos():
         for ciudad in p["ciudades"]:
             ciudades.setdefault(normalizar.texto(ciudad),[]).append(p["codigo"])
     claves.sort(key=lambda x: -len(x[0]))  # las frases largas primero ("santiago de chile" antes que "santiago")
+    # Contrato v12: «paises» son todos los que se reconocen en un aviso; «codigos», «latam» y «europa», solo los cubiertos.
+    cubiertos = [p for p in paises if p.get("cobertura", True)]
     return {
         "paises": paises,
-        "codigos": [p["codigo"] for p in paises],
-        "latam": [p["codigo"] for p in paises if p.get("region", "latam") == "latam"],
-        "europa": [p["codigo"] for p in paises if p.get("region") == "europa"],
+        "cubiertos": cubiertos,
+        "codigos": [p["codigo"] for p in cubiertos],
+        "reconocidos": [p["codigo"] for p in paises],
+        "latam": [p["codigo"] for p in cubiertos if p.get("region", "latam") == "latam"],
+        "europa": [p["codigo"] for p in cubiertos if p.get("region") == "europa"],
         "utc": {p["codigo"]: p["utc"] for p in paises},
         "claves": claves,
         "nombres_pais": [(p["codigo"],[normalizar.texto(x) for x in p["nombres"]+p["gentilicios"]]) for p in paises],
@@ -216,7 +220,11 @@ def elegibles(titulo, ubicacion, descripcion="", remoto=None):
         return next((r["paises"] for r in d["subregiones"] if _nombra(texto, r["nombres"])), None)
 
     def r(paises, confianza, nota):
-        return {"paises": paises, "modalidad": mod, "confianza": confianza, "nota": nota}
+        # Contrato v12: un país reconocido pero sin cobertura (Brasil) nunca queda como país desde el que se aplica.
+        cubiertos = [c for c in paises if c in todos]
+        if paises and not cubiertos and not nota:
+            nota = "país fuera de la cobertura"
+        return {"paises": cubiertos, "modalidad": mod, "confianza": confianza, "nota": nota}
 
     # Residencia explícita: también restringe ofertas presenciales o híbridas.
     titulo_normalizado = normalizar.texto(titulo)

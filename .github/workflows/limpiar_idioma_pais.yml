@@ -1,0 +1,81 @@
+name: Limpiar portugués y Brasil
+
+# Limpieza única del contrato v12 (docs/CONTRATO_DATOS_v12.md): retira de `ofertas` las vacantes en portugués o solo
+# para Brasil y las archiva en el catálogo. Primero lanzarla sin cambiar nada (simulación) y revisar el resumen; luego
+# lanzarla otra vez marcando «aplicar» y escribiendo BORRAR. Antes de aplicar guarda una copia cifrada (90 días).
+# A mano: Actions > Limpiar portugués y Brasil > Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      aplicar:
+        description: "Aplicar los cambios (sin marcar: solo simula y no cambia nada)"
+        type: boolean
+        default: false
+      confirmar:
+        description: "Para aplicar, escribe BORRAR"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publicar
+  cancel-in-progress: false
+
+jobs:
+  limpiar:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Comprobar la confirmación
+        if: inputs.aplicar
+        env:
+          CONFIRMAR: ${{ inputs.confirmar }}
+        run: |
+          if [ "$CONFIRMAR" != "BORRAR" ]; then
+            echo "::error::Para aplicar escribe BORRAR en «confirmar». No se cambió nada."
+            exit 1
+          fi
+      - name: Traer el estado de trabajo (rama publicado)
+        if: inputs.aplicar
+        run: |
+          if git ls-remote --exit-code --heads origin publicado; then
+            git clone --depth 1 --branch publicado "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" salida
+            rm -rf salida/.git
+          else
+            mkdir -p salida
+          fi
+      - name: Copia cifrada antes de cambiar nada
+        if: inputs.aplicar
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_BACKUP_KEY: ${{ secrets.SUPABASE_BACKUP_KEY }}
+        run: python -m buscador.traspaso --fase respaldo --salida salida --privado privado
+      - name: Conservar la copia 90 días
+        if: inputs.aplicar
+        uses: actions/upload-artifact@v6
+        with:
+          name: respaldo-antes-de-limpiar-${{ github.run_id }}
+          path: privado/respaldos/*.enc
+          if-no-files-found: error
+          retention-days: 90
+      - name: Limpiar (o simular)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          CONFIRMAR: ${{ inputs.confirmar }}
+        run: |
+          if [ "${{ inputs.aplicar }}" = "true" ]; then
+            python -m buscador.limpiar_idioma_pais --aplicar --confirmar "$CONFIRMAR"
+          else
+            python -m buscador.limpiar_idioma_pais
+          fi

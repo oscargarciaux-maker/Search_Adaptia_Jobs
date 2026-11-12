@@ -138,6 +138,8 @@ def reetiquetar(v, publicada=False):
     v["familias"] = familias.clasificar(v["titulo"], desc)
     if desc:
         v["ingles"], v["anos_min"], v["salario"] = etiquetas.ingles(desc), etiquetas.anos_min(desc), etiquetas.salario(desc)
+        # Contrato v12: el idioma también se recalcula; antes un aviso largo en portugués quedaba guardado como «es».
+        v["idioma"] = etiquetas.idioma(f"{v['titulo']}\n{desc}")
     if publicada:
         return v
     if "greenhouse" in v.get("fuente", "").lower() and v.get("_fecha_publicacion_origen") is None:

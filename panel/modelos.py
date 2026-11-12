@@ -92,14 +92,14 @@ class Perfil(Modelo):
     @field_validator("vive_en")
     @classmethod
     def residencia(cls, v):
-        if v not in paises.datos()["codigos"]:
+        if v not in paises.datos()["reconocidos"]:  # un perfil guardado con Brasil se sigue leyendo (contrato v12)
             raise ValueError("La cobertura actual es LATAM y España.")
         return v
 
     @field_validator("paises_presenciales_extra")
     @classmethod
     def cobertura(cls, vs):
-        if not set(vs) <= set(paises.datos()["codigos"]):
+        if not set(vs) <= set(paises.datos()["reconocidos"]):
             raise ValueError("La cobertura actual es LATAM y España.")
         return list(dict.fromkeys(vs))
 

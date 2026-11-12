@@ -11,7 +11,7 @@ CASOS = [
     # Presencial o híbrido en un país
     ("Product Designer", "Bogota, D.C., Capital District, Colombia", "", None, ["CO"], "alta"),
     ("Diseñador UX", "Medellín, Antioquia, Colombia", "", None, ["CO"], "alta"),
-    ("UX Designer", "São Paulo, State of São Paulo, Brazil", "", None, ["BR"], "alta"),
+    ("UX Designer", "São Paulo, State of São Paulo, Brazil", "", None, [], "alta"),  # v12: Brasil fuera de la cobertura
     ("Desarrollador Backend", "Ciudad de México, CDMX, México", "", None, ["MX"], "alta"),
     ("Frontend Developer", "Lima, Peru", "", None, ["PE"], "alta"),
     ("Editor de video", "Caracas, Distrito Capital, Venezuela", "", None, ["VE"], "alta"),
@@ -39,7 +39,7 @@ CASOS = [
     ("Product Designer", "Colombia", "", True, ["CO"], "media"),
     ("UX/UI Designer - Remote", "Mexico", "", None, ["MX"], "media"),
     ("Desarrollador Full Stack (Remoto)", "Venezuela", "", None, ["VE"], "media"),
-    ("Senior Designer", "Remote, Brazil", "", None, ["BR"], "media"),
+    ("Senior Designer", "Remote, Brazil", "", None, [], "media"),  # v12: remota solo para Brasil
     # Remoto en una lista de países
     ("Backend Engineer", "Remote - Mexico, Colombia, Argentina", "", None, ["MX", "CO", "AR"], "alta"),
     # Remoto para toda LATAM o el mundo
@@ -48,7 +48,7 @@ CASOS = [
     ("Video Editor", "Remote - Worldwide", "", None, TODOS, "alta"),
     ("Frontend Developer", "Anywhere", "", None, TODOS, "alta"),
     ("QA Engineer", "Remote (Americas)", "", None, LATAM, "alta"),
-    ("Designer", "Remote - South America", "", None, ["AR", "BO", "BR", "CL", "CO", "EC", "PE", "PY", "UY", "VE"], "alta"),
+    ("Designer", "Remote - South America", "", None, ["AR", "BO", "CL", "CO", "EC", "PE", "PY", "UY", "VE"], "alta"),
     # Remoto fuera de LATAM
     ("Product Designer", "Remote - US", "", None, [], "alta"),
     ("UX Designer", "United States (Remote)", "", None, [], "alta"),
@@ -60,7 +60,7 @@ CASOS = [
     ("Designer", "Remote", "You must be based in Latin America to apply.", None, LATAM, "alta"),
     ("Developer", "Remote", "Only candidates from Colombia or Mexico.", None, ["CO", "MX"], "alta"),
     # Zona horaria
-    ("Product Designer", "Remote", "We work in UTC-3 to UTC-5 hours.", None, ["AR", "BO", "BR", "CL", "CO", "CU", "DO", "EC", "PA", "PE", "PR", "PY", "UY", "VE"], "baja"),
+    ("Product Designer", "Remote", "We work in UTC-3 to UTC-5 hours.", None, ["AR", "BO", "CL", "CO", "CU", "DO", "EC", "PA", "PE", "PR", "PY", "UY", "VE"], "baja"),
     ("UX Designer", "Remote", "You need at least 4 hours overlap with EST.", None, None, "baja"),
     # Remoto sin región
     ("Video Editor", "Remote", "Edit short videos for social media.", None, TODOS, "baja"),
@@ -93,8 +93,8 @@ def test_modalidad():
 
 def test_datos_de_paises_bien_formados():
     d = paises.datos()
-    assert len(d["codigos"]) == len(set(d["codigos"])) == 21
-    assert d["europa"] == ["ES"] and len(d["latam"]) == 20
+    assert len(d["codigos"]) == len(set(d["codigos"])) == 20  # v12: Brasil se reconoce pero no se cubre
+    assert d["europa"] == ["ES"] and len(d["latam"]) == 19 and "BR" in d["reconocidos"] and "BR" not in d["codigos"]
     for p in d["paises"]:
         assert set(p) >= {"codigo", "nombre", "nombres", "gentilicios", "ciudades", "utc"}
         assert -8 <= p["utc"] <= -2 or p.get("region") == "europa"
@@ -149,4 +149,4 @@ def test_residencia_desconocida_no_hereda_espana_de_emea():
 def test_herramienta_exclusiva_no_es_restriccion_geografica():
     r = paises.elegibles("Staff Product Designer (AI Track)", "RS, Brazil",
                          "You design exclusively in Figma and hand off static specs. Our team works remotely.", True)
-    assert r["paises"] == ["BR"] and r["confianza"] == "media"
+    assert r["paises"] == [] and r["confianza"] == "media" and r["nota"] == "país fuera de la cobertura"

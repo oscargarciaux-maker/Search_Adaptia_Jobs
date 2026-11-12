@@ -84,6 +84,41 @@ def test_ingles(texto, nivel):
     assert etiquetas.ingles(texto) == nivel
 
 
+# Contrato v12: textos con la forma de los avisos reales del 5–12 nov (anonimizados). Los avisos largos en portugués
+# salían como «es» porque se contaban palabras comunes a los dos idiomas («de», «que», «para», «empresa»…).
+PORTUGUES_LARGO = ("Estamos buscando um(a) Gerente de Produto Junior para atuar na Empresa X, em regime presencial em "
+                   "Campinas. Você será responsável por apoiar a estratégia de produto e transformar insights de mercado "
+                   "em soluções. Requisitos: experiência com análise de dados, conhecimento em metodologias ágeis e "
+                   "inglês intermediário. Benefícios: vale refeição, plano de saúde e participação nos lucros. ") * 3
+ESPANOL_LARGO = ("En Empresa Y buscamos un Product Designer para nuestro equipo de producto en Bogotá. Funciones: "
+                 "diseñar flujos, prototipos y pruebas con usuarios. Requisitos: 3 años de experiencia, manejo de Figma "
+                 "y conocimientos de accesibilidad. Ofrecemos trabajo híbrido, capacitación y un buen ambiente. ") * 3
+
+
+@pytest.mark.parametrize("texto, esperado", [
+    (PORTUGUES_LARGO, "pt"),
+    ("Product Owner Júnior\n" + "Atribuições: detalhar demandas de um produto já priorizado, com regra de negócio e "
+     "critério de aceite. Trabalhar com as equipes de desenvolvimento e garantir a entrega das atividades.", "pt"),
+    ("Senior Product Designer\n" + PORTUGUES_LARGO, "pt"),          # título en inglés, aviso en portugués
+    (ESPANOL_LARGO, "es"),
+    (ESPANOL_LARGO + " Valoramos si tienes experiência en fintech.", "es"),  # una palabra suelta en portugués
+    ("Analista de Datos Semi Senior\nBuscamos una persona con conocimientos de SQL y Python para el equipo de "
+     "analítica. Trabajo remoto desde Colombia o México.", "es"),
+    ("We are looking for a Senior QA Engineer to join our remote team. You will design test strategies and work "
+     "with the product team. Requirements: 5 years of experience.", "en"),
+])
+def test_idioma_distingue_portugues_de_espanol(texto, esperado):
+    assert etiquetas.idioma(texto) == esperado
+
+
+def test_aviso_en_portugues_no_es_entregable():
+    from buscador import contrato, vacante
+    v = vacante.crear("Gerente de Produto Junior", "Empresa X", "https://jobs.lever.co/x/1", "Lever",
+                      ubicacion="Remote - LATAM", descripcion=PORTUGUES_LARGO, fecha="2026-11-10", remoto=True,
+                      hoy="2026-11-12")
+    assert v["idioma"] == "pt" and contrato.entregable(v) == "idioma fuera del contrato"
+
+
 def test_idioma_anos_y_salario():
     assert etiquetas.idioma("We are looking for a designer with experience in Figma") == "en"
     assert etiquetas.idioma("Buscamos diseñador con experiencia en Figma para nuestro equipo") == "es"

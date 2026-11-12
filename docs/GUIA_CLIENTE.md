@@ -61,7 +61,7 @@ histórico. La cifra seleccionada no equivale a oportunidades disponibles ahora.
 rellenarse con repeticiones, pendientes o cargos ajenos. Las ubicaciones con confianza baja quedan fuera de nuevas
 entregas hasta confirmarse; una etiqueta remota no acredita que se pueda aplicar desde cualquier país. Se conservan variantes pertinentes del mapa de cargos.
 
-La cobertura permitida es LATAM y España. Entre ofertas pertinentes se priorizan las remotas que permitan trabajar
+La cobertura permitida es LATAM y España, solo con vacantes escritas en español o inglés. Desde el 12 de noviembre, Brasil solo cuenta dentro de remotas abiertas a varios países: no llegan vacantes en portugués ni locales, híbridas o remotas solo para Brasil (contrato v12). Entre ofertas pertinentes se priorizan las remotas que permitan trabajar
 desde esa cobertura, incluidas las mundiales. Las presenciales e híbridas necesitan una ubicación local identificada;
 las remotas limitadas a países ajenos se excluyen. País desconocido, simple coincidencia horaria o texto comercial
 sobre un equipo global no son prueba de elegibilidad. Si falta evidencia, no se completa la meta con ese aviso.
