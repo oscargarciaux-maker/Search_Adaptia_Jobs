@@ -98,7 +98,7 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
   de `buscador/fuentes/` —LinkedIn público (rotación familia × país, consultas con OR), Indeed (JobSpy, 11 países),
   portales de empresas (`ats.py`: Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Recruitee; la lista crece sola
   probando las empresas que traen las demás fuentes), tableros remotos (Remotive y Working Nomads con el enlace
-  original), Get on Board, y Apify/Brave si existen `APIFY_TOKEN`/`BRAVE_API_KEY`—; `vacante.py` arma cada vacante
+  original), Get on Board, Computrabajo (17 países, fecha de `datePosted`, nunca la de actualización), y Apify/Brave si existen `APIFY_TOKEN`/`BRAVE_API_KEY`—; `vacante.py` arma cada vacante
   (familias, países, etiquetas) y junta copias; `limpiar` quita viejas, cerradas y las que no sirven desde LATAM;
   `publicar.py` conserva `datos/salud.json` y `trabajo/` en la rama histórica `publicado` para la siguiente captura;
   retira los archivos antiguos de la interfaz sin borrar inventario, colas ni reservas. Presupuestos de cada fuente en `datos/config.yaml`. Las familias de los roles de la entrega se buscan

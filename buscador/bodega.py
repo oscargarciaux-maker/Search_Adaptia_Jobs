@@ -18,7 +18,8 @@ from pathlib import Path
 import yaml
 
 from buscador import calidad, contrato, cobertura, enlaces, familias, normalizar, paises, tiempos, vacante
-from buscador.fuentes import ats, brave, getonbrd, indeed, linkedin_apify, linkedin_publico, publicaciones_apify, remotos
+from buscador.fuentes import (ats, brave, computrabajo, getonbrd, indeed, linkedin_apify, linkedin_publico,
+                              publicaciones_apify, remotos)
 from buscador.http import Cliente
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -139,6 +140,13 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
         turnos = cobertura.repartir(combinaciones, {}, hoy, prioritarias)
         return getonbrd.buscar(Cliente(pausa=(0.3, 0.8)), [c[1] for c in turnos[:p["getonbrd_busquedas"]]])
 
+    def f_computrabajo():
+        if not p.get("computrabajo_busquedas", 0):
+            return [], {"omitida": "sin presupuesto"}
+        return computrabajo.buscar(Cliente(pausa=(0.6, 1.4)), mapa, activos, estado.setdefault("computrabajo", {}),
+                                   p["computrabajo_busquedas"], hoy=hoy, max_fichas=p.get("computrabajo_fichas", 150),
+                                   limite_segundos=limite, prioritarias=prioritarias)
+
     filas_ats = ats.leer_lista(ats.RUTA, trabajo / "empresas_ats.csv")
 
     def f_ats():
@@ -150,11 +158,12 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
                 return [], set(), {"omitida": "modo dirigido: aún no hay portales asociados a los cargos"}
         return ats.buscar(Cliente(pausa=(0.05, 0.2)), filas, limite_segundos=limite, prioritarias=prioritarias)
 
-    with ThreadPoolExecutor(7) as ex:
+    with ThreadPoolExecutor(8) as ex:
         tareas = {n: ex.submit(correr, n, f) for n, f in [("LinkedIn", f_linkedin), ("Indeed", f_indeed),
                                                             ("LinkedIn (Apify)", f_apify), ("Tableros remotos", f_remotos),
                                                             ("Get on Board", f_getonbrd), ("Portales de empresas", f_ats),
-                                                            ("Publicaciones LinkedIn (Apify)", f_publicaciones)]}
+                                                            ("Publicaciones LinkedIn (Apify)", f_publicaciones),
+                                                            ("Computrabajo", f_computrabajo)]}
         resultados = {n: t.result() for n, t in tareas.items()}
     crudas, empresas = [], set()
     for n, r in resultados.items():

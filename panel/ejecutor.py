@@ -65,6 +65,7 @@ def preparar(version, fecha):
     motor["control_dirigido"] = True
     motor["presupuestos"].update(linkedin_busquedas=min(300, max(24, len(roles) * 24)),
         indeed_busquedas=min(72, max(6, len(roles) * 8)), getonbrd_busquedas=min(30, len(roles) * 4),
+        computrabajo_busquedas=min(90, max(12, len(roles) * 12)),
         empresas_por_probar=20, remotos_paginas=24)
     return mapa, configuracion, motor
 
