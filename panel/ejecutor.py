@@ -95,6 +95,13 @@ def iniciar(repo, version, fecha):
     return ejecucion
 
 
+def _embudo_por_nombre(reporte):
+    """Embudo de la nocturna por nombre de cargo; las capturas horarias conservan el último guardado."""
+    embudo = ((reporte or {}).get("entrega") or {}).get("embudo") or {}
+    return {e["nombre"]: {k: v for k, v in e.items() if k != "nombre"} for e in embudo.values()
+            if isinstance(e, dict) and "nombre" in e}
+
+
 def registrar(repo, version, fecha, reporte=None):
     """Reconstruible desde la selección confirmada, incluso tras perder el proceso anterior."""
     ejecucion = iniciar(repo, version, fecha)
@@ -141,7 +148,9 @@ def registrar(repo, version, fecha, reporte=None):
                           "asignaciones": len(filas),
                           "ampliadas": sum(any(isinstance(e, dict) and e.get("ampliacion") for e in f["explicacion"]) for f in filas),
                           "perfiles_bajo_minimo": sum(1 for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id))
-                                                      if estrictas.get(p.id, 0) < MINIMO_POR_PERFIL)},
+                                                      if estrictas.get(p.id, 0) < MINIMO_POR_PERFIL),
+                          **({"embudo": embudo} if (embudo := _embudo_por_nombre(reporte) or
+                                                    (ejecucion.get("resumen") or {}).get("embudo")) else {})},
               "terminada_en": datetime.now().astimezone().isoformat()})
 
 

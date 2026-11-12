@@ -50,6 +50,9 @@ export type Ejecucion = {
     meta?: number;
     faltantes?: Record<string, number>;
     asignaciones?: number;
+    ampliadas?: number;
+    perfiles_bajo_minimo?: number;
+    embudo?: Record<string, Embudo>;
   };
 };
 export type Vacante = {
@@ -99,6 +102,7 @@ export type EstimacionCargo = {
   del_cargo: number;
   cupo: number;
   estado: "alcanza" | "justo" | "insuficiente" | "sin_cupo";
+  solapes?: { cargo: string; vacantes: number }[];
 };
 export type VistaPrevia = {
   incompleto?: boolean;
@@ -124,4 +128,15 @@ export type EstimacionEnVivo = {
   >;
   segundos?: number;
   nota?: string;
+};
+export type Embudo = {
+  encontradas: number;
+  con_descripcion: number;
+  entregables: number;
+  nuevas: number;
+  enlace_comprobado: number;
+  cumplen_filtros: number;
+  entregadas: number;
+  ampliadas: number;
+  principal_perdida: string;
 };

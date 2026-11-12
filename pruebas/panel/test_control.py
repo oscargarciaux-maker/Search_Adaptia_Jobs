@@ -712,3 +712,26 @@ def test_sugerencias_traen_cercanos_y_la_estimacion_cuenta_la_ampliacion(cfg_un_
     info = r["perfiles"][cfg_un_perfil["perfiles"][0]["id"]]
     assert "ampliables" in info
     assert info["compatibles"] >= 5 or info["compatibles"] + info["ampliables"] <= 5
+
+
+def test_embudo_por_cargo_sin_datos_de_clientes_y_se_conserva_entre_capturas(cfg_un_perfil):
+    con_dato = trabajo()["_descripcion"]
+    ofertas = [_oferta("Product Designer", n, con_dato) for n in range(3)] + [_oferta("Product Designer", 9, "corta")]
+    ofertas[2]["verificacion"] = {"estado": "pendiente"}
+    with ejecutor.activar({"configuracion": cfg_un_perfil}, hoy()):
+        for v in ofertas:
+            v["familias"] = familias.clasificar(v["titulo"], v["_descripcion"])
+        _, resumen = entrega.elegir(ofertas, {}, hoy())
+        e = entrega.embudo(ofertas, {}, hoy(), resumen=resumen)["cargo:" + cfg_un_perfil["cargos"][0]["id"]]
+    assert (e["encontradas"], e["con_descripcion"], e["enlace_comprobado"], e["cumplen_filtros"]) == (4, 3, 2, 2)
+    assert e["principal_perdida"] and "Cliente" not in str(e)
+    # El registro guarda el embudo por nombre de cargo y una captura horaria sin embudo no lo borra.
+    assert ejecutor._embudo_por_nombre({"entrega": {"embudo": {"cargo:x": dict(e, nombre="QA")}}})["QA"]["encontradas"] == 4
+
+
+def test_estimacion_avisa_cargos_que_comparten_vacantes(cfg):
+    cfg["cargos"][1].update(nombre="Diseñador UX/UI", terminos_exactos=["Product Designer"], terminos_similares=[])
+    r = servicio.vista_previa(RepositorioDemo(), Configuracion.model_validate(cfg), hoy())
+    segundo = r["cargos"][cfg["cargos"][1]["id"]]
+    assert segundo["solapes"] and segundo["solapes"][0]["cargo"] == "Product Designer"
+    assert not r["cargos"][cfg["cargos"][0]["id"]]["solapes"]

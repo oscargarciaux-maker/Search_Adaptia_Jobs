@@ -241,6 +241,51 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificac
     return salida, {"roles": resumen, "descartadas": dict(motivos)}
 
 
+ETAPAS_EMBUDO = ("encontradas", "con_descripcion", "entregables", "nuevas", "enlace_comprobado", "cumplen_filtros")
+PERDIDA = {"con_descripcion": "sin descripción completa (no se sabe el idioma)",
+           "entregables": "país o idioma sin confirmar",
+           "nuevas": "ya entregadas antes o vistas hace demasiado",
+           "enlace_comprobado": "enlace sin comprobar a tiempo",
+           "cumplen_filtros": "no cumplen los filtros de ningún perfil del cargo"}
+
+
+def embudo(vacantes, entregadas, hoy, cfg=None, resumen=None):
+    """Por cargo: cuántas vacantes sobreviven a cada paso hasta la entrega y dónde se pierden más. Solo cuentas por
+    cargo y motivo, sin datos de clientes. `resumen` (de `elegir`/`correr`) aporta entregadas y ampliadas."""
+    cfg = cfg or config()
+    roles = cfg["roles"]
+    desde = (date.fromisoformat(hoy) - timedelta(days=cfg.get("dias_frescura", 14))).isoformat()
+    idiomas = tuple(cfg.get("idiomas", ["es", "en"]))
+    salida = {r["id"]: {"nombre": r["nombre"], **{e: 0 for e in ETAPAS_EMBUDO}} for r in roles}
+    for v in vacantes:
+        grados = {f["familia"]: f["coincidencia"] for f in v.get("familias", [])}
+        propios = [r for r in roles if any(grados.get(f) in ("exacto", "similar") for f in r["familias"])]
+        if not propios:
+            continue
+        pasos = ["encontradas"]
+        if len(v.get("_descripcion") or "") >= 200:
+            pasos.append("con_descripcion")
+            if not contrato.entregable(dict(v, verificacion=None), idiomas):
+                pasos.append("entregables")
+                if not any(h in entregadas for h in huellas(v)) and (v.get("visto_primera_vez") or "") >= desde:
+                    pasos.append("nuevas")
+                    if (v.get("verificacion") or {}).get("estado") == "verificada":
+                        pasos.append("enlace_comprobado")
+        asignado = rol_de(v, roles)[0] if "enlace_comprobado" in pasos else None
+        for r in propios:
+            for e in pasos:
+                salida[r["id"]][e] += 1
+            if asignado is r:
+                salida[r["id"]]["cumplen_filtros"] += 1
+    for rid, e in salida.items():
+        r = ((resumen or {}).get("roles") or {}).get(rid, {})
+        e["entregadas"], e["ampliadas"] = r.get("entregadas", 0), sum((r.get("ampliadas") or {}).values())
+        caidas = {etapa: e[anterior] - e[etapa] for anterior, etapa in zip(ETAPAS_EMBUDO, ETAPAS_EMBUDO[1:])}
+        mayor = max(caidas, key=caidas.get) if any(caidas.values()) else None
+        e["principal_perdida"] = PERDIDA[mayor] if mayor else ""
+    return salida
+
+
 def filas_de(elegidas, roles, hoy, capturada):
     nombres = {r["id"]: r["nombre"] for r in roles}
     filas, ids = [], set()

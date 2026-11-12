@@ -161,6 +161,12 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
     data: { revision: estado.revision - 1, configuracion: estado.borrador },
   });
   expect(conflicto.status()).toBe(409);
+  // Actividad: embudo por cargo para ver dónde se pierden las vacantes.
+  await page.getByRole("button", { name: "Actividad", exact: true }).click();
+  await page.getByText("Dónde se pierden las vacantes de cada cargo").click();
+  await expect(
+    page.getByRole("columnheader", { name: "Enlace comprobado" }),
+  ).toBeVisible();
   // El conflicto intencional se produce desde request, no desde la página.
   expect(errores).toEqual([]);
   await page.screenshot({

@@ -53,6 +53,7 @@ import type {
   Ejecucion,
   Vacante,
   EstimacionCargo,
+  Embudo,
   EstimacionEnVivo,
   EstimacionPerfil,
   VistaPrevia,
@@ -670,7 +671,70 @@ function PreviewCargo({
     >
       <Target size={12} />≈ {info.disponibles} guardadas sin entregar ·{" "}
       {textoEstadoCargo[info.estado]}
+      {!!info.solapes?.length && (
+        <span className="overlap">
+          {" "}
+          · comparte{" "}
+          {info.solapes
+            .map((s) => s.vacantes + " vacantes con «" + s.cargo + "»")
+            .join(", ")}
+          : cada vacante va al primero de la lista. Mejor un solo cargo con
+          varios perfiles.
+        </span>
+      )}
     </div>
+  );
+}
+
+const etapasEmbudo: [keyof Embudo, string][] = [
+  ["encontradas", "Encontradas"],
+  ["con_descripcion", "Con descripción"],
+  ["entregables", "País e idioma confirmados"],
+  ["nuevas", "Nuevas"],
+  ["enlace_comprobado", "Enlace comprobado"],
+  ["cumplen_filtros", "Cumplen filtros"],
+  ["entregadas", "Entregadas"],
+];
+
+function EmbudoCargos({ embudo }: { embudo: Record<string, Embudo> }) {
+  return (
+    <details className="funnel">
+      <summary>Dónde se pierden las vacantes de cada cargo</summary>
+      <div className="funnel-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Cargo</th>
+              {etapasEmbudo.map(([k, t]) => (
+                <th key={k}>{t}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {Object.entries(embudo).map(([cargo, e]) => (
+              <tr key={cargo}>
+                <th scope="row">
+                  {cargo}
+                  {e.principal_perdida && (
+                    <span className="muted">
+                      Mayor pérdida: {e.principal_perdida}
+                    </span>
+                  )}
+                </th>
+                {etapasEmbudo.map(([k]) => (
+                  <td key={k}>
+                    {e[k] as number}
+                    {k === "entregadas" && e.ampliadas > 0 && (
+                      <span className="muted"> ({e.ampliadas} ampliadas)</span>
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
   );
 }
 
@@ -2155,6 +2219,15 @@ function App() {
                               .join(" · ")}
                           </p>
                         )}
+                      {!!r.resumen.ampliadas && (
+                        <p className="helper">
+                          {r.resumen.ampliadas} asignaciones entraron por
+                          ampliación para que cada cliente llegue a 5.
+                        </p>
+                      )}
+                      {r.resumen.embudo && (
+                        <EmbudoCargos embudo={r.resumen.embudo} />
+                      )}
                     </div>
                     <span
                       className={

@@ -81,7 +81,7 @@ def vista_previa(repo, cfg, fecha=None):
     fecha = fecha or hoy()
     catalogo = repo.catalogo_vigente()
     clientes = {c.id for c in cfg.clientes if c.activo}
-    perfiles, cargos = {}, {}
+    perfiles, cargos, anteriores = {}, {}, []
     for c in cfg.cargos:
         if not c.activo:
             continue
@@ -100,7 +100,12 @@ def vista_previa(repo, cfg, fecha=None):
         n = len(disponibles)
         estado = ("sin_cupo" if not c.cupo else "alcanza" if n >= c.cupo else "justo" if n * 2 >= c.cupo
                   else "insuficiente")
-        cargos[str(c.id)] = {"disponibles": n, "del_cargo": len(del_cargo), "cupo": c.cupo, "estado": estado}
+        # Cada vacante va a un solo cargo: si coincide igual de bien con uno anterior de la lista, se lo lleva ese.
+        propios = {v["id"] for v in del_cargo}
+        solapes = [{"cargo": nombre, "vacantes": len(propios & ids)} for nombre, ids in anteriores if propios & ids]
+        anteriores.append((c.nombre, propios))
+        cargos[str(c.id)] = {"disponibles": n, "del_cargo": len(del_cargo), "cupo": c.cupo, "estado": estado,
+                             "solapes": solapes}
     return {"catalogo": {"vacantes": len(catalogo["vacantes"]), "actualizado": catalogo["actualizado"]},
             "perfiles": perfiles, "cargos": cargos,
             "nota": "Estimación con vacantes ya guardadas y aún no entregadas. La búsqueda dirigida de mañana "

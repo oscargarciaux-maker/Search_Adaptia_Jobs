@@ -466,6 +466,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
                 if central:
                     central.guardar_lote(lote)
                 return r
+        entregadas_antes = dict(entregadas)
         resumen_entrega = entrega.correr(vacantes, entregadas if not prueba else dict(entregadas), hoy, capturada,
                                          salida / "datos" / "entregas", subir=None if prueba else supabase.subir,
                                          pendientes=pendientes_v1,
@@ -481,6 +482,10 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
             historico_entregas = entrega.registrar_medicion(historial, resumen_entrega, hoy)
             _guardar_json(trabajo / "metricas_entrega.json", historial)
         resumen_entrega["fecha"] = hoy
+        try:
+            resumen_entrega["embudo"] = entrega.embudo(vacantes, entregadas_antes, hoy, resumen=resumen_entrega)
+        except Exception as e:  # noqa: BLE001 — el diagnóstico nunca detiene la entrega
+            resumen_entrega["embudo"] = {"error": f"{type(e).__name__}"}
     # El lote histórico conserva su snapshot; el estado actual se evalúa aparte con el catálogo y la caché.
     lote_actual = _leer_json(trabajo / "lote_entrega.json", {})
     if lote_actual.get("fecha") == hoy:
