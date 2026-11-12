@@ -164,7 +164,7 @@ def ampliar(rol, elegidas, libres, cuantas, max_por_empresa, hoy):
     perfiles = rol.get("_perfiles") or []
     if not perfiles or len(elegidas) >= cuantas:
         return elegidas
-    from panel.afinidad import AMPLIACIONES, MINIMO_POR_PERFIL, evaluar, evaluar_ampliada
+    from panel.afinidad import AMPLIACIONES, MINIMO_POR_PERFIL, TOPE_EMPRESA_AMPLIADO, evaluar, evaluar_ampliada
     elegidas = list(elegidas)
     empresas = Counter(normalizar.empresa(v["empresa"]) for v, _ in elegidas)
     def estrictas(p):
@@ -175,12 +175,13 @@ def ampliar(rol, elegidas, libres, cuantas, max_por_empresa, hoy):
         return min((grados[f] for f in rol["familias"] if f in grados), key=GRADOS.index, default=None)
     for nivel in AMPLIACIONES:
         permitidos = ("exacto", "similar", "cercano") if nivel != "sin_dato" else ("exacto", "similar")
+        tope = TOPE_EMPRESA_AMPLIADO if nivel == "empresa_4" else max_por_empresa
         for p in perfiles:
             falta = MINIMO_POR_PERFIL - estrictas(p)
             while falta > 0 and len(elegidas) < cuantas:
                 opciones = [(GRADOS.index(g), -(int((v.get("fecha_publicacion") or "0000-00-00").replace("-", "") or 0)), i, v, g)
                             for i, v in enumerate(libres) if (g := grado_en_rol(v)) in permitidos
-                            and empresas[normalizar.empresa(v["empresa"])] < max_por_empresa
+                            and empresas[normalizar.empresa(v["empresa"])] < tope
                             and evaluar_ampliada(v, p, hoy, nivel)["compatible"]]
                 if not opciones:
                     break
@@ -190,6 +191,43 @@ def ampliar(rol, elegidas, libres, cuantas, max_por_empresa, hoy):
                 empresas[normalizar.empresa(v["empresa"])] += 1
                 falta -= 1
     return elegidas
+
+
+def completar_cupo_por_empresa(elegidas, candidatas, cuantas):
+    """Contrato v11 (último recurso): si el cargo no llega a su cupo solo porque sus candidatas son de pocas empresas,
+    admite hasta 4 por empresa (en vez de 2) con vacantes que ya cumplen los filtros de algún perfil."""
+    from panel.afinidad import TOPE_EMPRESA_AMPLIADO
+    if len(elegidas) >= cuantas:
+        return elegidas
+    elegidas = list(elegidas)
+    tomadas = {v["id"] for v, _ in elegidas}
+    empresas = Counter(normalizar.empresa(v["empresa"]) for v, _ in elegidas)
+    resto = [x for x in candidatas if x[0]["id"] not in tomadas]
+    resto.sort(key=lambda x: x[0].get("fecha_publicacion") or "", reverse=True)
+    resto.sort(key=lambda x: GRADOS.index(x[1]))
+    for v, g in resto:
+        if len(elegidas) >= cuantas:
+            break
+        empresa = normalizar.empresa(v["empresa"])
+        if empresas[empresa] < TOPE_EMPRESA_AMPLIADO:
+            elegidas.append((dict(v, _ampliacion="empresa_4"), g))
+            empresas[empresa] += 1
+    return elegidas
+
+
+def deficit_por_perfil(elegidas, roles, hoy):
+    """{perfil_id: cuántas le faltan para el mínimo diario} con lo elegido (estricto o ampliado). Uso interno: nunca
+    se escribe en reportes públicos; ahí solo van conteos por cargo."""
+    from panel.afinidad import MINIMO_POR_PERFIL, evaluar, evaluar_ampliada
+    salida = {}
+    for rol in roles:
+        lista = elegidas.get(rol["id"], [])
+        for p in rol.get("_perfiles") or []:
+            n = sum(1 for v, _ in lista if evaluar(v, p, hoy)["compatible"] or
+                    (v.get("_ampliacion") and evaluar_ampliada(v, p, hoy, v["_ampliacion"])["compatible"]))
+            if n < MINIMO_POR_PERFIL:
+                salida[p["id"]] = MINIMO_POR_PERFIL - n
+    return salida
 
 
 def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificacion=False):
@@ -248,6 +286,8 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificac
         for rol in roles:
             salida[rol["id"]] = ampliar(rol, salida[rol["id"]], libres, meta_de(rol, cfg),
                                         cfg.get("max_por_empresa", 2), hoy)
+            salida[rol["id"]] = completar_cupo_por_empresa(salida[rol["id"]], por_rol[rol["id"]], meta_de(rol, cfg))
+        deficit = deficit_por_perfil(salida, roles, hoy)
     for rol in roles:
         candidatas = por_rol[rol["id"]]
         elegidas = [v for v, _ in salida[rol["id"]]]
@@ -270,6 +310,10 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificac
             "reserva_sin_entregar": max(0, len(candidatas) + len(iniciales.get(rol["id"], [])) - len(elegidas)),
             "ampliadas": dict(Counter(v["_ampliacion"] for v in elegidas if v.get("_ampliacion"))),
         }
+        if panel:
+            perfiles_rol = [p["id"] for p in rol.get("_perfiles") or []]
+            resumen[rol["id"]]["perfiles_bajo_minimo"] = sum(1 for pid in perfiles_rol if pid in deficit)
+            resumen[rol["id"]]["faltan_para_minimo"] = sum(deficit.get(pid, 0) for pid in perfiles_rol)
     return salida, {"roles": resumen, "descartadas": dict(motivos)}
 
 

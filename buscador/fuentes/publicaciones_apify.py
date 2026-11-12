@@ -26,9 +26,27 @@ CONTRATA = re.compile(r"\b(hiring|we.?re hiring|we are hiring|now hiring|join ou
                       r"oferta laboral|unete|sumate|postulate|postula|envia tu cv|envianos tu cv|send your cv|"
                       r"send me your cv|dm me)\b")
 RUIDO = re.compile(r"\b(open ?to ?work|opentowork|busco empleo|busco trabajo|estoy buscando (?:empleo|trabajo|"
-                   r"nuevas oportunidades|una nueva oportunidad)|i.?m looking for (?:a new|my next|new opportunities)|"
-                   r"looking for my next|webinar|bootcamp|curso|course|masterclass|taller|workshop|mentoria|"
-                   r"mentorship|certificacion gratuita|free certification)\b")
+                   r"nuevas oportunidades|una nueva oportunidad|mi (?:proximo|siguiente) (?:reto|desafio|empleo|trabajo))|"
+                   r"me encuentro (?:buscando|en busqueda)|en busqueda (?:activa )?de (?:empleo|trabajo|nuevas oportunidades)|"
+                   r"disponible para (?:nuevos? )?(?:proyectos|oportunidades|trabajar|empleo)|"
+                   r"i.?m looking for (?:a new|my next|new opportunities|a job|work)|looking for my next|"
+                   r"i.?m (?:currently )?(?:open|available) (?:to|for) (?:new )?(?:opportunities|roles|work)|"
+                   r"seeking (?:a new|my next|new) (?:role|opportunit)|"
+                   r"webinar|bootcamp|curso|course|masterclass|taller|workshop|mentoria|"
+                   r"mentorship|certificacion gratuita|free certification|meetup|conferencia|charla|evento)\b")
+# Contrato v11: avisos de «base de datos» o a futuro no son vacantes abiertas.
+A_FUTURO = re.compile(r"\b(banco de (?:talento|talentos|candidatos|hojas de vida|cv)|base de datos|talent (?:pool|community|network)|"
+                      r"futuras? (?:oportunidades|vacantes|procesos|posiciones)|futuros procesos|proximos procesos|"
+                      r"future (?:opportunities|openings|roles|positions)|te (?:contactaremos|llamaremos)|"
+                      r"(?:algun|un) dia|cuando (?:se abra|haya|surja)|registra(?:r)? tu (?:cv|hoja de vida)|"
+                      r"deja(?:r)? tu (?:cv|hoja de vida) para|keep (?:your|you) (?:cv|resume|profile) on file|"
+                      r"we.?ll (?:reach out|contact you) (?:in the future|when))\b")
+# Una contratación real pide hacer algo: postular, enviar el CV, escribir o comentar.
+ACCION = re.compile(r"\b(apply|aplica|aplicar|postula|postulate|postularse|postular|envia|enviame|envianos|send|dm|"
+                    r"mensaje|message|escribe|escribeme|escribenos|contacta|contactame|contact me|reach out|inbox|"
+                    r"comenta|comment|interesad[oa]s?|interested|link|enlace|correo|email|e-mail|whatsapp)\b")
+CORREO = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+CORREO_FALSO = re.compile(r"(?i)(no-?reply|@linkedin\.com$)")
 _EMPRESA_CARGO = re.compile(r"(?:\bat\b|@|\ben\b|\bin\b|\|)\s*([A-Z0-9][\w&.,'’\- ]{1,40}?)(?=\s*(?:\||·|,|-|–|$))")
 
 
@@ -86,16 +104,36 @@ def cargo_de(texto, familias_validas):
     return ""
 
 
-def a_vacante(item, familias_validas):
-    """Vacante cruda (formato de las fuentes) o (None, motivo)."""
+def contacto_de(item, texto):
+    """Cómo escribirle a quien publicó: su perfil de LinkedIn (persona o empresa) y un correo si el post lo da."""
+    perfil = str(_campo(item, "author.linkedinUrl", "author.url", "authorProfileUrl", "author.profileUrl")).split("?")[0]
+    h = enlaces.host(perfil)
+    if not ((h == "linkedin.com" or h.endswith(".linkedin.com")) and re.search(r"/(in|company)/[^/]+", perfil)):
+        perfil = ""
+    correo = next((c.rstrip(".") for c in CORREO.findall(texto or "") if not CORREO_FALSO.search(c.rstrip("."))), "")
+    return {k: v for k, v in (("perfil", perfil), ("correo", correo)) if v}
+
+
+def a_vacante(item, familias_validas, hoy=None, max_dias=30):
+    """Vacante cruda (formato de las fuentes) o (None, motivo). Filtro estricto sin IA (contrato v11): anuncia una
+    contratación y pide postular o escribir; no es alguien buscando empleo, un curso ni un «banco de talento»; nombra un
+    cargo del mapa, un país activo o remoto, la empresa y una fecha dentro del plazo. La forma de contacto se exige
+    después, solo al post que no enlaza una ficha formal (`contrato.entregable_post`)."""
     texto = str(_campo(item, "content", "text", "postText"))
     enlace = str(_campo(item, "linkedinUrl", "postUrl", "url", "socialContent.shareUrl"))
     h = enlaces.host(enlace)
     if not texto or not enlaces.sirve(enlace) or not (h == "linkedin.com" or h.endswith(".linkedin.com")):
         return None, "sin texto o enlace"
     t = normalizar.texto(texto)
-    if RUIDO.search(t) or not CONTRATA.search(t):
+    titular = normalizar.texto(str(_campo(item, "author.info", "author.headline", "authorHeadline")))
+    if RUIDO.search(t) or RUIDO.search(titular):
+        return None, "busca empleo, curso o evento"
+    if A_FUTURO.search(t):
+        return None, "banco de talento o vacante a futuro"
+    if not CONTRATA.search(t):
         return None, "no anuncia una contratación"
+    if len(set(re.findall(r"https?://\S+", texto))) > 3:
+        return None, "lista de vacantes de terceros"
     titulo = cargo_de(texto, familias_validas)
     if not titulo:
         return None, "sin cargo del mapa"
@@ -106,12 +144,21 @@ def a_vacante(item, familias_validas):
     remoto = bool(paises._REMOTO.search(t) or paises._REMOTO_DESC.search(t))
     if not nombrados and not remoto:
         return None, "sin país ni remoto"
-    nombres = {p["codigo"]: p["nombre"] for p in paises.datos()["paises"]}
+    if not ACCION.search(t) and not re.search(r"https?://", texto):
+        return None, "no pide postular ni escribir"
     fecha = str(_campo(item, "postedAt.date", "postedAt", "publishedAt", "date"))[:10]
+    fecha = fecha if re.match(r"\d{4}-\d{2}-\d{2}$", fecha) else ""
+    if hoy and fecha:
+        from datetime import date
+        edad = (date.fromisoformat(hoy) - date.fromisoformat(fecha)).days
+        if not 0 <= edad <= max_dias:
+            return None, "fuera del plazo"
+    nombres = {p["codigo"]: p["nombre"] for p in paises.datos()["paises"]}
     return {
         "titulo": titulo, "empresa": empresa, "ubicacion": ", ".join(nombres[c] for c in nombrados[:3]),
-        "descripcion": texto[:15000], "fecha": fecha if re.match(r"\d{4}-\d{2}-\d{2}", fecha) else "",
+        "descripcion": texto[:15000], "fecha": fecha,
         "enlace": enlace.split("?")[0], "enlace_directo": "", "remoto": True if remoto else None, "fuente": NOMBRE,
+        "contacto": contacto_de(item, texto),  # sin contacto puede servir si enlaza una ficha; un post solo no
     }, ""
 
 
@@ -189,3 +236,56 @@ def buscar(cliente, actor, consultas, familias_validas, hoy, maximo=60, token=No
                     "vacantes": len(crudas), "pendientes_revision": len(revision), "muestras_revision": revision[:10],
                     "ejecucion": ejecucion,
                     "descartadas": motivos}
+
+
+def consultas_post(terminos, maximo=2):
+    """Consultas del buscador de posts para un cargo: contratación + el término exacto (máx. 5 operadores)."""
+    return [f'(hiring OR contratando OR vacante OR buscamos) "{t}"' for t in list(dict.fromkeys(terminos))[:maximo]]
+
+
+def buscar_posts(cliente, actor, consultas, familias_validas, hoy, maximo=30, token=None, control_gasto=None,
+                 max_dias=30, reloj=time.monotonic):
+    """Contrato v11: posts para perfiles con déficit. Devuelve (fichas formales, posts, estadísticas). Un post que enlaza
+    a una ficha formal se entrega como esa ficha; sin ficha, queda como post etiquetado (nunca en el cupo ni en
+    `ofertas`). Las estadísticas solo traen conteos."""
+    from buscador import vacante
+    inicio = reloj()
+    token = token or os.environ.get("APIFY_TOKEN", "")
+    if not token or not actor:
+        return [], [], {"omitida": "sin APIFY_TOKEN o sin actor_publicaciones"}
+    if not consultas or maximo <= 0:
+        return [], [], {"omitida": "sin consultas o sin posts en el presupuesto"}
+    control_gasto = control_gasto or Presupuesto({}, hoy)
+    cargo = control_gasto.reservar(round(maximo * 0.002 + 0.01, 3))  # ≈ USD 2 por 1.000 posts
+    if not cargo:
+        return [], [], {"omitida": "presupuesto de Apify agotado"}
+    items, ejecucion = ejecutar(cliente, actor, entrada(actor, consultas, max(1, maximo // len(consultas)), hoy), token,
+                                cargo, max_items=maximo, limite_segundos=180)
+    if ejecucion.get("error"):
+        return [], [], {k: ejecucion[k] for k in ("error", "clave_invalida") if k in ejecucion}
+    formales, posts, motivos, vistos = [], [], {}, set()
+    for item in items if isinstance(items, list) else []:
+        if reloj() - inicio >= 240:
+            break
+        if not isinstance(item, dict) or item.get("type") in ("comment", "reaction"):
+            continue
+        cruda, motivo = a_vacante(item, familias_validas, hoy, max_dias)
+        if not cruda:
+            motivos[motivo] = motivos.get(motivo, 0) + 1
+            continue
+        formal = resolver_oferta(cliente, item, familias_validas)
+        if formal:
+            formales.append(formal)
+            continue
+        post = vacante.crear_post(cruda["titulo"], cruda["empresa"], cruda["enlace"], cruda["ubicacion"],
+                                  cruda["descripcion"], cruda["fecha"], cruda["remoto"], cruda["contacto"], hoy)
+        from buscador import contrato
+        motivo = "sin cargo del mapa" if not post else contrato.entregable_post(post)
+        if motivo or post["id"] in vistos:
+            motivos[motivo or "repetido"] = motivos.get(motivo or "repetido", 0) + 1
+            continue
+        vistos.add(post["id"])
+        posts.append(post)
+    return formales, posts, {"consultas": len(consultas), "publicaciones": len(items) if isinstance(items, list) else 0,
+                             "fichas_formales": len(formales), "posts": len(posts), "descartadas": motivos,
+                             "gasto_reservado_usd": cargo}

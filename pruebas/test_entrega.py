@@ -245,7 +245,8 @@ def test_publicaciones_de_apify():
     buena = {"linkedinUrl": "https://www.linkedin.com/posts/ana-perez_hiring-activity-7391234567890123456-abcd?utm_source=x",
              "content": "¡Estamos contratando! Buscamos Senior Product Designer para trabajar 100% remoto desde "
                         "Colombia o México. Experiencia con Figma y design systems. Envía tu CV por DM.",
-             "author": {"name": "Ana Pérez", "info": "Talent Acquisition Lead at Rappi | Tech recruiter", "type": "profile"},
+             "author": {"name": "Ana Pérez", "info": "Talent Acquisition Lead at Rappi | Tech recruiter", "type": "profile",
+                        "linkedinUrl": "https://www.linkedin.com/in/ana-perez-ejemplo"},
              "postedAt": {"date": "2026-11-04T15:20:00.000Z"}}
     v, motivo = publicaciones_apify.a_vacante(buena, validas)
     assert motivo == "" and v["titulo"] == "Senior Product Designer" and v["empresa"] == "Rappi"
@@ -255,10 +256,11 @@ def test_publicaciones_de_apify():
                         fecha=v["fecha"], remoto=v["remoto"], hoy=HOY)
     assert vac is None  # indicio del feed pendiente de verificar; no se envía a Supabase
     open_to_work = dict(buena, content="#OpenToWork Soy Product Designer y estoy buscando trabajo en Colombia.")
-    assert publicaciones_apify.a_vacante(open_to_work, validas)[1] == "no anuncia una contratación"
+    assert publicaciones_apify.a_vacante(open_to_work, validas)[1] == "busca empleo, curso o evento"
     sin_empresa = dict(buena, author={"name": "Ana", "info": "Diseñadora", "type": "profile"})
     assert publicaciones_apify.a_vacante(sin_empresa, validas)[1] == "sin empresa"
-    empresa_autora = dict(buena, author={"name": "Nubank", "type": "company"})
+    empresa_autora = dict(buena, author={"name": "Nubank", "type": "company",
+                                         "linkedinUrl": "https://www.linkedin.com/company/nubank"})
     assert publicaciones_apify.a_vacante(empresa_autora, validas)[0]["empresa"] == "Nubank"
     lejos = dict(buena, content="We're hiring a Product Designer in New York, onsite.")
     assert publicaciones_apify.a_vacante(lejos, validas)[1] == "sin país ni remoto"

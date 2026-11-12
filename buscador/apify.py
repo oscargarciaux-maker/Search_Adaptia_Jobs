@@ -50,6 +50,10 @@ def ejecutar(cliente, actor, entrada, token, max_usd, max_items=20, build=None, 
         detalle = getattr(cliente, "ultimo_error", None)
         if detalle:
             stats["detalle"] = {k: v.replace(token, "[oculto]") if isinstance(v, str) else v for k, v in detalle.items()}
+        if (detalle or {}).get("http") in (401, 403):
+            # Clave revocada o rotada (p. ej. incidente de seguridad de Apify, nov 2026): no insistir y avisar.
+            return [], dict(stats, clave_invalida=True,
+                            error="Apify rechazó la clave (APIFY_TOKEN): reemplazarla por la vigente en los secretos")
         return [], dict(stats, error="Apify no confirmó el inicio; se conserva la reserva para evitar doble gasto")
     stats["run_id"] = run["id"]
     while run.get("status") in ("READY", "RUNNING", "TIMING-OUT", "ABORTING"):

@@ -416,6 +416,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         return salida_verificada
     vacantes = comprobar_destinos(vacantes)
     refuerzos = []
+    posts_nuevos = []
     if modo != "incremental" and not consulta and not prueba and cfg.get("refuerzo", {}).get("rondas", 0):
         from buscador import entrega, refuerzo
         entregadas = _leer_json(trabajo / "entregadas.json", {})
@@ -431,6 +432,40 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
             lambda mapa, ronda: refuerzo.buscar(mapa, _paises_activos(cfg), estado, hoy, ronda,
                                                  cfg["refuerzo"], cfg["dias_maximos"]), incorporar,
             iniciales=lote_previo.get("elegidas", {}) if lote_previo.get("fecha") == hoy else None)
+        if cfg.get("control_dirigido") and os.environ.get("APIFY_TOKEN"):
+            from buscador.apify import Presupuesto
+            from buscador.fuentes import linkedin_apify
+            control = control_central or Presupuesto(
+                _leer_json(trabajo / "apify_presupuesto.json", {}), hoy,
+                mensual=cfg["apify"].get("tope_mensual_usd", 5), corrida=cfg["apify"].get("tope_por_corrida_usd", 3),
+                guardar=lambda datos: _guardar_json(trabajo / "apify_presupuesto.json", datos))
+
+            def buscar_apify(combinaciones):
+                return linkedin_apify.buscar(Cliente(), cfg["apify"]["actor_linkedin"], combinaciones, {}, hoy,
+                                             presupuesto=len(combinaciones), max_dias=cfg["dias_maximos"],
+                                             limite_segundos=600, control_gasto=control, max_por_busqueda=10,
+                                             tope_consulta_usd=cfg["apify"].get("tope_consulta_usd", 0.025),
+                                             build=cfg["apify"].get("build_linkedin", "0.0.61"), ordenar=False)
+            try:
+                vacantes, salud["LinkedIn (Apify) rescate"] = refuerzo.rescate_apify(
+                    vacantes, entregadas, hoy, entrega.config(), familias.mapa(), buscar_apify, incorporar,
+                    iniciales=lote_previo.get("elegidas", {}) if lote_previo.get("fecha") == hoy else None,
+                    max_busquedas=cfg["apify"].get("rescate_busquedas", 4))
+            except Exception as e:  # noqa: BLE001 — el rescate nunca tumba la noche
+                salud["LinkedIn (Apify) rescate"] = {"error": f"{type(e).__name__}: {e}"[:300]}
+            # Contrato v11: posts de LinkedIn para quien sigue bajo el mínimo, con lo que quede del día de Apify.
+            maximo_posts = cfg["apify"].get("posts_rescate", 0)
+            if maximo_posts > 0 and not prueba:
+                def buscar_posts(consultas, validas):
+                    return publicaciones_apify.buscar_posts(Cliente(), cfg["apify"].get("actor_publicaciones", ""),
+                                                            consultas, validas, hoy, maximo=maximo_posts,
+                                                            control_gasto=control, max_dias=cfg["dias_maximos"])
+                try:  # los posts traen el perfil o correo de quien publicó: solo van a Supabase, nunca a `trabajo/`
+                    vacantes, salud["LinkedIn (Apify) posts"], posts_nuevos = refuerzo.rescate_posts(
+                        vacantes, entregadas, hoy, entrega.config(), familias.mapa(), buscar_posts, incorporar,
+                        iniciales=lote_previo.get("elegidas", {}) if lote_previo.get("fecha") == hoy else None)
+                except Exception as e:  # noqa: BLE001
+                    salud["LinkedIn (Apify) posts"] = {"error": f"{type(e).__name__}: {e}"[:300]}
     if not prueba and not consulta and not vacantes and not retiradas:
         raise RuntimeError("La búsqueda no produjo un catálogo válido; se conserva el estado anterior.")
     _guardar_json(trabajo / "bodega.json.gz", vacantes, comprimido=True)
@@ -446,6 +481,14 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         _guardar_json(trabajo / "catalogo_sincronizado.json.gz", sincronizado, comprimido=True)
         if not resumen_catalogo.get("pendientes") and not resumen_catalogo.get("errores"):
             resumen_catalogo["identidad"] = supabase.reconciliar_ofertas()
+        if posts_nuevos:
+            # Contrato v11: los posts van al catálogo privado con `tipo="post"`; el panel los asigna a perfiles con
+            # déficit. Si la subida falla se pierden solo esos posts (la noche siguiente se buscan otros).
+            filas_posts = [catalogo.fila(p, p.get("vista_en")) for p in posts_nuevos]
+            if filas_posts:
+                r = dict(supabase.subir_catalogo(filas_posts))
+                resumen_catalogo["posts"] = {"enviados": len(filas_posts), "confirmados": len(r.pop("confirmadas", [])),
+                                             "errores": len(r.get("errores") or [])}
     reintentos_centrales = {}
     if central and (modo == "incremental" or consulta):
         from buscador import supabase

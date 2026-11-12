@@ -76,6 +76,11 @@ def configuracion_valida(valor):
     return {"destinatarios": list(dict.fromkeys(destinatarios)), "tipos": tipos}
 
 
+def fuentes_con_clave_invalida(salud):
+    """Fuentes pagadas cuya clave fue rechazada (Apify tras rotar sus claves): sin aviso, la fuente cae a 0 en silencio."""
+    return [n for n, v in ((salud or {}).get("fuentes") or {}).items() if isinstance(v, dict) and v.get("clave_invalida")]
+
+
 def decidir(modo, resultado, salud, panel=None, fallos_seguidos=0):
     """Qué alerta corresponde, o None. `modo`: diario (noche), manana (pasada de la mañana) o horaria."""
     entrega = (salud or {}).get("entrega") or {}
@@ -84,7 +89,7 @@ def decidir(modo, resultado, salud, panel=None, fallos_seguidos=0):
         for k in ("supabase", "registro_seleccion")))
     if modo == "horaria":
         return "fallo" if resultado != "success" and fallos_seguidos == FALLOS_HORARIOS_PARA_AVISAR else None
-    if tecnico:
+    if tecnico or fuentes_con_clave_invalida(salud):
         return "fallo"
     bajo_minimo = ((panel or {}).get("resumen") or {}).get("perfiles_bajo_minimo", 0)
     if entrega.get("meta_cumplida") and not bajo_minimo:
@@ -105,9 +110,16 @@ def contenido(tipo, modo, salud, panel=None, enlace_ejecucion="", enlace_panel="
               "pocas_vacantes": f"Adaptia · {fecha}: faltan vacantes ({total} de {meta})",
               "fallo": f"Adaptia · {fecha}: {momento} necesita revisión"}[tipo]
     lineas = []
-    if tipo == "fallo":
+    claves = fuentes_con_clave_invalida(salud)
+    if claves:
+        lineas.append(f"{', '.join(claves)} rechazó la clave: crea una nueva en Apify (Settings → API & Integrations) y "
+                      "actualiza el secreto APIFY_TOKEN en GitHub (Settings → Secrets → Actions). Mientras tanto esa "
+                      "fuente no aporta vacantes.")
+    if tipo == "fallo" and not (claves and entrega):
         lineas.append(f"Falló {momento}. Lo ya entregado se conserva; la siguiente ejecución reintenta sola. "
                       "Abre el registro para ver el error.")
+    elif tipo == "fallo":
+        lineas.append(f"Resultado de {momento}: {total} vacantes de {meta}.")
     else:
         lineas.append(f"Resultado de {momento}: {total} vacantes de {meta}.")
     roles = entrega.get("roles") or {}
@@ -123,6 +135,8 @@ def contenido(tipo, modo, salud, panel=None, enlace_ejecucion="", enlace_panel="
         if r.get("faltan") and perdida:
             texto += f". Mayor pérdida: {perdida}"
         lineas.append("• " + texto)
+    if not resumen.get("perfiles_bajo_minimo"):
+        resumen = dict(resumen, perfiles_bajo_minimo=sum(r.get("perfiles_bajo_minimo", 0) for r in roles.values()))
     if resumen.get("perfiles_bajo_minimo"):
         lineas.append(f"{resumen['perfiles_bajo_minimo']} perfil(es) de clientes quedaron con menos de 5 vacantes. "
                       "Revisa sus filtros con «Estimar con búsqueda en vivo».")

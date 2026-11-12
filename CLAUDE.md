@@ -31,7 +31,7 @@ como alternativa silenciosa ni vaciar reservas/colas para resolver errores. El a
 
 ## Decisiones vigentes de cobertura e integridad
 
-Leer `docs/CONTRATO_DATOS_v10.md` (ajustes `panel_ajustes` SQL 012 y alertas por correo con Resend; contactos y borradores de WhatsApp SQL 013), `docs/CONTRATO_DATOS_v9.md` (mínimo de 5 por perfil con ampliación marcada; comprobación 24 h para seleccionar y 6 h para compartir), `docs/CONTRATO_DATOS_v8.md` (perfil por país de residencia y modalidades), `docs/CONTRATO_DATOS_v7.md` (inglés exigido precalculado para estimar), `docs/CONTRATO_DATOS_v6.md` y `docs/CONTRATO_DATOS_v5.md`: una fila por vacante en `ofertas`, archivo íntegro de enlaces duplicados,
+Leer `docs/CONTRATO_DATOS_v11.md` (rescate por persona hasta 5: experiencia ±2, hasta 4 por empresa, reutilizar entre personas sin repetir a la misma, Apify dirigido solo a perfiles con déficit; posts de LinkedIn etiquetados «Post» como último recurso), `docs/CONTRATO_DATOS_v10.md` (ajustes `panel_ajustes` SQL 012 y alertas por correo con Resend; contactos y borradores de WhatsApp SQL 013), `docs/CONTRATO_DATOS_v9.md` (mínimo de 5 por perfil con ampliación marcada; comprobación 24 h para seleccionar y 6 h para compartir), `docs/CONTRATO_DATOS_v8.md` (perfil por país de residencia y modalidades), `docs/CONTRATO_DATOS_v7.md` (inglés exigido precalculado para estimar), `docs/CONTRATO_DATOS_v6.md` y `docs/CONTRATO_DATOS_v5.md`: una fila por vacante en `ofertas`, archivo íntegro de enlaces duplicados,
 IDs agrupados y selección sin contar copias. No borrar archivos históricos ni snapshots para ocultar déficit.
 Leer también `docs/CONTRATO_DATOS_v4.md`: vistas privadas de disponibilidad, afinidad vigente y reporte por rol.
 SQL 004 es aditivo y automático; no modificar SQL registrado ni el estado histórico v1. SQL 010 optimiza el grafo de aliases;
@@ -55,7 +55,8 @@ a Supabase y conservación sin borrado automático de ofertas de la base. No con
 en esta etapa. El horario de Bogotá solo programa la ejecución; no limita los países. La admisión exige ubicación positiva:
 locales/híbridas en cobertura, remotas con alcance pertinente; horario compatible o país desconocido no completan la meta.
 Apify usa curious_coder/linkedin-jobs-scraper con permisos limitados para fichas formales, sin cookies y con tope USD 5/mes. El feed pagado queda
-desactivado por defecto. Un post solo aporta una oferta si se recupera su ficha formal; sin ella sigue por verificar.
+desactivado por defecto. Un post solo aporta una oferta (cupo/`ofertas`) si se recupera su ficha formal; sin ella, desde v11
+solo llega etiquetado «Post» a perfiles con déficit, hasta completar 5, tras el filtro estricto contra basura.
 La entrega normal comprueba Supabase antes de recoger; la validación final falla si hay déficit o sincronización pendiente.
 
 ## Reglas de integridad y modo heredado
@@ -66,7 +67,8 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
   inventa: ni la moneda de un "$" solo, ni la modalidad que el aviso no dice). Un campo nuevo se agrega primero al
   contrato (versión nueva) y después al código. Solo ofertas en español o inglés.
 - **Entrega diaria:** cupos por cargo en el panel o `por_rol` en legado, nuevas por rol, nunca repetidas (`trabajo/entregadas.json`), variadas (idioma, nivel,
-  país, modalidad, fuente, máximo 2 por empresa). Países: LATAM y España (decisión de Oscar, 5 nov 2026).
+  país, modalidad, fuente, máximo 2 por empresa; hasta 4 solo como último recurso v11). Por persona, una vacante de días
+  anteriores puede reasignarse a quien nunca la recibió (v11); nunca dos veces a la misma persona. Países: LATAM y España (decisión de Oscar, 5 nov 2026).
 - **Solo enlaces donde se postula de verdad:** el sistema de postulación de la empresa (Greenhouse, Lever, Ashby…), su
   página de empleo o un portal donde se postula ahí mismo (LinkedIn, Indeed, Computrabajo…). Nunca agregadores ni sitios
   de pago (Jooble, BeBee, trabajo.org, JobLeads, Talent.com…): se rastrea el original o la vacante no se guarda.
@@ -109,7 +111,8 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
   sobrescribe: external_id repetido se ignora). En `--prueba` no marca entregadas ni sube.
 - **Apify formal**: `curious_coder/linkedin-jobs-scraper`, build `1.7.18`, USD 5/mes de reservas durables compartidas
   entre nocturna/búsquedas profundas. El feed `harvestapi/linkedin-post-search` sigue implementado pero desactivado
-  (`publicaciones_por_dia=0`); solo una ficha formal recuperada puede aportar una oferta, no un post por sí mismo.
+  (`publicaciones_por_dia=0`); solo una ficha formal recuperada puede aportar una oferta. Desde v11, `posts_rescate`
+  busca posts para perfiles bajo 5 y los guarda en el catálogo con `tipo="post"` (fuera del cupo, de `ofertas` y de `trabajo/`).
 - **Catálogo/horario**: SQL 002 aditivo, `catalogo_vacantes` y `entregas_diarias`; `CAPTURA_HORARIA_ACTIVA=true` activa
   el horario y el catálogo v2 nocturno. `ofertas` permanece v1; verificación pública v3 se almacena en JSON, sin SQL nuevo.
 - **Enlaces**: `verificar_enlaces.py`, presupuestos en `datos/config.yaml`, caché en `trabajo/`; no confundir datos

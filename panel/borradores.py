@@ -47,6 +47,31 @@ def _lista(cargos):
     return cargos[0] if len(cargos) == 1 else ", ".join(cargos[:-1]) + " y " + cargos[-1]
 
 
+NOTA_POSTS = ("Las marcadas con 📣 Post son publicaciones de LinkedIn de quien está contratando: escríbele por mensaje "
+              "(o al correo, si lo deja) para postularte.")
+
+
+def es_post(v):
+    return v.get("tipo") == "post"
+
+
+def con_posts(vacantes, minimo=MINIMO, maximo=None):
+    """Contrato v11: primero las vacantes formales; los posts van al final y solo completan hasta el mínimo."""
+    formales = [v for v in vacantes if not es_post(v)][:maximo]
+    posts = [v for v in vacantes if es_post(v)][:max(0, minimo - len(formales))]
+    return formales + posts
+
+
+def _linea(i, v):
+    titulo, empresa = " ".join(v["titulo"].split()), " ".join(v["empresa"].split())
+    if es_post(v):
+        correo = (v.get("contacto") or {}).get("correo", "")
+        return (f"{i}. 📣 Post · {titulo} · {empresa}\nEscríbele por mensaje a quien publicó: {v['enlace']}"
+                + (f"\nO al correo: {correo}" if correo else ""))
+    modo = MODOS.get(v.get("modalidad", ""), "")
+    return f"{i}. {titulo} · {empresa}" + (f" ({modo})" if modo else "") + f"\n{v['enlace']}"
+
+
 def texto(nombre, grupos, fecha, cliente_id=""):
     """Mensaje humano: saludo, una frase con el cargo, la lista corta y un cierre. `grupos`: [(cargo, [vacantes])]."""
     semilla = f"{fecha}:{cliente_id}"
@@ -59,12 +84,12 @@ def texto(nombre, grupos, fecha, cliente_id=""):
         if len(grupos) > 1:
             partes.append(f"*{cargo}*")
         lineas = []
-        for v in vacantes:
+        for v in sorted(vacantes, key=es_post):  # los posts siempre al final
             i += 1
-            modo = MODOS.get(v.get("modalidad", ""), "")
-            lineas.append(f"{i}. {' '.join(v['titulo'].split())} · {' '.join(v['empresa'].split())}"
-                          + (f" ({modo})" if modo else "") + f"\n{v['enlace']}")
+            lineas.append(_linea(i, v))
         partes.append("\n\n".join(lineas))
+    if any(es_post(v) for _, vs in grupos for v in vs):
+        partes.append(NOTA_POSTS)
     partes.append(_elegir(CIERRES, semilla + "c"))
     return "\n\n".join(partes)
 
@@ -99,6 +124,7 @@ def generar(repo, fecha=None, dias_atras=3):
                 if v["estado"] == "lista" and v["id"] not in vistos and len(elegidas) < MAXIMO:
                     vistos.add(v["id"])
                     elegidas.append(v)
+        elegidas = con_posts(elegidas)
         if not elegidas:
             resultado["sin_vacantes"] += 1
             continue
