@@ -4,7 +4,7 @@
 Desde la petición del 6 de noviembre, existe un panel de control privado para el operador: clientes con perfiles,
 cargos abiertos y cupos por cargo que suman 120, filtros por país/modalidad/idioma/publicación/experiencia/inglés,
 y copia manual de WhatsApp. La retirada de la web histórica no prohíbe esta nueva plataforma expresamente solicitada.
-No reintroducir Pages/Cloudflare antiguos, Excel, agente WhatsApp ni seguimiento de candidaturas.
+No reintroducir Pages/Cloudflare antiguos, Excel, envío automático de WhatsApp ni seguimiento de candidaturas.
 Leer primero docs/PANEL_CONTROL.md y docs/CONTRATO_DATOS_v6.md. Estos prevalecen sobre restricciones históricas
 que prohibían filtrar experiencia/inglés o fijaban seis cargos. El acceso real queda cerrado hasta configurar login,
 por decisión del propietario; --demo usa datos ficticios y no toca Supabase. No abrir datos reales sin autorización.
@@ -24,14 +24,14 @@ Entrega al cliente y traspaso a su Supabase: `docs/ENTREGA_AL_CLIENTE.md` y fluj
 una vez como Secrets. Preparar Supabase sube respaldo cifrado antes de SQL, registra hashes en `adaptia_migraciones`
 y activa por marca privada; no pedir copiar 002/003 ni variables manuales para este camino. No modificar SQL ya registrado:
 añadir migración. Clave administrativa limitada a preparación; no se entrega a fuentes, navegador ni logs. Tras el
-instalador los cortes contienen once tablas y dos secuencias. Probar `python -m pruebas.probar_migraciones` solo en PG aislado.
+instalador los cortes contienen catorce tablas y dos secuencias. Probar `python -m pruebas.probar_migraciones` solo en PG aislado.
 SQL 003 + `ESTADO_SUPABASE_ACTIVO=true` activan el modo; no asumir que está desplegado. No volver al contador local
 como alternativa silenciosa ni vaciar reservas/colas para resolver errores. El arranque importa un corte coherente.
 `docs/PLAN.md` se conserva como diseño histórico: sus instrucciones antiguas no prevalecen sobre decisiones actuales.
 
 ## Decisiones vigentes de cobertura e integridad
 
-Leer `docs/CONTRATO_DATOS_v9.md` (mínimo de 5 por perfil con ampliación marcada; comprobación 24 h para seleccionar y 6 h para compartir), `docs/CONTRATO_DATOS_v8.md` (perfil por país de residencia y modalidades), `docs/CONTRATO_DATOS_v7.md` (inglés exigido precalculado para estimar), `docs/CONTRATO_DATOS_v6.md` y `docs/CONTRATO_DATOS_v5.md`: una fila por vacante en `ofertas`, archivo íntegro de enlaces duplicados,
+Leer `docs/CONTRATO_DATOS_v10.md` (ajustes `panel_ajustes` SQL 012 y alertas por correo con Resend; contactos y borradores de WhatsApp SQL 013), `docs/CONTRATO_DATOS_v9.md` (mínimo de 5 por perfil con ampliación marcada; comprobación 24 h para seleccionar y 6 h para compartir), `docs/CONTRATO_DATOS_v8.md` (perfil por país de residencia y modalidades), `docs/CONTRATO_DATOS_v7.md` (inglés exigido precalculado para estimar), `docs/CONTRATO_DATOS_v6.md` y `docs/CONTRATO_DATOS_v5.md`: una fila por vacante en `ofertas`, archivo íntegro de enlaces duplicados,
 IDs agrupados y selección sin contar copias. No borrar archivos históricos ni snapshots para ocultar déficit.
 Leer también `docs/CONTRATO_DATOS_v4.md`: vistas privadas de disponibilidad, afinidad vigente y reporte por rol.
 SQL 004 es aditivo y automático; no modificar SQL registrado ni el estado histórico v1. SQL 010 optimiza el grafo de aliases;
@@ -72,7 +72,8 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
   de pago (Jooble, BeBee, trabajo.org, JobLeads, Talent.com…): se rastrea el original o la vacante no se guarda.
 - **Enlace principal = LinkedIn** cuando la vacante está ahí; el directo de la empresa va en `enlace_directo`.
 - **LinkedIn nunca con la sesión ni la cookie de nadie** (`li_at` incluida). Ni actores de Apify que la pidan.
-- **Nada se envía solo:** el agente de WhatsApp no está implementado en esta etapa.
+- **Nada se envía solo:** desde el 12 nov hay borradores diarios de WhatsApp por cliente (contrato v10) que el operador
+  abre con un botón (wa.me) y envía a mano. No hay API de WhatsApp ni automatización que envíe mensajes.
 - **La búsqueda no usa IA.** Todo es código con pruebas. La IA solo construye y amplía el mapa de cargos leyendo
   archivos cortos (`reportes/`), nunca la bodega completa.
 - **Traspasable:** nada depende de las cuentas personales de Oscar. Ninguna clave, ID, correo ni dato de clientes en el
@@ -97,7 +98,7 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
   de `buscador/fuentes/` —LinkedIn público (rotación familia × país, consultas con OR), Indeed (JobSpy, 11 países),
   portales de empresas (`ats.py`: Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Recruitee; la lista crece sola
   probando las empresas que traen las demás fuentes), tableros remotos (Remotive y Working Nomads con el enlace
-  original), Get on Board, y Apify/Brave si existen `APIFY_TOKEN`/`BRAVE_API_KEY`—; `vacante.py` arma cada vacante
+  original), Get on Board, Computrabajo (17 países, fecha de `datePosted`, nunca la de actualización), y Apify/Brave si existen `APIFY_TOKEN`/`BRAVE_API_KEY`—; `vacante.py` arma cada vacante
   (familias, países, etiquetas) y junta copias; `limpiar` quita viejas, cerradas y las que no sirven desde LATAM;
   `publicar.py` conserva `datos/salud.json` y `trabajo/` en la rama histórica `publicado` para la siguiente captura;
   retira los archivos antiguos de la interfaz sin borrar inventario, colas ni reservas. Presupuestos de cada fuente en `datos/config.yaml`. Las familias de los roles de la entrega se buscan

@@ -179,3 +179,18 @@ el tamaño de cómputo del proyecto (Project Settings → Compute and Disk).
 - **Mientras sigas en el plan gratuito** de Supabase, alguna captura horaria puede fallar por saturación (unas 2 de
   cada 16 en la última medición). No se pierden datos: la siguiente captura reintenta.
 - **El panel** necesita alojamiento e inicio de sesión configurados; sin eso, solo funciona en demostración.
+
+
+## Avisos por correo (Resend) — una sola vez
+
+1. Crear una cuenta en resend.com (idealmente del cliente) y en **Domains → Add domain** escribir el dominio del cliente
+   (p. ej. adaptiajobs.com).
+2. Resend muestra 3 registros DNS (SPF, DKIM y MX/Return-Path). Añadirlos donde se administra el dominio y pulsar
+   **Verify**. Puede tardar unos minutos.
+3. **API Keys → Create API key** con permiso de envío. Copiarla una sola vez:
+   - GitHub → Settings → Secrets and variables → Actions → **New repository secret**: `RESEND_API_KEY`.
+   - Render → el servicio del panel → Environment: `RESEND_API_KEY` (la misma).
+4. Remitente, como **variable** (no secreto) en GitHub y en Render: `ALERTAS_REMITENTE` = `Adaptia <alertas@` + el dominio verificado + `>` (p. ej. `alertas@example.com` como forma).
+   Opcional en GitHub: variable `PANEL_URL` con la dirección del panel, para que el correo enlace a él.
+5. En el panel → **Actividad → Avisos por correo**: escribir el correo que recibirá los avisos, elegir los tipos,
+   **Guardar avisos** y **Enviar correo de prueba**.

@@ -4,6 +4,7 @@ from collections import defaultdict, deque
 import os
 from pathlib import Path
 import time
+from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -15,8 +16,8 @@ import requests
 
 from buscador import paises
 from panel import servicio
-from panel.modelos import Configuracion, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia
-from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase
+from panel.modelos import AjustesAlertas, CambioBorrador, Configuracion, Contacto, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia
+from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase, hoy
 from panel.terminos import sugerir
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -173,6 +174,69 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         except ValueError:
             return {"incompleto": True}
         return servicio.estimacion_en_vivo(repo, cfg, body.perfil_id)
+
+    @app.get("/api/ajustes/alertas")
+    def leer_alertas():
+        valor = AjustesAlertas.model_validate(repo.ajuste("alertas", {}) or {}).model_dump()
+        return {**valor, "envio_configurado": demo or bool(os.environ.get("RESEND_API_KEY") and
+                                                             os.environ.get("ALERTAS_REMITENTE"))}
+
+    @app.put("/api/ajustes/alertas")
+    def guardar_alertas(body: AjustesAlertas):
+        return repo.guardar_ajuste("alertas", body.model_dump())
+
+    @app.post("/api/alertas/prueba")
+    def probar_alertas():
+        from buscador import alertas
+        destinatarios = AjustesAlertas.model_validate(repo.ajuste("alertas", {}) or {}).destinatarios
+        if not destinatarios:
+            raise HTTPException(422, "Guarda al menos un correo antes de probar.")
+        if demo:
+            return {"enviado": False, "nota": "Demostración: no se envía ningún correo."}
+        ok = alertas.enviar(destinatarios, "Adaptia · correo de prueba",
+                            "<p>Las alertas de búsqueda llegarán a este correo.</p>",
+                            "Las alertas de búsqueda llegarán a este correo.")
+        if not ok:
+            raise HTTPException(503, "No se pudo enviar: revisa RESEND_API_KEY y ALERTAS_REMITENTE en el alojamiento.")
+        return {"enviado": True, "nota": f"Correo de prueba enviado a {len(destinatarios)} destinatario(s)."}
+
+    @app.get("/api/contactos")
+    def leer_contactos():
+        return {c["cliente_id"]: {k: c.get(k) for k in ("telefono", "nombre_saludo", "consentimiento")}
+                for c in repo.contactos()}
+
+    @app.put("/api/contactos/{cliente_id}")
+    def guardar_contacto(cliente_id: UUID, body: Contacto):
+        return repo.guardar_contacto(str(cliente_id), body.model_dump())
+
+    @app.delete("/api/contactos/{cliente_id}")
+    def borrar_contacto(cliente_id: UUID):
+        repo.borrar_contacto(str(cliente_id))
+        return {"borrado": True}
+
+    @app.get("/api/borradores")
+    def leer_borradores(fecha: str | None = None):
+        from panel import borradores as b
+        fecha = fecha or hoy()
+        contactos = {c["cliente_id"]: c for c in repo.contactos()}
+        salida = []
+        for x in repo.borradores(fecha=fecha):
+            c = contactos.get(x["cliente_id"])
+            salida.append({**x, "enlace": b.enlace_whatsapp(c["telefono"], x["texto"]) if c else "",
+                           "pocas": len(x.get("vacantes", [])) < b.MINIMO})
+        return {"fecha": fecha, "borradores": salida}
+
+    @app.post("/api/borradores/generar")
+    def generar_borradores():
+        from panel import borradores as b
+        return b.generar(repo)
+
+    @app.patch("/api/borradores/{borrador_id}")
+    def cambiar_borrador(borrador_id: UUID, body: CambioBorrador):
+        cambios = body.model_dump(exclude_none=True)
+        if "texto" in cambios:
+            cambios["editado"] = True
+        return repo.actualizar_borrador(str(borrador_id), cambios)
 
     @app.get("/api/ejecuciones")
     def ejecuciones():

@@ -64,6 +64,8 @@ presupuestos:
   linkedin_busquedas: 450      # páginas de resultados por noche (10 avisos cada una)
   linkedin_fichas: 450         # avisos a los que se les lee la descripción completa
   linkedin_relectura: 300      # avisos ya guardados sin descripción que se releen tras la búsqueda
+  computrabajo_busquedas: 60   # páginas de resultados de Computrabajo (17 países; se postula en el mismo portal)
+  computrabajo_fichas: 150     # fichas de Computrabajo a las que se les lee la descripción
   pausa_linkedin: [1.0, 2.5]   # segundos entre peticiones a LinkedIn
   indeed_busquedas: 90
   apify_busquedas: 60          # solo con APIFY_TOKEN

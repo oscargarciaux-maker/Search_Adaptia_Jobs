@@ -51,6 +51,10 @@ def identidades(conn):
     return {'ciclos_aliases_sin_referencia_explicita':len(ciclos),'muestra_ids':[list(c) for c in ciclos[:5]]}
 
 
+# 012 y 013 solo crean tablas privadas del panel (ajustes, contactos y borradores): se pueden ensayar igual.
+ENSAYABLES = {"006", "007", "008", "009", "010", "011", "012", "013"}
+
+
 def ensayar(conn):
     # El mismo bloqueo del instalador; el ensayo nunca registra una migración como aplicada.
     with conn.transaction(force_rollback=True):
@@ -58,8 +62,9 @@ def ensayar(conn):
         conn.execute("set local statement_timeout='30s'")
         conn.execute("select pg_advisory_xact_lock(hashtextextended('adaptia.migraciones',0))")
         pendientes = migraciones.pendientes(conn, migraciones.descubrir())
-        if any(m.version not in {"006","007","008","009","010","011"} for m in pendientes):
-            raise RuntimeError("Este ensayo admite únicamente las migraciones 006/007/008/009/010/011 de esta revisión; usar el instalador respaldado para otras versiones.")
+        if any(m.version not in ENSAYABLES for m in pendientes):
+            raise RuntimeError("Este ensayo admite únicamente las migraciones " + "/".join(sorted(ENSAYABLES)) +
+                               " de esta revisión; usar el instalador respaldado para otras versiones.")
         migraciones.aplicar(conn, pendientes)
         if any(m.version in {"008", "010", "011"} for m in pendientes):
             conn.execute("set local statement_timeout='3s'")

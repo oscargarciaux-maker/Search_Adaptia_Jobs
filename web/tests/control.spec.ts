@@ -94,6 +94,22 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   ).toBeDisabled();
   await page.getByLabel("Vacantes de QA", { exact: true }).fill("30");
   await expect(page.getByText(/guardadas sin entregar/).first()).toBeVisible();
+  // Accesibilidad: al cerrar con Escape el foco vuelve al botón que abrió la ventana; ningún texto bajo 12 px.
+  await page.getByRole("button", { name: "Añadir cargo", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Añadir cargo", exact: true }),
+  ).toBeFocused();
+  const pequenos = await page.evaluate(
+    () =>
+      [...document.querySelectorAll("main *, aside *")].filter(
+        (el) =>
+          [...el.childNodes].some(
+            (n) => n.nodeType === 3 && n.textContent!.trim(),
+          ) && parseFloat(getComputedStyle(el).fontSize) < 12,
+      ).length,
+  );
+  expect(pequenos).toBe(0);
   await page.route("**/api/cargos/expandir", (route) =>
     route.fulfill({
       json: {
@@ -149,7 +165,8 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
     dialog.getByRole("button", { name: "Mensaje copiado", exact: true }),
   ).toBeVisible();
   const texto = await page.evaluate(() => navigator.clipboard.readText());
-  expect(texto).toContain("Hola, el día de hoy");
+  expect(texto).toMatch(/Hola|Buen día/);
+  expect(texto).toContain("Product Designer");
   expect((texto.match(/https:\/\//g) || []).length).toBe(50);
   await dialog
     .getByRole("button", { name: "Cerrar", exact: true })
@@ -162,7 +179,30 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   });
   expect(conflicto.status()).toBe(409);
   // Actividad: embudo por cargo para ver dónde se pierden las vacantes.
+  // Mensajes: se preparan, se abren en WhatsApp con el texto y se marcan como enviados.
+  await page.getByRole("button", { name: "Mensajes", exact: true }).click();
+  await page.getByRole("button", { name: "Preparar mensajes" }).click();
+  const abrir = page.getByRole("link", { name: "Abrir en WhatsApp" }).first();
+  await expect(abrir).toHaveAttribute("href", /^https:\/\/wa\.me\/\d+\?text=/);
+  const antes = await page
+    .getByRole("link", { name: "Abrir en WhatsApp" })
+    .count();
+  await page
+    .getByRole("button", { name: "Marcar como enviado" })
+    .first()
+    .click();
+  await expect(
+    page.getByRole("link", { name: "Abrir en WhatsApp" }),
+  ).toHaveCount(antes - 1);
   await page.getByRole("button", { name: "Actividad", exact: true }).click();
+  // Avisos por correo: se guardan y la prueba responde (en demostración no envía).
+  await page
+    .getByLabel("Correos que reciben los avisos")
+    .fill("operador@example.org");
+  await page.getByRole("button", { name: "Guardar avisos" }).click();
+  await expect(page.getByText("Avisos por correo guardados.")).toBeVisible();
+  await page.getByRole("button", { name: "Enviar correo de prueba" }).click();
+  await expect(page.getByText(/Demostración: no se envía/)).toBeVisible();
   await page.getByText("Dónde se pierden las vacantes de cada cargo").click();
   await expect(
     page.getByRole("columnheader", { name: "Enlace comprobado" }),

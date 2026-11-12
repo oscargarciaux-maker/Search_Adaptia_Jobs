@@ -735,3 +735,41 @@ def test_estimacion_avisa_cargos_que_comparten_vacantes(cfg):
     segundo = r["cargos"][cfg["cargos"][1]["id"]]
     assert segundo["solapes"] and segundo["solapes"][0]["cargo"] == "Product Designer"
     assert not r["cargos"][cfg["cargos"][0]["id"]]["solapes"]
+
+
+def test_cargos_parecidos_se_reparten_las_compartidas_por_turnos(cfg):
+    """12 nov: «Diseñador UX/UI» recibía solo 2 porque «Product Designer», primero en la lista, se llevaba las compartidas."""
+    cfg["cargos"][1].update(nombre="Diseñador UX/UI", terminos_exactos=["Product Designer"], terminos_similares=[],
+                            cupo=10)
+    cfg["cargos"][0]["cupo"], cfg["cargos"][2]["cupo"] = 20, 90
+    for p in cfg["perfiles"]:
+        p.update(experiencia_min=None, experiencia_max=None, ingles_maximo="sin_filtro")
+    con_dato = trabajo()["_descripcion"]
+    ofertas = [_oferta("Product Designer", n, con_dato) for n in range(15)]
+    with ejecutor.activar({"configuracion": cfg}, hoy()):
+        for v in ofertas:
+            v["familias"] = familias.clasificar(v["titulo"], v["_descripcion"])
+        elegidas, _ = entrega.elegir(ofertas, {}, hoy())
+        legado_cfg = dict(entrega.config(), roles=[{k: v for k, v in r.items() if k != "_perfiles"}
+                                                   for r in entrega.config()["roles"]])
+        legado, _ = entrega.elegir(ofertas, {}, hoy(), legado_cfg)
+    pd, ux = (elegidas["cargo:" + cfg["cargos"][i]["id"]] for i in (0, 1))
+    assert (len(pd), len(ux)) == (10, 5)  # proporcional a lo que le falta a cada uno (20 y 10)
+    assert not {v["id"] for v, _ in pd} & {v["id"] for v, _ in ux}
+    # Sin perfiles (modo heredado) sigue mandando el orden de la lista.
+    assert len(legado["cargo:" + cfg["cargos"][1]["id"]]) == 0
+
+
+def test_lo_exclusivo_va_siempre_a_su_cargo(cfg):
+    cfg["cargos"][1].update(nombre="Diseñador UX/UI", terminos_exactos=["Product Designer"],
+                            terminos_similares=["Diseñador Gráfico Digital"], cupo=10)
+    cfg["cargos"][0]["cupo"], cfg["cargos"][2]["cupo"] = 20, 90
+    for p in cfg["perfiles"]:
+        p.update(experiencia_min=None, experiencia_max=None, ingles_maximo="sin_filtro")
+    con_dato = trabajo()["_descripcion"]
+    ofertas = [_oferta("Diseñador Gráfico Digital", 100 + n, con_dato) for n in range(3)]
+    with ejecutor.activar({"configuracion": cfg}, hoy()):
+        for v in ofertas:
+            v["familias"] = familias.clasificar(v["titulo"], v["_descripcion"])
+        elegidas, _ = entrega.elegir(ofertas, {}, hoy())
+    assert len(elegidas["cargo:" + cfg["cargos"][1]["id"]]) == 3

@@ -9,7 +9,7 @@ cuando sus filtros coincidan. Los filtros pertenecen a cada perfil y pueden prod
 Mientras se edita un perfil, el panel estima cuántas vacantes ya guardadas y aún no entregadas lo cumplirían hoy y
 qué ajuste añadiría más (por ejemplo, admitir experiencia o inglés no informados: solo ~1 de cada 4 avisos dice los
 años exigidos y ~1 de cada 8 el nivel de inglés). En «Cargos y cupos» cada cargo indica si alcanza para su cupo.
-No hay agente WhatsApp ni seguimiento de postulaciones. El operador copia el mensaje y lo envía manualmente.
+Nada se envía solo. Cada mañana, en «Mensajes», cada cliente con WhatsApp y aceptación tiene su mensaje listo: «Abrir en WhatsApp» abre su chat con el texto escrito para revisarlo y enviarlo. No hay seguimiento de postulaciones.
 
 Los apartados siguientes describen también el scraper heredado y sus consultas técnicas en Supabase. **Con panel activo,
 los cargos son configurables y role_id adopta cargo:<UUID>; no hay que buscar siempre role_id=qa.** Las vistas antiguas
@@ -92,4 +92,4 @@ Las vistas de Supabase calculan caducidad con la hora de la base.
 La instalación preferida es [automática](INSTALACION_AUTOMATICA.md). Las migraciones se preparan con respaldo cifrado
 previo; no copiar SQL 002/003/004 cada vez. Un respaldo previo a migraciones no equivale a una copia periódica diaria.
 Para cambiar propietario seguir [Traspaso](TRASPASO.md); para aceptar la entrega, [Estado y aceptación](ACEPTACION_Y_ESTADO.md).
-La automatización de WhatsApp y el seguimiento de candidaturas requieren una ampliación separada.
+El envío automático por WhatsApp (API oficial) y el seguimiento de candidaturas requieren una ampliación separada.

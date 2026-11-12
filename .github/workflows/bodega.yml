@@ -119,6 +119,15 @@ jobs:
               listas=sum(v.get('catalog_status')=='active' and v.get('afinidad_vigente') is True and (v.get('verificacion') or {}).get('estado')=='verificada' for v in r.get('vacantes',[]))
               print('{}: {} listas; {} faltantes vigentes frente a la meta'.format(r['nombre'],listas,max(0,r.get('meta',20)-listas)))
           " >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Alertas por correo
+        if: ${{ always() && !inputs.prueba && steps.decidir.outputs.ejecutar == 'true' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERTAS_REMITENTE: ${{ vars.ALERTAS_REMITENTE }}
+          PANEL_ORIGIN: ${{ vars.PANEL_URL }}
+        run: python -m buscador.alertas --salida salida --modo ${{ github.event.schedule == '17 12 * * *' && 'manana' || 'diario' }} --resultado ${{ job.status }}
       - name: Avisar
         if: always()
         env:

@@ -3,7 +3,7 @@
 **Camino preferido actual:** [INSTALACION_AUTOMATICA.md](INSTALACION_AUTOMATICA.md). Con dos accesos iniciales adicionales,
 GitHub respalda, aplica 001–010 e importa/activa sin copiar SQL ni crear variables. Las secciones 3–4 y 7 de esta
 guía describen la alternativa manual anterior. Los conceptos y límites siguientes siguen siendo útiles para aprender.
-El instalador añade `adaptia_migraciones`: sus cortes incluyen once tablas y dos secuencias.
+El instalador añade `adaptia_migraciones`: sus cortes incluyen catorce tablas (con `panel_ajustes`, `panel_contactos` y `panel_borradores`, SQL 012–013) y dos secuencias.
 
 Preparado el 5 de noviembre de 2026. **Código preparado no significa activación productiva.** Esta extensión requiere
 SQL 003 y la variable indicada más abajo. No se aplicó a la base real durante su desarrollo.

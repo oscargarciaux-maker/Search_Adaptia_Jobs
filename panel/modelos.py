@@ -192,3 +192,43 @@ class Expansion(Modelo):
 class Credenciales(Modelo):
     email: str = Field(min_length=3,max_length=254)
     password: str = Field(min_length=1,max_length=256)
+
+
+class AjustesAlertas(Modelo):
+    """Contrato v10: a quién y qué alertas por correo. Se guarda aparte de la configuración versionada."""
+    destinatarios: list[str] = Field(default_factory=list, max_length=5)
+    tipos: list[Literal["exito", "pocas_vacantes", "fallo"]] = Field(
+        default_factory=lambda: ["exito", "pocas_vacantes", "fallo"])
+
+    @model_validator(mode="after")
+    def correos(self):
+        from buscador.alertas import configuracion_valida
+        limpio = configuracion_valida(self.model_dump())
+        self.destinatarios, self.tipos = limpio["destinatarios"], limpio["tipos"]
+        return self
+
+
+class Contacto(Modelo):
+    """Contrato v10: WhatsApp de un cliente. Fuera de la configuración versionada; tabla privada."""
+    telefono: str = Field(max_length=25)
+    nombre_saludo: str = Field(default="", max_length=60)
+    consentimiento: bool = False
+
+    @field_validator("telefono")
+    @classmethod
+    def telefono_valido(cls, v):
+        from panel.borradores import normalizar_telefono
+        return normalizar_telefono(v)
+
+    @field_validator("nombre_saludo")
+    @classmethod
+    def saludo(cls, v):
+        v = " ".join(v.split())
+        if "@" in v or "://" in v:
+            raise ValueError("Escribe solo el nombre con el que saludas.")
+        return v
+
+
+class CambioBorrador(Modelo):
+    texto: str | None = Field(default=None, min_length=1, max_length=4000)
+    estado: Literal["pendiente", "abierto", "enviado", "descartado"] | None = None

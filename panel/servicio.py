@@ -238,6 +238,7 @@ def resultados(repo, cliente_id=None, fecha=None):
             "idioma": datos.get("idioma", ""), "publicada": datos.get("fecha_publicacion", ""),
             "experiencia": datos.get("anos_min"), "match_grade": row["match_grade"],
             "explicacion": row["explicacion"], "cargo_id": row["cargo_id"], "enlace": enlace,
+            "cargo_nombre": (row.get("cargo_configuracion") or {}).get("nombre", ""),
             "estado": "lista" if enlace else "retirada" if v.get("status") != "active" else "por_confirmar",
             "motivos": filtros["motivos"], "ampliacion": ETIQUETAS_AMPLIACION.get(ampliacion, "")}
         if clave in vistas:
@@ -254,8 +255,14 @@ def whatsapp(repo, cliente_id, fecha=None):
     listas = [v for v in r["vacantes"] if v["estado"] == "lista"]
     if not listas:
         return {"texto": "", "vacantes": 0, "nota": "No hay vacantes con filtros y enlace vigentes para copiar."}
-    texto = "Hola, el día de hoy te traigo estas vacantes que pueden ser de tu interés. Te las comparto para que puedas aplicar lo más pronto posible:\n\n"
-    texto += "\n\n".join(f"{i}. {' '.join(v['titulo'].split())} · {' '.join(v['empresa'].split())}\n{v['enlace']}"
-                          for i, v in enumerate(listas, 1))
-    texto += "\n\nRevisa los requisitos y postúlate directamente en cada enlace. ¡Mucho éxito!"
+    # Misma plantilla humana que los borradores diarios (contrato v10): cargo y lista, sin enumerar filtros.
+    from panel import borradores
+    grupos = {}
+    for v in listas:
+        grupos.setdefault(v.get("cargo_nombre") or "tu perfil", []).append(v)
+    contacto = next((c for c in (repo.contactos() if hasattr(repo, "contactos") else [])
+                     if c.get("cliente_id") == cliente_id), {})
+    nombre = contacto.get("nombre_saludo", "")
+    texto = borradores.texto(nombre, list(grupos.items()), (r.get("ejecucion") or {}).get("fecha") or hoy(),
+                             str(cliente_id or ""))
     return {"texto": texto, "vacantes": len(listas)}
