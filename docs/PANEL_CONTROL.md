@@ -40,7 +40,8 @@ Ambas se aplican por el instalador automático tras el respaldo; no hace falta c
    sin guardar. Si otra ventana guardó antes, se rechaza la revisión antigua: recargar y revisar antes de guardar otra vez.
 6. **Programar para mañana** muestra la distribución, guarda los cambios pendientes y confirma una versión inmutable.
    Entra en vigor al día siguiente según Bogotá. Se exige un perfil activo por cada cargo con cupo positivo.
-7. En **Actividad**, comprobar la captura y sus faltantes. «Dónde se pierden las vacantes de cada cargo» muestra el embudo: encontradas → con descripción → país e idioma confirmados → nuevas → enlace comprobado → cumplen filtros → entregadas, con la mayor pérdida. No se inventan vacantes ni se completan cupos con duplicados,
+7. **Mensajes**: cada mañana cada cliente con WhatsApp y aceptación tiene su mensaje (al menos 5 vacantes cuando existen, sin repetir). «Abrir en WhatsApp» abre su chat con el texto escrito; se revisa, se envía y se marca «enviado». El número y el nombre para saludar se añaden en la ficha del cliente.
+8. En **Actividad**, comprobar la captura y sus faltantes; ahí también se configuran los **avisos por correo**. «Dónde se pierden las vacantes de cada cargo» muestra el embudo: encontradas → con descripción → país e idioma confirmados → nuevas → enlace comprobado → cumplen filtros → entregadas, con la mayor pérdida. No se inventan vacantes ni se completan cupos con duplicados,
    ubicaciones ajenas o enlaces pendientes. Si las fuentes no ofrecen suficientes resultados, se indica el déficit.
 
 Archivar un cliente o cargo lo retira de la siguiente configuración que se programe. Conserva versiones, asignaciones

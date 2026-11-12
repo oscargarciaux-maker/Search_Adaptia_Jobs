@@ -165,7 +165,8 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
     dialog.getByRole("button", { name: "Mensaje copiado", exact: true }),
   ).toBeVisible();
   const texto = await page.evaluate(() => navigator.clipboard.readText());
-  expect(texto).toContain("Hola, el día de hoy");
+  expect(texto).toMatch(/Hola|Buen día/);
+  expect(texto).toContain("Product Designer");
   expect((texto.match(/https:\/\//g) || []).length).toBe(50);
   await dialog
     .getByRole("button", { name: "Cerrar", exact: true })
@@ -178,6 +179,21 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   });
   expect(conflicto.status()).toBe(409);
   // Actividad: embudo por cargo para ver dónde se pierden las vacantes.
+  // Mensajes: se preparan, se abren en WhatsApp con el texto y se marcan como enviados.
+  await page.getByRole("button", { name: "Mensajes", exact: true }).click();
+  await page.getByRole("button", { name: "Preparar mensajes" }).click();
+  const abrir = page.getByRole("link", { name: "Abrir en WhatsApp" }).first();
+  await expect(abrir).toHaveAttribute("href", /^https:\/\/wa\.me\/\d+\?text=/);
+  const antes = await page
+    .getByRole("link", { name: "Abrir en WhatsApp" })
+    .count();
+  await page
+    .getByRole("button", { name: "Marcar como enviado" })
+    .first()
+    .click();
+  await expect(
+    page.getByRole("link", { name: "Abrir en WhatsApp" }),
+  ).toHaveCount(antes - 1);
   await page.getByRole("button", { name: "Actividad", exact: true }).click();
   // Avisos por correo: se guardan y la prueba responde (en demostración no envía).
   await page

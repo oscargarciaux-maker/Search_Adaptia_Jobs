@@ -69,6 +69,41 @@ class RepositorioSupabase:
                    json={"clave": clave, "valor": valor, "actualizado_en": datetime.now(timezone.utc).isoformat()})
         return valor
 
+    # Contrato v10: contactos de WhatsApp y borradores diarios (tablas privadas, solo credencial de servicio).
+    def contactos(self):
+        return self.pedir("GET", "panel_contactos", params={"select": "*", "limit": 1000}) or []
+
+    def guardar_contacto(self, cliente_id, datos):
+        fila = {"cliente_id": cliente_id, **datos, "actualizado_en": datetime.now(timezone.utc).isoformat()}
+        self.pedir("POST", "panel_contactos", params={"on_conflict": "cliente_id"},
+                   headers={"Prefer": "resolution=merge-duplicates,return=minimal"}, json=fila)
+        return fila
+
+    def borrar_contacto(self, cliente_id):
+        self.pedir("DELETE", "panel_contactos", params={"cliente_id": "eq." + cliente_id})
+
+    def borradores(self, fecha=None, cliente_id=None):
+        params = {"select": "*", "order": "fecha.desc,creado_en.desc", "limit": 500}
+        if fecha:
+            params["fecha"] = "eq." + fecha
+        if cliente_id:
+            params["cliente_id"] = "eq." + cliente_id
+        return self.pedir("GET", "panel_borradores", params=params) or []
+
+    def guardar_borrador(self, b):
+        fila = {**b, "actualizado_en": datetime.now(timezone.utc).isoformat()}
+        self.pedir("POST", "panel_borradores", params={"on_conflict": "fecha,cliente_id"},
+                   headers={"Prefer": "resolution=merge-duplicates,return=minimal"}, json=fila)
+        return fila
+
+    def actualizar_borrador(self, borrador_id, cambios):
+        filas = self.pedir("PATCH", "panel_borradores", params={"id": "eq." + borrador_id},
+                           headers={"Prefer": "return=representation"},
+                           json={**cambios, "actualizado_en": datetime.now(timezone.utc).isoformat()})
+        if not filas:
+            raise ErrorRepositorio("Ese mensaje ya no existe. Recarga la lista.", 404)
+        return filas[0]
+
     def publicar(self, revision):
         actual = self.config()
         if actual["revision"] != revision:
@@ -211,6 +246,54 @@ class RepositorioDemo:
             self.estado.setdefault("ajustes", {})[clave] = deepcopy(valor)
             self._guardar()
         return valor
+
+    def contactos(self):
+        with self.lock:
+            if "contactos" not in self.estado:  # números ficticios para la demostración
+                self.estado["contactos"] = {c["id"]: {"cliente_id": c["id"], "telefono": f"+5730000000{i:02}",
+                                                      "nombre_saludo": ("Ana", "Luis", "Marta", "", "")[i],
+                                                      "consentimiento": i < 3}
+                                            for i, c in enumerate(configuracion_demo()["clientes"])}
+            return deepcopy(list(self.estado["contactos"].values()))
+
+    def guardar_contacto(self, cliente_id, datos):
+        self.contactos()
+        with self.lock:
+            self.estado["contactos"][cliente_id] = {"cliente_id": cliente_id, **datos}
+            self._guardar()
+            return deepcopy(self.estado["contactos"][cliente_id])
+
+    def borrar_contacto(self, cliente_id):
+        self.contactos()
+        with self.lock:
+            self.estado["contactos"].pop(cliente_id, None)
+            self._guardar()
+
+    def borradores(self, fecha=None, cliente_id=None):
+        with self.lock:
+            return deepcopy([b for b in self.estado.get("borradores", [])
+                             if (not fecha or b["fecha"] == fecha) and (not cliente_id or b["cliente_id"] == cliente_id)])
+
+    def guardar_borrador(self, b):
+        with self.lock:
+            lista = self.estado.setdefault("borradores", [])
+            previo = next((x for x in lista if x["fecha"] == b["fecha"] and x["cliente_id"] == b["cliente_id"]), None)
+            fila = {**(previo or {"id": str(uuid5(NAMESPACE_DNS, "borrador" + b["fecha"] + b["cliente_id"]))}), **b}
+            if previo:
+                lista[lista.index(previo)] = fila
+            else:
+                lista.append(fila)
+            self._guardar()
+            return deepcopy(fila)
+
+    def actualizar_borrador(self, borrador_id, cambios):
+        with self.lock:
+            for b in self.estado.get("borradores", []):
+                if b["id"] == borrador_id:
+                    b.update(cambios)
+                    self._guardar()
+                    return deepcopy(b)
+        raise ErrorRepositorio("Ese mensaje ya no existe. Recarga la lista.", 404)
 
     def _guardar(self):
         if self.archivo:

@@ -55,7 +55,7 @@ def sin_archivos_reales_de_actions(monkeypatch):
 
 def test_migraciones_en_orden_y_hash_del_sql_original():
     versiones = migraciones.descubrir()
-    assert [m.version for m in versiones] == ["001", "002", "003", "004", "005", "006", "007", "008", "009", "010", "011", "012"]
+    assert [m.version for m in versiones] == ["001", "002", "003", "004", "005", "006", "007", "008", "009", "010", "011", "012", "013"]
     assert all(len(m.digest) == 64 for m in versiones)
     assert "begin;\n" not in versiones[1].cuerpo.lower()
     assert "begin\n" in versiones[1].cuerpo.lower()  # conserva el cuerpo PL/pgSQL

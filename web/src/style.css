@@ -3010,3 +3010,56 @@ h1 {
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+.mensajes {
+  display: grid;
+  gap: 14px;
+}
+.mensaje {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+}
+.mensaje-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+.mensaje h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.mensaje p {
+  margin: 2px 0 0;
+}
+.mensaje textarea {
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  resize: vertical;
+  background: #fbfcfa;
+}
+a.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+.whatsapp-contacto {
+  margin: 14px 0 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: grid;
+  gap: 8px;
+}
+.whatsapp-contacto legend {
+  font-weight: 600;
+  padding: 0 4px;
+}

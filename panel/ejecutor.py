@@ -171,6 +171,12 @@ def correr(salida, modo="diario", prueba=False, repo=None):
                 if any(c["activo"] and grado(v["titulo"],c)[0] for c in cargos)})[:120]
             reporte = bodega.correr(salida, modo=modo, hoy=fecha)
             registrar(repo, version, fecha, reporte)
+            if modo != "incremental":
+                try:  # borradores de WhatsApp listos para revisar; un fallo aquí nunca tumba la búsqueda
+                    from panel import borradores
+                    borradores.generar(repo, fecha)
+                except Exception:  # noqa: BLE001
+                    pass
             return reporte
     except Exception:
         aviso = "La captura requiere revisión; se conserva su historial y pendientes."

@@ -132,7 +132,11 @@ def main():
                 (ejecucion_panel,perfil_panel["cliente_id"],perfil_panel["id"],perfil_panel["cargo_id"],json.dumps(perfil_panel),json.dumps(control["cargos"][0])))
             conn.execute("""insert into public.panel_ajustes(clave,valor)
                 values('alertas','{"destinatarios":["operador@example.org"],"tipos":["fallo"]}')""")
-            # Backup de doce tablas y ambas secuencias; el archivo no contiene el texto en claro.
+            conn.execute("""insert into public.panel_contactos(cliente_id,telefono,nombre_saludo,consentimiento)
+                values(%s,'+573000000001','Ana',true)""", (perfil_panel["cliente_id"],))
+            conn.execute("""insert into public.panel_borradores(fecha,cliente_id,texto,vacantes,cargos)
+                values(current_date,%s,'Hola Ana','["aaaaaaaaaaaaaaaa"]','["Product Designer"]')""", (perfil_panel["cliente_id"],))
+            # Backup de catorce tablas y ambas secuencias; el archivo no contiene el texto en claro.
             conn.execute("select public.estado_guardar('ofertas','[{\"identificador\":\"pendiente\",\"revision\":0,\"payload\":{\"external_id\":\"pendiente\"}}]')")
             conn.execute("insert into public.ofertas(external_id,job_title,company_name) select 'lote-'||n,'QA','Ensayo' from generate_series(1,201) n")
             # Archivo con decimal anidado y una fusión todavía pendiente: recuperar sin aplicar limpieza al corte.
@@ -172,7 +176,7 @@ def main():
                 assert destino.execute("select tgenabled from pg_trigger where tgname='oferta_unica'").fetchone()[0] == 'O'
                 assert not destino.execute("select has_table_privilege('anon','public.estado_operativo','SELECT')").fetchone()[0]
         print("Actualización manual → automática sin perder crédito/historia, respaldo obligatorio y migradores concurrentes: aprobados.")
-        print("Copia AES-GCM y restauración: doce tablas, dos secuencias, decimales exactos, pendiente, permisos y trabajo; corrupción rechazada.")
+        print("Copia AES-GCM y restauración: catorce tablas, dos secuencias, decimales exactos, pendiente, permisos y trabajo; corrupción rechazada.")
 
 
 if __name__ == "__main__":

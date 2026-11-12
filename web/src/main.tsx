@@ -54,6 +54,8 @@ import type {
   Ejecucion,
   Vacante,
   EstimacionCargo,
+  Borrador,
+  Contacto,
   Embudo,
   EstimacionEnVivo,
   EstimacionPerfil,
@@ -692,6 +694,195 @@ function PreviewCargo({
   );
 }
 
+const estadosMensaje: Record<Borrador["estado"], string> = {
+  pendiente: "Por enviar",
+  abierto: "Abierto en WhatsApp",
+  enviado: "Enviado",
+  descartado: "Descartado",
+};
+
+function Mensajes({
+  clientes,
+  notify,
+}: {
+  clientes: Cliente[];
+  notify: (s: string, error?: boolean) => void;
+}) {
+  const [lista, setLista] = useState<Borrador[] | null>(null);
+  const [soloPendientes, setSoloPendientes] = useState(true);
+  const [ocupado, setOcupado] = useState(false);
+  async function cargar() {
+    try {
+      const r = await api<{ borradores: Borrador[] }>("/borradores");
+      setLista(r.borradores);
+    } catch (e) {
+      notify((e as Error).message, true);
+      setLista([]);
+    }
+  }
+  useEffect(() => {
+    cargar();
+  }, []);
+  async function cambiar(b: Borrador, cambios: Partial<Borrador>) {
+    try {
+      const r = await api<Borrador>("/borradores/" + b.id, {
+        method: "PATCH",
+        body: JSON.stringify(cambios),
+      });
+      setLista((l) =>
+        (l || []).map((x) => (x.id === b.id ? { ...x, ...r } : x)),
+      );
+    } catch (e) {
+      notify((e as Error).message, true);
+    }
+  }
+  async function generar() {
+    setOcupado(true);
+    try {
+      const r = await api<{ generados: number; conservados: number }>(
+        "/borradores/generar",
+        { method: "POST" },
+      );
+      notify(
+        r.generados
+          ? `${r.generados} mensajes preparados.`
+          : "No hay vacantes listas nuevas para preparar mensajes.",
+      );
+      await cargar();
+    } catch (e) {
+      notify((e as Error).message, true);
+    } finally {
+      setOcupado(false);
+    }
+  }
+  const nombre = (id: string) =>
+    clientes.find((c) => c.id === id)?.nombre || "Cliente";
+  const visibles = (lista || []).filter(
+    (b) =>
+      !soloPendientes || b.estado === "pendiente" || b.estado === "abierto",
+  );
+  return (
+    <section className="card activity mensajes">
+      <div className="section-title">
+        <h2>Mensajes de hoy</h2>
+        <div className="alerts-actions">
+          <label className="check-line">
+            <input
+              type="checkbox"
+              checked={soloPendientes}
+              onChange={(e) => setSoloPendientes(e.target.checked)}
+            />
+            Solo pendientes
+          </label>
+          <button
+            type="button"
+            className="button secondary"
+            disabled={ocupado}
+            onClick={generar}
+          >
+            <RefreshCw size={14} /> Preparar mensajes
+          </button>
+        </div>
+      </div>
+      <p className="helper">
+        Para que una persona reciba su mensaje, en «Clientes» añade su WhatsApp
+        y marca que aceptó recibir vacantes. Nada se envía solo: «Abrir en
+        WhatsApp» abre su chat con el mensaje escrito para que lo revises y lo
+        envíes.
+      </p>
+      {lista === null ? (
+        <p className="muted">
+          <Loader2 size={14} className="spin" /> Cargando mensajes…
+        </p>
+      ) : !visibles.length ? (
+        <Empty
+          icon={MessageCircle}
+          title="No hay mensajes por enviar"
+          texto="Los mensajes se preparan solos cada mañana tras la búsqueda. También puedes pulsar «Preparar mensajes»."
+        />
+      ) : (
+        visibles.map((b) => (
+          <article className="mensaje" key={b.id}>
+            <div className="mensaje-top">
+              <div>
+                <h3>{nombre(b.cliente_id)}</h3>
+                <p className="muted">
+                  {b.cargos.join(" · ")} · {b.vacantes.length}{" "}
+                  {b.vacantes.length === 1 ? "vacante" : "vacantes"}
+                  {b.pocas && " · hoy hubo menos de 5"}
+                </p>
+              </div>
+              <span
+                className={
+                  "pill " + (b.estado === "enviado" ? "green" : "amber")
+                }
+              >
+                {estadosMensaje[b.estado]}
+              </span>
+            </div>
+            <label className="sr-only" htmlFor={"texto-" + b.id}>
+              Mensaje para {nombre(b.cliente_id)}
+            </label>
+            <textarea
+              id={"texto-" + b.id}
+              defaultValue={b.texto}
+              rows={8}
+              onBlur={(e) =>
+                e.target.value !== b.texto &&
+                cambiar(b, { texto: e.target.value })
+              }
+            />
+            <div className="alerts-actions">
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => cambiar(b, { estado: "descartado" })}
+              >
+                Descartar
+              </button>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(b.texto);
+                    notify("Mensaje copiado.");
+                  } catch {
+                    notify("No se pudo copiar; selecciona el texto.", true);
+                  }
+                }}
+              >
+                <Copy size={14} /> Copiar
+              </button>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => cambiar(b, { estado: "enviado" })}
+              >
+                <Check size={14} /> Marcar como enviado
+              </button>
+              {b.enlace && (
+                <a
+                  className="button primary"
+                  href={b.enlace}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() =>
+                    b.estado === "pendiente" &&
+                    cambiar(b, { estado: "abierto" })
+                  }
+                >
+                  <MessageCircle size={14} /> Abrir en WhatsApp
+                </a>
+              )}
+            </div>
+          </article>
+        ))
+      )}
+    </section>
+  );
+}
+
 type AjustesAlertas = {
   destinatarios: string[];
   tipos: string[];
@@ -895,6 +1086,25 @@ function ClienteDialog({
   const [c, setC] = useState<Cliente>(
     cliente ? { ...cliente } : { id: uid(), nombre: "", activo: true },
   );
+  // WhatsApp del cliente: se guarda al momento en una tabla privada, fuera de la configuración programada.
+  const vacioContacto: Contacto = {
+    telefono: "",
+    nombre_saludo: "",
+    consentimiento: false,
+  };
+  const [ct, setCt] = useState<Contacto>(vacioContacto);
+  const [teniaContacto, setTeniaContacto] = useState(false);
+  useEffect(() => {
+    if (!cliente) return;
+    api<Record<string, Contacto>>("/contactos")
+      .then((r) => {
+        if (r[cliente.id]) {
+          setCt(r[cliente.id]);
+          setTeniaContacto(true);
+        }
+      })
+      .catch(() => undefined);
+  }, [cliente]);
   const [ps, setPs] = useState<Perfil[]>(
     cliente
       ? structuredClone(
@@ -924,7 +1134,7 @@ function ClienteDialog({
       onClose={onClose}
     >
       <form
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           if (!ps.length) {
             setError("Añade al menos un perfil de búsqueda.");
@@ -947,6 +1157,19 @@ function ClienteDialog({
             setError("Revisa el rango de experiencia.");
             return;
           }
+          try {
+            if (ct.telefono.trim()) {
+              await api("/contactos/" + c.id, {
+                method: "PUT",
+                body: JSON.stringify(ct),
+              });
+            } else if (teniaContacto) {
+              await api("/contactos/" + c.id, { method: "DELETE" });
+            }
+          } catch (err) {
+            setError((err as Error).message);
+            return;
+          }
           onSave(c, ps);
         }}
       >
@@ -964,6 +1187,51 @@ function ClienteDialog({
             onChange={(e) => setC({ ...c, nombre: e.target.value })}
           />
         </div>
+        <fieldset className="whatsapp-contacto">
+          <legend>WhatsApp (opcional)</legend>
+          <div className="form-grid">
+            <div className="field">
+              <label htmlFor="cliente-telefono">
+                Número con código de país
+              </label>
+              <input
+                id="cliente-telefono"
+                type="tel"
+                inputMode="tel"
+                autoComplete="off"
+                placeholder="+57 300 123 4567"
+                value={ct.telefono}
+                onChange={(e) => setCt({ ...ct, telefono: e.target.value })}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="cliente-saludo">Nombre para saludar</label>
+              <input
+                id="cliente-saludo"
+                maxLength={60}
+                placeholder="Ana"
+                value={ct.nombre_saludo}
+                onChange={(e) =>
+                  setCt({ ...ct, nombre_saludo: e.target.value })
+                }
+              />
+            </div>
+          </div>
+          <label className="check-line">
+            <input
+              type="checkbox"
+              checked={ct.consentimiento}
+              onChange={(e) =>
+                setCt({ ...ct, consentimiento: e.target.checked })
+              }
+            />
+            Aceptó recibir vacantes por WhatsApp
+          </label>
+          <p className="field-help">
+            Con número y aceptación, cada mañana tendrás su mensaje listo en
+            «Mensajes». Nada se envía solo.
+          </p>
+        </fieldset>
         <div className="section-title">
           <h3>Perfiles de búsqueda</h3>
           <span className="muted">
@@ -1594,6 +1862,7 @@ function App() {
     { t: "Clientes", i: Users },
     { t: "Cargos y cupos", i: SlidersHorizontal },
     { t: "Vacantes", i: BriefcaseBusiness },
+    { t: "Mensajes", i: MessageCircle },
     { t: "Actividad", i: Clock3 },
   ];
   return (
@@ -1695,9 +1964,11 @@ function App() {
                       ? "Tú decides dónde buscar."
                       : tab === "Vacantes"
                         ? "Oportunidades para compartir."
-                        : tab === "Actividad"
-                          ? "Todo lo que ha pasado."
-                          : "Tu espacio, bajo control."}
+                        : tab === "Mensajes"
+                          ? "Mensajes listos para enviar."
+                          : tab === "Actividad"
+                            ? "Todo lo que ha pasado."
+                            : "Tu espacio, bajo control."}
               </h1>
               <p>
                 {tab === "Resumen"
@@ -1708,9 +1979,11 @@ function App() {
                       ? "Reparte las 120 vacantes diarias entre los cargos que necesitas."
                       : tab === "Vacantes"
                         ? "Revisa las coincidencias de cada cliente y prepara su mensaje."
-                        : tab === "Actividad"
-                          ? "Cada noche: cuántas vacantes trajo la búsqueda con tu configuración y qué cargos quedaron cortos."
-                          : "Información sobre la conexión y el funcionamiento del espacio."}
+                        : tab === "Mensajes"
+                          ? "Cada mañana cada persona tiene su mensaje con sus vacantes. Ábrelo en WhatsApp, revísalo y envíalo."
+                          : tab === "Actividad"
+                            ? "Cada noche: cuántas vacantes trajo la búsqueda con tu configuración y qué cargos quedaron cortos."
+                            : "Información sobre la conexión y el funcionamiento del espacio."}
               </p>
             </div>
             {["Resumen", "Clientes", "Cargos y cupos"].includes(tab) && (
@@ -2304,6 +2577,9 @@ function App() {
                 />
               )}
             </>
+          )}
+          {tab === "Mensajes" && (
+            <Mensajes clientes={draft.clientes} notify={notify} />
           )}
           {tab === "Actividad" && <AvisosCorreo notify={notify} />}
           {tab === "Actividad" && (

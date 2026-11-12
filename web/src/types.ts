@@ -140,3 +140,20 @@ export type Embudo = {
   ampliadas: number;
   principal_perdida: string;
 };
+export type Contacto = {
+  telefono: string;
+  nombre_saludo: string;
+  consentimiento: boolean;
+};
+export type Borrador = {
+  id: string;
+  fecha: string;
+  cliente_id: string;
+  texto: string;
+  vacantes: string[];
+  cargos: string[];
+  estado: "pendiente" | "abierto" | "enviado" | "descartado";
+  editado: boolean;
+  enlace: string;
+  pocas: boolean;
+};
