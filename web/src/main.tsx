@@ -61,7 +61,7 @@ import type {
 import "./style.css";
 
 const uid = () => crypto.randomUUID();
-const colores = ["#2d7e68", "#6b91b4", "#b28b59", "#907bb1", "#b76e79"];
+const colores = ["#2b7863", "#516e88", "#836641", "#766491", "#965a63"]; // ≥4,5:1 sobre su fondo tenue
 const fecha = (v: string) =>
   new Date(v + "T12:00:00").toLocaleDateString("es-CO", {
     day: "numeric",
@@ -157,8 +157,13 @@ function Dialog({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
+    // Al cerrar, el foco vuelve al botón que abrió la ventana (WCAG 2.4.3).
+    const origen = document.activeElement as HTMLElement | null;
     ref.current?.showModal();
-    return () => ref.current?.close();
+    return () => {
+      ref.current?.close();
+      if (origen && document.contains(origen)) origen.focus();
+    };
   }, []);
   return (
     <dialog
@@ -678,8 +683,8 @@ function PreviewCargo({
           {info.solapes
             .map((s) => s.vacantes + " vacantes con «" + s.cargo + "»")
             .join(", ")}
-          : cada vacante va al primero de la lista. Mejor un solo cargo con
-          varios perfiles.
+          : se reparten por turnos según lo que le falta a cada uno. Mejor un
+          solo cargo con varios perfiles.
         </span>
       )}
     </div>
@@ -1173,7 +1178,7 @@ function App() {
   }
   useEffect(() => {
     if (toast) {
-      const t = setTimeout(() => setToast(null), 6500);
+      const t = setTimeout(() => setToast(null), toast.error ? 8000 : 5000);
       return () => clearTimeout(t);
     }
   }, [toast]);
@@ -1335,6 +1340,7 @@ function App() {
     setTab(t);
     setMenu(false);
     setSearch("");
+    setToast((x) => (x && !x.error ? null : x)); // un aviso no se arrastra a otra sección
   }
   if (loading)
     return (
@@ -2274,8 +2280,14 @@ function App() {
                 ? draft.cargos.map((x) => (x.id === c.id ? c : x))
                 : [...draft.cargos, c],
             });
+            const nuevo = !draft.cargos.some((x) => x.id === c.id);
             setModal(null);
-            notify("Cargo actualizado en el borrador.");
+            notify(
+              (nuevo
+                ? "Cargo añadido al borrador."
+                : "Cargo actualizado en el borrador.") +
+                " Prográmalo para que se aplique desde mañana.",
+            );
           }}
         />
       )}
@@ -2296,8 +2308,14 @@ function App() {
                 ...ps,
               ],
             });
+            const nuevo = !draft.clientes.some((x) => x.id === c.id);
             setModal(null);
-            notify("Perfil actualizado en el borrador.");
+            notify(
+              (nuevo
+                ? "Cliente añadido al borrador."
+                : "Cliente actualizado en el borrador.") +
+                " Prográmalo para que se aplique desde mañana.",
+            );
           }}
         />
       )}

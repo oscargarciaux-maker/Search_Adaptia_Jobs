@@ -94,6 +94,22 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   ).toBeDisabled();
   await page.getByLabel("Vacantes de QA", { exact: true }).fill("30");
   await expect(page.getByText(/guardadas sin entregar/).first()).toBeVisible();
+  // Accesibilidad: al cerrar con Escape el foco vuelve al botón que abrió la ventana; ningún texto bajo 12 px.
+  await page.getByRole("button", { name: "Añadir cargo", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Añadir cargo", exact: true }),
+  ).toBeFocused();
+  const pequenos = await page.evaluate(
+    () =>
+      [...document.querySelectorAll("main *, aside *")].filter(
+        (el) =>
+          [...el.childNodes].some(
+            (n) => n.nodeType === 3 && n.textContent!.trim(),
+          ) && parseFloat(getComputedStyle(el).fontSize) < 12,
+      ).length,
+  );
+  expect(pequenos).toBe(0);
   await page.route("**/api/cargos/expandir", (route) =>
     route.fulfill({
       json: {

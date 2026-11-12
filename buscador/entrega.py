@@ -38,6 +38,12 @@ def huellas(v):
 
 def rol_de(v, roles):
     """(rol, grado) de la vacante: el rol con la coincidencia más fuerte; si empatan, el primero de la lista."""
+    empatados, grado = roles_de(v, roles)
+    return (empatados[0], grado) if empatados else (None, None)
+
+
+def roles_de(v, roles):
+    """([roles empatados en la mejor coincidencia, en el orden de la lista], grado)."""
     grados = {f["familia"]: f["coincidencia"] for f in v.get("familias", [])}
     titulo = normalizar.texto(v.get("titulo", ""))
     mejor = None
@@ -54,10 +60,11 @@ def rol_de(v, roles):
             if not any(evaluar(v, p, rol["_hoy"])["compatible"] for p in rol["_perfiles"]):
                 continue
         grado = min(en_rol, key=GRADOS.index)
-        clave = (GRADOS.index(grado), orden)
-        if mejor is None or clave < mejor[0]:
-            mejor = (clave, rol, grado)
-    return (mejor[1], mejor[2]) if mejor else (None, None)
+        if mejor is None or GRADOS.index(grado) < GRADOS.index(mejor[1]):
+            mejor = ([rol], grado)
+        elif grado == mejor[1]:
+            mejor[0].append(rol)
+    return mejor if mejor else ([], None)
 
 
 def _rasgos(v):
@@ -120,6 +127,24 @@ def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False, 
     return elegidas
 
 
+def _repartir_por_turnos(compartidas, por_rol, roles, cfg, iniciales):
+    """Cargos que aceptan la misma vacante con igual coincidencia (p. ej. «Product Designer» y «Diseñador UX/UI»): en vez
+    de llevárselas todas el primero de la lista, cada una va al cargo con mayor fracción de cupo pendiente."""
+    orden = {r["id"]: i for i, r in enumerate(roles)}
+    meta = {r["id"]: meta_de(r, cfg) for r in roles}
+    tienen = {r["id"]: len(por_rol[r["id"]]) + len(iniciales.get(r["id"], [])) for r in roles}
+    compartidas.sort(key=lambda x: x[0].get("fecha_publicacion") or "", reverse=True)  # recientes primero
+    compartidas.sort(key=lambda x: GRADOS.index(x[1]))  # estable: mejor coincidencia primero
+    for v, grado, ids in compartidas:
+        def clave(rid):
+            m = meta[rid] or 0
+            pendiente = max(0, m - tienen[rid]) / m if m else -1
+            return (-pendiente, tienen[rid] / m if m else float("inf"), orden[rid])
+        elegido = min(ids, key=clave)
+        por_rol[elegido].append((v, grado))
+        tienen[elegido] += 1
+
+
 def _motivo_general(v, entregadas, desde, cfg, omitir_verificacion=False):
     """Reglas que nunca se amplían: no entregada antes, frescura, enlace comprobado y contrato (idioma, país, texto)."""
     if any(h in entregadas for h in huellas(v)):
@@ -178,10 +203,12 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificac
     descartes_rol = {r["id"]: Counter() for r in roles}
     panel = any("_perfiles" in r for r in roles)
     libres = []  # pasan las reglas generales pero ningún perfil las acepta tal cual: material para ampliar
+    compartidas = []  # sirven igual de bien a varios cargos del panel: se reparten por turnos
     for v in vacante.juntar(vacantes):
         if any(h in incluidas for h in huellas(v)):
             continue
-        rol, grado = rol_de(v, roles)
+        empatados, grado = roles_de(v, roles)
+        rol = empatados[0] if empatados else None
         if not rol:
             if panel and not _motivo_general(v, entregadas, desde, cfg, omitir_verificacion):
                 libres.append(v)
@@ -204,7 +231,12 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificac
             motivos[motivo] += 1
             descartes_rol[rol["id"]][motivo] += 1
             continue
-        por_rol[rol["id"]].append((v, grado))
+        if panel and len(empatados) > 1:
+            compartidas.append((v, grado, [r["id"] for r in empatados]))
+        else:
+            por_rol[rol["id"]].append((v, grado))
+    if compartidas:
+        _repartir_por_turnos(compartidas, por_rol, roles, cfg, iniciales)
     salida, resumen = {}, {}
     for rol in roles:
         candidatas = por_rol[rol["id"]]
