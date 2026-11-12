@@ -774,7 +774,7 @@ function AvisosCorreo({
           type="text"
           inputMode="email"
           autoComplete="email"
-          placeholder="nombre@empresa.com, otra@empresa.com"
+          placeholder="nombre@example.com, otra@example.com"
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
         />

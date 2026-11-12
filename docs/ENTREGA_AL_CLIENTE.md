@@ -190,7 +190,7 @@ el tamaño de cómputo del proyecto (Project Settings → Compute and Disk).
 3. **API Keys → Create API key** con permiso de envío. Copiarla una sola vez:
    - GitHub → Settings → Secrets and variables → Actions → **New repository secret**: `RESEND_API_KEY`.
    - Render → el servicio del panel → Environment: `RESEND_API_KEY` (la misma).
-4. Remitente, como **variable** (no secreto) en GitHub y en Render: `ALERTAS_REMITENTE` = `Adaptia <alertas@adaptiajobs.com>`.
+4. Remitente, como **variable** (no secreto) en GitHub y en Render: `ALERTAS_REMITENTE` = `Adaptia <alertas@` + el dominio verificado + `>` (p. ej. `alertas@example.com` como forma).
    Opcional en GitHub: variable `PANEL_URL` con la dirección del panel, para que el correo enlace a él.
 5. En el panel → **Actividad → Avisos por correo**: escribir el correo que recibirá los avisos, elegir los tipos,
    **Guardar avisos** y **Enviar correo de prueba**.
