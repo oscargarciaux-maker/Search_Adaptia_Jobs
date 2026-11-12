@@ -587,3 +587,19 @@ def test_api_en_vivo_en_demo_no_sale_a_internet(monkeypatch):
                  headers={"origin": "http://testserver"}).json()
     assert r["fuentes"] == {"Demostración": {"avisos": r["avisos"], "busquedas": 0, "fallidas": 0}}
     assert r["del_cargo"] >= r["compatibles"] >= 0
+
+
+def test_pasada_posterior_fallida_no_borra_el_resultado_del_dia(cfg, monkeypatch, tmp_path):
+    cambios = []
+    class Repo:
+        def operativa(self, fecha): return {"revision": 1, "configuracion": cfg}
+        def pedir(self, metodo, ruta, **op):
+            if metodo == "GET":
+                return [{"id": "ejemplo", "revision": 1, "estado": "parcial",
+                         "resumen": {"vacantes": 35, "meta": 120, "faltantes": {"QA": 13}}}]
+            cambios.append(op["json"])
+    monkeypatch.setattr(bodega, "correr", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("selección canónica")))
+    with pytest.raises(RuntimeError):
+        ejecutor.correr(tmp_path, repo=Repo())
+    assert "estado" not in cambios[-1]
+    assert cambios[-1]["resumen"]["vacantes"] == 35 and cambios[-1]["resumen"]["aviso_ultima_pasada"]

@@ -262,3 +262,25 @@ def test_cierre_confirmado_se_guarda_sin_borrar_snapshot_historico(monkeypatch, 
 def reconciliacion_de_integracion_simulada(monkeypatch):
     from buscador import supabase
     monkeypatch.setattr(supabase, "reconciliar_ofertas", lambda: {"archivadas": 0, "sin_identificar": 0})
+
+
+@pytest.mark.parametrize("incremental", [False, True])
+def test_pasada_que_completa_el_dia_no_reescribe_el_snapshot_registrado(monkeypatch, incremental):
+    """11 nov 2026: la pasada de la mañana reescribió `verificacion` dentro de lo ya registrado y Supabase la rechazó
+    («No se puede reemplazar una selección canónica»). Lo registrado se audita solo como copia."""
+    registrada, nueva = oferta(1), oferta(2)
+    registrada["verificacion"] = resultado(registrada["enlace"])  # comprobación de la noche
+    lote = {"fecha": "2026-11-05", "elegidas": {"ux-ui-designer": [(registrada, "exacto")]}}
+    original = deepcopy(lote)
+    actuales = [dict(registrada), nueva]
+    ahora_mas_tarde = AHORA + timedelta(hours=8)
+    monkeypatch.setattr(ve, "comprobar", lambda u, t, **op: resultado(u, ahora=ahora_mas_tarde))
+    ve.preparar(actuales, {}, "2026-11-05", {}, lote=lote, incremental=incremental)
+    assert lote == original
+    # Y la entrega guarda exactamente el mismo snapshot para lo ya registrado.
+    guardados = []
+    entrega.correr(actuales, {}, "2026-11-05", "2026-11-05T13:00:00Z", None, lote=lote,
+                   persistir_lote=lambda d: guardados.append(deepcopy(d)))
+    registrado = next(v for v, _ in guardados[0]["elegidas"]["ux-ui-designer"] if v["id"] == registrada["id"])
+    assert {k: v for k, v in registrado.items() if k != "_capturada_entrega"} == \
+        {k: v for k, v in registrada.items() if k != "_capturada_entrega"}

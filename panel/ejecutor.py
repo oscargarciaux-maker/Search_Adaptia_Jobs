@@ -148,9 +148,15 @@ def correr(salida, modo="diario", prueba=False, repo=None):
             registrar(repo, version, fecha, reporte)
             return reporte
     except Exception:
+        aviso = "La captura requiere revisión; se conserva su historial y pendientes."
         try:
-            repo.pedir("PATCH","panel_ejecuciones",params={"id":"eq."+ejecucion["id"]},
-                       json={"estado":"fallida","resumen":{"error":"La captura requiere revisión; se conserva su historial y pendientes."}})
+            actual = (repo.pedir("GET", "panel_ejecuciones", params={"id": "eq." + ejecucion["id"], "limit": 1}) or [{}])[0]
+            if actual.get("estado") in ("parcial", "completa"):
+                # Una pasada posterior fallida (mañana, cada hora) no borra el resultado ya registrado del día.
+                cambio = {"resumen": {**(actual.get("resumen") or {}), "aviso_ultima_pasada": aviso}}
+            else:
+                cambio = {"estado": "fallida", "resumen": {"error": aviso}}
+            repo.pedir("PATCH", "panel_ejecuciones", params={"id": "eq." + ejecucion["id"]}, json=cambio)
         except Exception:
             pass
         raise

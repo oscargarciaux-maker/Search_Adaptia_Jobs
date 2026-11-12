@@ -320,6 +320,9 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
                                "Recuperar el estado de trabajo/artefacto y completar el registro antes de continuar; "
                                "no se inició otra selección ni búsqueda.")
         lote_previo = lote_db
+    # Lo ya registrado hoy es inmutable: la entrega recibe una copia que ningún paso intermedio (verificación,
+    # refuerzo) puede alterar.
+    lote_registrado = deepcopy(lote_previo)
     if central:
         _guardar_json(trabajo / "lote_entrega.json", lote_previo)
         memoria_db.update(central.recuperar_pendientes(pendientes_v1, guardar_v1, pendientes_registro, guardar_registro))
@@ -459,7 +462,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
                                          pendientes=pendientes_v1,
                                          persistir=None if prueba else
                                          guardar_v1,
-                                         lote=lote_previo,
+                                         lote=lote_registrado,
                                          persistir_lote=None if prueba else
                                          guardar_lote,
                                          registrar_seleccion=registrar)
