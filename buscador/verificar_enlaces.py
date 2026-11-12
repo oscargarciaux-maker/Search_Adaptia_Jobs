@@ -199,10 +199,18 @@ def urls(v):
     return list(dict.fromkeys(u for u in (v.get("enlace"), v.get("enlace_directo")) if u))
 
 
-def vigente(r, titulo, ahora):
+# Una comprobación positiva o un cierre sirven 24 h para decidir la selección: las capturas de cada hora van llenando el
+# pool que se entregará por la noche. Lo que se comparte (copiar a WhatsApp) exige 6 h y el lote del día se vuelve a
+# comprobar con ese plazo. Un bloqueo o fallo temporal solo cuenta 30 min.
+VIGENCIA_SELECCION = 24 * 3600
+VIGENCIA_COMPARTIR = 6 * 3600
+VIGENCIA_PENDIENTE = 1800
+
+
+def vigente(r, titulo, ahora, vigencia=VIGENCIA_SELECCION):
     try:
         edad = (ahora - datetime.fromisoformat(r["comprobada_en"].replace("Z", "+00:00"))).total_seconds()
-        return r.get("_titulo") == titulo and 0 <= edad < (1800 if r["estado"] == "pendiente" else 21600)
+        return r.get("_titulo") == titulo and 0 <= edad < (VIGENCIA_PENDIENTE if r["estado"] == "pendiente" else vigencia)
     except (KeyError, ValueError, TypeError):
         return False
 
@@ -224,13 +232,14 @@ def anotar(v, cache, ahora=None):
     return v["verificacion"]
 
 
-def auditar(vacantes, cache, *, maximo=240, segundos=240, hilos=6, comprobar_url=None, ahora=None):
+def auditar(vacantes, cache, *, maximo=240, segundos=240, hilos=6, comprobar_url=None, ahora=None,
+            vigencia=VIGENCIA_SELECCION):
     ahora = ahora or datetime.now(timezone.utc)
     comprobar_url = comprobar_url or comprobar
     plazo = time.monotonic() + segundos
     escogidas, peticiones = [], {}
     for v in vacantes:
-        pendientes = [u for u in urls(v) if not vigente(cache.get(u, {}), v["titulo"], ahora)]
+        pendientes = [u for u in urls(v) if not vigente(cache.get(u, {}), v["titulo"], ahora, vigencia)]
         if pendientes and len(escogidas) < maximo:
             escogidas.append(v)
             for u in pendientes:
@@ -269,9 +278,40 @@ def resumen(vacantes):
     return {"vacantes": len(vacantes), "estados": dict(estados), "motivos": dict(motivos)}
 
 
+def cola_de_seleccion(vacantes, entregadas, hoy, cache, iniciales, maximo, ahora=None):
+    """Candidatas en el orden en que las elegiría la selección (con los filtros del panel si está activo), más allá del
+    cupo: si las primeras fallan, ya estarán comprobadas las siguientes. Solo cuenta las que necesitan comprobación."""
+    from buscador import contrato, entrega
+    ahora = ahora or datetime.now(timezone.utc)
+    ids_iniciales = {v["id"] for lista in iniciales.values() for v, _ in lista}
+    # Reducir una sola vez a lo que la selección podría tomar (mismas reglas que `elegir`); las rondas son baratas.
+    # El inventario ya llega sin copias (`limpiar`); `elegir` vuelve a juntar solo este subconjunto.
+    cfg = entrega.config()
+    idiomas = tuple(cfg.get("idiomas", ["es", "en"]))
+    vacantes = [v for v in vacantes
+                if entrega.rol_de(v, cfg["roles"])[0] and not any(h in entregadas for h in entrega.huellas(v))
+                and not contrato.entregable(dict(v, verificacion=None), idiomas)]
+    cola, vistas, por_comprobar = [], set(ids_iniciales), 0
+    for _ in range(12):
+        disponibles = [v for v in vacantes if v["id"] not in vistas]
+        seleccion, _ = entrega.elegir(disponibles, entregadas, hoy, iniciales=iniciales, omitir_verificacion=True)
+        # `elegir` devuelve también los objetos del lote ya registrado: nunca se auditan aquí (ver `historicas`).
+        nuevas = [v for lista in seleccion.values() for v, _ in lista if v["id"] not in vistas]
+        if not nuevas:
+            break
+        for v in nuevas:
+            vistas.add(v["id"])
+            cola.append(v)
+            por_comprobar += any(not vigente(cache.get(u, {}), v["titulo"], ahora) for u in urls(v))
+        if por_comprobar >= maximo:
+            break
+    return cola
+
+
 def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, cfg=None):
-    """Comprueba candidatas antes de la selección; lo no revisado nunca se da por aprobado."""
-    from buscador import entrega
+    """Comprueba candidatas antes de la selección; lo no revisado nunca se da por aprobado.
+    Orden: el lote ya registrado hoy (plazo para compartir), las que elegiría la selección en su orden y, en las
+    capturas horarias, lo reciente con el presupuesto que sobre."""
     cfg = cfg or {}
     maximo = cfg.get("vacantes_por_captura", 40) if incremental else cfg.get("vacantes_por_corrida", 300)
     segundos = cfg.get("segundos_captura", 90) if incremental else cfg.get("segundos_corrida", 240)
@@ -280,26 +320,30 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
         anotar(v, cache)
     por_id = {v["id"]: v for v in vacantes}
     iniciales = (lote or {}).get("elegidas", {}) if (lote or {}).get("fecha") == hoy else {}
-    historicas = [por_id.get(v["id"], dict(v)) for lista in iniciales.values() for v, _ in lista]
-    ids_iniciales = {v["id"] for lista in iniciales.values() for v, _ in lista}
+    # Copias: auditar nunca debe tocar los objetos del lote registrado (Supabase exige su snapshot intacto).
+    historicas = [dict(por_id.get(v["id"], v)) for lista in iniciales.values() for v, _ in lista]
     hora = datetime.now(timezone.utc).hour
     if incremental and historicas:
         inicio = hora * maximo % len(historicas)
         historicas = historicas[inicio:] + historicas[:inicio]
-    revisadas = set()
     revisadas_n = 0
+    if historicas:
+        revisadas_n += auditar(historicas, cache, maximo=maximo // 3 if incremental else maximo,
+                               segundos=max(0, plazo - time.monotonic()), vigencia=VIGENCIA_COMPARTIR)
+    revisadas = set()
     for ronda in range(4):
+        if revisadas_n >= maximo or time.monotonic() >= plazo:
+            break
         disponibles = [v for v in vacantes if v["id"] not in revisadas or v["verificacion"]["estado"] == "verificada"]
-        seleccion, _ = entrega.elegir(disponibles, entregadas, hoy, iniciales=iniciales, omitir_verificacion=True)
-        # `elegir` devuelve también los objetos del lote ya registrado: se auditan solo sus copias (`historicas`) para
-        # no reescribir el snapshot canónico, que Supabase exige intacto al completar el día.
-        candidatas = [v for lista in seleccion.values() for v, _ in lista if v["id"] not in ids_iniciales]
+        t0 = time.monotonic()
+        candidatas = cola_de_seleccion(disponibles, entregadas, hoy, cache, iniciales, maximo - revisadas_n)
+        plazo += time.monotonic() - t0  # el presupuesto de segundos es para comprobar enlaces, no para ordenar
         if incremental:
             recientes = sorted(vacantes, key=lambda v: v.get("publicada_en") or v.get("visto_primera_vez", ""), reverse=True)
             inicio = hora * maximo % len(recientes) if recientes else 0
             candidatas += recientes[:maximo // 2] + recientes[inicio:] + recientes[:inicio]
-        grupo = list({v["id"]: v for v in historicas + candidatas if v["id"] not in revisadas}.values())
-        if not grupo or revisadas_n >= maximo or time.monotonic() >= plazo:
+        grupo = list({v["id"]: v for v in candidatas if v["id"] not in revisadas}.values())
+        if not grupo:
             break
         n = auditar(grupo, cache, maximo=maximo - revisadas_n, segundos=max(0, plazo - time.monotonic()))
         revisadas_n += n
@@ -308,7 +352,7 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
             break
     for v in vacantes:
         anotar(v, cache)
-    actuales = [por_id.get(v["id"], v) for v in historicas]
+    actuales = [dict(por_id.get(v["id"], v)) for lista in iniciales.values() for v, _ in lista]
     for v in actuales:
         anotar(v, cache)
     return dict(resumen(vacantes), candidatas_programadas=revisadas_n, seleccion_del_dia=resumen(actuales))

@@ -12,8 +12,8 @@ hora_bodega_bogota: "01:17"
 
 # GET de fichas y enlaces de aplicación visibles. No consume Apify ni envía formularios.
 verificacion_enlaces:
-  vacantes_por_corrida: 300
-  segundos_corrida: 240
+  vacantes_por_corrida: 400
+  segundos_corrida: 360
   vacantes_por_captura: 120
   segundos_captura: 180
 
@@ -22,6 +22,7 @@ incremental:
   minutos_por_fuente: 2
   linkedin_busquedas: 24
   linkedin_fichas: 48
+  linkedin_relectura: 48     # avisos guardados sin descripción que se releen cada hora (sin ella no se pueden entregar)
   indeed_busquedas: 6
   ats_detalles: 20
   rotacion_empresas: 30
@@ -62,6 +63,7 @@ presupuestos:
   minutos_por_fuente: 50
   linkedin_busquedas: 450      # páginas de resultados por noche (10 avisos cada una)
   linkedin_fichas: 450         # avisos a los que se les lee la descripción completa
+  linkedin_relectura: 300      # avisos ya guardados sin descripción que se releen tras la búsqueda
   pausa_linkedin: [1.0, 2.5]   # segundos entre peticiones a LinkedIn
   indeed_busquedas: 90
   apify_busquedas: 60          # solo con APIFY_TOKEN

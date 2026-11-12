@@ -42,11 +42,13 @@ Páginas que cargan por JavaScript y rutas de registro pueden ser legítimas. No
 - Tratar bloqueos, CAPTCHA, login, timeout y errores temporales como pendientes. No cerrar una vacante por un 403.
 - Comprobar los dos enlaces por separado. Si LinkedIn falla y el portal original funciona, compartir solo el original;
   conservar ambos como evidencia histórica. No publicar un enlace malo como alternativa al comprobado.
-- Reutilizar comprobaciones positivas seis horas y pendientes treinta minutos, con la hora real de revisión. Limitar
+- Reutilizar comprobaciones positivas y cierres 24 horas para decidir la selección, seis horas para compartir (copiar a
+  WhatsApp) y pendientes treinta minutos, con la hora real de revisión (contrato v9). Limitar
   solicitudes simultáneas, bytes, tiempo y ofertas por corrida. Los pendientes no se aprueban al agotarse el presupuesto.
 - Antes de nuevas selecciones, comprobar candidatas y buscar reemplazos cuando fallen. Los refuerzos gratuitos siguen
   operando cuando hay déficit. El presupuesto se comparte entre las rondas: no se multiplican los límites.
-- La captura horaria prioriza revisar la selección del día y luego ofertas recientes. No promete revisar las diez mil
+- La captura horaria revisa primero la selección del día (plazo de seis horas), después las candidatas en el orden en
+  que las elegiría la próxima selección, más allá del cupo, y con lo que sobre ofertas recientes. No promete revisar las diez mil
   ofertas cada hora. Los límites se ajustan en `datos/config.yaml`, sección `verificacion_enlaces`.
 - La página muestra estado/hora y permite filtrar comprobadas. La selección para compartir y WhatsApp manual
   usan enlaces vigentes; la interfaz deshabilita la selección de pendientes. Los históricos sin metadatos no se certifican.
