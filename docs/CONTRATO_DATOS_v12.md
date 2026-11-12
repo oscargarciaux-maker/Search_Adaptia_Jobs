@@ -32,8 +32,9 @@ Revisión del 12 de noviembre de 2026 (decisión de Oscar). Amplía v1 (idioma),
 
 ## Limpieza única de la base de datos
 
-Flujo manual **«Limpiar portugués y Brasil»** (`.github/workflows/limpiar_idioma_pais.yml`,
-`buscador/limpiar_idioma_pais.py`), autorizado por Oscar para cumplir este contrato. No sirve para ocultar déficit.
+Flujo manual **«Limpiar portugués y Brasil»** (ejecutado el 12 nov: 153 filas borradas de `ofertas`), autorizado por
+Oscar para cumplir este contrato. No sirve para ocultar déficit. **Reemplazado por el flujo general de v13**
+(«Revisar y limpiar vacantes fuera del objetivo»), que incluye estas reglas.
 
 - **Simulación (por defecto):** aplica las reglas de arriba a todo `catalogo_vacantes` y cruza con `ofertas` por
   `vacante_id`, `external_id` en `ids_agrupados` y enlaces. Las filas de `ofertas` sin catálogo se juzgan por

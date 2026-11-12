@@ -62,8 +62,9 @@ def test_copia_incierta_sola_sigue_incierta_y_no_inventa_pais():
 
 
 def test_volver_a_ver_la_misma_copia_no_cambia_nota_ni_orden():
-    # SmartRecruiters de Francia con el país como código: ubicación sin confirmar, siempre la misma.
-    sr = crudo("https://jobs.smartrecruiters.com/acme/1", "Portales de empresas (smartrecruiters)", "Valbonne, fr")
+    # Código ambiguo (PA: Panamá o Pensilvania) con una ciudad desconocida: sin confirmar, siempre la misma.
+    # («Valbonne, fr» ya se reconoce como Francia desde el contrato v13.)
+    sr = crudo("https://jobs.smartrecruiters.com/acme/1", "Portales de empresas (smartrecruiters)", "Conshohocken, PA")
     horas = capturas([sr], [], [sr], [sr], [])
     estados = [campos(unica(h), LUGAR) for h in horas]
     assert estados[0]["nota_pais"] == "confirmar ubicación"

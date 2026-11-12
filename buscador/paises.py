@@ -196,10 +196,45 @@ def combinar(resultados):
     return {"paises": union, "modalidad": modo, "confianza": confianza, "nota": nota}
 
 
+# Contrato v13: códigos al final de la ubicación. LinkedIn y los portales escriben «Bucharest, ro» o «Barcelona, es»
+# (país ISO en minúsculas) y «San Jose, CA» (estado de EE. UU. en mayúsculas). Antes quedaban «por confirmar».
+_ISO_EXTRANJEROS = set("""us ca gb uk ie fr de it pl ro pt nl be lu ch at se no dk fi is cz sk hu gr bg hr si rs ua by ru
+    lt lv ee md al ba me mk tr cy mt il ae sa qa kw bh om eg ma tn dz za ng ke gh et in pk bd lk np cn hk tw jp kr sg my
+    th vn ph id au nz""".split())
+_ESTADOS_EEUU = set("""AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC
+    ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC""".split())
+_CODIGO_FINAL = re.compile(r",\s*([A-Za-z]{2})\s*$")
+
+
+def _expandir_codigos(ubicacion):
+    """Cambia un código final por el nombre del país (cubierto) o por «pais extranjero». En mayúsculas, un código que
+    también es estado de EE. UU. (CO, AR, PA) solo se lee como país si la ciudad es de ese país; si no, se deja."""
+    d = datos()
+    nombres = {p["codigo"]: p["nombre"] for p in d["paises"]}
+    partes = []
+    for parte in re.split(r"([;|])", str(ubicacion or "")):
+        m = _CODIGO_FINAL.search(parte)
+        if m:
+            codigo, ciudad = m.group(1), normalizar.texto(parte[:m.start()])
+            es_ciudad_de = lambda c: c in d["ciudades"].get(ciudad, []) or _pais_por_nombre(ciudad, [c])  # noqa: E731
+            if codigo.islower() or codigo.upper() not in _ESTADOS_EEUU:
+                if codigo.upper() in nombres:
+                    parte = parte[:m.start()] + ", " + nombres[codigo.upper()]
+                elif codigo.lower() in _ISO_EXTRANJEROS:
+                    parte = parte[:m.start()] + ", pais extranjero"
+            elif codigo in nombres and es_ciudad_de(codigo):
+                parte = parte[:m.start()] + ", " + nombres[codigo]
+            elif codigo not in nombres:
+                parte = parte[:m.start()] + ", pais extranjero"
+        partes.append(parte)
+    return "".join(partes)
+
+
 def elegibles(titulo, ubicacion, descripcion="", remoto=None):
     """Países desde los que se puede aplicar, con modalidad, confianza y una nota corta."""
     d = datos()
     todos, latam, europa = d["codigos"], d["latam"], d["europa"]
+    ubicacion = _expandir_codigos(ubicacion)
     lugar = normalizar.texto(f"{ubicacion} {titulo}")
     ambito = normalizar.texto(ubicacion) or lugar
     desc = normalizar.texto(descripcion)[:30000]
