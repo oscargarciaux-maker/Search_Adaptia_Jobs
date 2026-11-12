@@ -94,7 +94,9 @@ jobs:
             python -m buscador.limpiar_fuera_objetivo --aplicar --confirmar "$CONFIRMAR" --huella "$HUELLA" \
               --conservar "$CONSERVAR" --borrar-tambien "$BORRAR_TAMBIEN"
           else
-            python -m buscador.limpiar_fuera_objetivo
+            # Sin «aplicar» solo revisa; si se escribieron datos para borrar, el resumen avisa que no se borró nada.
+            python -m buscador.limpiar_fuera_objetivo --huella "$HUELLA" --conservar "$CONSERVAR" \
+              --borrar-tambien "$BORRAR_TAMBIEN" --confirmar "$CONFIRMAR"
           fi
       - name: Guardar el listado para revisar (30 días)
         if: always()
