@@ -53,6 +53,7 @@ import type {
   Ejecucion,
   Vacante,
   EstimacionCargo,
+  EstimacionEnVivo,
   EstimacionPerfil,
   VistaPrevia,
 } from "./types";
@@ -69,7 +70,6 @@ const modos: Record<string, string> = {
   remoto: "Remoto",
   hibrido: "Híbrido",
   presencial: "Presencial",
-  cualquiera: "Cualquier modalidad",
 };
 const grados: Record<string, string> = {
   exact: "Cargo exacto",
@@ -86,14 +86,51 @@ function iniciales(nombre: string) {
     .join("")
     .toUpperCase();
 }
+function hoyBogota() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+  }).format(new Date());
+}
+function manana() {
+  const d = new Date(hoyBogota() + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+// Por qué no hay vacantes: sin configuración, a la espera de la primera búsqueda o sin coincidencias.
+function vacioVacantes(estado: EstadoConfig | null, r: Resultados | null) {
+  if (!estado?.publicada)
+    return {
+      title: "Programa la configuración para empezar",
+      texto:
+        "Las vacantes de cada cliente aparecen después de la primera búsqueda nocturna con su configuración. Ve a «Cargos y cupos» y pulsa «Programar para mañana».",
+    };
+  const desde = estado.publicada.vigente_desde;
+  if (!r?.ejecucion || r.ejecucion.fecha < desde)
+    return {
+      title: "Aún no hay búsqueda para este cliente",
+      texto:
+        "La primera búsqueda con tu configuración será el " +
+        fecha(desde) +
+        " a la 1:17 a. m. (hora Colombia). Después aparecerán aquí sus vacantes.",
+    };
+  return {
+    title: "La búsqueda no encontró vacantes para este cliente",
+    texto:
+      "La búsqueda del " +
+      fecha(r.ejecucion.fecha) +
+      " no trajo vacantes que cumplan los filtros de este cliente. Revisa sus filtros en «Clientes» con la estimación.",
+  };
+}
+
 function perfilNuevo(cliente: string, cargo: string): Perfil {
   return {
     id: uid(),
     cliente_id: cliente,
     cargo_id: cargo,
     activo: true,
-    paises: ["CO"],
-    modalidad: "remoto",
+    vive_en: "CO",
+    modalidades: ["remoto"],
+    paises_presenciales_extra: [],
     antiguedad_dias: 14,
     idiomas: ["es", "en"],
     ingles_maximo: "sin_filtro",
@@ -448,9 +485,9 @@ function PreviewPerfil({
         <span>
           <strong>≈ {info.compatibles}</strong>{" "}
           {info.compatibles === 1
-            ? "vacante disponible"
-            : "vacantes disponibles"}{" "}
-          hoy cumplen este perfil
+            ? "vacante guardada aún no entregada"
+            : "vacantes guardadas aún no entregadas"}{" "}
+          cumple{info.compatibles === 1 ? "" : "n"} este perfil
           <span className="preview-sub">
             {" "}
             · {info.del_cargo} del cargo en el catálogo
@@ -481,6 +518,116 @@ function PreviewPerfil({
   );
 }
 
+function EnVivo({
+  config,
+  perfilId,
+  onAjustar,
+}: {
+  config: Configuracion;
+  perfilId: string;
+  onAjustar: (cambio: Partial<Perfil>) => void;
+}) {
+  const [r, setR] = useState<EstimacionEnVivo | null>(null);
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState("");
+  async function estimar() {
+    setCargando(true);
+    setError("");
+    try {
+      const x = await api<EstimacionEnVivo>("/estimacion-en-vivo", {
+        method: "POST",
+        body: JSON.stringify({ configuracion: config, perfil_id: perfilId }),
+      });
+      if (x.incompleto) setError("Completa el perfil antes de buscar.");
+      else if (x.ocupado || x.espera || x.error)
+        setError(x.nota || x.error || "");
+      else setR(x);
+    } catch {
+      setError("No se pudo buscar en este momento. Inténtalo más tarde.");
+    } finally {
+      setCargando(false);
+    }
+  }
+  const fallo =
+    r?.fuentes &&
+    Object.entries(r.fuentes)
+      .filter(([, f]) => f.error || (f.busquedas && f.fallidas === f.busquedas))
+      .map(([n]) => n);
+  return (
+    <div className="live">
+      <button
+        type="button"
+        className="button secondary small"
+        disabled={cargando}
+        onClick={estimar}
+      >
+        {cargando ? (
+          <Loader2 size={14} className="spin" />
+        ) : (
+          <Search size={14} />
+        )}
+        {cargando
+          ? "Buscando en LinkedIn y Get on Board… (hasta 30 s)"
+          : r
+            ? "Repetir búsqueda en vivo"
+            : "Estimar con búsqueda en vivo"}
+      </button>
+      {error && (
+        <p className="live-note" role="status">
+          {error}
+        </p>
+      )}
+      {r && !cargando && (
+        <div className="live-result" role="status" aria-live="polite">
+          <p className="preview-main">
+            <Target size={15} />
+            <span>
+              <strong>≈ {r.compatibles}</strong>{" "}
+              {r.compatibles === 1
+                ? "encontrada ahora en las fuentes cumple"
+                : "encontradas ahora en las fuentes cumplen"}{" "}
+              este perfil
+              <span className="preview-sub">
+                {" "}
+                · {r.nuevas} aún no guardadas · {r.del_cargo} del cargo en{" "}
+                {r.avisos} avisos revisados
+                {r.ya_entregadas ? ` · ${r.ya_entregadas} ya entregadas` : ""}
+              </span>
+            </span>
+          </p>
+          {!!r.limitantes?.length && (
+            <ul className="preview-tips">
+              {r.limitantes.slice(0, 2).map((l) => (
+                <li key={l.motivo}>
+                  <span>
+                    {l.sugerencia}: <strong>+{l.vacantes}</strong>
+                  </span>
+                  {ajustesSinDato[l.motivo] && (
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() => onAjustar(ajustesSinDato[l.motivo])}
+                    >
+                      Aplicar
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {!!fallo?.length && (
+            <p className="live-note">
+              {fallo.join(" y ")} no respondió esta vez; el número puede quedar
+              corto.
+            </p>
+          )}
+          <p className="live-note">{r.nota}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const textoEstadoCargo: Record<EstimacionCargo["estado"], string> = {
   alcanza: "alcanza para el cupo",
   justo: "puede quedar corto",
@@ -503,7 +650,7 @@ function PreviewCargo({
       }
       title="Vacantes ya guardadas, aún no entregadas, que cumplen los filtros de algún perfil de este cargo."
     >
-      <Target size={12} />≈ {info.disponibles} disponibles hoy ·{" "}
+      <Target size={12} />≈ {info.disponibles} guardadas sin entregar ·{" "}
       {textoEstadoCargo[info.estado]}
     </div>
   );
@@ -537,14 +684,15 @@ function ClienteDialog({
   function patch(id: string, v: Partial<Perfil>) {
     setPs(ps.map((p) => (p.id === id ? { ...p, ...v } : p)));
   }
-  const previa = useVistaPrevia({
+  const borrador: Configuracion = {
     ...config,
     clientes: [
       ...config.clientes.filter((x) => x.id !== c.id),
       { ...c, nombre: c.nombre.trim() || "Cliente", activo: true },
     ],
     perfiles: [...config.perfiles.filter((p) => p.cliente_id !== c.id), ...ps],
-  });
+  };
+  const previa = useVistaPrevia(borrador);
   return (
     <Dialog
       ancho
@@ -559,8 +707,10 @@ function ClienteDialog({
             setError("Añade al menos un perfil de búsqueda.");
             return;
           }
-          if (ps.some((p) => !p.paises.length || !p.idiomas.length)) {
-            setError("Selecciona al menos un país y un idioma por perfil.");
+          if (ps.some((p) => !p.modalidades.length || !p.idiomas.length)) {
+            setError(
+              "Selecciona al menos una modalidad y un idioma por perfil.",
+            );
             return;
           }
           if (
@@ -625,63 +775,109 @@ function ClienteDialog({
                 </select>
               </div>
               <div className="field">
-                <label>Modalidad</label>
+                <label htmlFor={"vive-" + p.id}>¿En qué país vive?</label>
                 <select
-                  aria-label={"Modalidad del perfil " + (i + 1)}
-                  value={p.modalidad}
-                  onChange={(e) => patch(p.id, { modalidad: e.target.value })}
+                  id={"vive-" + p.id}
+                  aria-label={"País de residencia del perfil " + (i + 1)}
+                  value={p.vive_en}
+                  onChange={(e) =>
+                    patch(p.id, {
+                      vive_en: e.target.value,
+                      paises_presenciales_extra:
+                        p.paises_presenciales_extra.filter(
+                          (x) => x !== e.target.value,
+                        ),
+                    })
+                  }
                 >
-                  {Object.entries(modos).map(([v, t]) => (
-                    <option value={v} key={v}>
-                      {t}
+                  {paises.map((pais) => (
+                    <option key={pais.codigo} value={pais.codigo}>
+                      {pais.nombre}
                     </option>
                   ))}
                 </select>
               </div>
             </div>
-            <div className="field">
-              <label>Desde dónde puede trabajar</label>
-              <div className="country-grid">
-                {paises.map((pais) => (
-                  <label
-                    className={
-                      "country " +
-                      (p.paises.includes(pais.codigo) ? "selected" : "")
-                    }
-                    key={pais.codigo}
-                  >
+            <fieldset className="field plain">
+              <legend>¿Qué modalidades acepta?</legend>
+              <div className="check-line">
+                {Object.entries(modos).map(([v, t]) => (
+                  <label key={v}>
                     <input
                       type="checkbox"
-                      checked={p.paises.includes(pais.codigo)}
+                      aria-label={t + " en el perfil " + (i + 1)}
+                      checked={p.modalidades.includes(v)}
                       onChange={(e) =>
                         patch(p.id, {
-                          paises: e.target.checked
-                            ? [...p.paises, pais.codigo]
-                            : p.paises.filter((x) => x !== pais.codigo),
+                          modalidades: e.target.checked
+                            ? [...p.modalidades, v]
+                            : p.modalidades.filter((x) => x !== v),
                         })
                       }
                     />
-                    {pais.nombre}
+                    {t}
                   </label>
                 ))}
               </div>
-              <button
-                className="text-button"
-                type="button"
-                onClick={() =>
-                  patch(p.id, {
-                    paises:
-                      p.paises.length === paises.length
-                        ? []
-                        : paises.map((x) => x.codigo),
-                  })
-                }
+              <p className="field-help">
+                {p.modalidades.includes("remoto")
+                  ? "Remoto incluye vacantes de LATAM, España o del mundo abiertas a su país. "
+                  : ""}
+                {p.modalidades.some((m) => m !== "remoto")
+                  ? "Híbrido y presencial: solo con oficina en su país o en los que elija abajo."
+                  : ""}
+              </p>
+            </fieldset>
+            {p.modalidades.some((m) => m !== "remoto") && (
+              <details
+                className="field mudanza"
+                open={p.paises_presenciales_extra.length > 0}
               >
-                {p.paises.length === paises.length
-                  ? "Quitar selección"
-                  : "Seleccionar LATAM y España"}
-              </button>
-            </div>
+                <summary>
+                  También se mudaría a…{" "}
+                  <span className="muted">
+                    {p.paises_presenciales_extra.length
+                      ? p.paises_presenciales_extra.length +
+                        (p.paises_presenciales_extra.length === 1
+                          ? " país"
+                          : " países")
+                      : "opcional"}
+                  </span>
+                </summary>
+                <div className="country-grid">
+                  {paises
+                    .filter((pais) => pais.codigo !== p.vive_en)
+                    .map((pais) => (
+                      <label
+                        className={
+                          "country " +
+                          (p.paises_presenciales_extra.includes(pais.codigo)
+                            ? "selected"
+                            : "")
+                        }
+                        key={pais.codigo}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={p.paises_presenciales_extra.includes(
+                            pais.codigo,
+                          )}
+                          onChange={(e) =>
+                            patch(p.id, {
+                              paises_presenciales_extra: e.target.checked
+                                ? [...p.paises_presenciales_extra, pais.codigo]
+                                : p.paises_presenciales_extra.filter(
+                                    (x) => x !== pais.codigo,
+                                  ),
+                            })
+                          }
+                        />
+                        {pais.nombre}
+                      </label>
+                    ))}
+                </div>
+              </details>
+            )}
             <div className="form-grid">
               <div className="field">
                 <label>Antigüedad máxima de publicación</label>
@@ -809,6 +1005,11 @@ function ClienteDialog({
             <PreviewPerfil
               info={previa.datos?.perfiles?.[p.id]}
               estado={previa.estado}
+              onAjustar={(cambio) => patch(p.id, cambio)}
+            />
+            <EnVivo
+              config={borrador}
+              perfilId={p.id}
               onAjustar={(cambio) => patch(p.id, cambio)}
             />
           </section>
@@ -1185,17 +1386,6 @@ function App() {
           <span className="brand-icon">a</span>adaptia
           <span className="brand-dot">.</span>
         </a>
-        <div className="workspace">
-          <div className="workspace-icon">
-            <Compass size={17} />
-          </div>
-          <div>
-            <strong>Mi espacio de trabajo</strong>
-            <span>Control de búsqueda</span>
-          </div>
-          <ChevronDown size={15} />
-        </div>
-        <p className="nav-label">ESPACIO DE TRABAJO</p>
         <nav>
           {nav.map(({ t, i: Icon }) => (
             <button
@@ -1212,17 +1402,6 @@ function App() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="sidebar-tip">
-            <span className="tip-icon">
-              <Target size={18} />
-            </span>
-            <strong>Más foco. Más oportunidades.</strong>
-            <p>Una búsqueda que se adapta a las personas que acompañas.</p>
-          </div>
-          <button className="nav-settings" onClick={() => go("Configuración")}>
-            <Settings2 size={18} />
-            Configuración
-          </button>
           <div className="operator">
             <span className="avatar dark">OP</span>
             <div>
@@ -1258,8 +1437,6 @@ function App() {
             >
               <Menu size={21} />
             </button>
-            <span>Control de búsqueda</span>
-            <ChevronRight size={13} />
             <strong>{tab}</strong>
           </div>
           <div className="topbar-right">
@@ -1308,7 +1485,7 @@ function App() {
                       : tab === "Vacantes"
                         ? "Revisa las coincidencias de cada cliente y prepara su mensaje."
                         : tab === "Actividad"
-                          ? "Consulta el resultado de las capturas y sus pendientes."
+                          ? "Cada noche: cuántas vacantes trajo la búsqueda con tu configuración y qué cargos quedaron cortos."
                           : "Información sobre la conexión y el funcionamiento del espacio."}
               </p>
             </div>
@@ -1333,61 +1510,30 @@ function App() {
               </div>
             )}
           </div>
-          {dirty && (
-            <div className="dirty-bar">
-              <span className="amber-dot" />
-              Tienes cambios sin guardar. La búsqueda programada no cambia hasta
-              que los confirmes.
+          {["Resumen", "Clientes", "Cargos y cupos"].includes(tab) && (
+            <div className={"flow-status" + (dirty ? " pending" : "")}>
+              <span className="flow-pill">
+                {dirty
+                  ? "Cambios sin guardar"
+                  : estado?.publicada &&
+                      estado.publicada.revision === estado.revision
+                    ? "Programado desde el " +
+                      fecha(estado.publicada.vigente_desde)
+                    : estado?.revision
+                      ? "Borrador guardado, sin programar"
+                      : "Sin configuración programada"}
+              </span>
+              <span>
+                <strong>Programar para mañana</strong> guarda tus cambios y los
+                aplica desde la búsqueda de la 1:17 a. m. (hora Colombia).{" "}
+                <strong>Guardar borrador</strong> solo los conserva, sin cambiar
+                la próxima búsqueda.
+              </span>
             </div>
           )}
           {tab === "Resumen" && (
             <>
-              <section className="overview-top">
-                <div className="hero">
-                  <div className="hero-content">
-                    <span className="hero-label">
-                      <span />
-                      {estado?.publicada
-                        ? "CRITERIOS DE BÚSQUEDA CONFIRMADOS"
-                        : "PREPARA TU PRÓXIMA BÚSQUEDA"}
-                    </span>
-                    <h2>
-                      Menos ruido.
-                      <br />
-                      Más <em>coincidencias.</em>
-                    </h2>
-                    <p>
-                      Define quién está buscando, qué necesita
-                      <br className="desktop" /> y cuántas oportunidades quieres
-                      encontrar.
-                    </p>
-                    <button
-                      className="button light"
-                      onClick={() => go("Clientes")}
-                    >
-                      Gestionar clientes
-                      <ArrowUpRight size={17} />
-                    </button>
-                  </div>
-                  <div className="hero-art" aria-hidden="true">
-                    <div className="orbit one" />
-                    <div className="orbit two" />
-                    <div className="orbit three" />
-                    <div className="orbit-center">
-                      <Compass size={39} strokeWidth={1.1} />
-                    </div>
-                    <div className="floating-check">
-                      <Check size={17} />
-                    </div>
-                    <div className="floating-job">
-                      <BriefcaseBusiness size={16} />
-                    </div>
-                  </div>
-                  <div className="hero-bottom">
-                    <ShieldCheck size={14} />
-                    Búsquedas dirigidas · Sin consumo de IA
-                  </div>
-                </div>
+              <section className="overview-top solo">
                 <div className="quota-summary card">
                   <div className="card-label">
                     <span>OBJETIVO DIARIO</span>
@@ -1504,6 +1650,7 @@ function App() {
                       index={i}
                       perfiles={profiles(c.id)}
                       cargos={draft.cargos}
+                      paises={sesion.paises}
                       onEdit={() => {
                         setEditCliente(c);
                         setModal("cliente");
@@ -1527,20 +1674,6 @@ function App() {
                     />
                   )}
                 </div>
-              </section>
-              <section className="workflow-note">
-                <div className="workflow-note-icon">
-                  <Workflow size={23} />
-                </div>
-                <div>
-                  <h3>Configuras hoy. Buscas con foco mañana.</h3>
-                  <p>
-                    Las vacantes se buscan por cargo, se contrastan con cada
-                    perfil y quedan listas para compartir cuando su enlace está
-                    vigente.
-                  </p>
-                </div>
-                <ArrowUpRight size={19} />
               </section>
             </>
           )}
@@ -1579,6 +1712,7 @@ function App() {
                       index={i}
                       perfiles={profiles(c.id)}
                       cargos={draft.cargos}
+                      paises={sesion.paises}
                       onEdit={() => {
                         setEditCliente(c);
                         setModal("cliente");
@@ -1942,8 +2076,7 @@ function App() {
               {!loadingResults && !shown.length && (
                 <Empty
                   icon={BriefcaseBusiness}
-                  title="Las oportunidades aparecerán aquí"
-                  texto="Después de una captura, verás las vacantes que cumplan los filtros del cliente. Un perfil nuevo empieza a participar con la próxima configuración programada."
+                  {...vacioVacantes(estado, results)}
                 />
               )}
             </>
@@ -1951,7 +2084,7 @@ function App() {
           {tab === "Actividad" && (
             <section className="card activity">
               <div className="section-title">
-                <h2>Historial de capturas</h2>
+                <h2>Resultado de cada búsqueda nocturna</h2>
                 <button
                   className="icon"
                   aria-label="Actualizar actividad"
@@ -2022,58 +2155,6 @@ function App() {
                   </div>
                 ))
               )}
-            </section>
-          )}
-          {tab === "Configuración" && (
-            <section className="settings-grid">
-              <div className="card settings-card">
-                <ShieldCheck size={24} />
-                <h2>
-                  {sesion.demo ? "Entorno de demostración" : "Espacio privado"}
-                </h2>
-                <p>
-                  {sesion.demo
-                    ? "Puedes explorar, añadir clientes y ajustar la distribución con datos ficticios. Los cambios se guardan solo en esta demostración."
-                    : "Los datos se guardan en el inventario privado de la empresa y solo el operador autorizado accede a ellos."}
-                </p>
-                <span className="pill green">
-                  {sesion.demo
-                    ? "Sin acceso a datos reales"
-                    : "Acceso del operador verificado"}
-                </span>
-              </div>
-              <div className="card settings-card">
-                <CalendarClock size={24} />
-                <h2>Cómo se aplican los cambios</h2>
-                <p>
-                  Guardar conserva un borrador. «Programar para mañana» confirma
-                  la configuración del siguiente día, según la hora de Colombia.
-                  Las capturas ya iniciadas conservan su versión.
-                </p>
-                <p>
-                  Los horarios automáticos pueden retrasarse. La pestaña
-                  Actividad muestra el resultado de cada captura dirigida.
-                </p>
-              </div>
-              <div className="card settings-card">
-                <MessageCircle size={24} />
-                <h2>Compartir con criterio</h2>
-                <p>
-                  El botón WhatsApp prepara un mensaje y lo copia al
-                  portapapeles. Tú decides cuándo y a quién enviarlo. No se
-                  envían mensajes automáticamente.
-                </p>
-              </div>
-              <div className="card settings-card">
-                <Compass size={24} />
-                <h2>Cargos sin un listado cerrado</h2>
-                <p>
-                  Puedes añadir cualquier cargo. Las variantes de escritura y el
-                  vocabulario ocupacional disponible ayudan a encontrar
-                  equivalentes; revisa y completa los términos desde cada cargo.
-                </p>
-                <p>No se usa IA para ejecutar las búsquedas.</p>
-              </div>
             </section>
           )}
           <footer className="footer">
@@ -2154,9 +2235,15 @@ function App() {
             <strong>{total} / 120</strong>
           </div>
           <p className="helper note">
-            La configuración empezará a regir mañana en Colombia. Si las fuentes
-            no ofrecen suficientes vacantes válidas, se mostrará el faltante; no
-            se rellenará con duplicados o resultados fuera de los filtros.
+            Al confirmar se guardan tus cambios y esta configuración se usa
+            desde la búsqueda del <strong>{fecha(manana())}</strong> a la 1:17
+            a. m. (hora Colombia). La de esta noche, si ya empezó, conserva la
+            anterior.
+            {!estado?.publicada &&
+              " Es tu primera configuración: desde entonces dejan de buscarse los seis cargos fijos anteriores; solo se buscarán los cargos de esta lista."}{" "}
+            Si las fuentes no ofrecen suficientes vacantes válidas, verás el
+            faltante; no se rellena con duplicados ni con vacantes fuera de los
+            filtros.
           </p>
           {sesion.demo && (
             <p className="demo-inline">
@@ -2311,6 +2398,7 @@ function ClientCard({
   index,
   perfiles,
   cargos,
+  paises,
   onEdit,
   onResults,
   onArchive,
@@ -2319,6 +2407,7 @@ function ClientCard({
   index: number;
   perfiles: Perfil[];
   cargos: Cargo[];
+  paises: Sesion["paises"];
   onEdit: () => void;
   onResults: () => void;
   onArchive?: () => void;
@@ -2357,11 +2446,12 @@ function ClientCard({
           <>
             <span>
               <Globe2 size={12} />
-              {p.paises.length > 3
-                ? p.paises.length + " países"
-                : p.paises.join(" · ")}
+              Vive en{" "}
+              {paises.find((x) => x.codigo === p.vive_en)?.nombre || p.vive_en}
+              {p.paises_presenciales_extra.length > 0 &&
+                " · +" + p.paises_presenciales_extra.length}
             </span>
-            <span>{modos[p.modalidad]}</span>
+            <span>{p.modalidades.map((m) => modos[m]).join(" · ")}</span>
           </>
         )}
       </div>

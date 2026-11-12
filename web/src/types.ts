@@ -13,8 +13,9 @@ export type Perfil = {
   cliente_id: string;
   cargo_id: string;
   activo: boolean;
-  paises: string[];
-  modalidad: string;
+  vive_en: string;
+  modalidades: string[];
+  paises_presenciales_extra: string[];
   antiguedad_dias: number;
   idiomas: string[];
   ingles_maximo: string;
@@ -98,5 +99,23 @@ export type VistaPrevia = {
   catalogo?: { vacantes: number; actualizado: string };
   perfiles?: Record<string, EstimacionPerfil>;
   cargos?: Record<string, EstimacionCargo>;
+  nota?: string;
+};
+export type EstimacionEnVivo = {
+  incompleto?: boolean;
+  ocupado?: boolean;
+  espera?: number;
+  error?: string;
+  compatibles?: number;
+  del_cargo?: number;
+  nuevas?: number;
+  ya_entregadas?: number;
+  avisos?: number;
+  limitantes?: Limitante[];
+  fuentes?: Record<
+    string,
+    { avisos?: number; busquedas?: number; fallidas?: number; error?: boolean }
+  >;
+  segundos?: number;
   nota?: string;
 };

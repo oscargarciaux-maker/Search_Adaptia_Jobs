@@ -13,6 +13,11 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await expect(
     page.getByRole("heading", { name: "Cada búsqueda, con propósito." }),
   ).toBeVisible();
+  await expect(page.getByText("Mi espacio de trabajo")).toHaveCount(0);
+  await expect(page.getByText("Menos ruido.")).toHaveCount(0);
+  await expect(
+    page.getByText(/guarda tus cambios y los aplica desde la búsqueda/),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Clientes", exact: true }).click();
   await page
     .getByRole("button", { name: "Nuevo cliente", exact: true })
@@ -27,8 +32,26 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await dialog.getByLabel("Cargo del perfil 1").selectOption({ label: "QA" });
   await dialog.getByLabel("Antigüedad del perfil 1").selectOption("7");
   await dialog.getByLabel("Experiencia máxima del perfil 1").fill("4");
+  // Contrato v8: país de residencia y varias modalidades, sin las 21 casillas.
+  await dialog
+    .getByLabel("País de residencia del perfil 1")
+    .selectOption({ label: "México" });
+  await expect(
+    dialog.getByText(/Remoto incluye vacantes de LATAM/),
+  ).toBeVisible();
+  await expect(dialog.getByText("Seleccionar LATAM y España")).toHaveCount(0);
+  await dialog.getByLabel("Presencial en el perfil 1").check();
+  await expect(dialog.getByText("También se mudaría a…")).toBeVisible();
+  // Estimación en vivo: en demostración usa avisos ficticios y no sale a internet.
+  await dialog
+    .getByRole("button", { name: "Estimar con búsqueda en vivo" })
+    .click();
+  await expect(
+    dialog.getByText(/encontradas? ahora en las fuentes cumplen?/),
+  ).toBeVisible();
+  await expect(dialog.getByText(/Es una muestra/)).toBeVisible();
   // Vista previa: estima con el catálogo y permite admitir datos no informados.
-  await expect(dialog.getByText("hoy cumplen este perfil")).toBeVisible();
+  await expect(dialog.getByText(/cumplen? este perfil/)).toBeVisible();
   const aplicar = dialog.getByRole("button", { name: "Aplicar", exact: true });
   if (await aplicar.count()) {
     await aplicar.first().click();
@@ -70,7 +93,7 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
     page.getByRole("button", { name: "Programar para mañana", exact: true }),
   ).toBeDisabled();
   await page.getByLabel("Vacantes de QA", { exact: true }).fill("30");
-  await expect(page.getByText(/disponibles hoy/).first()).toBeVisible();
+  await expect(page.getByText(/guardadas sin entregar/).first()).toBeVisible();
   await page.route("**/api/cargos/expandir", (route) =>
     route.fulfill({
       json: {

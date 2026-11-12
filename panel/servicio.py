@@ -1,5 +1,8 @@
 """Vistas y texto para copiar; nunca se envía WhatsApp."""
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
+import threading
+import time
 
 from buscador import contrato, vacante
 from panel.afinidad import enlace_utilizable, evaluar
@@ -11,7 +14,7 @@ SUGERENCIAS = {
     "experiencia no informada": "Admitir experiencia no informada",
     "inglés requerido sin confirmar": "Admitir inglés no informado",
     "publicación fuera del plazo": "Ampliar la antigüedad de publicación",
-    "país sin elegibilidad confirmada": "Añadir más países",
+    "oficina en otro país": "Añadir países a los que se mudaría",
     "modalidad diferente": "Aceptar otra modalidad",
     "idioma del aviso diferente": "Aceptar avisos en español e inglés",
     "experiencia fuera del rango": "Ampliar el rango de experiencia",
@@ -33,6 +36,25 @@ def _del_cargo(catalogo, cargo):
     return _POR_CARGO[clave]
 
 
+def _contar(vacantes, p, fecha):
+    """(ids compatibles, filtros que por sí solos dejan fuera más vacantes, con su sugerencia)."""
+    ids, solo = set(), Counter()
+    for v in vacantes:
+        r = evaluar(v, p, fecha)
+        if r["compatible"]:
+            ids.add(v["id"])
+        elif len(r["motivos"]) == 1:
+            solo[r["motivos"][0]] += 1
+        elif set(r["motivos"]) == SIN_DATO:  # muchos avisos no dicen ni años ni nivel de inglés
+            solo["ambos sin dato"] += 1
+    limitantes = [{"motivo": m, "vacantes": n, "sugerencia": SUGERENCIAS[m]} for m, n in solo.items() if m in SUGERENCIAS]
+    if solo["ambos sin dato"]:
+        limitantes.append({"motivo": "experiencia e inglés no informados",
+                           "vacantes": sum(solo[m] for m in (*SIN_DATO, "ambos sin dato")),
+                           "sugerencia": "Admitir experiencia e inglés no informados"})
+    return ids, sorted(limitantes, key=lambda x: -x["vacantes"])[:3]
+
+
 def vista_previa(repo, cfg, fecha=None):
     """Cuántas vacantes ya guardadas y aún no entregadas cumplirían hoy cada perfil y cargo del borrador.
     Es una estimación con las mismas reglas de la selección; no busca, no guarda y no devuelve vacantes ni clientes."""
@@ -51,24 +73,9 @@ def vista_previa(repo, cfg, fecha=None):
         for p in cfg.perfiles:
             if not p.activo or p.cargo_id != c.id or p.cliente_id not in clientes:
                 continue
-            compatibles, solo = 0, Counter()
-            for v in del_cargo:
-                r = evaluar(v, p, fecha)
-                if r["compatible"]:
-                    compatibles += 1
-                    disponibles.add(v["id"])
-                elif len(r["motivos"]) == 1:
-                    solo[r["motivos"][0]] += 1
-                elif set(r["motivos"]) == SIN_DATO:  # muchos avisos no dicen ni años ni nivel de inglés
-                    solo["ambos sin dato"] += 1
-            limitantes = [{"motivo": m, "vacantes": n, "sugerencia": SUGERENCIAS[m]}
-                          for m, n in solo.items() if m in SUGERENCIAS]
-            if solo["ambos sin dato"]:
-                limitantes.append({"motivo": "experiencia e inglés no informados",
-                                   "vacantes": sum(solo[m] for m in (*SIN_DATO, "ambos sin dato")),
-                                   "sugerencia": "Admitir experiencia e inglés no informados"})
-            perfiles[str(p.id)] = {"compatibles": compatibles, "del_cargo": len(del_cargo),
-                                   "limitantes": sorted(limitantes, key=lambda x: -x["vacantes"])[:3]}
+            ids, limitantes = _contar(del_cargo, p, fecha)
+            disponibles |= ids
+            perfiles[str(p.id)] = {"compatibles": len(ids), "del_cargo": len(del_cargo), "limitantes": limitantes}
         n = len(disponibles)
         estado = ("sin_cupo" if not c.cupo else "alcanza" if n >= c.cupo else "justo" if n * 2 >= c.cupo
                   else "insuficiente")
@@ -77,6 +84,107 @@ def vista_previa(repo, cfg, fecha=None):
             "perfiles": perfiles, "cargos": cargos,
             "nota": "Estimación con vacantes ya guardadas y aún no entregadas. La búsqueda dirigida de mañana "
                     "puede encontrar otras; un cargo nuevo empieza con pocas porque todavía no se ha buscado."}
+
+
+# ── Estimación con búsqueda en vivo ───────────────────────────────────────────────────────────────────────────────
+# Una muestra corta en las fuentes públicas (LinkedIn sin sesión y Get on Board), nunca Apify ni cookies. Se protege la
+# IP del servidor: una búsqueda a la vez y una espera mínima por perfil, porque un bloqueo de LinkedIn también afectaría
+# a la captura real.
+LIMITE_SEGUNDOS = 25
+ESPERA_PERFIL = 120
+NOTA_EN_VIVO = ("Es una muestra: las fuentes muestran solo parte de los resultados y esta búsqueda revisa pocas "
+                "páginas; la búsqueda de la noche revisa más y añade otros portales.")
+_EN_CURSO = threading.Lock()
+_ULTIMA = {}
+
+
+class _SinInsistir:
+    """Ante un 429 no espera ni reintenta: la estimación se conforma con lo obtenido."""
+
+    def __init__(self, cliente):
+        self.cliente = cliente
+
+    def get(self, url, params=None, **k):
+        return self.cliente.get(url, params=params, reintentar_429=False, **k)
+
+    def json(self, url, params=None, **k):
+        return self.cliente.json(url, params=params, reintentar_429=False, **k)
+
+
+def fuentes_publicas(cargo, perfil, limite_segundos):
+    """Avisos crudos de LinkedIn público (país de residencia y remotas regionales) y Get on Board, en paralelo."""
+    from buscador.fuentes import getonbrd, linkedin_publico
+    from buscador.http import Cliente
+    from panel.ejecutor import lugares_perfil
+    terminos = [cargo["nombre"], *cargo["terminos_exactos"], *cargo["terminos_similares"]]
+    familia = {"id": "vivo", "consultas": terminos, "lugares": list(lugares_perfil(perfil).items())}
+
+    def linkedin():
+        cliente = _SinInsistir(Cliente(pausa=(0.3, 0.7), timeout=6))
+        return linkedin_publico.buscar(cliente, [familia], [], {}, presupuesto=len(familia["lugares"]),
+                                       max_fichas=12, max_dias=perfil.antiguedad_dias, reloj=time.monotonic,
+                                       limite_segundos=limite_segundos - 8, max_paginas=1)
+
+    def getonboard():
+        return getonbrd.buscar(_SinInsistir(Cliente(pausa=(0.2, 0.4), timeout=6)), terminos[:2])
+
+    crudas, fuentes = [], {}
+    with ThreadPoolExecutor(2) as hilos:
+        for nombre, futuro in (("LinkedIn", hilos.submit(linkedin)), ("Get on Board", hilos.submit(getonboard))):
+            try:
+                filas, stats = futuro.result(timeout=limite_segundos + 5)
+                crudas += filas
+                fuentes[nombre] = {k: stats.get(k, 0) for k in ("busquedas", "fallidas", "avisos")}
+            except Exception:  # noqa: BLE001 - una fuente caída no impide estimar con la otra
+                fuentes[nombre] = {"error": True}
+    return crudas, fuentes
+
+
+def estimacion_en_vivo(repo, cfg, perfil_id, fecha=None, fuentes=None, reloj=time.monotonic):
+    """Cuántos avisos encontrados ahora en las fuentes públicas cumplen el perfil. No guarda nada ni devuelve vacantes."""
+    fecha = fecha or hoy()
+    p = next((x for x in cfg.perfiles if str(x.id) == str(perfil_id)), None)
+    c = p and next((x for x in cfg.cargos if x.id == p.cargo_id), None)
+    if not c:
+        return {"error": "Perfil o cargo no encontrado en la configuración."}
+    if not _EN_CURSO.acquire(blocking=False):
+        return {"ocupado": True, "nota": "Ya hay una búsqueda en vivo en curso. Inténtalo en un minuto."}
+    try:
+        inicio = reloj()
+        falta = ESPERA_PERFIL - (inicio - _ULTIMA.get(str(perfil_id), -ESPERA_PERFIL))
+        if falta > 0:
+            return {"espera": int(falta) + 1,
+                    "nota": f"Para no saturar las fuentes, espera {int(falta) + 1} s antes de repetir este perfil."}
+        _ULTIMA[str(perfil_id)] = inicio
+        raw = c.model_dump(mode="json")
+        if not raw["terminos_exactos"]:
+            raw["terminos_exactos"] = sugerir(c.nombre, consultar_esco=False)["terminos_exactos"]
+        buscar = fuentes or getattr(repo, "fuentes_en_vivo", None) or fuentes_publicas
+        crudas, por_fuente = buscar(raw, p, LIMITE_SEGUNDOS)
+        catalogo = repo.catalogo_vigente()
+        guardadas = {v["id"] for v in catalogo["vacantes"]}
+        entregadas = set(catalogo.get("entregadas") or ())
+        vistas, del_cargo, ya_entregadas = set(), [], 0
+        for x in crudas:
+            if not grado(x.get("titulo") or "", raw)[0]:
+                continue
+            # `consulta` = el propio título: el cargo ya se comprobó con sus términos, no con el mapa nocturno.
+            v = vacante.crear(x.get("titulo"), x.get("empresa"), x.get("enlace"), x.get("fuente", ""),
+                              ubicacion=x.get("ubicacion", ""), descripcion=x.get("descripcion", ""),
+                              fecha=x.get("fecha", ""), remoto=x.get("remoto"), hoy=fecha, consulta=x.get("titulo"))
+            if not v or v["id"] in vistas or contrato.url_limpia(v["enlace"]) in vistas:
+                continue
+            vistas |= {v["id"], contrato.url_limpia(v["enlace"])}
+            if v["id"] in entregadas:
+                ya_entregadas += 1
+                continue
+            del_cargo.append(v)
+        ids, limitantes = _contar(del_cargo, p, fecha)
+        return {"compatibles": len(ids), "del_cargo": len(del_cargo), "nuevas": len(ids - guardadas),
+                "ya_entregadas": ya_entregadas, "avisos": len(crudas), "limitantes": limitantes,
+                "fuentes": por_fuente, "segundos": round(reloj() - inicio, 1), "nota": NOTA_EN_VIVO}
+    finally:
+        _EN_CURSO.release()
 
 
 def resultados(repo, cliente_id=None, fecha=None):

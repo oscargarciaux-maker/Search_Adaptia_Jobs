@@ -15,11 +15,22 @@ import requests
 
 from buscador import paises
 from panel import servicio
-from panel.modelos import Configuracion, Credenciales, Expansion, Guardar, Publicar, VistaPrevia
+from panel.modelos import Configuracion, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia
 from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase
 from panel.terminos import sugerir
 
 RAIZ = Path(__file__).resolve().parent.parent
+
+
+def a_v8(estado):
+    """Perfiles guardados con el contrato v6 se muestran ya convertidos a v8 (país de residencia y modalidades)."""
+    for cfg in (estado.get("borrador"), (estado.get("publicada") or {}).get("configuracion")):
+        if isinstance(cfg, dict) and cfg.get("perfiles"):
+            try:
+                cfg["perfiles"] = [Perfil.model_validate(p).model_dump(mode="json") for p in cfg["perfiles"]]
+            except ValueError:
+                pass  # se devuelve tal cual: el panel lo marcará como incompleto
+    return estado
 
 
 def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
@@ -133,7 +144,7 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
 
     @app.get("/api/config")
     def config():
-        return repo.config()
+        return a_v8(repo.config())
 
     @app.put("/api/config")
     def guardar(body: Guardar):
@@ -154,6 +165,14 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         except ValueError:  # incluye ValidationError: borrador a medio editar
             return {"incompleto": True}
         return servicio.vista_previa(repo, cfg)
+
+    @app.post("/api/estimacion-en-vivo")
+    def en_vivo(body: EnVivo):
+        try:
+            cfg = Configuracion.model_validate(body.configuracion)
+        except ValueError:
+            return {"incompleto": True}
+        return servicio.estimacion_en_vivo(repo, cfg, body.perfil_id)
 
     @app.get("/api/ejecuciones")
     def ejecuciones():

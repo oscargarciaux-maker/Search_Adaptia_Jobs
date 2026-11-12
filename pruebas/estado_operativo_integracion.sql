@@ -101,6 +101,20 @@ begin
   exception when raise_exception then
     if sqlerrm='Se permitió repetir la vacante en otro día' then raise; end if;
   end;
+  -- Pasada de la mañana (11 nov 2026): completar el día conservando intacto lo registrado se acepta...
+  r:=public.estado_guardar('lote',jsonb_build_array(jsonb_build_object('identificador',fila.identificador,'revision',0,
+    'payload',jsonb_set(fila.payload,'{elegidas,qa}',(fila.payload->'elegidas'->'qa')||
+      '[[{"id":"cccccccccccccccc","_capturada_entrega":"2026-11-05T13:00:00Z"},"exacto"]]'::jsonb))));
+  if (r->0->>'revision')::bigint=0 then raise exception 'No se guardó el lote ampliado'; end if;
+  -- ...pero no si un paso intermedio reescribió el snapshot registrado (p. ej. su verificación).
+  begin
+    perform public.estado_guardar('lote',jsonb_build_array(jsonb_build_object('identificador',fila.identificador,
+      'revision',(r->0->>'revision')::bigint,'payload',jsonb_set(fila.payload,'{elegidas,qa,0,0,verificacion}','{"estado":"verificada"}'))));
+    raise exception 'Se aceptó un snapshot canónico alterado';
+  exception when raise_exception then
+    if sqlerrm='Se aceptó un snapshot canónico alterado' then raise; end if;
+    if sqlerrm not like 'No se puede reemplazar una selección canónica%' then raise; end if;
+  end;
 end $$;
 reset role;
 rollback;

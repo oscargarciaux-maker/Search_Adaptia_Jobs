@@ -99,7 +99,7 @@ npm --prefix web ci && npm --prefix web run build
 python -m panel.api --demo --port 8000
 ```
 
-Abrir http://localhost:8000. Probar: crear un cliente con un perfil, ver la estimación «≈ N vacantes disponibles hoy»,
+Abrir http://localhost:8000. Probar: crear un cliente con un perfil, ver la estimación «≈ N vacantes guardadas aún no entregadas», pulsar **Estimar con búsqueda en vivo**,
 pulsar **Aplicar** en una sugerencia, añadir un cargo nuevo (por ejemplo «Editor de video») y revisar sus sugerencias,
 programar para mañana y copiar el mensaje de WhatsApp.
 
@@ -125,7 +125,7 @@ vacantes también tarda unos segundos mientras lee el catálogo. Detalle técnic
 
 1. **Cargos y cupos**: crear los cargos que quieres (revisar sus denominaciones) y repartir exactamente 120.
 2. **Clientes**: cada cargo con cupo necesita al menos un perfil de cliente con sus filtros. Mira la estimación
-   «≈ N vacantes disponibles hoy» y usa «Aplicar» si un filtro deja muy pocas.
+   «≈ N vacantes guardadas aún no entregadas» o **Estimar con búsqueda en vivo** y usa «Aplicar» si un filtro deja muy pocas.
 3. **Programar para mañana**. La versión rige desde el día siguiente en Colombia: si programas antes de la 1:17 a. m.,
    la búsqueda de esa madrugada ya la usa.
 4. Desde ese momento **los seis cargos fijos actuales dejan de usarse**: si quieres conservar alguno, créalo en el panel.

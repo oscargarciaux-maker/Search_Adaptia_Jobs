@@ -263,7 +263,7 @@ def test_cambio_de_titulo_actual_invalida_asignacion_historica():
 
 def test_reparto_considera_clientes_sin_cubrir_dentro_del_mismo_cargo(cfg):
     p1, p2 = deepcopy(cfg["perfiles"][:2])
-    p1["paises"], p2["paises"] = ["CO"], ["ES"]
+    p1["vive_en"], p2["vive_en"] = "CO", "ES"
     candidatas = [(trabajo(id=str(i), empresa="Empresa " + str(i), paises=[pais], confianza_pais="alta"), "exacto")
                   for i, pais in enumerate(["CO"] * 5 + ["ES"] * 5)]
     elegidas = entrega.variadas(candidatas, 4, 2, hoy(), perfiles=[p1, p2])
@@ -363,7 +363,7 @@ def test_vista_previa_api_no_guarda_ni_devuelve_vacantes_ni_clientes(cfg):
         assert set(r.json()["perfiles"]) == {p["id"] for p in cfg["perfiles"]}
         assert c.get("/api/config").json()["revision"] == 1 and repo.config()["borrador"] == cfg
         incompleto = deepcopy(cfg)
-        incompleto["perfiles"][0]["paises"] = []
+        incompleto["perfiles"][0]["modalidades"] = []
         r = c.post("/api/vista-previa", json={"configuracion": incompleto}, headers={"Origin": "http://testserver"})
         assert r.status_code == 200 and r.json() == {"incompleto": True}
 
@@ -415,3 +415,191 @@ def test_ingles_precalculado_en_el_catalogo_da_el_mismo_veredicto():
         ligera = afinidad.ligera(datos)
         for p in perfiles:
             assert afinidad.evaluar(ligera, p, hoy()) == afinidad.evaluar(v, p, hoy())
+
+
+# ── Contrato v8: país de residencia y modalidades ──────────────────────────────────────────────────────────────────
+
+def _vacante_en(ubicacion, titulo="Product Designer"):
+    from buscador import paises as geo
+    lugar = geo.elegibles(titulo, ubicacion, "", None)
+    return trabajo(paises=lugar["paises"], modalidad=lugar["modalidad"], confianza_pais=lugar["confianza"])
+
+
+@pytest.mark.parametrize("ubicacion,esperado", [
+    ("Remote - LATAM", True), ("Remoto Latinoamérica", True), ("Madrid, Spain (Remote, open to LATAM)", True),
+    ("Remote - Mexico, Colombia, Argentina", True), ("Remote - Worldwide", True),
+    ("Remote - South America", False), ("Remoto, Brazil", False), ("Bogotá, Colombia", False),
+])
+def test_vive_en_mexico_y_acepta_remoto_recibe_las_remotas_abiertas_a_mexico(ubicacion, esperado):
+    p = Perfil.model_validate({"id": str(uuid4()), "cliente_id": str(uuid4()), "cargo_id": str(uuid4()),
+                               "vive_en": "MX", "modalidades": ["remoto"]})
+    assert afinidad.evaluar(_vacante_en(ubicacion), p, hoy())["compatible"] is esperado
+
+
+def test_presencial_solo_en_su_pais_o_en_los_que_se_mudaria():
+    base = {"id": str(uuid4()), "cliente_id": str(uuid4()), "cargo_id": str(uuid4()), "vive_en": "MX",
+            "modalidades": ["presencial", "hibrido"]}
+    bogota, cdmx = _vacante_en("Bogotá, Colombia"), _vacante_en("Ciudad de México, México")
+    assert bogota["modalidad"] == "presencial" and cdmx["modalidad"] == "presencial"
+    p = Perfil.model_validate(base)
+    assert afinidad.evaluar(cdmx, p, hoy())["compatible"]
+    r = afinidad.evaluar(bogota, p, hoy())
+    assert not r["compatible"] and "oficina en otro país" in r["motivos"]
+    assert afinidad.evaluar(bogota, Perfil.model_validate({**base, "paises_presenciales_extra": ["CO"]}), hoy())["compatible"]
+    # Solo presencial: una remota abierta a México no entra.
+    assert not afinidad.evaluar(_vacante_en("Remote - LATAM"), p, hoy())["compatible"]
+
+
+@pytest.mark.parametrize("antiguo,vive,mods,extra", [
+    ({"paises": ["MX"], "modalidad": "remoto"}, "MX", ["remoto"], []),
+    ({"paises": ["CO", "PE", "ES"], "modalidad": "cualquiera"}, "CO", ["remoto", "hibrido", "presencial"], ["PE", "ES"]),
+    ({"paises": ["NI"], "modalidad": "presencial"}, "NI", ["presencial"], []),
+])
+def test_perfiles_v6_se_leen_como_v8_sin_migracion(antiguo, vive, mods, extra):
+    p = Perfil.model_validate({"id": str(uuid4()), "cliente_id": str(uuid4()), "cargo_id": str(uuid4()), **antiguo})
+    assert (p.vive_en, p.modalidades, p.paises_presenciales_extra) == (vive, mods, extra)
+    assert "paises" not in p.model_dump() and "modalidad" not in p.model_dump()
+
+
+def test_busqueda_dirigida_por_residencia_y_remotas_regionales(cfg):
+    cfg["perfiles"][0].update(vive_en="MX", modalidades=["remoto", "presencial"], paises_presenciales_extra=["CO"])
+    mapa, _, _ = ejecutor.preparar({"configuracion": cfg}, hoy())
+    lugares = dict(next(m for m in mapa if m["id"] == "cargo:" + cfg["perfiles"][0]["cargo_id"])["lugares"])
+    assert lugares["REMOTO_MX"]["f_WT"] == "2" and lugares["REMOTO"]["location"] == "Latin America"
+    assert "REMOTO_MUNDO" in lugares and "MX" in lugares and "CO" in lugares
+
+
+def test_api_muestra_perfiles_v6_ya_convertidos():
+    from panel.api import a_v8
+    antiguo = {"id": str(uuid4()), "cliente_id": str(uuid4()), "cargo_id": str(uuid4()),
+               "paises": ["MX", "CO"], "modalidad": "cualquiera"}
+    estado = a_v8({"revision": 3, "borrador": {"perfiles": [dict(antiguo)]},
+                   "publicada": {"configuracion": {"perfiles": [dict(antiguo)]}}})
+    for p in (estado["borrador"]["perfiles"][0], estado["publicada"]["configuracion"]["perfiles"][0]):
+        assert p["vive_en"] == "MX" and p["paises_presenciales_extra"] == ["CO"] and len(p["modalidades"]) == 3
+
+
+# ── Estimación con búsqueda en vivo ────────────────────────────────────────────────────────────────────────────────
+
+@pytest.fixture
+def en_vivo(monkeypatch):
+    monkeypatch.setattr(servicio, "_ULTIMA", {})
+    from buscador.fuentes import linkedin_apify, publicaciones_apify
+
+    def prohibido(*a, **k):
+        raise AssertionError("la estimación en vivo nunca usa Apify")
+    monkeypatch.setattr(linkedin_apify, "buscar", prohibido)
+    monkeypatch.setattr(publicaciones_apify, "buscar", prohibido)
+
+
+def _crudo(titulo, ubicacion, n, remoto=None, dias=1):
+    texto = "We design digital products with a collaborative team and research users every week. " * 3
+    return {"titulo": titulo, "empresa": f"Empresa {n}", "ubicacion": ubicacion, "descripcion": texto,
+            "fecha": (date.fromisoformat(hoy()) - timedelta(days=dias)).isoformat(),
+            "enlace": f"https://www.linkedin.com/jobs/view/{4100000000 + n}", "remoto": remoto, "fuente": "LinkedIn"}
+
+
+def test_en_vivo_aplica_cargo_y_filtros_del_perfil_y_no_devuelve_vacantes(cfg, en_vivo):
+    cfg["perfiles"][0].update(vive_en="MX", modalidades=["remoto"], experiencia_min=None, experiencia_max=None,
+                              ingles_maximo="sin_filtro", antiguedad_dias=14)
+    crudas = [_crudo("Product Designer", "Remote - LATAM", 1, True),
+              _crudo("UX Designer", "Remote - Worldwide", 2, True),
+              _crudo("Product Designer", "Remote - Worldwide", 2, True),  # mismo enlace: se cuenta una vez
+              _crudo("Product Designer", "Bogotá, Colombia", 3),            # presencial en otro país
+              _crudo("Product Designer", "Remote - LATAM", 4, True, dias=20),  # fuera del plazo
+              _crudo("Contador", "Remote - LATAM", 5, True)]                 # otro cargo
+    llamadas = []
+
+    def fuentes(cargo, perfil, limite):
+        llamadas.append((cargo["nombre"], perfil.vive_en, limite))
+        return crudas, {"LinkedIn": {"avisos": len(crudas)}}
+    c = Configuracion.model_validate(cfg)
+    r = servicio.estimacion_en_vivo(RepositorioDemo(), c, cfg["perfiles"][0]["id"], fuentes=fuentes)
+    assert llamadas == [("Product Designer", "MX", servicio.LIMITE_SEGUNDOS)]
+    assert r["del_cargo"] == 4 and r["compatibles"] == 2 and r["nuevas"] == 2
+    assert [l["motivo"] for l in r["limitantes"]] == ["publicación fuera del plazo"]  # Bogotá falla dos filtros
+    assert "vacantes" not in r and "Es una muestra" in r["nota"]
+
+
+def test_en_vivo_espera_entre_busquedas_del_mismo_perfil_y_una_a_la_vez(cfg, en_vivo):
+    c = Configuracion.model_validate(cfg)
+    reloj = iter([100.0, 101.0, 150.0, 230.0, 231.0])
+    vacias = lambda *a: ([], {})
+    pid = cfg["perfiles"][0]["id"]
+    assert "compatibles" in servicio.estimacion_en_vivo(RepositorioDemo(), c, pid, fuentes=vacias, reloj=lambda: next(reloj))
+    r = servicio.estimacion_en_vivo(RepositorioDemo(), c, pid, fuentes=vacias, reloj=lambda: next(reloj))
+    assert r["espera"] == 71 and "compatibles" not in r
+    assert "compatibles" in servicio.estimacion_en_vivo(RepositorioDemo(), c, pid, fuentes=vacias, reloj=lambda: next(reloj))
+    servicio._EN_CURSO.acquire()
+    try:
+        assert servicio.estimacion_en_vivo(RepositorioDemo(), c, cfg["perfiles"][1]["id"], fuentes=vacias)["ocupado"]
+    finally:
+        servicio._EN_CURSO.release()
+
+
+def test_en_vivo_excluye_ya_entregadas(cfg, en_vivo):
+    cfg["perfiles"][0].update(vive_en="CO", modalidades=["remoto"], experiencia_min=None, experiencia_max=None,
+                              ingles_maximo="sin_filtro")
+    crudas = [_crudo("Product Designer", "Remote - LATAM", n, True) for n in (1, 2)]
+    entregada = vacante.crear(**{k: crudas[0][k] for k in ("titulo", "empresa", "enlace")}, fuente="LinkedIn")["id"]
+    repo = RepositorioDemo()
+    repo._catalogo = {"vacantes": [], "entregadas": {entregada}, "actualizado": "x"}
+    r = servicio.estimacion_en_vivo(repo, Configuracion.model_validate(cfg), cfg["perfiles"][0]["id"],
+                                    fuentes=lambda *a: (crudas, {}))
+    assert r["ya_entregadas"] == 1 and r["compatibles"] == 1
+
+
+def test_fuentes_publicas_respetan_limite_sin_reintentar_429(cfg, monkeypatch):
+    from buscador.fuentes import getonbrd, linkedin_publico
+    vistos = {}
+
+    def li(cliente, mapa, activos, estado, presupuesto, **k):
+        vistos["li"] = (presupuesto, k["limite_segundos"], k["max_dias"], k["max_paginas"], dict(mapa[0]["lugares"]))
+        cliente.get("https://www.linkedin.com/x")
+        return [], {"busquedas": 1}
+
+    def gob(cliente, consultas):
+        vistos["gob"] = consultas
+        raise RuntimeError("caída")
+
+    class Falso:
+        def __init__(self, **k): pass
+        def get(self, url, params=None, reintentar_429=True, **k):
+            vistos["reintentar"] = reintentar_429
+    monkeypatch.setattr(linkedin_publico, "buscar", li)
+    monkeypatch.setattr(getonbrd, "buscar", gob)
+    monkeypatch.setattr("buscador.http.Cliente", Falso)
+    p = Perfil.model_validate({**cfg["perfiles"][0], "vive_en": "MX", "modalidades": ["remoto"], "antiguedad_dias": 7})
+    cargo = cfg["cargos"][0]
+    _, fuentes = servicio.fuentes_publicas(cargo, p, 25)
+    presupuesto, limite, dias, paginas, lugares = vistos["li"]
+    assert limite < 25 and dias == 7 and paginas == 1 and presupuesto == len(lugares)
+    assert set(lugares) == {"REMOTO_MX", "REMOTO", "REMOTO_MUNDO"} and vistos["reintentar"] is False
+    assert fuentes["Get on Board"] == {"error": True} and "LinkedIn" in fuentes
+
+
+def test_api_en_vivo_en_demo_no_sale_a_internet(monkeypatch):
+    monkeypatch.setattr(servicio, "_ULTIMA", {})
+    monkeypatch.setattr(servicio, "fuentes_publicas", lambda *a: (_ for _ in ()).throw(AssertionError("internet")))
+    api = TestClient(crear_app(demo=True, repositorio=RepositorioDemo()))
+    cfg = api.get("/api/config").json()["borrador"]
+    r = api.post("/api/estimacion-en-vivo", json={"configuracion": cfg, "perfil_id": cfg["perfiles"][0]["id"]},
+                 headers={"origin": "http://testserver"}).json()
+    assert r["fuentes"] == {"Demostración": {"avisos": r["avisos"], "busquedas": 0, "fallidas": 0}}
+    assert r["del_cargo"] >= r["compatibles"] >= 0
+
+
+def test_pasada_posterior_fallida_no_borra_el_resultado_del_dia(cfg, monkeypatch, tmp_path):
+    cambios = []
+    class Repo:
+        def operativa(self, fecha): return {"revision": 1, "configuracion": cfg}
+        def pedir(self, metodo, ruta, **op):
+            if metodo == "GET":
+                return [{"id": "ejemplo", "revision": 1, "estado": "parcial",
+                         "resumen": {"vacantes": 35, "meta": 120, "faltantes": {"QA": 13}}}]
+            cambios.append(op["json"])
+    monkeypatch.setattr(bodega, "correr", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("selección canónica")))
+    with pytest.raises(RuntimeError):
+        ejecutor.correr(tmp_path, repo=Repo())
+    assert "estado" not in cambios[-1]
+    assert cambios[-1]["resumen"]["vacantes"] == 35 and cambios[-1]["resumen"]["aviso_ultima_pasada"]

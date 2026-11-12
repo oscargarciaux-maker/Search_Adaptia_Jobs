@@ -281,6 +281,7 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
     por_id = {v["id"]: v for v in vacantes}
     iniciales = (lote or {}).get("elegidas", {}) if (lote or {}).get("fecha") == hoy else {}
     historicas = [por_id.get(v["id"], dict(v)) for lista in iniciales.values() for v, _ in lista]
+    ids_iniciales = {v["id"] for lista in iniciales.values() for v, _ in lista}
     hora = datetime.now(timezone.utc).hour
     if incremental and historicas:
         inicio = hora * maximo % len(historicas)
@@ -290,7 +291,9 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
     for ronda in range(4):
         disponibles = [v for v in vacantes if v["id"] not in revisadas or v["verificacion"]["estado"] == "verificada"]
         seleccion, _ = entrega.elegir(disponibles, entregadas, hoy, iniciales=iniciales, omitir_verificacion=True)
-        candidatas = [v for lista in seleccion.values() for v, _ in lista]
+        # `elegir` devuelve también los objetos del lote ya registrado: se auditan solo sus copias (`historicas`) para
+        # no reescribir el snapshot canónico, que Supabase exige intacto al completar el día.
+        candidatas = [v for lista in seleccion.values() for v, _ in lista if v["id"] not in ids_iniciales]
         if incremental:
             recientes = sorted(vacantes, key=lambda v: v.get("publicada_en") or v.get("visto_primera_vez", ""), reverse=True)
             inicio = hora * maximo % len(recientes) if recientes else 0

@@ -2854,3 +2854,84 @@ h1 {
   background: #f1f3ef;
   color: #6f7d73;
 }
+
+/* Resumen sin la tarjeta grande: la distribución ocupa todo el ancho */
+.overview-top.solo {
+  grid-template-columns: 1fr !important;
+}
+/* Estado del borrador y ayuda Guardar / Programar */
+.flow-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: -6px 0 18px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #f1f6f2;
+  border: 1px solid #dfeae2;
+  font-size: 12px;
+  color: #4f5e55;
+  line-height: 1.5;
+}
+.flow-status.pending {
+  background: #fbf6ee;
+  border-color: #efe2c9;
+}
+.flow-pill {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #e2efe6;
+  color: #245e4b;
+  font-weight: 600;
+  font-size: 11px;
+}
+.flow-status.pending .flow-pill {
+  background: #f6e8cc;
+  color: #7e5f25;
+}
+
+.field.plain legend {
+  font-size: 11px;
+  font-weight: 550;
+  color: #718362;
+  margin-bottom: 6px;
+}
+.field-help {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #7d926a;
+}
+.mudanza summary {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 550;
+  color: #718362;
+  margin-bottom: 8px;
+}
+.live {
+  margin-top: 10px;
+}
+.live .button.small {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  padding: 7px 11px;
+}
+.live-result {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #f3f5fa;
+  border: 1px solid #e0e5ef;
+  font-size: 12px;
+}
+.live-note {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #6f7d73;
+}
