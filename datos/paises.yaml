@@ -2,6 +2,9 @@
 # código ISO, nombre para la página, nombres con los que aparece en los avisos (español, inglés, portugués), gentilicios,
 # ciudades principales y zona horaria (UTC, hora estándar). `region: europa` marca a los que no son de LATAM.
 # Se puede agregar una ciudad o un nombre sin tocar código; las pruebas revisan el formato.
+# `cobertura: false` (contrato v12, decisión de Oscar del 12 nov 2026): el país se reconoce en los avisos («São Paulo» es
+# Brasil) pero no cuenta como cobertura. Una vacante local, híbrida o remota solo para ese país no se entrega; una remota
+# abierta a varios países se conserva para los demás.
 paises:
   - codigo: AR
     nombre: Argentina
@@ -17,6 +20,7 @@ paises:
     utc: -4
   - codigo: BR
     nombre: Brasil
+    cobertura: false  # solo español e inglés: Brasil vale únicamente dentro de remotas de varios países
     nombres: [brasil, brazil]
     gentilicios: [brasileno, brasilena, brasileiro, brazilian]
     ciudades: [sao paulo, rio de janeiro, belo horizonte, brasilia, curitiba, porto alegre, florianopolis, recife,

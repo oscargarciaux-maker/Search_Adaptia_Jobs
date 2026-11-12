@@ -92,7 +92,20 @@ def test_requisito_local_prevalece_sobre_la_etiqueta_mundial(descripcion):
     assert contrato.entregable(oferta("Remote Worldwide",descripcion=descripcion+" "+TEXTO))
 
 
-@pytest.mark.parametrize("ubicacion,codigo", [("Madrid y alrededores","ES"),("Barcelona y alrededores","ES"),("Recife y alrededores","BR"),("Belo Horizonte y alrededores","BR"),("Área metropolitana de Lima","PE"),("Pamplona/Iruña","ES")])
+@pytest.mark.parametrize("ubicacion", ["Recife y alrededores", "Belo Horizonte y alrededores", "São Paulo, SP, Brazil",
+                                       "Remoto, Brazil"])
+def test_brasil_se_reconoce_pero_no_se_entrega(ubicacion):
+    v = oferta(ubicacion)  # contrato v12: se sabe que es Brasil (no queda «por confirmar») y no se entrega
+    assert v["paises"] == [] and v["nota_pais"] == "país fuera de la cobertura"
+    assert contrato.entregable(v) == "no se puede aplicar desde los países"
+
+
+def test_remota_de_varios_paises_con_brasil_se_conserva_para_los_demas():
+    v = oferta("Argentina (Remote); Mexico (Remote); São Paulo, Brazil")
+    assert "BR" not in v["paises"] and {"AR", "MX"} <= set(v["paises"])
+
+
+@pytest.mark.parametrize("ubicacion,codigo", [("Madrid y alrededores","ES"),("Barcelona y alrededores","ES"),("Área metropolitana de Lima","PE"),("Pamplona/Iruña","ES")])
 def test_formatos_metropolitanos_conocidos_no_se_pierden(ubicacion,codigo):
     v = oferta(ubicacion)
     assert v["paises"] == [codigo] and not contrato.entregable(v)

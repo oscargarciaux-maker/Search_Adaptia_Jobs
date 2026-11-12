@@ -78,7 +78,7 @@ def test_dos_ubicaciones_confirmadas_se_conservan_aunque_solo_se_vea_una():
                    fecha_origen="first_published")
     horas = capturas([mexico, brasil], [], [brasil], [mexico], [])
     estados = [campos(unica(h), LUGAR) for h in horas]
-    assert estados[0]["paises"] == ["BR", "MX"] and estados[0]["confianza_pais"] == "alta"
+    assert estados[0]["paises"] == ["MX"] and estados[0]["confianza_pais"] == "alta"  # v12: Brasil no se cubre
     assert all(e == estados[0] for e in estados)
 
 
@@ -186,8 +186,8 @@ TODOS = paises.datos()["codigos"]
      (TODOS, "baja", "confirmar ubicación")),
     ([r(TODOS, "baja", "confirmar ubicación"), r(TODOS[:20], "baja", "por zona horaria")],
      (TODOS, "baja", paises.NOTA_INCIERTA)),
-    ([r(["MX", "BR"], "alta", "restricción explícita de residencia")],
-     (["BR", "MX"], "alta", "restricción explícita de residencia")),
+    ([r(["MX", "PE"], "alta", "restricción explícita de residencia")],
+     (["MX", "PE"], "alta", "restricción explícita de residencia")),
 ])
 def test_combinar_no_depende_del_orden_y_conserva_la_evidencia_mas_fuerte(resultados, esperado):
     for orden in permutations(resultados):

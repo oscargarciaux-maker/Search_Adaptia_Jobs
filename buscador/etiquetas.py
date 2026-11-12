@@ -4,13 +4,19 @@ import re
 
 from buscador import normalizar
 
-_ES = {"el", "la", "los", "las", "de", "del", "y", "en", "para", "con", "por", "una", "que", "experiencia", "buscamos",
-       "empresa", "conocimientos", "requisitos", "funciones", "trabajo", "nuestro", "somos"}
+# Solo palabras PROPIAS de cada idioma (contrato v12). Las compartidas por español y portugués («de», «que», «para»,
+# «experiencia», «empresa», «requisitos»…) no cuentan: con ellas un aviso largo en portugués salía como español.
+_ES = {"el", "la", "los", "las", "del", "y", "en", "es", "un", "una", "lo", "le", "al", "sus", "muy", "pero", "hasta",
+       "donde", "tambien", "usted", "nuestro", "nuestra", "nuestros", "nuestras", "buscamos", "puesto", "ofrecemos",
+       "conocimientos", "funciones", "desarrollo", "equipo", "trabajo", "personas", "proceso", "manejo", "cual",
+       "vacante", "postulate", "contar", "deseable", "ubicacion"}
 _EN = {"the", "and", "of", "to", "for", "with", "we", "you", "your", "our", "experience", "looking", "skills", "team",
        "role", "requirements", "about", "will", "are", "is"}
-_PT = {"voce", "nao", "para", "com", "uma", "dos", "das", "experiencia", "vaga", "requisitos", "empresa", "trabalho",
-       "conhecimento", "atuar", "sobre", "nossa", "nosso", "beneficios", "desejavel"}
-_PT_SOLO = {"voce", "nao", "vaga", "atuar", "nossa", "nosso", "desejavel", "conhecimento", "trabalho"}
+_PT = {"em", "uma", "um", "da", "das", "ao", "aos", "pelo", "pela", "seu", "sua", "seus", "suas", "com", "ou", "voce",
+       "nao", "sao", "tambem", "equipe", "vaga", "vagas", "atuar", "atuacao", "nosso", "nossa", "nossos", "nossas",
+       "desejavel", "conhecimento", "conhecimentos", "trabalho", "trabalhar", "pessoas", "solucoes", "desenvolvimento",
+       "atividades", "mais", "muito", "onde", "ate", "isso", "essa", "esse", "processo"}
+assert not _ES & _PT  # una palabra que se escribe igual en los dos idiomas no decide
 
 
 def idioma(texto):
@@ -20,7 +26,7 @@ def idioma(texto):
         return ""
     es = sum(p in _ES for p in palabras)
     en = sum(p in _EN for p in palabras)
-    pt = sum(p in _PT_SOLO for p in palabras) * 3 + sum(p in _PT and p not in _PT_SOLO for p in palabras) * 0.3
+    pt = sum(p in _PT for p in palabras)
     mejor = max((en, "en"), (es, "es"), (pt, "pt"))
     return mejor[1] if mejor[0] > 0 else ""
 
