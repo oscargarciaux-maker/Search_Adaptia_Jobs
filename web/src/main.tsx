@@ -252,6 +252,7 @@ function CargoDialog({
           terminos_exactos: [],
           terminos_similares: [],
           terminos_excluidos: [],
+          terminos_cercanos: [],
         },
   );
   const [busy, setBusy] = useState(false);
@@ -262,6 +263,7 @@ function CargoDialog({
       const r = await api<{
         terminos_exactos: string[];
         terminos_similares: string[];
+        terminos_cercanos?: string[];
         fuentes: string[];
         requiere_revision: boolean;
       }>("/cargos/expandir", {
@@ -272,6 +274,9 @@ function CargoDialog({
         ...v,
         terminos_exactos: r.terminos_exactos,
         terminos_similares: r.terminos_similares,
+        terminos_cercanos: r.terminos_cercanos?.length
+          ? r.terminos_cercanos
+          : v.terminos_cercanos || [],
       }));
       setNota(
         r.fuentes.join(" · ") +
@@ -370,6 +375,16 @@ function CargoDialog({
             values={c.terminos_similares}
             onChange={(v) => setC({ ...c, terminos_similares: v })}
           />
+          <TagInput
+            label="Cargos cercanos (solo si faltan vacantes)"
+            values={c.terminos_cercanos || []}
+            onChange={(v) => setC({ ...c, terminos_cercanos: v })}
+          />
+          <p className="helper">
+            Si un cliente no llega a 5 vacantes en el día, se completan primero
+            con avisos que no dicen años o inglés y luego con estos oficios
+            vecinos. En «Vacantes» aparecen marcadas como «Ampliada».
+          </p>
           <TagInput
             label="Excluir estos términos"
             values={c.terminos_excluidos}
@@ -491,6 +506,9 @@ function PreviewPerfil({
           <span className="preview-sub">
             {" "}
             · {info.del_cargo} del cargo en el catálogo
+            {info.compatibles < 5 && !!info.ampliables && (
+              <> · +{info.ampliables} con ampliación hasta llegar a 5</>
+            )}
           </span>
         </span>
       </p>
@@ -2531,6 +2549,14 @@ function VacancyCard({ v }: { v: Vacante }) {
         </span>
         <span>{v.idioma === "es" ? "Español" : "Inglés"}</span>
         <span>{grados[v.match_grade] || v.match_grade}</span>
+        {v.ampliacion && (
+          <span
+            className="amplified"
+            title="Entró para completar el mínimo de 5 vacantes de este perfil. No aparece en el mensaje de WhatsApp."
+          >
+            Ampliada: {v.ampliacion}
+          </span>
+        )}
       </div>
       <div className="vacancy-meta">
         <span>
@@ -2549,16 +2575,18 @@ function VacancyCard({ v }: { v: Vacante }) {
           <ChevronDown size={13} />
         </summary>
         <ul>
-          {v.explicacion.map((e, i) => (
-            <li key={i}>
-              <Check size={12} />
-              {typeof e === "string"
-                ? e
-                : e.termino
-                  ? "Cargo: " + e.termino
-                  : e.regla}
-            </li>
-          ))}
+          {v.explicacion
+            .filter((e) => typeof e === "string" || !e.ampliacion)
+            .map((e, i) => (
+              <li key={i}>
+                <Check size={12} />
+                {typeof e === "string"
+                  ? e
+                  : e.termino
+                    ? "Cargo: " + e.termino
+                    : e.regla}
+              </li>
+            ))}
         </ul>
         {v.motivos.length > 0 && (
           <p className="helper">Revisar: {v.motivos.join(" · ")}</p>

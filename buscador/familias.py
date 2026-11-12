@@ -131,7 +131,7 @@ def clasificar(titulo, descripcion=""):
                 excluidas.add(fam["id"])
                 continue
             from panel.terminos import grado as grado_control
-            g, _ = grado_control(titulo, fam["_control_cargo"])
+            g, _ = grado_control(titulo, fam["_control_cargo"], cercanos=True)
             if g:
                 salida[fam["id"]] = g
             continue

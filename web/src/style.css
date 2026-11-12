@@ -2935,3 +2935,8 @@ h1 {
   line-height: 1.45;
   color: #6f7d73;
 }
+.vacancy-tags .amplified {
+  background: #fbf3e2;
+  border-color: #ecd9ae;
+  color: #7a5a17;
+}

@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from buscador import bodega, entrega, familias, paises, supabase
-from panel.afinidad import evaluar
+from panel.afinidad import AMPLIACIONES, MINIMO_POR_PERFIL, evaluar, evaluar_ampliada
 from panel.modelos import Configuracion
 from pydantic import ValidationError
 from panel.repositorio import RepositorioSupabase, hoy
@@ -50,7 +50,7 @@ def preparar(version, fecha):
             lugares.update(lugares_perfil(p, nombres))
         rid = "cargo:" + str(c.id)
         mapa.append({"id": rid, "nombre": c.nombre, "consultas": [c.nombre, *raw["terminos_exactos"], *raw["terminos_similares"]],
-            "exactos": raw["terminos_exactos"], "similares": raw["terminos_similares"], "cercanos": [],
+            "exactos": raw["terminos_exactos"], "similares": raw["terminos_similares"], "cercanos": raw.get("terminos_cercanos", []),
             "excluir": raw["terminos_excluidos"], "herramientas": [], "lugares": list(lugares.items()),
             "_control_cargo": raw,
             "paises_objetivo": sorted({x for p in perfiles for x in p.paises_oficina}),
@@ -100,7 +100,14 @@ def registrar(repo, version, fecha, reporte=None):
     ejecucion = iniciar(repo, version, fecha)
     cfg = validar_version(version)
     seleccionadas = repo.pedir("GET", "entregas_diarias", params={"delivery_date": "eq." + fecha, "select": "*", "limit": 500})
-    filas, conteos = [], {}
+    filas, conteos, estrictas, ampliables = [], {}, {}, []
+    def fila(row, p, cargo_id, pruebas, extra=()):
+        c = next(c for c in cfg.cargos if str(c.id) == cargo_id)
+        _, evidencia = grado(row["snapshot"]["titulo"], c.model_dump(mode="json"), cercanos=True)
+        return {"ejecucion_id": ejecucion["id"], "cliente_id": str(p.cliente_id),
+                "perfil_id": str(p.id), "cargo_id": cargo_id, "vacante_id": row["vacante_id"],
+                "match_grade": row["match_grade"], "explicacion": [*pruebas, evidencia or {"regla": "similitud textual"}, *extra],
+                "filtros": p.model_dump(mode="json"), "cargo_configuracion": c.model_dump(mode="json")}
     for row in seleccionadas:
         if not row["role_id"].startswith("cargo:"):
             continue
@@ -108,14 +115,20 @@ def registrar(repo, version, fecha, reporte=None):
         conteos[cargo_id] = conteos.get(cargo_id, 0) + 1
         for p in cfg.perfiles_activos(cargo_id):
             match = evaluar(row["snapshot"], p, fecha)
-            if not match["compatible"]:
-                continue
-            c = next(c for c in cfg.cargos if str(c.id) == cargo_id)
-            _, evidencia = grado(row["snapshot"]["titulo"], c.model_dump(mode="json"))
-            filas.append({"ejecucion_id": ejecucion["id"], "cliente_id": str(p.cliente_id),
-                "perfil_id": str(p.id), "cargo_id": cargo_id, "vacante_id": row["vacante_id"],
-                "match_grade": row["match_grade"], "explicacion": [*match["pruebas"], evidencia or {"regla": "similitud textual"}],
-                "filtros": p.model_dump(mode="json"), "cargo_configuracion":c.model_dump(mode="json")})
+            if match["compatible"]:
+                estrictas[p.id] = estrictas.get(p.id, 0) + 1
+                filas.append(fila(row, p, cargo_id, match["pruebas"]))
+            elif row["snapshot"].get("_ampliacion") in AMPLIACIONES:
+                ampliables.append((row, p, cargo_id))
+    # Contrato v9: lo ampliado solo se asigna a perfiles que no llegaron al mínimo con vacantes que cumplen todo.
+    for row, p, cargo_id in ampliables:
+        nivel = row["snapshot"]["_ampliacion"]
+        if estrictas.get(p.id, 0) >= MINIMO_POR_PERFIL:
+            continue
+        match = evaluar_ampliada(row["snapshot"], p, fecha, nivel)
+        if match["compatible"]:
+            estrictas[p.id] = estrictas.get(p.id, 0) + 1
+            filas.append(fila(row, p, cargo_id, match["pruebas"], [{"ampliacion": nivel}]))
     for inicio in range(0, len(filas), 250):
         repo.pedir("POST", "panel_asignaciones", params={"on_conflict": "ejecucion_id,perfil_id,vacante_id"},
                     json=filas[inicio:inicio + 250], headers={"Prefer":"resolution=ignore-duplicates"})
@@ -125,7 +138,10 @@ def registrar(repo, version, fecha, reporte=None):
     repo.pedir("PATCH", "panel_ejecuciones", params={"id": "eq." + ejecucion["id"]},
         json={"estado": "parcial" if any(faltantes.values()) or not confirmado else "completa",
               "resumen": {"vacantes": sum(conteos.values()), "meta": 120, "faltantes": faltantes,
-                          "asignaciones": len(filas)},
+                          "asignaciones": len(filas),
+                          "ampliadas": sum(any(isinstance(e, dict) and e.get("ampliacion") for e in f["explicacion"]) for f in filas),
+                          "perfiles_bajo_minimo": sum(1 for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id))
+                                                      if estrictas.get(p.id, 0) < MINIMO_POR_PERFIL)},
               "terminada_en": datetime.now().astimezone().isoformat()})
 
 

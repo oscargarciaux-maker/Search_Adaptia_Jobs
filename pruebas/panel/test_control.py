@@ -603,3 +603,112 @@ def test_pasada_posterior_fallida_no_borra_el_resultado_del_dia(cfg, monkeypatch
         ejecutor.correr(tmp_path, repo=Repo())
     assert "estado" not in cambios[-1]
     assert cambios[-1]["resumen"]["vacantes"] == 35 and cambios[-1]["resumen"]["aviso_ultima_pasada"]
+
+
+# ── Contrato v9: mínimo de 5 por perfil con ampliación marcada ─────────────────────────────────────────────────────
+
+SIN_DATO = "We design digital products with a collaborative team and research users every week. " * 4
+
+
+def _oferta(titulo, n, texto, ubicacion="Remote - Worldwide", remoto=True):
+    v = vacante.crear(titulo, f"Empresa {n}", f"https://jobs.lever.co/empresa/amp-{n}", "Lever", ubicacion=ubicacion,
+                      descripcion=texto, fecha=hoy(), hoy=hoy(), remoto=remoto)
+    v["verificacion"] = {"estado": "verificada"}
+    return v
+
+
+@pytest.fixture
+def cfg_un_perfil(cfg):
+    for p in cfg["perfiles"][1:3]:
+        p["activo"] = False  # el cargo Product Designer queda con un solo perfil (Colombia, remoto, 0–5 años, inglés ≤B2)
+    cfg["cargos"][0]["terminos_cercanos"] = ["UX Researcher"]
+    return cfg
+
+
+def _elegir(cfg, ofertas):
+    with ejecutor.activar({"configuracion": cfg}, hoy()):
+        for v in ofertas:  # como hace la bodega al reetiquetar con el mapa del panel
+            v["familias"] = familias.clasificar(v["titulo"], v["_descripcion"])
+        elegidas, resumen = entrega.elegir(ofertas, {}, hoy())
+    rid = "cargo:" + cfg["cargos"][0]["id"]
+    return elegidas[rid], resumen["roles"][rid]
+
+
+def test_perfil_bajo_el_minimo_se_completa_primero_sin_dato_y_luego_cercanos(cfg_un_perfil):
+    con_dato = trabajo()["_descripcion"]  # dice 3 años e inglés B2: cumple el perfil
+    ofertas = ([_oferta("Product Designer", n, con_dato) for n in range(2)] +
+               [_oferta("Product Designer", 10, SIN_DATO)] +
+               [_oferta("UX Researcher", 20 + n, SIN_DATO) for n in range(3)] +
+               [_oferta("Product Designer", 30, con_dato, ubicacion="Bogotá, Colombia", remoto=None)])  # presencial
+    elegidas, resumen = _elegir(cfg_un_perfil, ofertas)
+    marcas = [v.get("_ampliacion") for v, _ in elegidas]
+    assert len(elegidas) == 5 and marcas.count(None) == 2
+    assert marcas.count("sin_dato") == 1 and marcas.count("cargo_cercano") == 2
+    assert not any(v["empresa"] == "Empresa 30" for v, _ in elegidas)  # la modalidad/país nunca se amplía para un remoto
+    assert resumen["ampliadas"] == {"sin_dato": 1, "cargo_cercano": 2}
+    assert all(g == "cercano" for v, g in elegidas if v.get("_ampliacion") == "cargo_cercano")
+
+
+def test_con_cinco_que_cumplen_no_se_amplia_y_el_cupo_manda(cfg_un_perfil):
+    con_dato = trabajo()["_descripcion"]
+    ofertas = [_oferta("Product Designer", n, con_dato) for n in range(5)] + \
+              [_oferta("Product Designer", 10 + n, SIN_DATO) for n in range(4)]
+    elegidas, _ = _elegir(cfg_un_perfil, ofertas)
+    assert not any(v.get("_ampliacion") for v, _ in elegidas)
+    pocas = [_oferta("Product Designer", 0, con_dato)] + [_oferta("Product Designer", 10 + n, SIN_DATO) for n in range(6)]
+    cfg_un_perfil["cargos"][0]["cupo"], cfg_un_perfil["cargos"][1]["cupo"] = 3, 87
+    elegidas, _ = _elegir(cfg_un_perfil, pocas)
+    assert len(elegidas) == 3  # las ampliadas cuentan dentro del cupo
+
+
+def test_presencial_puede_ampliar_a_remotas_abiertas_a_su_pais(cfg_un_perfil):
+    cfg_un_perfil["perfiles"][0].update(modalidades=["presencial"], aceptar_experiencia_sin_dato=True,
+                                       aceptar_ingles_sin_dato=True)
+    ofertas = [_oferta("Product Designer", n, SIN_DATO) for n in range(3)] + \
+              [_oferta("Product Designer", 10, SIN_DATO, ubicacion="Remote - Brazil")]  # remota cerrada a Colombia
+    elegidas, _ = _elegir(cfg_un_perfil, ofertas)
+    assert [v.get("_ampliacion") for v, _ in elegidas] == ["remota_cercana"] * 3
+
+
+def test_registro_asigna_lo_ampliado_solo_a_quien_no_llega_y_el_panel_lo_marca(cfg):
+    p_estricto = cfg["perfiles"][0]
+    rid = "cargo:" + cfg["cargos"][0]["id"]
+    ampliada = dict(_oferta("Product Designer", 1, SIN_DATO), _ampliacion="sin_dato")
+    asignaciones = []
+    class Repo:
+        ejecucion = None
+        def pedir(self, metodo, ruta, **op):
+            if ruta == "panel_ejecuciones":
+                if metodo == "GET": return [self.ejecucion] if self.ejecucion else []
+                if metodo == "POST": self.ejecucion = {"id": "e1", **op["json"]}
+                if metodo == "PATCH": self.ejecucion.update(op["json"])
+            elif ruta == "entregas_diarias":
+                return [{"role_id": rid, "vacante_id": ampliada["id"], "match_grade": "exact", "snapshot": ampliada}]
+            elif ruta == "panel_asignaciones":
+                asignaciones.extend(op["json"])
+    repo = Repo()
+    ejecutor.registrar(repo, {"revision": 1, "configuracion": cfg}, hoy())
+    perfiles = {a["perfil_id"] for a in asignaciones}
+    assert p_estricto["id"] in perfiles
+    assert all({"ampliacion": "sin_dato"} in a["explicacion"] for a in asignaciones)
+    assert repo.ejecucion["resumen"]["ampliadas"] == len(asignaciones)
+    # El panel muestra la marca; el texto para WhatsApp no.
+    fila = dict(asignaciones[0], catalogo_vacantes={"id": ampliada["id"], "status": "active", "datos": dict(
+        ampliada, verificacion={"estado": "verificada", "enlaces": [{"url": ampliada["enlace"], "estado": "verificada",
+        "comprobada_en": datetime.now(timezone.utc).isoformat()}]}), "description_full": SIN_DATO})
+    class Resultados:
+        def resultados(self, cliente_id, fecha):
+            return {"ejecucion": repo.ejecucion, "clientes": [], "filas": [fila]}
+    r = servicio.resultados(Resultados())
+    assert r["vacantes"][0]["ampliacion"] == "aviso sin años o inglés informados" and r["vacantes"][0]["estado"] == "lista"
+    texto = servicio.whatsapp(Resultados(), None)["texto"]
+    assert ampliada["titulo"] in texto and "mpliad" not in texto and "sin años" not in texto
+
+
+def test_sugerencias_traen_cercanos_y_la_estimacion_cuenta_la_ampliacion(cfg_un_perfil):
+    s = terminos.sugerir("Product Designer", consultar_esco=False)
+    assert s["terminos_cercanos"] and not set(map(str.lower, s["terminos_cercanos"])) & set(map(str.lower, s["terminos_exactos"]))
+    r = servicio.vista_previa(RepositorioDemo(), Configuracion.model_validate(cfg_un_perfil), hoy())
+    info = r["perfiles"][cfg_un_perfil["perfiles"][0]["id"]]
+    assert "ampliables" in info
+    assert info["compatibles"] >= 5 or info["compatibles"] + info["ampliables"] <= 5

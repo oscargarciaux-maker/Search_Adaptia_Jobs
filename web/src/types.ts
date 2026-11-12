@@ -7,6 +7,7 @@ export type Cargo = {
   terminos_exactos: string[];
   terminos_similares: string[];
   terminos_excluidos: string[];
+  terminos_cercanos?: string[];
 };
 export type Perfil = {
   id: string;
@@ -61,11 +62,15 @@ export type Vacante = {
   publicada: string;
   experiencia: number | null;
   match_grade: string;
-  explicacion: (string | { regla: string; termino?: string })[];
+  explicacion: (
+    | string
+    | { regla?: string; termino?: string; ampliacion?: string }
+  )[];
   cargo_id: string;
   enlace: string;
   estado: string;
   motivos: string[];
+  ampliacion?: string;
 };
 export type Resultados = {
   ejecucion: Ejecucion | null;
@@ -87,6 +92,7 @@ export type EstimacionPerfil = {
   compatibles: number;
   del_cargo: number;
   limitantes: Limitante[];
+  ampliables?: number;
 };
 export type EstimacionCargo = {
   disponibles: number;
