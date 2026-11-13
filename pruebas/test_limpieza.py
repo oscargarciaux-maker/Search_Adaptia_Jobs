@@ -72,3 +72,21 @@ def test_v14_ambiguas_siguen_por_confirmar():
 def test_v14_trabajar_en_el_pais_es_el_pais_del_aviso():
     r = paises.elegibles("QA", "Bogotá, Colombia", "Must be authorized to work in the country.")
     assert r["paises"] == ["CO"] and r["confianza"] == "alta"
+
+
+def test_v17_decisiones_de_la_bandeja_mandan_en_la_limpieza():
+    decisiones = limpieza.decisiones_operador([
+        {"vacante_id": "a", "estado": "descartada", "motivo": "no sirve (operador)", "paises": []},
+        {"vacante_id": "b", "estado": "descartada", "motivo": "otro país (operador)", "paises": []},
+        {"vacante_id": "c", "estado": "confirmada", "motivo": "confirmada por operador", "paises": ["EC"]},
+        {"vacante_id": "d", "estado": "saltada", "motivo": "", "paises": []}])
+    assert decisiones == {"a": "borrar", "b": "borrar", "c": "conservar"}
+    ofertas = [{"id": n, "vacante_id": v, "external_id": f"x{n}", "job_title": "Product Designer",
+                "location": ubic, "work_mode": "remote", "posting_language": "en", "offer_url": f"https://e.com/{n}",
+                "company_name": "E", "scraped_at": "2026-11-10"}
+               for n, v, ubic in ((1, "a", "Bogotá, Colombia"), (2, "b", "Remote Remoto"), (3, "c", "Remote Remoto"),
+                                  (4, "d", "Remote Remoto"))]
+    filas = {f["numero"]: f for f in limpieza.planificar([], ofertas, decisiones)}
+    assert filas[1]["decision"] == filas[2]["decision"] == "borrar" and filas[1]["motivo"] == limpieza.OPERADOR
+    assert 3 not in filas  # confirmada por el operador: se conserva
+    assert filas[4]["decision"] == "revisar"  # saltada: sigue a revisión

@@ -62,3 +62,16 @@ def test_solo_cargos_de_los_roles_e_idioma_valido():
     assert c.candidatas([v], {"diseno-producto-ux"}, HOY) == []
     v2 = dict(_vacante(2), idioma="")
     assert c.candidatas([v2], set(), HOY) == []
+
+
+def test_v17_decisiones_del_operador_valen_en_cada_busqueda():
+    from buscador import contrato
+    a, b, d = _vacante(1), _vacante(2), _vacante(3)
+    for v in (a, b, d):
+        v.update(paises=["CO", "MX"], confianza_pais="baja")
+    tocadas = c.aplicar_operador([a, b, d], {a["id"]: {"paises": ["EC"]}, b["id"]: {"extranjero": True},
+                                             d["id"]: {"descartada": True}})
+    assert tocadas == 3
+    assert a["paises"] == ["EC"] and a["confianza_pais"] in ("alta", "media")
+    assert b["paises"] == [] and b["confianza_pais"] == "alta"
+    assert d["descartada_operador"] and contrato.entregable(d, HOY) == "descartada por el operador"

@@ -801,8 +801,41 @@ function PorConfirmar({
       setOcupado("");
     }
   }
+  async function cargarTodas() {
+    setOcupado("todas");
+    try {
+      const r = await api<{
+        por_confirmar: number;
+        agregadas?: number;
+        resueltas_por_regla?: number;
+      }>("/revisiones/cargar", { method: "POST" });
+      notify(
+        `Bandeja lista: ${r.por_confirmar} por confirmar` +
+          (r.agregadas ? ` (${r.agregadas} nuevas)` : "") +
+          (r.resueltas_por_regla
+            ? `, ${r.resueltas_por_regla} resueltas solas por reglas`
+            : "") +
+          ".",
+      );
+      await cargar();
+    } catch (e) {
+      notify((e as Error).message, true);
+    } finally {
+      setOcupado("");
+    }
+  }
   const masiva = (
     <div className="revision-masiva">
+      <button
+        className="button secondary"
+        onClick={cargarTodas}
+        disabled={ocupado === "todas"}
+      >
+        <RefreshCw size={15} />
+        {ocupado === "todas"
+          ? "Cargando…"
+          : "Cargar todas las dudosas de la base"}
+      </button>
       <a className="button secondary" href="/api/revisiones.csv" download>
         <ArrowDownToLine size={15} />
         Descargar todas (CSV)
@@ -830,7 +863,9 @@ function PorConfirmar({
       <Empty
         icon={CheckCheck}
         title="Todo al día"
-        texto="No hay vacantes por confirmar. Las que lleguen aparecerán aquí después de la búsqueda de la noche."
+        texto="No hay vacantes por confirmar en la bandeja. La búsqueda de la noche trae las que ayudan a tus clientes; para depurar toda la base ahora, carga todas las dudosas."
+        action={ocupado === "todas" ? undefined : cargarTodas}
+        label="Cargar todas las dudosas de la base"
       />
     );
   return (

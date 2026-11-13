@@ -255,6 +255,8 @@ def entregable(v, idiomas=("es", "en")):
     """Motivo por el que la vacante no puede ir en la entrega, o '' si puede."""
     if v.get("tipo") == "post":
         return "post de LinkedIn: no es una oferta formal"  # contrato v11: nunca cupo ni `ofertas`
+    if v.get("descartada_operador"):
+        return "descartada por el operador"  # contrato v17: «no sirve» en la bandeja
     if not v.get("titulo") or not v.get("empresa") or v.get("empresa") == EMPRESA_DESCONOCIDA:
         return "sin empresa"
     motivo = calidad.motivo(v["titulo"], v.get("enlace", ""), v.get("fuente", ""))

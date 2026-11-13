@@ -244,6 +244,11 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         from panel import revision
         return revision.listar(repo, hoy())
 
+    @app.post("/api/revisiones/cargar")
+    def cargar_revisiones():
+        from panel import revision
+        return revision.cargar_todas(repo, hoy())
+
     @app.get("/api/revisiones.csv")
     def descargar_revisiones():
         from fastapi.responses import Response

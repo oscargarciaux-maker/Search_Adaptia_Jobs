@@ -67,8 +67,25 @@ def decidir(datos=None, descripcion="", oferta=None):
     return "", ""
 
 
-def planificar(catalogo, ofertas):
-    """Listado de filas de `ofertas` a borrar o revisar, con los datos públicos para revisarlas."""
+OPERADOR = "descartada por el operador"
+_DESCARTES = {"otro país (operador)", "no sirve (operador)"}
+
+
+def decisiones_operador(filas):
+    """Contrato v17: {vacante_id: 'borrar'|'conservar'} desde `panel_revisiones` (bandeja «Por confirmar» y CSV)."""
+    salida = {}
+    for f in filas or []:
+        if f.get("estado") == "descartada" and f.get("motivo") in _DESCARTES:
+            salida[f["vacante_id"]] = BORRAR
+        elif f.get("estado") == "confirmada" and f.get("paises"):
+            salida[f["vacante_id"]] = "conservar"
+    return salida
+
+
+def planificar(catalogo, ofertas, decisiones=None):
+    """Listado de filas de `ofertas` a borrar o revisar, con los datos públicos para revisarlas.
+    `decisiones` (v17): lo que el operador decidió en la bandeja manda sobre la lectura automática."""
+    decisiones = decisiones or {}
     por_id = {fila["id"]: fila for fila in catalogo}
     por_alias = {}
     for fila in catalogo:
@@ -78,7 +95,14 @@ def planificar(catalogo, ofertas):
     for o in ofertas:
         fila = por_id.get(o.get("vacante_id") or "") or por_alias.get(str(o.get("external_id") or ""))
         datos = (fila or {}).get("datos") or {}
-        decision, motivo = decidir(datos, (fila or {}).get("description_full") or "", o)
+        ids = [(fila or {}).get("id"), o.get("vacante_id"), *[str(i) for i in datos.get("ids_agrupados") or []]]
+        del_operador = next((decisiones[i] for i in ids if i and i in decisiones), None)
+        if del_operador == BORRAR:
+            decision, motivo = BORRAR, OPERADOR
+        elif del_operador == "conservar":
+            decision, motivo = "", ""
+        else:
+            decision, motivo = decidir(datos, (fila or {}).get("description_full") or "", o)
         if not decision:
             continue
         filas.append({"numero": o["id"], "decision": decision, "motivo": motivo,
@@ -199,26 +223,31 @@ def aplicar(conn, filas, numeros):
 
 
 def _cargar_reglas(conn):
-    """Contrato v17: las reglas de ubicación del operador y aprendidas también cuentan al revisar `ofertas`."""
+    """Contrato v17: las reglas de ubicación del operador y aprendidas también cuentan al revisar `ofertas`, y las
+    decisiones de la bandeja deciden su vacante. Devuelve {vacante_id: decisión}."""
     try:
         with conn.transaction(), conn.cursor() as cur:
             cur.execute("select texto, resultado, origen, activa from public.panel_reglas_ubicacion")
             paises.cargar_reglas([{"texto": t, "resultado": r, "origen": o, "activa": a} for t, r, o, a in cur])
-    except Exception:  # noqa: BLE001 — sin la tabla (instalaciones anteriores a SQL 014) se revisa sin reglas
+            cur.execute("select vacante_id, estado, motivo, paises from public.panel_revisiones "
+                        "where estado in ('confirmada', 'descartada')")
+            return decisiones_operador([{"vacante_id": v, "estado": e, "motivo": m, "paises": p} for v, e, m, p in cur])
+    except Exception:  # noqa: BLE001 — sin las tablas (instalaciones anteriores a SQL 014) se revisa sin reglas
         paises.cargar_reglas()
+        return {}
 
 
 def correr(conn, carpeta="revision", aplicar_cambios=False, huella_revisada="", conservar="", borrar_tambien=""):
-    _cargar_reglas(conn)
+    decisiones = _cargar_reglas(conn)
     try:
-        return _correr(conn, carpeta, aplicar_cambios, huella_revisada, conservar, borrar_tambien)
+        return _correr(conn, carpeta, aplicar_cambios, huella_revisada, conservar, borrar_tambien, decisiones)
     finally:
         paises.cargar_reglas()
 
 
-def _correr(conn, carpeta, aplicar_cambios, huella_revisada, conservar, borrar_tambien):
+def _correr(conn, carpeta, aplicar_cambios, huella_revisada, conservar, borrar_tambien, decisiones=None):
     catalogo, ofertas = leer(conn)
-    filas = planificar(catalogo, ofertas)
+    filas = planificar(catalogo, ofertas, decisiones)
     datos_resumen = resumen(filas, len(ofertas))
     escribir_listado(filas, datos_resumen, carpeta)
     datos_resumen["modo"] = "revisión (no se cambió nada)"

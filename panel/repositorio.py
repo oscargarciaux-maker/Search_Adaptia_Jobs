@@ -107,9 +107,15 @@ class RepositorioSupabase:
         return filas[0]
 
     # Contrato v16: bandeja «Por confirmar» y reglas de ubicación (tablas privadas, SQL 014).
-    def candidatas_por_confirmar(self, desde):
-        return self._paginas("catalogo_vacantes", "id", {"reason": "eq.elegibilidad regional por confirmar",
-                             "observed_at": "gte." + desde, "select": "id,datos,description_full"}, 500)
+    def candidatas_por_confirmar(self, desde=None):
+        params = {"reason": "eq.elegibilidad regional por confirmar", "select": "id,datos,description_full"}
+        if desde:
+            params["observed_at"] = "gte." + desde
+        return self._paginas("catalogo_vacantes", "id", params, 500)
+
+    def archivar_catalogo(self, vacante_id, razon):
+        self.pedir("PATCH", "catalogo_vacantes", params={"id": "eq." + vacante_id},
+                   headers={"Prefer": "return=minimal"}, json={"status": "archived", "reason": razon})
 
     def recibidas(self, perfil_ids):
         salida = {}
@@ -122,13 +128,14 @@ class RepositorioSupabase:
         return salida
 
     def revisiones(self, estado=None, vacante_id=None):
-        params = {"select": "*,catalogo_vacantes(id,datos,description_full,status,reason)", "limit": 1000,
-                  "order": "prioridad.desc"}
+        params = {"select": "*,catalogo_vacantes(id,datos,description_full,status,reason)"}
         if estado:
             params["estado"] = "eq." + estado
         if vacante_id:
-            params["vacante_id"] = "eq." + vacante_id
-        return self.pedir("GET", "panel_revisiones", params=params) or []
+            return self.pedir("GET", "panel_revisiones", params={**params, "vacante_id": "eq." + vacante_id}) or []
+        # Por páginas: la depuración completa puede guardar miles (contrato v17).
+        filas = list(self._paginas("panel_revisiones", "vacante_id", params, 200))
+        return sorted(filas, key=lambda r: -(r.get("prioridad") or 0))
 
     def guardar_revisiones(self, filas):
         ahora = datetime.now(timezone.utc).isoformat()
@@ -466,6 +473,16 @@ class RepositorioDemo:
 
     def actualizar_catalogo_datos(self, vacante_id, datos):
         pass  # la demostración ya trae el enlace comprobado
+
+    def archivar_catalogo(self, vacante_id, razon):
+        with self.lock:
+            for r in self._revisiones():
+                if r["vacante_id"] == vacante_id and r.get("catalogo_vacantes"):
+                    r["catalogo_vacantes"].update(status="archived", reason=razon)
+            self._guardar()
+
+    def candidatas_por_confirmar(self, desde=None):
+        return []  # la demostración trae su bandeja ya preparada
 
     def _guardar(self):
         if self.archivo:

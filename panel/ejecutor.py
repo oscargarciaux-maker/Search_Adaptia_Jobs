@@ -304,6 +304,12 @@ def correr(salida, modo="diario", prueba=False, repo=None):
             paises.cargar_reglas()
     try:
         with activar(version, fecha):
+            if hasattr(repo, "decisiones_ubicacion"):
+                try:  # contrato v17: cada decisión de la bandeja vale en esta búsqueda
+                    from panel.revision import decisiones_para_busqueda
+                    bodega._config_operativa["decisiones_operador"] = decisiones_para_busqueda(repo.decisiones_ubicacion())
+                except Exception:  # noqa: BLE001
+                    pass
             previas = bodega._leer_json(Path(salida) / "trabajo/bodega.json.gz", [])
             cargos = version["configuracion"]["cargos"]
             bodega._config_operativa["empresas_objetivo"] = sorted({v["empresa"] for v in previas

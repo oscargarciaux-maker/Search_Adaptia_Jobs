@@ -51,7 +51,10 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   ).toBeVisible();
   await expect(dialog.getByText(/Es una muestra/)).toBeVisible();
   // Vista previa: estima con el catálogo y permite admitir datos no informados.
-  await expect(dialog.getByText(/cumplen? este perfil/)).toBeVisible();
+  // La estimación en vivo también dice «cumple(n) este perfil»: buscar la frase propia de la vista previa.
+  await expect(
+    dialog.getByText(/guardadas? aún no entregadas? cumplen? este perfil/),
+  ).toBeVisible();
   const aplicar = dialog.getByRole("button", { name: "Aplicar", exact: true });
   if (await aplicar.count()) {
     await aplicar.first().click();
@@ -305,6 +308,13 @@ test("revisión masiva por CSV y reglas aprendidas sin IA", async ({
   expect(
     (await (await request.get("/api/revisiones.csv")).text()).split("\n")[0],
   ).toContain("vacante_id,cargo,empresa,ubicacion,pista");
+  // Depuración completa (v17): un botón llena la bandeja sin esperar la búsqueda de la noche.
+  await page
+    .getByRole("button", { name: "Cargar todas las dudosas de la base" })
+    .click();
+  await expect(
+    page.getByText(/Bandeja lista: \d+ por confirmar/),
+  ).toBeVisible();
   // Basta con las columnas que se llenan; los demás datos del CSV descargado son para leer.
   const revisiones = await (await request.get("/api/revisiones")).json();
   const granada = revisiones.pendientes.find(

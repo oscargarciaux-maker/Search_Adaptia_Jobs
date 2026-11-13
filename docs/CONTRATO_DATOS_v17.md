@@ -67,6 +67,30 @@ quedan en el resumen de la ejecución y en el correo diario («Aprendizaje: …�
   - acepta el país por nombre o por sigla;
   - informa las filas con error y sigue con las demás.
 
+## Depuración completa de la base
+
+La bandeja diaria solo trae dudosas que **hoy** le sirven a algún cliente y se arma al final de la búsqueda de la noche.
+Para depurar la base entera antes de entregarla:
+
+- **«Cargar todas las dudosas de la base»** (`POST /api/revisiones/cargar`) llena la bandeja al momento con **todas** las
+  vacantes del catálogo «por confirmar» (`reason = elegibilidad regional por confirmar`), sin filtro de fecha y también
+  las que hoy no le sirven a ningún cliente (`motivo = depuración completa`, sin perfiles, prioridad baja), hasta 3.000.
+  Las reglas activas resuelven solas las que pueden.
+- Las cargadas así **no vencen** con la búsqueda de la noche: esperan a la persona hasta 30 días.
+- El panel sigue mostrando las 10 más útiles; el CSV («Descargar todas») trae todas.
+- **Cada decisión cambia la base al momento:**
+  - «Sirve para…» guarda el país en el catálogo (confianza alta, «confirmada por el operador»);
+  - «Solo para otro país» y «No sirve» archivan la vacante del catálogo (`reason = descartada por el operador`);
+  - si la vacante no le sirve hoy a nadie, no se crean asignaciones ni se exige la búsqueda del día.
+- **Cada búsqueda respeta lo decidido** (noche, mañana y cada hora): `bodega` recibe las decisiones
+  (`decisiones_operador`) y `confirmar_ubicacion.aplicar_operador` añade la observación «operador» (el país elegido, o
+  «país extranjero») o marca `descartada_operador`, que `contrato.entregable` rechaza («descartada por el operador»).
+- **La limpieza de `ofertas`** («Revisar y limpiar vacantes fuera del objetivo», v13) lee `panel_revisiones`:
+  - lo descartado en la bandeja («otro país» o «no sirve») aparece para borrar con el motivo «descartada por el operador»;
+  - lo confirmado se conserva aunque la lectura automática dude;
+  - lo saltado sigue en «revisar».
+  Borrar sigue exigiendo la huella y «aplicar», como siempre.
+
 ## Garantía
 
 Todo el ciclo funciona solo con código:
