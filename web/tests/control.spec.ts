@@ -64,6 +64,26 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await dialog.getByLabel("Aceptó recibir vacantes por WhatsApp").check();
   await expect(dialog.getByLabel("Número con código de país")).toBeVisible();
   await dialog.getByLabel("Aceptó recibir vacantes por WhatsApp").uncheck();
+  // Sección 8: crear un cargo sin salir del cliente; el formulario conserva lo escrito.
+  await dialog
+    .getByLabel("Cargo del perfil 1")
+    .selectOption({ label: "＋ Añadir cargo nuevo…" });
+  const cargoNuevo = page.locator("dialog", { hasText: "Añadir un cargo" });
+  await cargoNuevo.getByLabel("Cargo", { exact: true }).fill("UX Writer");
+  await cargoNuevo
+    .getByRole("button", { name: "Añadir cargo", exact: true })
+    .click();
+  await cargoNuevo
+    .getByRole("button", { name: "Añadir cargo", exact: true })
+    .click();
+  await expect(cargoNuevo).toHaveCount(0);
+  await expect(
+    dialog.getByLabel("Cargo del perfil 1").locator("option:checked"),
+  ).toHaveText("UX Writer");
+  await expect(dialog.getByText("Este cargo aún no tiene cupo")).toBeVisible();
+  await expect(
+    dialog.getByLabel("Nombre o referencia del cliente"),
+  ).toHaveValue("Prueba operadora");
   await dialog.getByLabel("Cargo del perfil 1").selectOption({ label: "QA" });
   await dialog.getByLabel("Antigüedad del perfil 1").selectOption("7");
   // Contrato v20: un solo campo de años; busca de 3 menos a 3 más.
@@ -268,10 +288,22 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await ir(page, "Actividad");
   // Sin avisos por correo: el operador no quiere servicios externos (13 nov).
   await expect(page.getByText("Avisos por correo")).toHaveCount(0);
-  await page.getByText("Dónde se pierden las vacantes de cada cargo").click();
-  await expect(
-    page.getByRole("columnheader", { name: "Enlace comprobado" }),
-  ).toBeVisible();
+  // Sección 8: el embudo de la última búsqueda se ve abierto, en tarjetas y sin desbordar.
+  const embudo = page.locator(".embudo-cargo").first();
+  await expect(embudo.getByText("Enlace comprobado")).toBeVisible();
+  for (const ancho of [1366, 390]) {
+    await page.setViewportSize({ width: ancho, height: 900 });
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth <= innerWidth &&
+          [...document.querySelectorAll(".embudo-cargo")].every(
+            (e) => e.scrollWidth <= e.clientWidth,
+          ),
+      ),
+    ).toBe(true);
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
   // El conflicto intencional se produce desde request, no desde la página.
   expect(errores).toEqual([]);
   await page.screenshot({

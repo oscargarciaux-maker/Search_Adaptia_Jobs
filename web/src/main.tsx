@@ -1565,45 +1565,63 @@ const etapasEmbudo: [keyof Embudo, string][] = [
   ["entregadas", "Entregadas"],
 ];
 
-function EmbudoCargos({ embudo }: { embudo: Record<string, Embudo> }) {
+// Sección 8 (13 nov): una tarjeta por cargo en vez de una tabla ancha; cabe en el móvil sin scroll horizontal.
+function EmbudoCargos({
+  embudo,
+  abierto = false,
+}: {
+  embudo: Record<string, Embudo>;
+  abierto?: boolean;
+}) {
   return (
-    <details className="funnel">
-      <summary>Dónde se pierden las vacantes de cada cargo</summary>
-      <div className="funnel-table">
-        <table>
-          <thead>
-            <tr>
-              <th>Cargo</th>
-              {etapasEmbudo.map(([k, t]) => (
-                <th key={k}>{t}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {Object.entries(embudo).map(([cargo, e]) => (
-              <tr key={cargo}>
-                <th scope="row">
-                  {cargo}
-                  {e.principal_perdida && (
-                    <span className="muted">
-                      Mayor pérdida: {e.principal_perdida}
-                    </span>
-                  )}
-                </th>
-                {etapasEmbudo.map(([k]) => (
-                  <td key={k}>
-                    {e[k] as number}
-                    {k === "entregadas" && e.ampliadas > 0 && (
-                      <span className="muted"> ({e.ampliadas} ampliadas)</span>
-                    )}
-                  </td>
+    <Plegable
+      className="funnel"
+      inicial={abierto}
+      mostrar="Ver dónde se pierden las vacantes"
+      ocultar="Ocultar dónde se pierden las vacantes"
+    >
+      <div className="embudo-lista">
+        {Object.entries(embudo).map(([cargo, e]) => {
+          // La etapa que más vacantes pierde respecto a la anterior.
+          let peor = -1,
+            perdida = 0;
+          etapasEmbudo.forEach(([k], n) => {
+            if (n === 0) return;
+            const caida =
+              ((e[etapasEmbudo[n - 1][0]] as number) || 0) -
+              ((e[k] as number) || 0);
+            if (caida > perdida) {
+              perdida = caida;
+              peor = n;
+            }
+          });
+          return (
+            <section className="embudo-cargo" key={cargo}>
+              <h4>
+                <span>{cargo}</span>
+                <span className="embudo-entregadas">
+                  Entregadas {e.entregadas}
+                  {e.ampliadas > 0 && ` (${e.ampliadas} ampliadas)`}
+                </span>
+              </h4>
+              <ol className="embudo-etapas">
+                {etapasEmbudo.map(([k, t], n) => (
+                  <li key={k} className={n === peor ? "mayor-perdida" : ""}>
+                    <strong>{e[k] as number}</strong>
+                    <span>{t}</span>
+                  </li>
                 ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+              </ol>
+              {e.principal_perdida && (
+                <p className="field-help">
+                  Mayor pérdida: {e.principal_perdida}
+                </p>
+              )}
+            </section>
+          );
+        })}
       </div>
-    </details>
+    </Plegable>
   );
 }
 
@@ -1613,13 +1631,17 @@ function ClienteDialog({
   paises,
   onClose,
   onSave,
+  onCrearCargo,
 }: {
   cliente: Cliente | null;
   config: Configuracion;
   paises: Sesion["paises"];
   onClose: () => void;
   onSave: (c: Cliente, p: Perfil[]) => void;
+  onCrearCargo: (c: Cargo) => void;
 }) {
+  // Sección 8 (13 nov): crear un cargo sin salir del cliente. `null` = cerrado; si no, el perfil que lo pidió.
+  const [cargoPara, setCargoPara] = useState<string | null>(null);
   const [c, setC] = useState<Cliente>(
     cliente ? { ...cliente } : { id: uid(), nombre: "", activo: true },
   );
@@ -1669,447 +1691,494 @@ function ClienteDialog({
   };
   const previa = useVistaPrevia(borrador);
   return (
-    <Dialog
-      ancho
-      titulo={cliente ? "Editar cliente" : "Nuevo cliente"}
-      subtitulo="Define qué oportunidades son útiles para esta persona."
-      onClose={onClose}
-    >
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (!ps.length) {
-            setError("Añade al menos un perfil de búsqueda.");
-            return;
-          }
-          if (ps.some((p) => !p.modalidades.length || !p.idiomas.length)) {
-            setError(
-              "Selecciona al menos una modalidad y un idioma por perfil.",
-            );
-            return;
-          }
-          try {
-            if (ct.telefono.trim()) {
-              await api("/contactos/" + c.id, {
-                method: "PUT",
-                body: JSON.stringify(ct),
-              });
-            } else if (teniaContacto) {
-              await api("/contactos/" + c.id, { method: "DELETE" });
-            }
-          } catch (err) {
-            setError((err as Error).message);
-            return;
-          }
-          onSave(c, ps);
-        }}
+    <>
+      <Dialog
+        ancho
+        titulo={cliente ? "Editar cliente" : "Nuevo cliente"}
+        subtitulo="Define qué oportunidades son útiles para esta persona."
+        onClose={onClose}
       >
-        <div className="field">
-          <label htmlFor="cliente-nombre">
-            Nombre o referencia del cliente
-          </label>
-          <input
-            id="cliente-nombre"
-            autoFocus
-            required
-            maxLength={100}
-            value={c.nombre}
-            placeholder="Nombre para identificar a tu cliente"
-            onChange={(e) => setC({ ...c, nombre: e.target.value })}
-          />
-        </div>
-        <fieldset className="whatsapp-contacto">
-          <legend>WhatsApp (opcional)</legend>
-          <label className="check-line">
-            <input
-              type="checkbox"
-              checked={ct.consentimiento}
-              onChange={(e) =>
-                setCt({ ...ct, consentimiento: e.target.checked })
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!ps.length) {
+              setError("Añade al menos un perfil de búsqueda.");
+              return;
+            }
+            if (ps.some((p) => !p.modalidades.length || !p.idiomas.length)) {
+              setError(
+                "Selecciona al menos una modalidad y un idioma por perfil.",
+              );
+              return;
+            }
+            try {
+              if (ct.telefono.trim()) {
+                await api("/contactos/" + c.id, {
+                  method: "PUT",
+                  body: JSON.stringify(ct),
+                });
+              } else if (teniaContacto) {
+                await api("/contactos/" + c.id, { method: "DELETE" });
               }
+            } catch (err) {
+              setError((err as Error).message);
+              return;
+            }
+            onSave(c, ps);
+          }}
+        >
+          <div className="field">
+            <label htmlFor="cliente-nombre">
+              Nombre o referencia del cliente
+            </label>
+            <input
+              id="cliente-nombre"
+              autoFocus
+              required
+              maxLength={100}
+              value={c.nombre}
+              placeholder="Nombre para identificar a tu cliente"
+              onChange={(e) => setC({ ...c, nombre: e.target.value })}
             />
-            Aceptó recibir vacantes por WhatsApp
-          </label>
-          {ct.consentimiento && (
-            <div className="whatsapp-datos">
-              <div className="form-grid">
-                <div className="field">
-                  <label htmlFor="cliente-telefono">
-                    Número con código de país
-                  </label>
-                  <input
-                    id="cliente-telefono"
-                    type="tel"
-                    inputMode="tel"
-                    autoComplete="off"
-                    placeholder="+57 300 123 4567"
-                    value={ct.telefono}
-                    onChange={(e) => setCt({ ...ct, telefono: e.target.value })}
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor="cliente-saludo">Nombre para saludar</label>
-                  <input
-                    id="cliente-saludo"
-                    maxLength={60}
-                    placeholder="Ana"
-                    value={ct.nombre_saludo}
-                    onChange={(e) =>
-                      setCt({ ...ct, nombre_saludo: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-              <p className="field-help">
-                Con número y aceptación, cada mañana tendrás su mensaje listo en
-                «Mensajes». Nada se envía solo.
-              </p>
-            </div>
-          )}
-        </fieldset>
-        <div className="section-title">
-          <h3>Perfiles de búsqueda</h3>
-          <span className="muted">
-            {ps.length} {ps.length === 1 ? "perfil" : "perfiles"}
-          </span>
-        </div>
-        {ps.map((p, i) => (
-          <section className="profile-editor" key={p.id}>
-            <div className="profile-heading">
-              <span className="tiny-kicker">PERFIL {i + 1}</span>
-              <button
-                type="button"
-                className="text-button danger"
-                onClick={() => setPs(ps.filter((x) => x.id !== p.id))}
-              >
-                Quitar perfil
-              </button>
-            </div>
-            <div className="form-grid">
-              <div className="field">
-                <label>Cargo</label>
-                <select
-                  aria-label={"Cargo del perfil " + (i + 1)}
-                  value={p.cargo_id}
-                  onChange={(e) => patch(p.id, { cargo_id: e.target.value })}
-                >
-                  {cargos.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor={"vive-" + p.id}>¿En qué país vive?</label>
-                <select
-                  id={"vive-" + p.id}
-                  aria-label={"País de residencia del perfil " + (i + 1)}
-                  value={p.vive_en}
-                  onChange={(e) =>
-                    patch(p.id, {
-                      vive_en: e.target.value,
-                      paises_presenciales_extra:
-                        p.paises_presenciales_extra.filter(
-                          (x) => x !== e.target.value,
-                        ),
-                    })
-                  }
-                >
-                  {paises.map((pais) => (
-                    <option key={pais.codigo} value={pais.codigo}>
-                      {pais.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <fieldset className="field plain">
-              <legend>
-                ¿Qué modalidades acepta?{" "}
-                <Ayuda etiqueta="modalidades">
-                  Remoto: vacantes de LATAM, España o del mundo abiertas a su
-                  país. Híbrido y presencial: solo con oficina en su país o en
-                  los países a los que se mudaría (se eligen abajo).
-                </Ayuda>
-              </legend>
-              <div className="check-line">
-                {Object.entries(modos).map(([v, t]) => (
-                  <label key={v}>
+          </div>
+          <fieldset className="whatsapp-contacto">
+            <legend>WhatsApp (opcional)</legend>
+            <label className="check-line">
+              <input
+                type="checkbox"
+                checked={ct.consentimiento}
+                onChange={(e) =>
+                  setCt({ ...ct, consentimiento: e.target.checked })
+                }
+              />
+              Aceptó recibir vacantes por WhatsApp
+            </label>
+            {ct.consentimiento && (
+              <div className="whatsapp-datos">
+                <div className="form-grid">
+                  <div className="field">
+                    <label htmlFor="cliente-telefono">
+                      Número con código de país
+                    </label>
                     <input
-                      type="checkbox"
-                      aria-label={t + " en el perfil " + (i + 1)}
-                      checked={p.modalidades.includes(v)}
+                      id="cliente-telefono"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="off"
+                      placeholder="+57 300 123 4567"
+                      value={ct.telefono}
                       onChange={(e) =>
-                        patch(p.id, {
-                          modalidades: e.target.checked
-                            ? [...p.modalidades, v]
-                            : p.modalidades.filter((x) => x !== v),
-                        })
+                        setCt({ ...ct, telefono: e.target.value })
                       }
                     />
-                    {t}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            {p.modalidades.some((m) => m !== "remoto") && (
-              <div className="field mudanza">
-                <span className="mudanza-titulo">
-                  También se mudaría a…{" "}
-                  <span className="muted">(opcional)</span>
-                </span>
-                <Plegable
-                  inicial={p.paises_presenciales_extra.length > 0}
-                  mostrar={
-                    "Mostrar países" +
-                    (p.paises_presenciales_extra.length
-                      ? ` (${p.paises_presenciales_extra.length} ${p.paises_presenciales_extra.length === 1 ? "elegido" : "elegidos"})`
-                      : "")
-                  }
-                  ocultar="Ocultar países"
-                >
-                  <div className="mudanza-acciones">
-                    <button
-                      type="button"
-                      className="text-button"
-                      onClick={() =>
-                        patch(p.id, {
-                          paises_presenciales_extra: paises
-                            .map((x) => x.codigo)
-                            .filter((x) => x !== p.vive_en),
-                        })
-                      }
-                    >
-                      Seleccionar todos
-                    </button>
-                    <button
-                      type="button"
-                      className="text-button"
-                      onClick={() =>
-                        patch(p.id, { paises_presenciales_extra: [] })
-                      }
-                    >
-                      Quitar todos
-                    </button>
                   </div>
-                  <div className="country-grid">
-                    {paises
-                      .filter((pais) => pais.codigo !== p.vive_en)
-                      .map((pais) => (
-                        <label
-                          className={
-                            "country " +
-                            (p.paises_presenciales_extra.includes(pais.codigo)
-                              ? "selected"
-                              : "")
-                          }
-                          key={pais.codigo}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={p.paises_presenciales_extra.includes(
-                              pais.codigo,
-                            )}
-                            onChange={(e) =>
-                              patch(p.id, {
-                                paises_presenciales_extra: e.target.checked
-                                  ? [
-                                      ...p.paises_presenciales_extra,
-                                      pais.codigo,
-                                    ]
-                                  : p.paises_presenciales_extra.filter(
-                                      (x) => x !== pais.codigo,
-                                    ),
-                              })
-                            }
-                          />
-                          {pais.nombre}
-                        </label>
-                      ))}
+                  <div className="field">
+                    <label htmlFor="cliente-saludo">Nombre para saludar</label>
+                    <input
+                      id="cliente-saludo"
+                      maxLength={60}
+                      placeholder="Ana"
+                      value={ct.nombre_saludo}
+                      onChange={(e) =>
+                        setCt({ ...ct, nombre_saludo: e.target.value })
+                      }
+                    />
                   </div>
-                </Plegable>
+                </div>
+                <p className="field-help">
+                  Con número y aceptación, cada mañana tendrás su mensaje listo
+                  en «Mensajes». Nada se envía solo.
+                </p>
               </div>
             )}
-            <div className="form-grid">
-              <div className="field">
-                <label>Antigüedad máxima de publicación</label>
-                <select
-                  aria-label={"Antigüedad del perfil " + (i + 1)}
-                  value={p.antiguedad_dias}
-                  onChange={(e) =>
-                    patch(p.id, { antiguedad_dias: Number(e.target.value) })
-                  }
+          </fieldset>
+          <div className="section-title">
+            <h3>Perfiles de búsqueda</h3>
+            <span className="muted">
+              {ps.length} {ps.length === 1 ? "perfil" : "perfiles"}
+            </span>
+          </div>
+          {ps.map((p, i) => (
+            <section className="profile-editor" key={p.id}>
+              <div className="profile-heading">
+                <span className="tiny-kicker">PERFIL {i + 1}</span>
+                <button
+                  type="button"
+                  className="text-button danger"
+                  onClick={() => setPs(ps.filter((x) => x.id !== p.id))}
                 >
-                  {[1, 3, 7, 14, 21, 30].map((n) => (
-                    <option key={n} value={n}>
-                      {n} {n === 1 ? "día" : "días"}
-                    </option>
-                  ))}
-                </select>
+                  Quitar perfil
+                </button>
               </div>
-              <div className="field">
-                <label>Idioma del aviso</label>
+              <div className="form-grid">
+                <div className="field">
+                  <label>Cargo</label>
+                  <select
+                    aria-label={"Cargo del perfil " + (i + 1)}
+                    value={p.cargo_id}
+                    onChange={(e) =>
+                      e.target.value === "__nuevo"
+                        ? setCargoPara(p.id)
+                        : patch(p.id, { cargo_id: e.target.value })
+                    }
+                  >
+                    {cargos.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre}
+                      </option>
+                    ))}
+                    <option value="__nuevo">＋ Añadir cargo nuevo…</option>
+                  </select>
+                  {cargos.find((x) => x.id === p.cargo_id)?.cupo === 0 && (
+                    <p className="field-help">
+                      Este cargo aún no tiene cupo: dale vacantes en «Cargos y
+                      cupos» para que reciba.
+                    </p>
+                  )}
+                </div>
+                <div className="field">
+                  <label htmlFor={"vive-" + p.id}>¿En qué país vive?</label>
+                  <select
+                    id={"vive-" + p.id}
+                    aria-label={"País de residencia del perfil " + (i + 1)}
+                    value={p.vive_en}
+                    onChange={(e) =>
+                      patch(p.id, {
+                        vive_en: e.target.value,
+                        paises_presenciales_extra:
+                          p.paises_presenciales_extra.filter(
+                            (x) => x !== e.target.value,
+                          ),
+                      })
+                    }
+                  >
+                    {paises.map((pais) => (
+                      <option key={pais.codigo} value={pais.codigo}>
+                        {pais.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <fieldset className="field plain">
+                <legend>
+                  ¿Qué modalidades acepta?{" "}
+                  <Ayuda etiqueta="modalidades">
+                    Remoto: vacantes de LATAM, España o del mundo abiertas a su
+                    país. Híbrido y presencial: solo con oficina en su país o en
+                    los países a los que se mudaría (se eligen abajo).
+                  </Ayuda>
+                </legend>
                 <div className="check-line">
-                  {[
-                    ["es", "Español"],
-                    ["en", "Inglés"],
-                  ].map(([code, label]) => (
-                    <label key={code}>
+                  {Object.entries(modos).map(([v, t]) => (
+                    <label key={v}>
                       <input
                         type="checkbox"
-                        checked={p.idiomas.includes(code)}
+                        aria-label={t + " en el perfil " + (i + 1)}
+                        checked={p.modalidades.includes(v)}
                         onChange={(e) =>
                           patch(p.id, {
-                            idiomas: e.target.checked
-                              ? [...p.idiomas, code]
-                              : p.idiomas.filter((x) => x !== code),
+                            modalidades: e.target.checked
+                              ? [...p.modalidades, v]
+                              : p.modalidades.filter((x) => x !== v),
                           })
                         }
                       />
-                      {label}
+                      {t}
                     </label>
                   ))}
                 </div>
+              </fieldset>
+              {p.modalidades.some((m) => m !== "remoto") && (
+                <div className="field mudanza">
+                  <span className="mudanza-titulo">
+                    También se mudaría a…{" "}
+                    <span className="muted">(opcional)</span>
+                  </span>
+                  <Plegable
+                    inicial={p.paises_presenciales_extra.length > 0}
+                    mostrar={
+                      "Mostrar países" +
+                      (p.paises_presenciales_extra.length
+                        ? ` (${p.paises_presenciales_extra.length} ${p.paises_presenciales_extra.length === 1 ? "elegido" : "elegidos"})`
+                        : "")
+                    }
+                    ocultar="Ocultar países"
+                  >
+                    <div className="mudanza-acciones">
+                      <button
+                        type="button"
+                        className="text-button"
+                        onClick={() =>
+                          patch(p.id, {
+                            paises_presenciales_extra: paises
+                              .map((x) => x.codigo)
+                              .filter((x) => x !== p.vive_en),
+                          })
+                        }
+                      >
+                        Seleccionar todos
+                      </button>
+                      <button
+                        type="button"
+                        className="text-button"
+                        onClick={() =>
+                          patch(p.id, { paises_presenciales_extra: [] })
+                        }
+                      >
+                        Quitar todos
+                      </button>
+                    </div>
+                    <div className="country-grid">
+                      {paises
+                        .filter((pais) => pais.codigo !== p.vive_en)
+                        .map((pais) => (
+                          <label
+                            className={
+                              "country " +
+                              (p.paises_presenciales_extra.includes(pais.codigo)
+                                ? "selected"
+                                : "")
+                            }
+                            key={pais.codigo}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={p.paises_presenciales_extra.includes(
+                                pais.codigo,
+                              )}
+                              onChange={(e) =>
+                                patch(p.id, {
+                                  paises_presenciales_extra: e.target.checked
+                                    ? [
+                                        ...p.paises_presenciales_extra,
+                                        pais.codigo,
+                                      ]
+                                    : p.paises_presenciales_extra.filter(
+                                        (x) => x !== pais.codigo,
+                                      ),
+                                })
+                              }
+                            />
+                            {pais.nombre}
+                          </label>
+                        ))}
+                    </div>
+                  </Plegable>
+                </div>
+              )}
+              <div className="form-grid">
+                <div className="field">
+                  <label>Antigüedad máxima de publicación</label>
+                  <select
+                    aria-label={"Antigüedad del perfil " + (i + 1)}
+                    value={p.antiguedad_dias}
+                    onChange={(e) =>
+                      patch(p.id, { antiguedad_dias: Number(e.target.value) })
+                    }
+                  >
+                    {[1, 3, 7, 14, 21, 30].map((n) => (
+                      <option key={n} value={n}>
+                        {n} {n === 1 ? "día" : "días"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Idioma del aviso</label>
+                  <div className="check-line">
+                    {[
+                      ["es", "Español"],
+                      ["en", "Inglés"],
+                    ].map(([code, label]) => (
+                      <label key={code}>
+                        <input
+                          type="checkbox"
+                          checked={p.idiomas.includes(code)}
+                          onChange={(e) =>
+                            patch(p.id, {
+                              idiomas: e.target.checked
+                                ? [...p.idiomas, code]
+                                : p.idiomas.filter((x) => x !== code),
+                            })
+                          }
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="form-grid">
-              <div className="field">
-                <label htmlFor={"anos-" + p.id}>Años de experiencia</label>
-                <input
-                  id={"anos-" + p.id}
-                  aria-label={"Años de experiencia del perfil " + (i + 1)}
-                  type="number"
-                  min={0}
-                  max={40}
-                  placeholder={
-                    p.experiencia_anos == null &&
-                    (p.experiencia_min !== null || p.experiencia_max !== null)
-                      ? `Hoy: ${p.experiencia_min ?? 0}–${p.experiencia_max ?? 40} años`
-                      : "Sin filtro"
-                  }
-                  value={p.experiencia_anos ?? ""}
-                  onChange={(e) => {
-                    // Contrato v20: de 3 años menos a 3 años más (el servidor hace la misma cuenta).
-                    const n =
-                      e.target.value === ""
-                        ? null
-                        : Math.max(0, Math.min(40, Number(e.target.value)));
-                    patch(p.id, {
-                      experiencia_anos: n,
-                      experiencia_min: n === null ? null : Math.max(0, n - 3),
-                      experiencia_max: n === null ? null : Math.min(40, n + 3),
-                    });
-                  }}
-                />
-                <p className="field-help">
-                  {p.experiencia_anos != null
-                    ? `Busca vacantes que pidan de ${p.experiencia_min} a ${p.experiencia_max} años.`
-                    : p.experiencia_min !== null || p.experiencia_max !== null
-                      ? `Hoy filtra de ${p.experiencia_min ?? 0} a ${p.experiencia_max ?? 40} años. Si escribes sus años, buscará de 3 menos a 3 más.`
-                      : "Vacío: sin filtro de experiencia. Con un valor, busca de 3 años menos a 3 más."}
-                </p>
+              <div className="form-grid">
+                <div className="field">
+                  <label htmlFor={"anos-" + p.id}>Años de experiencia</label>
+                  <input
+                    id={"anos-" + p.id}
+                    aria-label={"Años de experiencia del perfil " + (i + 1)}
+                    type="number"
+                    min={0}
+                    max={40}
+                    placeholder={
+                      p.experiencia_anos == null &&
+                      (p.experiencia_min !== null || p.experiencia_max !== null)
+                        ? `Hoy: ${p.experiencia_min ?? 0}–${p.experiencia_max ?? 40} años`
+                        : "Sin filtro"
+                    }
+                    value={p.experiencia_anos ?? ""}
+                    onChange={(e) => {
+                      // Contrato v20: de 3 años menos a 3 años más (el servidor hace la misma cuenta).
+                      const n =
+                        e.target.value === ""
+                          ? null
+                          : Math.max(0, Math.min(40, Number(e.target.value)));
+                      patch(p.id, {
+                        experiencia_anos: n,
+                        experiencia_min: n === null ? null : Math.max(0, n - 3),
+                        experiencia_max:
+                          n === null ? null : Math.min(40, n + 3),
+                      });
+                    }}
+                  />
+                  <p className="field-help">
+                    {p.experiencia_anos != null
+                      ? `Busca vacantes que pidan de ${p.experiencia_min} a ${p.experiencia_max} años.`
+                      : p.experiencia_min !== null || p.experiencia_max !== null
+                        ? `Hoy filtra de ${p.experiencia_min ?? 0} a ${p.experiencia_max ?? 40} años. Si escribes sus años, buscará de 3 menos a 3 más.`
+                        : "Vacío: sin filtro de experiencia. Con un valor, busca de 3 años menos a 3 más."}
+                  </p>
+                </div>
+                <div className="field">
+                  <label>Inglés requerido: hasta</label>
+                  <select
+                    aria-label={"Inglés del perfil " + (i + 1)}
+                    value={p.ingles_maximo}
+                    onChange={(e) =>
+                      patch(p.id, { ingles_maximo: e.target.value })
+                    }
+                  >
+                    <option value="sin_filtro">Sin filtro</option>
+                    {["A1", "A2", "B1", "B2", "C1", "C2", "native"].map((n) => (
+                      <option value={n} key={n}>
+                        {n === "native" ? "Nativo" : n}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="field-help">
+                    Es el nivel que pide el aviso, aparte del idioma en que está
+                    escrito.
+                  </p>
+                </div>
               </div>
-              <div className="field">
-                <label>Inglés requerido: hasta</label>
-                <select
-                  aria-label={"Inglés del perfil " + (i + 1)}
-                  value={p.ingles_maximo}
-                  onChange={(e) =>
-                    patch(p.id, { ingles_maximo: e.target.value })
-                  }
-                >
-                  <option value="sin_filtro">Sin filtro</option>
-                  {["A1", "A2", "B1", "B2", "C1", "C2", "native"].map((n) => (
-                    <option value={n} key={n}>
-                      {n === "native" ? "Nativo" : n}
-                    </option>
-                  ))}
-                </select>
-                <p className="field-help">
-                  Es el nivel que pide el aviso, aparte del idioma en que está
-                  escrito.
-                </p>
+              <div className="missing-options">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={p.aceptar_experiencia_sin_dato}
+                    onChange={(e) =>
+                      patch(p.id, {
+                        aceptar_experiencia_sin_dato: e.target.checked,
+                      })
+                    }
+                  />
+                  Admitir experiencia no informada
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={p.aceptar_ingles_sin_dato}
+                    onChange={(e) =>
+                      patch(p.id, { aceptar_ingles_sin_dato: e.target.checked })
+                    }
+                  />
+                  Admitir inglés no informado
+                </label>
               </div>
-            </div>
-            <div className="missing-options">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={p.aceptar_experiencia_sin_dato}
-                  onChange={(e) =>
-                    patch(p.id, {
-                      aceptar_experiencia_sin_dato: e.target.checked,
-                    })
-                  }
-                />
-                Admitir experiencia no informada
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={p.aceptar_ingles_sin_dato}
-                  onChange={(e) =>
-                    patch(p.id, { aceptar_ingles_sin_dato: e.target.checked })
-                  }
-                />
-                Admitir inglés no informado
-              </label>
-            </div>
-            <PreviewPerfil
-              info={previa.datos?.perfiles?.[p.id]}
-              estado={previa.estado}
-              motivo={previa.motivo}
-              pendiente={previa.datos?.incompletos?.[p.id]}
-              onAjustar={(cambio) => patch(p.id, cambio)}
-            />
-            <EnVivo
-              config={borrador}
-              perfilId={p.id}
-              onAjustar={(cambio) => patch(p.id, cambio)}
-            />
-          </section>
-        ))}
-        {ps.length ? (
-          <button
-            type="button"
-            disabled={!cargos.length}
-            className="text-button otro-perfil"
-            onClick={() => setPs([...ps, perfilNuevo(c.id, cargos[0].id)])}
-          >
-            <Plus size={15} />
-            Añadir otro perfil
-          </button>
-        ) : (
-          <button
-            type="button"
-            disabled={!cargos.length}
-            className="button secondary full dashed"
-            onClick={() => setPs([...ps, perfilNuevo(c.id, cargos[0].id)])}
-          >
-            <Plus size={16} />
-            Añadir perfil de búsqueda
-          </button>
-        )}
-        {!cargos.length && (
-          <p className="helper">Primero añade un cargo en «Cargos y cupos».</p>
-        )}
-        {error && (
-          <p className="form-error" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="dialog-actions">
-          <button className="button secondary" type="button" onClick={onClose}>
-            Cancelar
-          </button>
-          <button className="button primary">
-            {cliente ? "Aplicar cambios" : "Añadir cliente"}
-            <Check size={15} />
-          </button>
-        </div>
-      </form>
-    </Dialog>
+              <PreviewPerfil
+                info={previa.datos?.perfiles?.[p.id]}
+                estado={previa.estado}
+                motivo={previa.motivo}
+                pendiente={previa.datos?.incompletos?.[p.id]}
+                onAjustar={(cambio) => patch(p.id, cambio)}
+              />
+              <EnVivo
+                config={borrador}
+                perfilId={p.id}
+                onAjustar={(cambio) => patch(p.id, cambio)}
+              />
+            </section>
+          ))}
+          {ps.length ? (
+            <button
+              type="button"
+              disabled={!cargos.length}
+              className="text-button otro-perfil"
+              onClick={() => setPs([...ps, perfilNuevo(c.id, cargos[0].id)])}
+            >
+              <Plus size={15} />
+              Añadir otro perfil
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={!cargos.length}
+              className="button secondary full dashed"
+              onClick={() => setPs([...ps, perfilNuevo(c.id, cargos[0].id)])}
+            >
+              <Plus size={16} />
+              Añadir perfil de búsqueda
+            </button>
+          )}
+          {!cargos.length && (
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => setCargoPara("")}
+            >
+              <Plus size={16} />
+              Añadir cargo
+            </button>
+          )}
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="dialog-actions">
+            <button
+              className="button secondary"
+              type="button"
+              onClick={onClose}
+            >
+              Cancelar
+            </button>
+            <button className="button primary">
+              {cliente ? "Aplicar cambios" : "Añadir cliente"}
+              <Check size={15} />
+            </button>
+          </div>
+        </form>
+      </Dialog>
+      {cargoPara !== null && (
+        <CargoDialog
+          cargo={null}
+          notify={() => undefined}
+          onClose={() => setCargoPara(null)}
+          onSave={(nuevo) => {
+            onCrearCargo(nuevo);
+            const destino = cargoPara;
+            if (destino)
+              setPs((actuales) =>
+                actuales.map((x) =>
+                  x.id === destino ? { ...x, cargo_id: nuevo.id } : x,
+                ),
+              );
+            else
+              setPs((actuales) => [...actuales, perfilNuevo(c.id, nuevo.id)]);
+            setCargoPara(null);
+          }}
+        />
+      )}
+    </>
   );
 }
 // Sección 5 (13 nov): sin menú propio; cada sección tiene su dirección y se abre desde las tarjetas del resumen.
@@ -3249,7 +3318,7 @@ function App() {
                   texto="Programa tu configuración. La primera búsqueda con esos criterios aparecerá aquí."
                 />
               ) : (
-                runs.map((r) => (
+                runs.map((r, n) => (
                   <div className="run" key={r.id}>
                     <span
                       className={
@@ -3287,7 +3356,10 @@ function App() {
                         </p>
                       )}
                       {r.resumen.embudo && (
-                        <EmbudoCargos embudo={r.resumen.embudo} />
+                        <EmbudoCargos
+                          embudo={r.resumen.embudo}
+                          abierto={n === 0}
+                        />
                       )}
                     </div>
                     <span
@@ -3333,6 +3405,9 @@ function App() {
           config={draft}
           paises={sesion.paises}
           onClose={() => setModal(null)}
+          onCrearCargo={(nuevo) =>
+            cambiar({ ...draft, cargos: [...draft.cargos, nuevo] })
+          }
           onSave={(c, ps) => {
             cambiar({
               ...draft,
