@@ -16,7 +16,7 @@ import requests
 
 from buscador import paises
 from panel import servicio
-from panel.modelos import AjustesAlertas, CambioBorrador, Configuracion, Contacto, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia
+from panel.modelos import AjustesAlertas, CambioBorrador, Configuracion, Contacto, DecisionRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia
 from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase, hoy
 from panel.terminos import sugerir
 
@@ -237,6 +237,24 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         if "texto" in cambios:
             cambios["editado"] = True
         return repo.actualizar_borrador(str(borrador_id), cambios)
+
+    # Contrato v16: bandeja «Por confirmar».
+    @app.get("/api/revisiones")
+    def leer_revisiones():
+        from panel import revision
+        return revision.listar(repo, hoy())
+
+    @app.post("/api/revisiones/{vacante_id}")
+    def decidir_revision(vacante_id: str, body: DecisionRevision):
+        from panel import revision
+        if not 3 <= len(vacante_id) <= 80:
+            raise HTTPException(422, "Vacante no reconocida.")
+        comprobar = None
+        if not demo:
+            from buscador import verificar_enlaces
+            comprobar = verificar_enlaces.comprobar
+        return revision.decidir(repo, vacante_id, body.decision, body.paises, body.aplicar_a_iguales,
+                                comprobar=comprobar)
 
     @app.get("/api/ejecuciones")
     def ejecuciones():

@@ -223,6 +223,15 @@ def resultados(repo, cliente_id=None, fecha=None):
         # la bodega en vez de rehacerlo con menos evidencia.
         actual = vacante.reetiquetar(dict(datos, _descripcion=v.get("description_full") or datos.get("_descripcion", "")),
                                      publicada=True)
+        # Contrato v16: una vacante confirmada en la bandeja se evalúa con los países decididos. En el catálogo seguía
+        # archivada solo por «elegibilidad regional por confirmar»: eso ya no la retira.
+        from panel.revision import aplicar_confirmacion
+        confirmada = aplicar_confirmacion(actual, row.get("explicacion"))
+        if confirmada is not actual:
+            actual = confirmada
+            if v.get("status") == "archived" and v.get("reason") == "elegibilidad regional por confirmar":
+                v = dict(v, status="active")
+                row = dict(row, catalogo_vacantes=v)
         ampliacion = next((e["ampliacion"] for e in row.get("explicacion") or [] if isinstance(e, dict) and e.get("ampliacion")), "")
         filtros = evaluar_ampliada(actual, row["filtros"], hoy(), ampliacion) if ampliacion else evaluar(actual, row["filtros"], hoy())
         afinidad_cargo,_ = grado(actual["titulo"],row["cargo_configuracion"], cercanos=ampliacion == "cargo_cercano")

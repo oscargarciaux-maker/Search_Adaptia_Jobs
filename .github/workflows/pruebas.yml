@@ -85,6 +85,7 @@ jobs:
           python -m pruebas.probar_panel
           python -m pruebas.probar_traspaso
           python -m pruebas.probar_limpieza
+          python -m pruebas.probar_revision
   pruebas:
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -25,6 +25,7 @@ import {
   Loader2,
   LogOut,
   Mail,
+  MapPin,
   Megaphone,
   Menu,
   MessageCircle,
@@ -61,6 +62,8 @@ import type {
   EstimacionEnVivo,
   EstimacionPerfil,
   VistaPrevia,
+  Revision,
+  Revisiones,
 } from "./types";
 import "./style.css";
 
@@ -701,6 +704,221 @@ const estadosMensaje: Record<Borrador["estado"], string> = {
   enviado: "Enviado",
   descartado: "Descartado",
 };
+
+// Contrato v16: vacantes que le servirían a un cliente pero cuyo país no se pudo confirmar solo. Un clic por vacante.
+function PorConfirmar({
+  paises,
+  notify,
+  onCambio,
+}: {
+  paises: Sesion["paises"];
+  notify: (s: string, error?: boolean) => void;
+  onCambio: (total: number) => void;
+}) {
+  const [datos, setDatos] = useState<Revisiones | null>(null);
+  const [elegido, setElegido] = useState<Record<string, string>>({});
+  const [iguales, setIguales] = useState<Record<string, boolean>>({});
+  const [ocupado, setOcupado] = useState("");
+  async function cargar() {
+    try {
+      const r = await api<Revisiones>("/revisiones");
+      setDatos(r);
+      onCambio(r.total);
+    } catch (e) {
+      notify((e as Error).message, true);
+      setDatos({ pendientes: [], total: 0, ayudan_faltantes: 0 });
+    }
+  }
+  useEffect(() => {
+    cargar();
+  }, []);
+  const nombre = (codigo: string) =>
+    paises.find((p) => p.codigo === codigo)?.nombre || codigo;
+  async function decidir(r: Revision, decision: string) {
+    const pais = elegido[r.vacante_id] ?? r.sugerencia[0] ?? "";
+    if (decision === "sirve" && !pais) {
+      notify("Elige el país antes de confirmar.", true);
+      return;
+    }
+    setOcupado(r.vacante_id);
+    try {
+      const res = await api<{ asignadas: number; iguales: number }>(
+        "/revisiones/" + encodeURIComponent(r.vacante_id),
+        {
+          method: "POST",
+          body: JSON.stringify({
+            decision,
+            paises: decision === "sirve" ? [pais] : [],
+            aplicar_a_iguales: Boolean(iguales[r.vacante_id]),
+          }),
+        },
+      );
+      const extra = res.iguales
+        ? ` También se decidieron ${res.iguales} con la misma ubicación.`
+        : "";
+      notify(
+        decision === "sirve"
+          ? `Confirmada: se asignó a ${res.asignadas} cliente(s).${extra}`
+          : decision === "saltar"
+            ? "Apartada por ahora."
+            : `Descartada.${extra}`,
+      );
+      await cargar();
+    } catch (e) {
+      notify((e as Error).message, true);
+    } finally {
+      setOcupado("");
+    }
+  }
+  if (!datos) return <div className="card loading-card">Cargando…</div>;
+  if (!datos.pendientes.length)
+    return (
+      <Empty
+        icon={CheckCheck}
+        title="Todo al día"
+        texto="No hay vacantes por confirmar. Las que lleguen aparecerán aquí después de la búsqueda de la noche."
+      />
+    );
+  return (
+    <section className="revisiones">
+      <p className="helper revision-ayuda">
+        {datos.total} por confirmar
+        {datos.ayudan_faltantes
+          ? ` · ${datos.ayudan_faltantes} ayudan a clientes con menos de 5 vacantes`
+          : ""}
+        . Atajos con la tarjeta seleccionada: 1 Sirve · 2 Otro país · 3 No sirve
+        · 4 Saltar.
+      </p>
+      {datos.pendientes.map((r) => {
+        const pais = elegido[r.vacante_id] ?? r.sugerencia[0] ?? "";
+        return (
+          <article
+            className="card revision"
+            key={r.vacante_id}
+            tabIndex={0}
+            aria-label={`${r.titulo} en ${r.empresa}`}
+            onKeyDown={(e) => {
+              if ((e.target as HTMLElement).tagName === "SELECT") return;
+              const accion = {
+                "1": "sirve",
+                "2": "otro_pais",
+                "3": "no_sirve",
+                "4": "saltar",
+              }[e.key];
+              if (accion && !ocupado) {
+                e.preventDefault();
+                decidir(r, accion);
+              }
+            }}
+          >
+            <div className="vacancy-top">
+              <span className="company-avatar">{iniciales(r.empresa)}</span>
+              <div>
+                <span className="company-name">{r.empresa}</span>
+                <h3>{r.titulo}</h3>
+              </div>
+              {r.ayuda_faltantes && (
+                <span className="pill amber">
+                  Ayuda a clientes con faltantes
+                </span>
+              )}
+            </div>
+            <p className="revision-lugar">
+              <MapPin size={14} />
+              Ubicación del aviso: <strong>{r.ubicacion || "sin dato"}</strong>
+            </p>
+            {r.pista && (
+              <blockquote className="revision-pista">{r.pista}</blockquote>
+            )}
+            <p className="helper">
+              Le serviría a: {r.clientes.join(", ") || "—"}
+            </p>
+            <div className="revision-acciones">
+              <label className="revision-pais">
+                País
+                <select
+                  aria-label={`País de ${r.titulo} en ${r.empresa}`}
+                  value={pais}
+                  onChange={(e) =>
+                    setElegido({ ...elegido, [r.vacante_id]: e.target.value })
+                  }
+                >
+                  <option value="">Elige…</option>
+                  {paises.map((p) => (
+                    <option key={p.codigo} value={p.codigo}>
+                      {p.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="button primary"
+                disabled={ocupado === r.vacante_id}
+                onClick={() => decidir(r, "sirve")}
+              >
+                <Check size={15} />
+                {pais ? `Sirve para ${nombre(pais)}` : "Sirve"}
+              </button>
+              <button
+                type="button"
+                className="button secondary"
+                disabled={ocupado === r.vacante_id}
+                onClick={() => decidir(r, "otro_pais")}
+              >
+                Solo para otro país
+              </button>
+              <button
+                type="button"
+                className="button secondary"
+                disabled={ocupado === r.vacante_id}
+                onClick={() => decidir(r, "no_sirve")}
+              >
+                No sirve
+              </button>
+              <button
+                type="button"
+                className="text-button"
+                disabled={ocupado === r.vacante_id}
+                onClick={() => decidir(r, "saltar")}
+              >
+                Saltar
+              </button>
+            </div>
+            <div className="revision-pie">
+              {r.iguales > 0 && (
+                <label className="check-line">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(iguales[r.vacante_id])}
+                    onChange={(e) =>
+                      setIguales({
+                        ...iguales,
+                        [r.vacante_id]: e.target.checked,
+                      })
+                    }
+                  />
+                  Aplicar a las {r.iguales} con esta misma ubicación
+                </label>
+              )}
+              {r.enlace.startsWith("http") && (
+                <a
+                  href={r.enlace}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-button"
+                >
+                  Abrir aviso
+                  <ExternalLink size={14} />
+                </a>
+              )}
+            </div>
+          </article>
+        );
+      })}
+    </section>
+  );
+}
 
 function Mensajes({
   clientes,
@@ -1570,6 +1788,7 @@ function App() {
     [password, setPassword] = useState("");
   const peticionResultados = useRef(0);
   const [loadingResults, setLoadingResults] = useState(false);
+  const [porConfirmar, setPorConfirmar] = useState(0);
   const previaCargos = useVistaPrevia(
     tab === "Cargos y cupos" && sesion?.sesion ? draft : null,
   );
@@ -1594,6 +1813,9 @@ function App() {
       const s = await api<Sesion>("/session");
       setSesion(s);
       if (s.sesion) {
+        api<Revisiones>("/revisiones")
+          .then((r) => setPorConfirmar(r.total))
+          .catch(() => setPorConfirmar(0));
         const [c, e] = await Promise.all([
           api<EstadoConfig>("/config"),
           api<Ejecucion[]>("/ejecuciones"),
@@ -1863,6 +2085,7 @@ function App() {
     { t: "Clientes", i: Users },
     { t: "Cargos y cupos", i: SlidersHorizontal },
     { t: "Vacantes", i: BriefcaseBusiness },
+    { t: "Por confirmar", i: MapPin },
     { t: "Mensajes", i: MessageCircle },
     { t: "Actividad", i: Clock3 },
   ];
@@ -1891,6 +2114,11 @@ function App() {
               <Icon size={19} />
               {t}
               {t === "Clientes" && <span>{clientes.length}</span>}
+              {t === "Por confirmar" && porConfirmar > 0 && (
+                <span aria-label={`${porConfirmar} por confirmar`}>
+                  {porConfirmar}
+                </span>
+              )}
               {tab === t && <div className="nav-dot" />}
             </button>
           ))}
@@ -1965,11 +2193,13 @@ function App() {
                       ? "Tú decides dónde buscar."
                       : tab === "Vacantes"
                         ? "Oportunidades para compartir."
-                        : tab === "Mensajes"
-                          ? "Mensajes listos para enviar."
-                          : tab === "Actividad"
-                            ? "Todo lo que ha pasado."
-                            : "Tu espacio, bajo control."}
+                        : tab === "Por confirmar"
+                          ? "Unos segundos para no perder vacantes."
+                          : tab === "Mensajes"
+                            ? "Mensajes listos para enviar."
+                            : tab === "Actividad"
+                              ? "Todo lo que ha pasado."
+                              : "Tu espacio, bajo control."}
               </h1>
               <p>
                 {tab === "Resumen"
@@ -1980,11 +2210,13 @@ function App() {
                       ? "Reparte las 120 vacantes diarias entre los cargos que necesitas."
                       : tab === "Vacantes"
                         ? "Revisa las coincidencias de cada cliente y prepara su mensaje."
-                        : tab === "Mensajes"
-                          ? "Cada mañana cada persona tiene su mensaje con sus vacantes. Ábrelo en WhatsApp, revísalo y envíalo."
-                          : tab === "Actividad"
-                            ? "Cada noche: cuántas vacantes trajo la búsqueda con tu configuración y qué cargos quedaron cortos."
-                            : "Información sobre la conexión y el funcionamiento del espacio."}
+                        : tab === "Por confirmar"
+                          ? "Vacantes que le servirían a tus clientes, pero cuyo país no se pudo confirmar solo. Decide con un clic: las que confirmes llegan hoy a sus clientes."
+                          : tab === "Mensajes"
+                            ? "Cada mañana cada persona tiene su mensaje con sus vacantes. Ábrelo en WhatsApp, revísalo y envíalo."
+                            : tab === "Actividad"
+                              ? "Cada noche: cuántas vacantes trajo la búsqueda con tu configuración y qué cargos quedaron cortos."
+                              : "Información sobre la conexión y el funcionamiento del espacio."}
               </p>
             </div>
             {["Resumen", "Clientes", "Cargos y cupos"].includes(tab) && (
@@ -2578,6 +2810,13 @@ function App() {
                 />
               )}
             </>
+          )}
+          {tab === "Por confirmar" && (
+            <PorConfirmar
+              paises={sesion.paises}
+              notify={notify}
+              onCambio={setPorConfirmar}
+            />
           )}
           {tab === "Mensajes" && (
             <Mensajes clientes={draft.clientes} notify={notify} />

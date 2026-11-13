@@ -33,7 +33,7 @@ def probar_aliases(conectar, nombre):
                 insert into public.entregas_diarias(vacante_id,delivery_date,role_id,match_grade,selected_at,snapshot)
                 values('2222222222222222',current_date,'qa','exact',now(),'{"conservar":"histórico"}');""")
             antes = c.execute("select jsonb_agg(to_jsonb(c) order by id) from public.catalogo_vacantes c").fetchone()[0]
-            assert ensayar(c) == ['006','007','008','009','010','011','012','013']
+            assert ensayar(c) == ['006','007','008','009','010','011','012','013','014']
             assert c.execute("select jsonb_agg(to_jsonb(c) order by id) from public.catalogo_vacantes c").fetchone()[0] == antes
             assert c.execute("select count(*) from public.ofertas").fetchone()[0] == 2
             assert '006' not in migraciones.aplicadas(c)

@@ -414,6 +414,19 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
             else:
                 salida_verificada.append(v)
         return salida_verificada
+    if modo != "incremental" and not consulta and not prueba and cfg.get("confirmar_ubicacion", {}).get("fichas_por_corrida"):
+        # Contrato v16: antes de dejar una vacante «por confirmar», leer el país en los datos estructurados de su ficha.
+        from buscador import confirmar_ubicacion
+        memoria_fichas = _leer_json(trabajo / "ubicacion_fichas.json", {})
+        try:
+            salud["Ubicación desde la ficha"] = confirmar_ubicacion.confirmar(
+                vacantes, memoria_fichas, hoy, {f for r in roles_actuales for f in r["familias"]},
+                maximo=cfg["confirmar_ubicacion"]["fichas_por_corrida"],
+                segundos=cfg["confirmar_ubicacion"].get("segundos", 180))
+        except Exception as e:  # noqa: BLE001 — confirmar es una ayuda; nunca tumba la noche
+            salud["Ubicación desde la ficha"] = {"error": f"{type(e).__name__}"}
+        limite = (date.fromisoformat(hoy) - timedelta(days=confirmar_ubicacion.VIGENCIA_DIAS * 2)).isoformat()
+        _guardar_json(trabajo / "ubicacion_fichas.json", {u: d for u, d in memoria_fichas.items() if d.get("fecha", "") >= limite})
     vacantes = comprobar_destinos(vacantes)
     refuerzos = []
     posts_nuevos = []

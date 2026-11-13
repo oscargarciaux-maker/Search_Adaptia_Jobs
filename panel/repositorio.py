@@ -9,6 +9,8 @@ import random
 from threading import Lock, RLock, Thread
 import time
 from uuid import NAMESPACE_DNS, uuid5
+
+from buscador import normalizar
 from zoneinfo import ZoneInfo
 
 import requests
@@ -103,6 +105,69 @@ class RepositorioSupabase:
         if not filas:
             raise ErrorRepositorio("Ese mensaje ya no existe. Recarga la lista.", 404)
         return filas[0]
+
+    # Contrato v16: bandeja «Por confirmar» y reglas de ubicación (tablas privadas, SQL 014).
+    def candidatas_por_confirmar(self, desde):
+        return self._paginas("catalogo_vacantes", "id", {"reason": "eq.elegibilidad regional por confirmar",
+                             "observed_at": "gte." + desde, "select": "id,datos,description_full"}, 500)
+
+    def recibidas(self, perfil_ids):
+        salida = {}
+        for inicio in range(0, len(perfil_ids), 50):
+            ids = ",".join(perfil_ids[inicio:inicio + 50])
+            if ids:
+                for r in self._paginas("panel_asignaciones", "id", {"perfil_id": f"in.({ids})",
+                                                                     "select": "id,perfil_id,vacante_id"}, 1000):
+                    salida.setdefault(r["perfil_id"], set()).add(r["vacante_id"])
+        return salida
+
+    def revisiones(self, estado=None, vacante_id=None):
+        params = {"select": "*,catalogo_vacantes(id,datos,description_full,status,reason)", "limit": 1000,
+                  "order": "prioridad.desc"}
+        if estado:
+            params["estado"] = "eq." + estado
+        if vacante_id:
+            params["vacante_id"] = "eq." + vacante_id
+        return self.pedir("GET", "panel_revisiones", params=params) or []
+
+    def guardar_revisiones(self, filas):
+        ahora = datetime.now(timezone.utc).isoformat()
+        self.pedir("POST", "panel_revisiones", params={"on_conflict": "vacante_id"},
+                   headers={"Prefer": "resolution=ignore-duplicates,return=minimal"},
+                   json=[{**f, "actualizada_en": ahora} for f in filas])
+
+    def actualizar_revision(self, vacante_id, cambios):
+        self.pedir("PATCH", "panel_revisiones", params={"vacante_id": "eq." + vacante_id},
+                   headers={"Prefer": "return=minimal"},
+                   json={**cambios, "actualizada_en": datetime.now(timezone.utc).isoformat()})
+
+    def reglas(self):
+        return self.pedir("GET", "panel_reglas_ubicacion", params={"select": "*", "limit": 5000}) or []
+
+    def guardar_regla(self, fila):
+        self.pedir("POST", "panel_reglas_ubicacion", params={"on_conflict": "texto"},
+                   headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
+                   json={**fila, "actualizada_en": datetime.now(timezone.utc).isoformat()})
+
+    def ejecucion(self, fecha):
+        filas = self.pedir("GET", "panel_ejecuciones", params={"fecha": "eq." + fecha, "limit": 1})
+        return filas[0] if filas else None
+
+    def conteo_asignaciones(self, ejecucion_id, perfil_ids):
+        from collections import Counter
+        if not perfil_ids:
+            return Counter()
+        filas = self._paginas("panel_asignaciones", "id", {"ejecucion_id": "eq." + ejecucion_id,
+                              "perfil_id": "in.(" + ",".join(perfil_ids) + ")", "select": "id,perfil_id"}, 1000)
+        return Counter(r["perfil_id"] for r in filas)
+
+    def crear_asignaciones(self, filas):
+        self.pedir("POST", "panel_asignaciones", params={"on_conflict": "ejecucion_id,perfil_id,vacante_id"},
+                   headers={"Prefer": "resolution=ignore-duplicates"}, json=filas)
+
+    def actualizar_catalogo_datos(self, vacante_id, datos):
+        self.pedir("PATCH", "catalogo_vacantes", params={"id": "eq." + vacante_id},
+                   headers={"Prefer": "return=minimal"}, json={"datos": datos})
 
     def publicar(self, revision):
         actual = self.config()
@@ -295,6 +360,91 @@ class RepositorioDemo:
                     return deepcopy(b)
         raise ErrorRepositorio("Ese mensaje ya no existe. Recarga la lista.", 404)
 
+    # Contrato v16: bandeja «Por confirmar» ficticia (3 vacantes), sin red ni Supabase.
+    def _revisiones(self):
+        if "revisiones" not in self.estado:
+            cfg = configuracion_demo()
+            perfil = lambda i, faltan: {"perfil_id": cfg["perfiles"][i]["id"], "cliente_id": cfg["perfiles"][i]["cliente_id"],  # noqa: E731
+                                        "cargo_id": cfg["perfiles"][i]["cargo_id"], "faltan": faltan}
+            fecha = hoy()
+            casos = [("QA Engineer", "Lumen", "Remote Remoto", "You must be based in Colombia or Mexico to apply.",
+                      ["CO", "MX"], [perfil(4, True)], 160),
+                     ("Product Designer", "Orbita", "Granada", "Trabajarás en nuestra oficina de Granada, España, dos "
+                      "días por semana.", ["ES"], [perfil(1, False)], 40),
+                     ("Product Designer", "Forma", "Remote Remoto", "Open to candidates in Latin America.", [],
+                      [perfil(0, True), perfil(2, True)], 230)]
+            filas = []
+            for n, (titulo, empresa, lugar, frase, sugerida, perfiles, prioridad) in enumerate(casos):
+                vid = "rev-demo-" + str(n)
+                url = "https://example.org/empleos/" + vid
+                datos = {"id": vid, "titulo": titulo, "empresa": empresa, "ubicacion": lugar, "paises": [],
+                         "confianza_pais": "baja", "nota_pais": "remoto: confirmar región", "modalidad": "remoto",
+                         "idioma": "en" if n != 1 else "es", "fecha_publicacion": fecha, "fecha_estimada": False,
+                         "anos_min": 2, "ingles": "intermedio", "enlace": url, "enlaces_alternativos": [url],
+                         "verificacion": {"estado": "verificada", "enlaces": [{"url": url, "estado": "verificada",
+                                          "comprobada_en": self.creada.isoformat()}]}}
+                filas.append({"vacante_id": vid, "estado": "pendiente", "motivo": "ubicación por confirmar",
+                              "pista": frase, "ubicacion": normalizar.texto(lugar), "sugerencia": sugerida,
+                              "perfiles": perfiles, "prioridad": prioridad, "creada_en": self.creada.isoformat(),
+                              "catalogo_vacantes": {"id": vid, "datos": datos, "status": "archived",
+                                                    "reason": "elegibilidad regional por confirmar",
+                                                    "description_full": frase + " " + ("We require 2 years of "
+                                                        "experience. English B2 required. We build digital products. ") * 4}})
+            self.estado["revisiones"] = filas
+        return self.estado["revisiones"]
+
+    def revisiones(self, estado=None, vacante_id=None):
+        with self.lock:
+            return deepcopy([r for r in self._revisiones() if (not estado or r["estado"] == estado)
+                             and (not vacante_id or r["vacante_id"] == vacante_id)])
+
+    def guardar_revisiones(self, filas):
+        with self.lock:
+            existentes = {r["vacante_id"] for r in self._revisiones()}
+            self.estado["revisiones"].extend(deepcopy(f) for f in filas if f["vacante_id"] not in existentes)
+            self._guardar()
+
+    def actualizar_revision(self, vacante_id, cambios):
+        with self.lock:
+            for r in self._revisiones():
+                if r["vacante_id"] == vacante_id:
+                    r.update(deepcopy(cambios))
+            self._guardar()
+
+    def reglas(self):
+        with self.lock:
+            return deepcopy(list(self.estado.get("reglas", {}).values()))
+
+    def guardar_regla(self, fila):
+        with self.lock:
+            self.estado.setdefault("reglas", {})[fila["texto"]] = deepcopy(fila)
+            self._guardar()
+
+    def operativa(self, fecha):
+        return {"revision": 1, "configuracion": configuracion_demo()}
+
+    def ejecucion(self, fecha):
+        return self.ejecuciones()[0]
+
+    def recibidas(self, perfil_ids):
+        with self.lock:
+            salida = {}
+            for a in self.estado.get("asignaciones_extra", []):
+                salida.setdefault(a["perfil_id"], set()).add(a["vacante_id"])
+            return salida
+
+    def conteo_asignaciones(self, ejecucion_id, perfil_ids):
+        from collections import Counter
+        return Counter()
+
+    def crear_asignaciones(self, filas):
+        with self.lock:
+            self.estado.setdefault("asignaciones_extra", []).extend(deepcopy(filas))
+            self._guardar()
+
+    def actualizar_catalogo_datos(self, vacante_id, datos):
+        pass  # la demostración ya trae el enlace comprobado
+
     def _guardar(self):
         if self.archivo:
             self.archivo.parent.mkdir(parents=True, exist_ok=True)
@@ -432,4 +582,11 @@ class RepositorioDemo:
                     "explicacion": [{"tipo": "post"}, {"ampliacion": "sin_dato"}], "filtros": p,
                     "cargo_configuracion": cargo,
                     "catalogo_vacantes": {"id": v["id"], "status": "active", "datos": v, "description_full": texto}})
+        # Contrato v16: las confirmadas en la bandeja aparecen en «Vacantes» de su cliente.
+        catalogo = {r["vacante_id"]: r.get("catalogo_vacantes") for r in self.revisiones() if r.get("catalogo_vacantes")}
+        with self.lock:
+            for a in self.estado.get("asignaciones_extra", []):
+                if a["cliente_id"] == cliente_id and a["vacante_id"] in catalogo:
+                    filas.append({**deepcopy(a), "id": id_demo(a["perfil_id"] + a["vacante_id"]),
+                                  "catalogo_vacantes": deepcopy(catalogo[a["vacante_id"]])})
         return {"ejecucion": self.ejecuciones()[0], "filas": filas, "clientes": cfg["clientes"]}

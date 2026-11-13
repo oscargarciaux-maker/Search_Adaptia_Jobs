@@ -238,3 +238,55 @@ test("móvil: navegación accesible y sin desbordamiento horizontal", async ({
     page.getByRole("heading", { name: "Personas, no búsquedas genéricas." }),
   ).toBeVisible();
 });
+
+test("bandeja Por confirmar: un clic confirma, atajo 4 aparta y el contador baja", async ({
+  page,
+}) => {
+  const errores: string[] = [];
+  page.on("pageerror", (e) => errores.push(e.message));
+  await page.goto("/");
+  const menu = page.getByRole("button", { name: "Por confirmar", exact: true });
+  await expect(menu).toContainText("3");
+  await menu.click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Unos segundos para no perder vacantes.",
+    }),
+  ).toBeVisible();
+  await expect(page.locator(".revision")).toHaveCount(3);
+  const primera = page.locator(".revision").first();
+  await expect(primera.locator(".revision-pista")).toBeVisible();
+  await primera.getByLabel(/País de/).selectOption("CO");
+  await primera.getByRole("button", { name: "Sirve para Colombia" }).click();
+  await expect(
+    page.getByText(/Confirmada: se asignó a \d+ cliente/),
+  ).toBeVisible();
+  await expect(page.locator(".revision")).toHaveCount(2);
+  await expect(menu).toContainText("2");
+  const otra = page.locator(".revision").first();
+  await otra.focus();
+  await page.keyboard.press("4");
+  await expect(page.getByText("Apartada por ahora.")).toBeVisible();
+  await expect(page.locator(".revision")).toHaveCount(1);
+  const pequenos = await page.evaluate(
+    () =>
+      [...document.querySelectorAll("main *")].filter(
+        (el) =>
+          [...el.childNodes].some(
+            (n) => n.nodeType === 3 && n.textContent!.trim(),
+          ) && parseFloat(getComputedStyle(el).fontSize) < 12,
+      ).length,
+  );
+  expect(pequenos).toBe(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "/tmp/adaptia-por-confirmar.png",
+    fullPage: true,
+  });
+  expect(errores).toEqual([]);
+});
