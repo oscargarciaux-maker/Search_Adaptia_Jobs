@@ -2707,34 +2707,46 @@ a.button {
   align-items: center;
   gap: 6px;
 }
+/* Resumen con jerarquía (13 nov): rejilla de 12 columnas que no se reparte por igual. Clientes ocupa el alto de dos
+   filas, Cargos y cupos la parte ancha de arriba, las tres tarjetas de apoyo abajo con escalón, y Actividad es una
+   franja tipo entrada de evento desplazada a la derecha. */
 .resumen-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 24px;
+  align-items: stretch;
 }
 .tarjeta-resumen {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
-  min-height: 150px;
   padding: 16px 18px;
   text-align: left;
   cursor: pointer;
   font: inherit;
   color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 2px 4px #20382405;
   transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+  animation: tarjeta-entra 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 .tarjeta-resumen:hover {
+  transform: translateY(-3px);
   border-color: #b9ccb0;
-  box-shadow: 0 4px 14px #2b3b2a14;
+  box-shadow: 0 10px 24px #2b3b2a1f;
 }
 .tarjeta-resumen:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: 2px;
+  outline: 3px solid #e2b54b;
+  outline-offset: 3px;
 }
 .tarjeta-cabeza {
   display: flex;
@@ -2742,32 +2754,23 @@ a.button {
   gap: 7px;
   font-size: 12px;
   font-weight: 650;
+  letter-spacing: 0.02em;
   color: #56625a;
 }
 .tarjeta-numero {
+  font-family: "Manrope Variable", "DM Sans Variable", sans-serif;
   font-size: 28px;
   font-weight: 750;
   letter-spacing: -0.6px;
-  line-height: 1.15;
+  line-height: 1.1;
   color: #273127;
+  font-variant-numeric: tabular-nums;
 }
 .tarjeta-numero small {
   font-size: 14px;
   font-weight: 600;
+  letter-spacing: 0;
   color: #636b64;
-}
-.tarjeta-texto {
-  font-size: 19px;
-}
-.tarjeta-resumen.amber .tarjeta-numero {
-  color: #7a5a17;
-}
-.tarjeta-resumen.green .tarjeta-numero {
-  color: #2b6a55;
-}
-.tarjeta-barra {
-  width: 100%;
-  height: 6px;
 }
 .tarjeta-detalle {
   font-size: 13px;
@@ -2782,17 +2785,330 @@ a.button {
   font-weight: 650;
   color: var(--green);
 }
+.tarjeta-accion svg {
+  transition: transform 0.18s ease;
+}
+.tarjeta-resumen:hover .tarjeta-accion svg {
+  transform: translateX(4px);
+}
+
+/* 1. Clientes: la protagonista (verde oscuro, número grande y la lista de quiénes son). */
+.tarjeta-clientes {
+  grid-column: 1 / 6;
+  grid-row: 1 / 3;
+  background: linear-gradient(155deg, #245e4b 0%, #1d4c3d 100%);
+  border-color: #1d4c3d;
+  color: #f2f7f3;
+  padding: 22px 24px;
+  gap: 10px;
+  animation-delay: 0ms;
+}
+.tarjeta-clientes .tarjeta-cabeza,
+.tarjeta-clientes .tarjeta-accion {
+  color: #d7eadf;
+}
+.tarjeta-clientes .tarjeta-numero {
+  font-size: 56px;
+  letter-spacing: -2px;
+  color: #ffffff;
+}
+.tarjeta-clientes .tarjeta-numero small {
+  font-size: 15px;
+  letter-spacing: 0;
+  color: #cfe3d7;
+}
+.clientes-mini {
+  list-style: none;
+  margin: 2px 0 6px;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  max-width: 340px;
+}
+.clientes-mini li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  padding: 5px 0;
+  border-bottom: 1px solid #ffffff22;
+}
+.clientes-mini li span:first-child {
+  font-weight: 600;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.clientes-mini li span:last-child {
+  color: #cfe3d7;
+  white-space: nowrap;
+}
+.clientes-mini li.mas {
+  border: 0;
+  color: #cfe3d7;
+  font-style: italic;
+}
+.marca-agua {
+  position: absolute;
+  right: -10px;
+  bottom: -46px;
+  font-family: "Manrope Variable", sans-serif;
+  font-size: 200px;
+  font-weight: 800;
+  line-height: 1;
+  color: #ffffff10;
+  pointer-events: none;
+}
+.tarjeta-clientes:hover {
+  border-color: #163d31;
+  box-shadow: 0 14px 30px #1d4c3d40;
+}
+
+/* 2. Cargos y cupos: ancha arriba, con la barra repartida por cargo. */
+.tarjeta-cupos {
+  grid-column: 6 / 13;
+  grid-row: 1;
+  gap: 10px;
+  padding: 18px 22px;
+  animation-delay: 70ms;
+}
+.cupos-fila {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.tarjeta-cupos .tarjeta-numero {
+  font-size: 40px;
+  letter-spacing: -1.2px;
+}
+.tarjeta-cupos.green .tarjeta-numero {
+  color: #2b6a55;
+}
+.tarjeta-cupos.amber .tarjeta-numero {
+  color: #7a5a17;
+}
+.cupos-barra {
+  display: flex;
+  gap: 3px;
+  width: 100%;
+  height: 10px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #eef2ea;
+}
+.cupos-barra > span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  transform-origin: left center;
+  animation: barra-crece 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.cupos-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 12px;
+  color: #56625a;
+}
+.cupos-leyenda > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.cupos-leyenda i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.cupos-leyenda b {
+  color: #273127;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 3. Tarjetas de apoyo: más pequeñas, con escalón para dar ritmo. */
+.tarjeta-chica {
+  background: #fbfcfa;
+  padding: 14px 16px;
+}
+.tarjeta-chica .tarjeta-numero {
+  font-size: 26px;
+}
+.tarjeta-vacantes {
+  grid-column: 6 / 9;
+  grid-row: 2;
+  animation-delay: 140ms;
+}
+.tarjeta-confirmar {
+  grid-column: 9 / 11;
+  grid-row: 2;
+  margin-top: 10px;
+  animation-delay: 190ms;
+}
+.tarjeta-mensajes {
+  grid-column: 11 / 13;
+  grid-row: 2;
+  margin-top: 20px;
+  animation-delay: 240ms;
+}
+.tarjeta-confirmar.pendiente {
+  background: #fdf7ea;
+  border-color: #ecd9ae;
+}
+.tarjeta-confirmar.pendiente .tarjeta-numero {
+  color: #7a5a17;
+}
+.punto-vivo {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c9861a;
+  box-shadow: 0 0 0 0 #c9861a66;
+  animation: punto-vivo 1.8s ease-out infinite;
+}
+
+/* 4. Actividad: franja tipo entrada de evento, desplazada para romper la rejilla. */
+.tarjeta-actividad {
+  grid-column: 3 / 13;
+  grid-row: 3;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 18px 12px 12px;
+  border-style: dashed;
+  animation-delay: 300ms;
+}
+.evento-fecha {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 12px;
+  background: #273127;
+  color: #ffffff;
+  line-height: 1;
+}
+.evento-fecha b {
+  font-family: "Manrope Variable", sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+}
+.evento-fecha span {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #d7eadf;
+}
+.evento-texto {
+  flex: 1 1 200px;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.evento-titulo {
+  font-weight: 650;
+  font-size: 14px;
+  color: #273127;
+}
+.evento-titulo::first-letter {
+  text-transform: uppercase;
+}
+.tarjeta-actividad .pill {
+  margin-left: auto;
+}
+.tarjeta-actividad .tarjeta-accion {
+  margin-top: 0;
+}
+
+@keyframes tarjeta-entra {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes barra-crece {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes punto-vivo {
+  0% {
+    box-shadow: 0 0 0 0 #c9861a66;
+  }
+  80%,
+  100% {
+    box-shadow: 0 0 0 8px #c9861a00;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tarjeta-resumen,
+  .cupos-barra > span,
+  .punto-vivo {
+    animation: none;
+  }
+  .tarjeta-resumen,
+  .tarjeta-accion svg {
+    transition: none;
+  }
+}
 @media (max-width: 1000px) {
   .resumen-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .tarjeta-clientes {
+    grid-column: 1 / 4;
+    grid-row: 1 / 3;
+  }
+  .tarjeta-cupos {
+    grid-column: 4 / 7;
+    grid-row: 1;
+  }
+  .tarjeta-vacantes {
+    grid-column: 4 / 7;
+    grid-row: 2;
+  }
+  .tarjeta-confirmar {
+    grid-column: 1 / 4;
+    grid-row: 3;
+    margin-top: 0;
+  }
+  .tarjeta-mensajes {
+    grid-column: 4 / 7;
+    grid-row: 3;
+    margin-top: 0;
+  }
+  .tarjeta-actividad {
+    grid-column: 1 / 7;
+    grid-row: 4;
   }
 }
 @media (max-width: 620px) {
   .resumen-grid {
     grid-template-columns: 1fr;
   }
-  .tarjeta-resumen {
-    min-height: 0;
+  .resumen-grid > .tarjeta-resumen {
+    grid-column: 1;
+    grid-row: auto;
+    margin-top: 0;
+  }
+  .tarjeta-clientes .tarjeta-numero {
+    font-size: 44px;
+  }
+  .tarjeta-actividad {
+    flex-wrap: wrap;
+  }
+  .tarjeta-actividad .pill {
+    margin-left: 0;
   }
 }
 
