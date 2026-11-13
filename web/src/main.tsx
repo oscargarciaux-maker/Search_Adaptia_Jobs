@@ -21,14 +21,12 @@ import {
   Ellipsis,
   ExternalLink,
   Globe2,
-  LayoutDashboard,
   ListFilter,
   Loader2,
   LogOut,
   Mail,
   MapPin,
   Megaphone,
-  Menu,
   MessageCircle,
   MoreHorizontal,
   Pencil,
@@ -1992,19 +1990,211 @@ function ClienteDialog({
     </Dialog>
   );
 }
+// Sección 5 (13 nov): sin menú propio; cada sección tiene su dirección y se abre desde las tarjetas del resumen.
+const secciones: Record<string, string> = {
+  Resumen: "",
+  Clientes: "clientes",
+  "Cargos y cupos": "cargos",
+  Vacantes: "vacantes",
+  "Por confirmar": "por-confirmar",
+  Mensajes: "mensajes",
+  Actividad: "actividad",
+};
+function seccionDeHash() {
+  const h = decodeURIComponent(location.hash.replace(/^#\/?/, ""));
+  return Object.keys(secciones).find((t) => secciones[t] === h) || "Resumen";
+}
+const estadosEjecucion: Record<string, string> = {
+  completa: "Completada",
+  parcial: "Con faltantes",
+  fallida: "Requiere revisión",
+  en_curso: "En curso",
+};
+
+function TarjetaResumen({
+  icono: Icono,
+  titulo,
+  numero,
+  extra,
+  detalle,
+  accion,
+  tono,
+  onClick,
+  children,
+}: {
+  icono: typeof Users;
+  titulo: string;
+  numero: React.ReactNode;
+  extra?: string;
+  detalle: string;
+  accion: string;
+  tono?: "green" | "amber";
+  onClick: () => void;
+  children?: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      className={"tarjeta-resumen card" + (tono ? " " + tono : "")}
+      onClick={onClick}
+    >
+      <span className="tarjeta-cabeza">
+        <Icono size={17} />
+        {titulo}
+      </span>
+      <strong className="tarjeta-numero">
+        {numero}
+        {extra && <small>{extra}</small>}
+      </strong>
+      {children}
+      <span className="tarjeta-detalle">{detalle}</span>
+      <span className="tarjeta-accion">
+        {accion}
+        <ArrowRight size={14} />
+      </span>
+    </button>
+  );
+}
+
+function TarjetasResumen({
+  clientes,
+  perfiles,
+  cargos,
+  total,
+  ultima,
+  porConfirmar,
+  borradores,
+  go,
+}: {
+  clientes: number;
+  perfiles: number;
+  cargos: Cargo[];
+  total: number;
+  ultima?: Ejecucion;
+  porConfirmar: number;
+  borradores: Borrador[] | null;
+  go: (t: string) => void;
+}) {
+  const r = ultima?.resumen || {};
+  const vivos = (borradores || []).filter((b) => b.estado !== "descartado");
+  const enviados = vivos.filter((b) => b.estado === "enviado").length;
+  const hora = ultima
+    ? new Date(ultima.terminada_en || ultima.iniciada_en).toLocaleTimeString(
+        "es-CO",
+        { hour: "numeric", minute: "2-digit", timeZone: "America/Bogota" },
+      )
+    : "";
+  return (
+    <section className="resumen-grid" aria-label="Resumen del panel">
+      <TarjetaResumen
+        icono={Users}
+        titulo="Clientes"
+        numero={clientes}
+        detalle={`${perfiles} ${perfiles === 1 ? "perfil" : "perfiles"} de búsqueda`}
+        accion="Ver clientes"
+        onClick={() => go("Clientes")}
+      />
+      <TarjetaResumen
+        icono={SlidersHorizontal}
+        titulo="Cargos y cupos"
+        numero={total}
+        extra=" / 120"
+        tono={total === 120 ? "green" : "amber"}
+        detalle={
+          total === 120
+            ? "Distribución completa"
+            : total > 120
+              ? `Sobran ${total - 120}: quita cupos`
+              : `Faltan ${120 - total} por repartir`
+        }
+        accion="Editar cupos"
+        onClick={() => go("Cargos y cupos")}
+      >
+        <span className="quota-track tarjeta-barra" aria-hidden="true">
+          {cargos.map((c, i) => (
+            <span
+              key={c.id}
+              style={{
+                width: (c.cupo / Math.max(total, 120)) * 100 + "%",
+                background: colores[i % 5],
+              }}
+            />
+          ))}
+        </span>
+      </TarjetaResumen>
+      <TarjetaResumen
+        icono={BriefcaseBusiness}
+        titulo="Vacantes"
+        numero={ultima ? (r.vacantes ?? 0) : "—"}
+        extra={ultima ? ` / ${r.meta ?? 120}` : undefined}
+        detalle={
+          ultima ? `Búsqueda del ${fecha(ultima.fecha)}` : "Sin búsquedas aún"
+        }
+        accion="Ver vacantes"
+        onClick={() => go("Vacantes")}
+      />
+      <TarjetaResumen
+        icono={MapPin}
+        titulo="Por confirmar"
+        numero={porConfirmar}
+        tono={porConfirmar ? "amber" : undefined}
+        detalle={
+          porConfirmar ? "Vacantes esperando tu decisión" : "Nada pendiente"
+        }
+        accion="Revisar"
+        onClick={() => go("Por confirmar")}
+      />
+      <TarjetaResumen
+        icono={MessageCircle}
+        titulo="Mensajes de hoy"
+        numero={borradores ? vivos.length : "—"}
+        detalle={
+          !borradores
+            ? "Ábrelos para prepararlos"
+            : vivos.length
+              ? `${enviados} ${enviados === 1 ? "enviado" : "enviados"} de ${vivos.length}`
+              : "Aún no preparados"
+        }
+        accion="Ver mensajes"
+        onClick={() => go("Mensajes")}
+      />
+      <TarjetaResumen
+        icono={Clock3}
+        titulo="Actividad"
+        numero={
+          <span className="tarjeta-texto">
+            {ultima
+              ? estadosEjecucion[ultima.estado] || ultima.estado
+              : "Sin búsquedas"}
+          </span>
+        }
+        tono={
+          !ultima ? undefined : ultima.estado === "completa" ? "green" : "amber"
+        }
+        detalle={
+          ultima
+            ? `Última: ${fecha(ultima.fecha)} · ${hora}`
+            : "Aún no hay registro"
+        }
+        accion="Ver actividad"
+        onClick={() => go("Actividad")}
+      />
+    </section>
+  );
+}
+
 function App() {
   const [sesion, setSesion] = useState<Sesion | null>(null),
     [estado, setEstado] = useState<EstadoConfig | null>(null),
     [draft, setDraft] = useState<Configuracion>(vacio),
     [dirty, setDirty] = useState(false),
-    [tab, setTab] = useState("Resumen"),
+    [tab, setTab] = useState(seccionDeHash),
     [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [toast, setToast] = useState<{ texto: string; error: boolean } | null>(
       null,
     ),
-    [menu, setMenu] = useState(false),
     [modal, setModal] = useState<
       "cliente" | "cargo" | "publicar" | "archivo" | "whatsapp" | null
     >(null),
@@ -2027,6 +2217,7 @@ function App() {
   const peticionResultados = useRef(0);
   const [loadingResults, setLoadingResults] = useState(false);
   const [porConfirmar, setPorConfirmar] = useState(0);
+  const [borradoresHoy, setBorradoresHoy] = useState<Borrador[] | null>(null);
   const previaCargos = useVistaPrevia(
     tab === "Cargos y cupos" && sesion?.sesion ? draft : null,
   );
@@ -2081,6 +2272,25 @@ function App() {
     };
     window.addEventListener("sesion-vencida", vencer);
     return () => window.removeEventListener("sesion-vencida", vencer);
+  }, []);
+  // Las tarjetas del resumen se refrescan al volver a él (los mensajes o la bandeja pudieron cambiar).
+  useEffect(() => {
+    if (tab !== "Resumen" || !sesion?.sesion) return;
+    api<{ borradores: Borrador[] }>("/borradores")
+      .then((r) => setBorradoresHoy(r.borradores))
+      .catch(() => setBorradoresHoy(null));
+    api<Revisiones>("/revisiones")
+      .then((r) => setPorConfirmar(r.total))
+      .catch(() => undefined);
+  }, [tab, sesion?.sesion]);
+  useEffect(() => {
+    const seguir = () => setTab(seccionDeHash());
+    window.addEventListener("hashchange", seguir);
+    window.addEventListener("popstate", seguir);
+    return () => {
+      window.removeEventListener("hashchange", seguir);
+      window.removeEventListener("popstate", seguir);
+    };
   }, []);
   useEffect(() => {
     const alerta = (e: BeforeUnloadEvent) => {
@@ -2228,7 +2438,13 @@ function App() {
   }
   function go(t: string) {
     setTab(t);
-    setMenu(false);
+    // La sección va en la URL (#clientes…): el botón atrás del navegador vuelve al resumen (sección 5, 13 nov).
+    const h = secciones[t] ?? "";
+    if (location.hash.replace(/^#/, "") !== h) {
+      if (h) location.hash = h;
+      else history.pushState(null, "", location.pathname + location.search);
+    }
+    window.scrollTo(0, 0);
     setSearch("");
     setToast((x) => (x && !x.error ? null : x)); // un aviso no se arrastra a otra sección
   }
@@ -2343,97 +2559,9 @@ function App() {
     results?.vacantes.filter((v) =>
       (v.titulo + " " + v.empresa).toLowerCase().includes(search.toLowerCase()),
     ) || [];
-  const nav = [
-    { t: "Resumen", i: LayoutDashboard },
-    { t: "Clientes", i: Users },
-    { t: "Cargos y cupos", i: SlidersHorizontal },
-    { t: "Vacantes", i: BriefcaseBusiness },
-    { t: "Por confirmar", i: MapPin },
-    { t: "Mensajes", i: MessageCircle },
-    { t: "Actividad", i: Clock3 },
-  ];
   return (
     <div className="app-shell">
-      <aside className={"sidebar " + (menu ? "open" : "")}>
-        <a
-          className="brand"
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            go("Resumen");
-          }}
-        >
-          <span className="brand-icon">a</span>adaptia
-          <span className="brand-dot">.</span>
-        </a>
-        <nav>
-          {nav.map(({ t, i: Icon }) => (
-            <button
-              className={tab === t ? "active" : ""}
-              key={t}
-              aria-label={t}
-              onClick={() => go(t)}
-            >
-              <Icon size={19} />
-              {t}
-              {t === "Clientes" && <span>{clientes.length}</span>}
-              {t === "Por confirmar" && porConfirmar > 0 && (
-                <span aria-label={`${porConfirmar} por confirmar`}>
-                  {porConfirmar}
-                </span>
-              )}
-              {tab === t && <div className="nav-dot" />}
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="operator">
-            <span className="avatar dark">OP</span>
-            <div>
-              <strong>Operador</strong>
-              <span>
-                {sesion.demo ? "Espacio de demostración" : "Acceso privado"}
-              </span>
-            </div>
-            {!sesion.demo && (
-              <button
-                className="icon"
-                aria-label="Cerrar sesión"
-                onClick={async () => {
-                  await api("/auth/logout", { method: "POST" });
-                  setSesion({ ...sesion, sesion: false });
-                  setEstado(null);
-                }}
-              >
-                <LogOut size={17} />
-              </button>
-            )}
-          </div>
-        </div>
-      </aside>
-      {menu && <div className="nav-backdrop" onClick={() => setMenu(false)} />}
       <div className="main-shell">
-        <header className="topbar">
-          <div className="breadcrumbs">
-            <button
-              className="icon mobile-menu"
-              aria-label="Abrir menú"
-              onClick={() => setMenu(!menu)}
-            >
-              <Menu size={21} />
-            </button>
-            <strong>{tab}</strong>
-          </div>
-          <div className="topbar-right">
-            {sesion.demo && (
-              <span className="demo-badge">
-                <span />
-                Demostración
-              </span>
-            )}
-            <span className="avatar small">OP</span>
-          </div>
-        </header>
         <main className="main" inert={modal || busy ? true : undefined}>
           {sesion.demo && (
             <div className="demo-notice">
@@ -2444,26 +2572,37 @@ function App() {
               </span>
             </div>
           )}
+          {(tab !== "Resumen" || !sesion.demo) && (
+            <div className="page-top">
+              {tab !== "Resumen" ? (
+                <button
+                  className="text-button volver"
+                  onClick={() => go("Resumen")}
+                >
+                  <ArrowLeft size={15} />
+                  Volver al resumen
+                </button>
+              ) : (
+                <span />
+              )}
+              {!sesion.demo && (
+                <button
+                  className="text-button"
+                  onClick={async () => {
+                    await api("/auth/logout", { method: "POST" });
+                    setSesion({ ...sesion, sesion: false });
+                    setEstado(null);
+                  }}
+                >
+                  <LogOut size={15} />
+                  Cerrar sesión
+                </button>
+              )}
+            </div>
+          )}
           <div className="page-heading">
             <div>
-              <div className="eyebrow">TU CENTRO DE OPORTUNIDADES</div>
-              <h1>
-                {tab === "Resumen"
-                  ? "Cada búsqueda, con propósito."
-                  : tab === "Clientes"
-                    ? "Personas, no búsquedas genéricas."
-                    : tab === "Cargos y cupos"
-                      ? "Tú decides dónde buscar."
-                      : tab === "Vacantes"
-                        ? "Oportunidades para compartir."
-                        : tab === "Por confirmar"
-                          ? "Unos segundos para no perder vacantes."
-                          : tab === "Mensajes"
-                            ? "Mensajes listos para enviar."
-                            : tab === "Actividad"
-                              ? "Todo lo que ha pasado."
-                              : "Tu espacio, bajo control."}
-              </h1>
+              <h1>{tab}</h1>
               <p>
                 {tab === "Resumen"
                   ? "Organiza tus clientes y prepara las oportunidades de mañana."
@@ -2527,148 +2666,21 @@ function App() {
           {tab === "Resumen" && (
             <>
               <AvisoUltimaBusqueda ultima={runs?.[0]} />
-              <section className="overview-top solo">
-                <div className="quota-summary card">
-                  <div className="card-label">
-                    <span>OBJETIVO DIARIO</span>
-                    <span
-                      className={"pill " + (total === 120 ? "green" : "amber")}
-                    >
-                      {total === 120
-                        ? "Distribución completa"
-                        : "Por distribuir"}
-                    </span>
-                  </div>
-                  <div className="quota-main">
-                    <div className="quota-number">
-                      {total}
-                      <span> / 120</span>
-                    </div>
-                    <p>vacantes asignadas por cargo</p>
-                  </div>
-                  <div className="quota-track">
-                    {cargos.map((c, i) => (
-                      <span
-                        key={c.id}
-                        style={{
-                          width: (c.cupo / Math.max(total, 120)) * 100 + "%",
-                          background: colores[i % 5],
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <div className="quota-legend">
-                    {cargos.map((c, i) => (
-                      <div key={c.id}>
-                        <span style={{ background: colores[i % 5] }} />
-                        {c.nombre}
-                        <strong>{c.cupo}</strong>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    className="text-button quota-link"
-                    onClick={() => go("Cargos y cupos")}
-                  >
-                    Ajustar distribución
-                    <ArrowRight size={15} />
-                  </button>
-                </div>
-              </section>
-              <section className="stat-grid">
-                <div className="stat card">
-                  <span className="stat-icon mint">
-                    <Users size={21} />
-                  </span>
-                  <div>
-                    <span>Clientes activos</span>
-                    <strong>
-                      {clientes.length}
-                      <small>personas acompañadas</small>
-                    </strong>
-                  </div>
-                </div>
-                <div className="stat card">
-                  <span className="stat-icon blue">
-                    <BriefcaseBusiness size={21} />
-                  </span>
-                  <div>
-                    <span>Cargos en búsqueda</span>
-                    <strong>
-                      {cargos.filter((c) => c.cupo > 0).length}
-                      <small>búsquedas con foco</small>
-                    </strong>
-                  </div>
-                </div>
-                <div className="stat card">
-                  <span className="stat-icon sand">
-                    <CalendarClock size={21} />
-                  </span>
-                  <div>
-                    <span>Configuración confirmada</span>
-                    <strong className="date-stat">
-                      {estado?.publicada
-                        ? fecha(estado.publicada.vigente_desde)
-                        : "Por programar"}
-                      <small>
-                        {estado?.publicada
-                          ? "Vigente desde esta fecha"
-                          : "Guarda y programa tus criterios"}
-                      </small>
-                    </strong>
-                  </div>
-                </div>
-              </section>
-              <section className="section-block">
-                <div className="section-title">
-                  <div>
-                    <h2>
-                      Tus clientes, de un vistazo{" "}
-                      <span className="count-badge">{clientes.length}</span>
-                    </h2>
-                    <p>Cada perfil tiene sus propios criterios de búsqueda.</p>
-                  </div>
-                  <button
-                    className="text-button"
-                    onClick={() => go("Clientes")}
-                  >
-                    Ver todos
-                    <ArrowRight size={15} />
-                  </button>
-                </div>
-                <div className="client-grid">
-                  {clientes.slice(0, 3).map((c, i) => (
-                    <ClientCard
-                      key={c.id}
-                      c={c}
-                      index={i}
-                      perfiles={profiles(c.id)}
-                      cargos={draft.cargos}
-                      paises={sesion.paises}
-                      onEdit={() => {
-                        setEditCliente(c);
-                        setModal("cliente");
-                      }}
-                      onResults={() => {
-                        setSelectedClient(c.id);
-                        go("Vacantes");
-                      }}
-                    />
-                  ))}
-                  {!clientes.length && (
-                    <Empty
-                      icon={Users}
-                      title="Tu primer cliente empieza aquí"
-                      texto="Añade una persona y define su perfil de búsqueda."
-                      action={() => {
-                        setEditCliente(null);
-                        setModal("cliente");
-                      }}
-                      label="Añadir cliente"
-                    />
-                  )}
-                </div>
-              </section>
+              <TarjetasResumen
+                clientes={clientes.length}
+                perfiles={
+                  draft.perfiles.filter(
+                    (p) =>
+                      p.activo && clientes.some((c) => c.id === p.cliente_id),
+                  ).length
+                }
+                cargos={cargos}
+                total={total}
+                ultima={runs?.[0]}
+                porConfirmar={porConfirmar}
+                borradores={borradoresHoy}
+                go={go}
+              />
             </>
           )}
           {tab === "Clientes" && (
@@ -3166,32 +3178,13 @@ function App() {
                         "pill " + (r.estado === "completa" ? "green" : "amber")
                       }
                     >
-                      {(
-                        {
-                          completa: "Completada",
-                          parcial: "Con faltantes",
-                          fallida: "Requiere revisión",
-                          en_curso: "En curso",
-                        } as Record<string, string>
-                      )[r.estado] || r.estado}
+                      {estadosEjecucion[r.estado] || r.estado}
                     </span>
                   </div>
                 ))
               )}
             </section>
           )}
-          <footer className="footer">
-            <span>
-              adaptia<span className="brand-dot">.</span>{" "}
-              <span>Oportunidades con dirección.</span>
-            </span>
-            <span>
-              <ShieldCheck size={13} />
-              {sesion.demo
-                ? "Datos ficticios · Modo demostración"
-                : "Control privado de búsqueda"}
-            </span>
-          </footer>
         </main>
       </div>
       {modal === "cargo" && (
