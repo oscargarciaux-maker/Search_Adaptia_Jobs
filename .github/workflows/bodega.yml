@@ -2,16 +2,16 @@ name: Bodega nocturna
 
 # Usa la versión activa del panel (o seis cargos por veinte en legado), conserva catálogo y entrega en Supabase.
 # La rama publicado contiene estado y reportes técnicos, sin interfaz privada.
-# Cada día a las 6:30 a. m. de Bogotá (11:30 UTC; antes 1:17, cambio del 13 nov). A mano: Actions > Bodega nocturna >
-# Run workflow. Segunda pasada a las 8:30 a. m. de Bogotá (13:30 UTC): solo trabaja si la nocturna no llegó a la meta, no confirmó Supabase
+# Cada noche a la 1:17 de Bogotá (6:17 UTC). A mano: Actions > Bodega nocturna > Run workflow.
+# Segunda pasada a las 7:17 de Bogotá (12:17 UTC): solo trabaja si la nocturna no llegó a la meta, no confirmó Supabase
 # o no corrió; completa el mismo lote del día (no elige otro) y no supera el tope diario de Apify ya reservado.
 # Aviso opcional: secreto AVISO_NOCTURNA_URL (ping de Healthchecks u otro servicio similar).
 #   modo "inicial": olvida la rotación y pide 30 días a cada combinación (para la primera vez o tras un cambio grande)
 #   prueba: presupuestos mínimos (unos 5 minutos), para comprobar que todo funciona
 on:
   schedule:
-    - cron: "30 11 * * *"
-    - cron: "30 13 * * *"
+    - cron: "17 6 * * *"
+    - cron: "17 12 * * *"
   workflow_dispatch:
     inputs:
       modo:
@@ -55,7 +55,7 @@ jobs:
       - name: Decidir si hace falta la pasada de la mañana
         id: decidir
         run: |
-          if [ "${{ github.event.schedule }}" = "30 13 * * *" ]; then
+          if [ "${{ github.event.schedule }}" = "17 12 * * *" ]; then
             python -m buscador.validacion --salida salida --hace-falta-completar >> "$GITHUB_OUTPUT"
           else
             echo "ejecutar=true" >> "$GITHUB_OUTPUT"
@@ -127,7 +127,7 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ALERTAS_REMITENTE: ${{ vars.ALERTAS_REMITENTE }}
           PANEL_ORIGIN: ${{ vars.PANEL_URL }}
-        run: python -m buscador.alertas --salida salida --modo ${{ github.event.schedule == '30 13 * * *' && 'manana' || 'diario' }} --resultado ${{ job.status }}
+        run: python -m buscador.alertas --salida salida --modo ${{ github.event.schedule == '17 12 * * *' && 'manana' || 'diario' }} --resultado ${{ job.status }}
       - name: Avisar
         if: always()
         env:

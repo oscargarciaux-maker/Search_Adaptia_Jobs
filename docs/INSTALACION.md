@@ -142,7 +142,7 @@ ni histórico. `prueba=true` tampoco sirve para evaluar la continuidad de siete 
    comprobadas ni reenviar el lote antiguo solo porque tenía 20 por rol antes de la auditoría.
 6. Completar [ACEPTACION_Y_ESTADO.md](ACEPTACION_Y_ESTADO.md) y acordar responsables, alertas y respaldo.
 
-La búsqueda diaria solicita inicio a las 6:30 a. m. de Bogotá (segunda pasada 8:30); la horaria, al minuto 23. GitHub puede retrasar/saltar ejecuciones.
+La nocturna solicita inicio a la 1:17 a. m. de Bogotá; la horaria, al minuto 23. GitHub puede retrasar/saltar ejecuciones.
 La configuración horaria efectiva es el `cron` de los flujos en UTC; `hora_bodega_bogota` es informativo.
 
 ## 9. Opcionales, límites y documentación que se entrega

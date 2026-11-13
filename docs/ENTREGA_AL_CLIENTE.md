@@ -12,8 +12,8 @@ pegan claves en el código, en el chat ni en documentos.
 
 | Pieza | Cuándo corre | Qué hace |
 |---|---|---|
-| Bodega diaria | 6:30 a. m. (Colombia) | Busca y elige las 120 vacantes del día |
-| Bodega (segunda pasada) | 8:30 a. m. | Solo si a la noche le faltaron vacantes o no corrió: completa el mismo día |
+| Bodega nocturna | 1:17 a. m. (Colombia) | Busca y elige las 120 vacantes del día |
+| Bodega nocturna (pasada de la mañana) | 7:17 a. m. | Solo si a la noche le faltaron vacantes o no corrió: completa el mismo día |
 | Captura horaria | Cada hora | Actualiza vacantes y comprueba enlaces; no elige vacantes nuevas |
 | Copia de seguridad semanal | Domingos 5:41 a. m. | Copia cifrada de todo; se guarda 90 días en Actions |
 | Traspaso a otro Supabase | Solo a mano | Copia todo al Supabase del cliente y comprueba que coincida |
@@ -32,7 +32,7 @@ Ninguna de estas pruebas cambia la selección de vacantes ni gasta Apify.
 | 1 | Prueba corta de la búsqueda | Actions → **Bodega nocturna** → Run workflow → marcar *Corrida corta de prueba* | Termina en verde en unos 5–10 min; no escribe en Supabase |
 | 2 | Prueba de captura | Actions → **Captura horaria** → Run workflow → marcar *Solo capturar en temporal* | Verde; no escribe en Supabase |
 | 3 | Copia de seguridad | Actions → **Copia de seguridad semanal** → Run workflow | Verde. Abajo, en *Artifacts*, aparece `respaldo-semanal-…`; el resumen muestra cuántas filas tiene cada tabla |
-| 4 | Pasada de la mañana | Revisar Actions cualquier día después de las 8:30 a. m. | Aparece una *Bodega nocturna* de la mañana. Si la noche llegó a 120, termina en ~1 min sin hacer nada; si no, completa el día |
+| 4 | Pasada de la mañana | Revisar Actions cualquier día después de las 7:17 a. m. | Aparece una *Bodega nocturna* de la mañana. Si la noche llegó a 120, termina en ~1 min sin hacer nada; si no, completa el día |
 | 5 | Ensayo del traspaso | Ver sección 2 | El resumen dice *Ensayo comprobado* y los conteos coinciden; tu base sigue funcionando |
 | 6 | Panel en demostración | Ver sección 5 | Puedes crear clientes/cargos, ver la estimación de vacantes y copiar el mensaje de WhatsApp |
 | 7 | Avisos por correo | Ver sección 4 | Llega un correo de prueba |
@@ -126,7 +126,7 @@ vacantes también tarda unos segundos mientras lee el catálogo. Detalle técnic
 1. **Cargos y cupos**: crear los cargos que quieres (revisar sus denominaciones) y repartir exactamente 120.
 2. **Clientes**: cada cargo con cupo necesita al menos un perfil de cliente con sus filtros. Mira la estimación
    «≈ N vacantes guardadas aún no entregadas» o **Estimar con búsqueda en vivo** y usa «Aplicar» si un filtro deja muy pocas.
-3. **Programar para mañana**. La versión rige desde el día siguiente en Colombia: si programas antes de las 6:30 a. m.,
+3. **Programar para mañana**. La versión rige desde el día siguiente en Colombia: si programas antes de la 1:17 a. m.,
    la búsqueda de esa madrugada ya la usa.
 4. Desde ese momento **los seis cargos fijos actuales dejan de usarse**: si quieres conservar alguno, créalo en el panel.
 5. Al día siguiente, en **Vacantes**, revisa lo que llegó para cada cliente; en **Actividad**, si faltó algo.
@@ -164,7 +164,7 @@ Reservar unas 2 horas fuera del horario de la nocturna (entre las 9 a. m. y las 
 | Día | Revisar en Actions |
 |---|---|
 | Mismo día | Varias capturas horarias en verde |
-| Día siguiente | Bodega nocturna en verde; si no, que la pasada de las 8:30 a. m. la complete |
+| Día siguiente | Bodega nocturna en verde; si no, que la pasada de las 7:17 a. m. la complete |
 | Primer domingo | Copia de seguridad semanal en verde con su artefacto |
 | Toda la semana | Que no lleguen correos de aviso; si llegan, abrir la ejecución indicada |
 

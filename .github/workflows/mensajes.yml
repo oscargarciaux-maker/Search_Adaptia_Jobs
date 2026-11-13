@@ -1,10 +1,10 @@
 name: Mensajes de WhatsApp
 
-# Respaldo diario (10:15 a. m. Bogotá, después de la segunda pasada de las 8:30): prepara el borrador de cada cliente con WhatsApp y consentimiento si la búsqueda
+# Respaldo diario (8:05 a. m. Bogotá): prepara el borrador de cada cliente con WhatsApp y consentimiento si la búsqueda
 # de la noche o la pasada de la mañana no lo hicieron. Nada se envía: el operador lo abre en WhatsApp desde el panel.
 on:
   schedule:
-    - cron: "15 15 * * *"
+    - cron: "5 13 * * *"
   workflow_dispatch:
 
 permissions:

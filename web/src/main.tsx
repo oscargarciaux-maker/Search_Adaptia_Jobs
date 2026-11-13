@@ -121,7 +121,7 @@ function vacioVacantes(estado: EstadoConfig | null, r: Resultados | null) {
       texto:
         "La primera búsqueda con tu configuración será el " +
         fecha(desde) +
-        " a las 6:30 a. m. (hora Colombia). Después aparecerán aquí sus vacantes.",
+        " a la 1:17 a. m. (hora Colombia). Después aparecerán aquí sus vacantes.",
     };
   return {
     title: "La búsqueda no encontró vacantes para este cliente",
@@ -2560,7 +2560,7 @@ function App() {
               </span>
               <span>
                 <strong>Programar para mañana</strong> guarda tus cambios y los
-                aplica desde la búsqueda de las 6:30 a. m. (hora Colombia).{" "}
+                aplica desde la búsqueda de la 1:17 a. m. (hora Colombia).{" "}
                 <strong>Guardar borrador</strong> solo los conserva, sin cambiar
                 la próxima búsqueda.
               </span>
@@ -3304,8 +3304,8 @@ function App() {
           </div>
           <p className="helper note">
             Al confirmar se guardan tus cambios y esta configuración se usa
-            desde la búsqueda del <strong>{fecha(manana())}</strong> a las 6:30
-            a. m. (hora Colombia). La búsqueda de hoy, si ya empezó, conserva la
+            desde la búsqueda del <strong>{fecha(manana())}</strong> a la 1:17
+            a. m. (hora Colombia). La de esta noche, si ya empezó, conserva la
             anterior.
             {!estado?.publicada &&
               " Es tu primera configuración: desde entonces dejan de buscarse los seis cargos fijos anteriores; solo se buscarán los cargos de esta lista."}{" "}

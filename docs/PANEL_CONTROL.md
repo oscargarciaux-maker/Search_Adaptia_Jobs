@@ -190,7 +190,7 @@ El alojamiento debe conservar HTTPS y el origen correcto; no abrir CORS global n
 
 ## 8. Automatización, costes y límites operativos
 
-La búsqueda diaria solicita 6:30 a. m. Colombia (segunda pasada 8:30); la captura gratuita solicita minuto 23 de cada hora. GitHub puede retrasar o
+La nocturna solicita 1:17 a. m. Colombia; la captura gratuita solicita minuto 23 de cada hora. GitHub puede retrasar o
 omitir horarios. La horaria actualiza catálogo y asignaciones existentes, sin generar otras 120. Los reintentos conservan
 la versión diaria y no multiplican asignaciones. El historial de actividad distingue completa, parcial y fallida.
 Las fuentes públicas pueden devolver resultados más amplios que los filtros; la admisión final es estricta.
