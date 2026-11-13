@@ -116,6 +116,7 @@ export type EstimacionCargo = {
 export type VistaPrevia = {
   incompleto?: boolean;
   motivo?: string;
+  incompletos?: Record<string, string>;
   catalogo?: { vacantes: number; actualizado: string };
   perfiles?: Record<string, EstimacionPerfil>;
   cargos?: Record<string, EstimacionCargo>;

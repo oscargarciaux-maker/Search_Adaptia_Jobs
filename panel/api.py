@@ -16,7 +16,7 @@ import requests
 
 from buscador import paises
 from panel import servicio
-from panel.modelos import AjustesAlertas, CambioBorrador, Configuracion, Contacto, DecisionRevision, EstadoRegla, SubirRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia, explicar, solo_perfil
+from panel.modelos import AjustesAlertas, CambioBorrador, Configuracion, Contacto, DecisionRevision, EstadoRegla, SubirRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia, explicar, parcial, solo_perfil
 from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase, hoy
 from panel.terminos import sugerir
 
@@ -164,7 +164,11 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         try:
             cfg = Configuracion.model_validate(body.configuracion)
         except ValueError as e:  # incluye ValidationError: borrador a medio editar
-            return {"incompleto": True, "motivo": explicar(e)}
+            # Se estima lo que sí está completo; cada perfil pendiente dice qué le falta (sección 7a, 13 nov).
+            cfg, incompletos = parcial(body.configuracion)
+            if cfg is None:
+                return {"incompleto": True, "motivo": explicar(e)}
+            return {**servicio.vista_previa(repo, cfg), "incompletos": incompletos}
         return servicio.vista_previa(repo, cfg)
 
     @app.post("/api/estimacion-en-vivo")
