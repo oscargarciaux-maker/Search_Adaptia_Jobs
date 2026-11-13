@@ -117,3 +117,19 @@ def test_api_de_contactos_y_mensajes_en_demostracion():
     assert b["enlace"].startswith("https://wa.me/573001234567?text=") and "Ana" in b["texto"]
     cambiado = api.patch(f"/api/borradores/{b['id']}", json={"texto": "Hola Ana, editado"}, headers=h).json()
     assert cambiado["editado"] and api.patch(f"/api/borradores/{b['id']}", json={"estado": "enviado"}, headers=h).json()["estado"] == "enviado"
+
+
+def test_dice_por_que_no_preparo_mensajes(repo):
+    cfg = configuracion_demo()
+    activos = sum(1 for c in cfg["clientes"] if c.get("activo", True))
+    r = repo({hoy(): [dict(_v(1), estado="por_confirmar")]})  # la única vacante del día espera su enlace
+    res = borradores.generar(r)
+    assert res["generados"] == 0 and res["sin_vacantes"] == 3 and res["por_recomprobar"] == 3
+    assert res["clientes_activos"] == activos and res["sin_contacto"] == activos - 3
+
+    class SinContactos(r.__class__):
+        def contactos(self):
+            return []
+    sin = SinContactos({hoy(): [_v(1)]})
+    res = borradores.generar(sin)
+    assert res["generados"] == 0 and res["sin_contacto"] == activos

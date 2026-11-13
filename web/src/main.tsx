@@ -1185,14 +1185,39 @@ function Mensajes({
   async function generar() {
     setOcupado(true);
     try {
-      const r = await api<{ generados: number; conservados: number }>(
-        "/borradores/generar",
-        { method: "POST" },
-      );
+      const r = await api<{
+        generados: number;
+        conservados: number;
+        sin_vacantes?: number;
+        sin_contacto?: number;
+        por_recomprobar?: number;
+        clientes_activos?: number;
+      }>("/borradores/generar", { method: "POST" });
+      // Contrato v10: explicar por qué no salió nada, en lugar de un aviso genérico (13 nov).
+      const razones: string[] = [];
+      if (r.sin_contacto)
+        razones.push(
+          `${r.sin_contacto} de ${r.clientes_activos ?? r.sin_contacto} clientes sin WhatsApp o sin consentimiento (agrégalos en «Editar cliente»)`,
+        );
+      if (r.sin_vacantes)
+        razones.push(
+          `${r.sin_vacantes} clientes sin vacantes listas hoy` +
+            (r.por_recomprobar
+              ? ` (${r.por_recomprobar} esperan que se recompruebe su enlace; vuelve a intentarlo en una hora)`
+              : ""),
+        );
+      if (r.conservados)
+        razones.push(
+          `${r.conservados} mensajes ya abiertos, enviados o editados no se tocaron`,
+        );
       notify(
         r.generados
-          ? `${r.generados} mensajes preparados.`
-          : "No hay vacantes listas nuevas para preparar mensajes.",
+          ? `${r.generados} mensajes preparados.` +
+              (razones.length ? " " + razones.join(". ") + "." : "")
+          : "No se preparó ningún mensaje: " +
+              (razones.join(". ") || "no hay vacantes listas nuevas") +
+              ".",
+        !r.generados,
       );
       await cargar();
     } catch (e) {

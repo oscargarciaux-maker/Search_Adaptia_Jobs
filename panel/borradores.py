@@ -101,11 +101,15 @@ def generar(repo, fecha=None, dias_atras=3):
     from panel import servicio
     fecha = fecha or hoy()
     contactos = {c["cliente_id"]: c for c in repo.contactos() if c.get("consentimiento") and c.get("telefono")}
-    resultado = {"generados": 0, "con_pocas": 0, "sin_vacantes": 0, "conservados": 0}
-    if not contactos:
-        return resultado
+    # Conteos para explicar un resultado vacío en el panel (13 nov: «Preparar mensajes» no decía por qué).
+    resultado = {"generados": 0, "con_pocas": 0, "sin_vacantes": 0, "conservados": 0, "sin_contacto": 0,
+                 "por_recomprobar": 0, "clientes_activos": 0}
     hoy_r = servicio.resultados(repo, None, fecha)
     clientes = {c["id"]: c for c in hoy_r.get("clientes", []) if c.get("activo", True)}
+    resultado["clientes_activos"] = len(clientes)
+    resultado["sin_contacto"] = sum(1 for cid in clientes if cid not in contactos)
+    if not contactos:
+        return resultado
     existentes = {b["cliente_id"]: b for b in repo.borradores(fecha=fecha)}
     for cliente_id, contacto in contactos.items():
         if cliente_id not in clientes:
@@ -121,6 +125,8 @@ def generar(repo, fecha=None, dias_atras=3):
                 break
             f = (date.fromisoformat(fecha) - timedelta(days=dia)).isoformat()
             for v in servicio.resultados(repo, cliente_id, f)["vacantes"]:
+                if not dia and v["estado"] == "por_confirmar":
+                    resultado["por_recomprobar"] += 1  # del día, con el enlace aún por recomprobar
                 if v["estado"] == "lista" and v["id"] not in vistos and len(elegidas) < MAXIMO:
                     vistos.add(v["id"])
                     elegidas.append(v)
