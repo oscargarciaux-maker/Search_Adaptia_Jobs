@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 import threading
 import time
 
-from buscador import contrato, vacante
+from buscador import contrato, enlaces, vacante
 from panel.afinidad import (AMPLIACIONES, ETIQUETAS_AMPLIACION, MINIMO_POR_PERFIL, enlace_utilizable, evaluar,
                             evaluar_ampliada)
 from panel.repositorio import hoy
@@ -216,6 +216,10 @@ def estimacion_en_vivo(repo, cfg, perfil_id, fecha=None, fuentes=None, reloj=tim
 def resultados(repo, cliente_id=None, fecha=None):
     r = repo.resultados(cliente_id, fecha)
     salida, vistas = [], {}
+    # Una búsqueda de un día anterior ya se entregó: sus enlaces dejan de recomprobarse y caducan a las 6 h (contrato
+    # v9). Sus vacantes compatibles se muestran «Entregada el …», no «por confirmar» (13 nov).
+    dia = ((r.get("ejecucion") or {}).get("fecha") or "")[:10]
+    pasada = bool(dia) and dia < hoy()
     for row in r["filas"]:
         v = row.get("catalogo_vacantes") or {}
         datos = v.get("datos") or {}
@@ -250,9 +254,13 @@ def resultados(repo, cliente_id=None, fecha=None):
             "experiencia": datos.get("anos_min"), "match_grade": row["match_grade"],
             "explicacion": row["explicacion"], "cargo_id": row["cargo_id"], "enlace": enlace,
             "cargo_nombre": (row.get("cargo_configuracion") or {}).get("nombre", ""),
-            "estado": "lista" if enlace else "retirada" if v.get("status") != "active" else "por_confirmar",
+            "estado": "lista" if enlace else "retirada" if v.get("status") != "active" else
+                      "entregada" if pasada and filtros["compatible"] and not no_apta else "por_confirmar",
+            "entregada_el": dia if pasada else "",
             "motivos": filtros["motivos"], "ampliacion": ETIQUETAS_AMPLIACION.get(ampliacion, "") if not es_post else "",
             "tipo": "post" if es_post else "", "contacto": (datos.get("contacto") or {}) if es_post else {}}
+        if ficha["estado"] == "entregada" and enlaces.sirve(datos.get("enlace") or ""):
+            ficha["enlace"] = datos["enlace"]  # para consultarla; no cuenta como lista ni va al WhatsApp
         if clave in vistas:
             salida[salida.index(vistas[clave])] = ficha
         else:

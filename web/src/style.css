@@ -681,6 +681,10 @@ h1 {
   background: #eff5e8;
   color: #5e6d4f;
 }
+.pill.neutral {
+  background: #eef1ee;
+  color: #3b4a43;
+}
 .pill.amber {
   background: #faf2e1;
   color: #7a653c;

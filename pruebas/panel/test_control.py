@@ -705,6 +705,42 @@ def test_registro_asigna_lo_ampliado_solo_a_quien_no_llega_y_el_panel_lo_marca(c
     assert ampliada["titulo"] in texto and "mpliad" not in texto and "sin años" not in texto
 
 
+def test_vacantes_de_un_dia_anterior_se_ven_entregadas_y_no_por_confirmar(cfg):
+    from datetime import date, timedelta
+    rid = "cargo:" + cfg["cargos"][0]["id"]
+    oferta = dict(_oferta("Product Designer", 1, SIN_DATO), _ampliacion="sin_dato")
+    asignaciones = []
+    class Repo:
+        ejecucion = None
+        def pedir(self, metodo, ruta, **op):
+            if ruta == "panel_ejecuciones":
+                if metodo == "GET": return [self.ejecucion] if self.ejecucion else []
+                if metodo == "POST": self.ejecucion = {"id": "e1", **op["json"]}
+                if metodo == "PATCH": self.ejecucion.update(op["json"])
+            elif ruta == "entregas_diarias":
+                return [{"role_id": rid, "vacante_id": oferta["id"], "match_grade": "exact", "snapshot": oferta}]
+            elif ruta == "panel_asignaciones":
+                asignaciones.extend(op["json"])
+    repo = Repo()
+    ejecutor.registrar(repo, {"revision": 1, "configuracion": cfg}, hoy())
+    vieja = (datetime.now(timezone.utc) - timedelta(hours=30)).isoformat()  # comprobación ya caducada (más de 6 h)
+    fila = dict(asignaciones[0], catalogo_vacantes={"id": oferta["id"], "status": "active", "datos": dict(
+        oferta, verificacion={"estado": "verificada", "enlaces": [{"url": oferta["enlace"], "estado": "verificada",
+        "comprobada_en": vieja}]}), "description_full": SIN_DATO})
+
+    def ver(dia):
+        class Resultados:
+            def resultados(self, cliente_id, fecha):
+                return {"ejecucion": dict(repo.ejecucion, fecha=dia), "clientes": [], "filas": [fila]}
+        return servicio.resultados(Resultados())
+    ayer = (date.fromisoformat(hoy()) - timedelta(days=1)).isoformat()
+    r = ver(ayer)
+    v = r["vacantes"][0]
+    assert v["estado"] == "entregada" and v["entregada_el"] == ayer and v["enlace"] and r["listas"] == 0
+    hoy_ = ver(hoy())["vacantes"][0]  # la de hoy sigue esperando su recomprobación
+    assert hoy_["estado"] == "por_confirmar" and not hoy_["entregada_el"]
+
+
 def test_sugerencias_traen_cercanos_y_la_estimacion_cuenta_la_ampliacion(cfg_un_perfil):
     s = terminos.sugerir("Product Designer", consultar_esco=False)
     assert s["terminos_cercanos"] and not set(map(str.lower, s["terminos_cercanos"])) & set(map(str.lower, s["terminos_exactos"]))

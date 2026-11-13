@@ -3618,14 +3618,25 @@ function VacancyCard({ v }: { v: Vacante }) {
           <span className="company-name">{v.empresa}</span>
           <h3>{v.titulo}</h3>
         </div>
-        <span className={"pill " + (v.estado === "lista" ? "green" : "amber")}>
+        <span
+          className={
+            "pill " +
+            (v.estado === "lista"
+              ? "green"
+              : v.estado === "entregada"
+                ? "neutral"
+                : "amber")
+          }
+        >
           {v.estado === "lista"
             ? v.tipo === "post"
               ? "Vigente"
               : "Verificada"
             : v.estado === "retirada"
               ? "Retirada"
-              : "Por confirmar"}
+              : v.estado === "entregada"
+                ? `Entregada el ${fecha(v.entregada_el || "")}`
+                : "Por confirmar"}
         </span>
       </div>
       <div className="vacancy-tags">
@@ -3695,11 +3706,13 @@ function VacancyCard({ v }: { v: Vacante }) {
       <div className="vacancy-bottom">
         <span>
           <ShieldCheck size={13} />
-          {v.estado !== "lista"
-            ? "No se incluirá en el mensaje"
-            : v.tipo === "post"
-              ? "Post leído en las últimas 24 h"
-              : "Enlace con comprobación vigente"}
+          {v.estado === "entregada"
+            ? "Ya entregada ese día; no se vuelve a compartir"
+            : v.estado !== "lista"
+              ? "No se incluirá en el mensaje"
+              : v.tipo === "post"
+                ? "Post leído en las últimas 24 h"
+                : "Enlace con comprobación vigente"}
         </span>
         {v.enlace && (
           <a

@@ -57,6 +57,7 @@ export type Ejecucion = {
 };
 export type Vacante = {
   id: string;
+  entregada_el?: string;
   titulo: string;
   empresa: string;
   ubicacion: string;
