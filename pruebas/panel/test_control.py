@@ -883,3 +883,33 @@ def test_lo_exclusivo_va_siempre_a_su_cargo(cfg):
             v["familias"] = familias.clasificar(v["titulo"], v["_descripcion"])
         elegidas, _ = entrega.elegir(ofertas, {}, hoy())
     assert len(elegidas["cargo:" + cfg["cargos"][1]["id"]]) == 3
+
+
+# ── Contrato v20: un solo campo de años de experiencia; el servidor busca ±3 ─────────────────────────────────────
+
+@pytest.mark.parametrize("anos, minimo, maximo", [(5, 2, 8), (1, 0, 4), (0, 0, 3), (39, 36, 40)])
+def test_anos_de_experiencia_dan_un_rango_de_mas_menos_tres(cfg, anos, minimo, maximo):
+    p = Perfil.model_validate({**cfg["perfiles"][0], "experiencia_anos": anos, "experiencia_min": 30,
+                               "experiencia_max": 31})  # lo que traiga el navegador no manda
+    assert (p.experiencia_min, p.experiencia_max) == (minimo, maximo)
+
+
+def test_perfil_antiguo_conserva_su_rango_y_vacio_es_sin_filtro(cfg):
+    antiguo = Perfil.model_validate({**cfg["perfiles"][0], "experiencia_min": 0, "experiencia_max": 5})
+    assert antiguo.experiencia_anos is None and (antiguo.experiencia_min, antiguo.experiencia_max) == (0, 5)
+    vacio = Perfil.model_validate({**cfg["perfiles"][0], "experiencia_min": None, "experiencia_max": None})
+    assert (vacio.experiencia_min, vacio.experiencia_max) == (None, None)
+    with pytest.raises(ValidationError):
+        Perfil.model_validate({**cfg["perfiles"][0], "experiencia_anos": 41})
+
+
+def test_con_cinco_anos_entra_un_aviso_de_ocho_y_no_uno_de_nueve(cfg):
+    p = Perfil.model_validate({**cfg["perfiles"][0], "experiencia_anos": 5, "modalidades": ["remoto"],
+                               "ingles_maximo": "sin_filtro", "vive_en": "CO"})
+    base = dict(paises=["CO", "ES"], confianza_pais="alta")
+    ocho = afinidad.evaluar(trabajo(_descripcion="We require 8 years of experience. " * 4, anos_min=8, **base), p, hoy())
+    nueve = afinidad.evaluar(trabajo(_descripcion="We require 9 years of experience. " * 4, anos_min=9, **base), p, hoy())
+    assert "experiencia fuera del rango" not in ocho["motivos"]
+    assert "experiencia fuera del rango" in nueve["motivos"]
+    # El rescate por persona (v11) sigue sumando ±2 sobre el rango de ±3.
+    assert afinidad.relajado(p, "experiencia_cercana").experiencia_max == 10

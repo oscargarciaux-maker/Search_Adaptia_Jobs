@@ -19,7 +19,7 @@ SUGERENCIAS = {
     "oficina en otro país": "Añadir países a los que se mudaría",
     "modalidad diferente": "Aceptar otra modalidad",
     "idioma del aviso diferente": "Aceptar avisos en español e inglés",
-    "experiencia fuera del rango": "Ampliar el rango de experiencia",
+    "experiencia fuera del rango": "Revisar los años de experiencia",
     "inglés requerido superior al indicado": "Subir el nivel de inglés admitido",
 }
 SIN_DATO = {"experiencia no informada", "inglés requerido sin confirmar"}

@@ -144,6 +144,7 @@ function perfilNuevo(cliente: string, cargo: string): Perfil {
     ingles_maximo: "sin_filtro",
     experiencia_min: null,
     experiencia_max: null,
+    experiencia_anos: null,
     aceptar_experiencia_sin_dato: false,
     aceptar_ingles_sin_dato: false,
   };
@@ -1687,17 +1688,6 @@ function ClienteDialog({
             );
             return;
           }
-          if (
-            ps.some(
-              (p) =>
-                p.experiencia_min !== null &&
-                p.experiencia_max !== null &&
-                p.experiencia_min > p.experiencia_max,
-            )
-          ) {
-            setError("Revisa el rango de experiencia.");
-            return;
-          }
           try {
             if (ct.telefono.trim()) {
               await api("/contactos/" + c.id, {
@@ -1983,40 +1973,42 @@ function ClienteDialog({
                 </div>
               </div>
             </div>
-            <div className="form-grid three">
+            <div className="form-grid">
               <div className="field">
-                <label>Experiencia mínima exigida</label>
+                <label htmlFor={"anos-" + p.id}>Años de experiencia</label>
                 <input
-                  aria-label={"Experiencia mínima del perfil " + (i + 1)}
+                  id={"anos-" + p.id}
+                  aria-label={"Años de experiencia del perfil " + (i + 1)}
                   type="number"
                   min={0}
                   max={40}
-                  placeholder="Sin mínimo"
-                  value={p.experiencia_min ?? ""}
-                  onChange={(e) =>
-                    patch(p.id, {
-                      experiencia_min:
-                        e.target.value === "" ? null : Number(e.target.value),
-                    })
+                  placeholder={
+                    p.experiencia_anos == null &&
+                    (p.experiencia_min !== null || p.experiencia_max !== null)
+                      ? `Hoy: ${p.experiencia_min ?? 0}–${p.experiencia_max ?? 40} años`
+                      : "Sin filtro"
                   }
-                />
-              </div>
-              <div className="field">
-                <label>Experiencia máxima exigida</label>
-                <input
-                  aria-label={"Experiencia máxima del perfil " + (i + 1)}
-                  type="number"
-                  min={0}
-                  max={40}
-                  placeholder="Sin máximo"
-                  value={p.experiencia_max ?? ""}
-                  onChange={(e) =>
+                  value={p.experiencia_anos ?? ""}
+                  onChange={(e) => {
+                    // Contrato v20: de 3 años menos a 3 años más (el servidor hace la misma cuenta).
+                    const n =
+                      e.target.value === ""
+                        ? null
+                        : Math.max(0, Math.min(40, Number(e.target.value)));
                     patch(p.id, {
-                      experiencia_max:
-                        e.target.value === "" ? null : Number(e.target.value),
-                    })
-                  }
+                      experiencia_anos: n,
+                      experiencia_min: n === null ? null : Math.max(0, n - 3),
+                      experiencia_max: n === null ? null : Math.min(40, n + 3),
+                    });
+                  }}
                 />
+                <p className="field-help">
+                  {p.experiencia_anos != null
+                    ? `Busca vacantes que pidan de ${p.experiencia_min} a ${p.experiencia_max} años.`
+                    : p.experiencia_min !== null || p.experiencia_max !== null
+                      ? `Hoy filtra de ${p.experiencia_min ?? 0} a ${p.experiencia_max ?? 40} años. Si escribes sus años, buscará de 3 menos a 3 más.`
+                      : "Vacío: sin filtro de experiencia. Con un valor, busca de 3 años menos a 3 más."}
+                </p>
               </div>
               <div className="field">
                 <label>Inglés requerido: hasta</label>
@@ -2034,13 +2026,12 @@ function ClienteDialog({
                     </option>
                   ))}
                 </select>
+                <p className="field-help">
+                  Es el nivel que pide el aviso, aparte del idioma en que está
+                  escrito.
+                </p>
               </div>
             </div>
-            <p className="helper">
-              El rango filtra los años mínimos que exige la vacante. El inglés
-              requerido es independiente del idioma en que está escrito el
-              aviso.
-            </p>
             <div className="missing-options">
               <label>
                 <input
@@ -3626,12 +3617,14 @@ function ClientCard({
         <div>
           <BriefcaseBusiness size={14} />
           <span>
-            {p?.experiencia_min === null && p?.experiencia_max === null
-              ? "Sin filtro de experiencia"
-              : (p?.experiencia_min ?? 0) +
-                "–" +
-                (p?.experiencia_max ?? 40) +
-                " años exigidos"}
+            {p?.experiencia_anos != null
+              ? `${p.experiencia_anos} años · busca de ${p.experiencia_min} a ${p.experiencia_max}`
+              : p?.experiencia_min === null && p?.experiencia_max === null
+                ? "Sin filtro de experiencia"
+                : (p?.experiencia_min ?? 0) +
+                  "–" +
+                  (p?.experiencia_max ?? 40) +
+                  " años exigidos"}
           </span>
         </div>
         <div>
