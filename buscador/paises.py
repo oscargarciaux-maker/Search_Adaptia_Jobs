@@ -16,6 +16,7 @@ import yaml
 from buscador import normalizar
 
 RUTA = Path(__file__).resolve().parent.parent / "datos" / "paises.yaml"
+RUTA_MUNDO = RUTA.parent / "paises_mundo.yaml"
 
 _REMOTO = re.compile(r"\b(remote|remoto|remota|remotely|teletrabajo|home ?office|work from home|wfh|trabajo a distancia|"
                      r"100% remoto|distributed|fully distributed|anywhere|desde casa|trabajo desde casa|remote work)\b")
@@ -49,6 +50,59 @@ def datos():
     for p in paises:
         for ciudad in p["ciudades"]:
             ciudades.setdefault(normalizar.texto(ciudad),[]).append(p["codigo"])
+    # Contrato v15: la tabla ISO completa (datos/paises_mundo.yaml). Cada lugar apunta a su país propio (los 21 de
+    # paises.yaml) o a «XX» (extranjero). Un nombre que apunta a más de un país es ambiguo y nunca decide solo.
+    propios = {p["codigo"] for p in paises}
+    mundo = yaml.safe_load(RUTA_MUNDO.read_text(encoding="utf-8"))["paises"] if RUTA_MUNDO.exists() else []
+    nombres_propios = {normalizar.texto(x): p["codigo"] for p in paises for x in p["nombres"]}
+    for m in mundo:
+        if m["iso2"] in propios:
+            nombres_propios.update({n: m["iso2"] for n in m["nombres"]})
+    lugares = {}
+    def anotar(frase, codigo):
+        frase = normalizar.texto(frase)
+        if len(frase) > 2 and nombres_propios.get(frase, codigo) == codigo:  # el nombre de un país propio siempre gana
+            lugares.setdefault(frase, set()).add(codigo)
+    for p in paises:
+        for ciudad in p["ciudades"]:
+            anotar(ciudad, p["codigo"])
+    curadas = {f: set(c) for f, c in lugares.items()}  # ciudades elegidas a mano: ganan a una provincia homónima
+    comunes = {normalizar.texto(x) for x in crudo.get("palabras_comunes", [])}
+    provincias_fuera = set()
+    for m in mundo:
+        codigo = m["iso2"] if m["iso2"] in propios else "XX"
+        for sub in m.get("subdivisiones", []):
+            if normalizar.texto(sub) in comunes:
+                continue  # «Como», «Mayo», «Laguna»: palabras corrientes, no lugares
+            anotar(sub, codigo)
+            if codigo == "XX":
+                provincias_fuera.add(normalizar.texto(sub))
+        if codigo == "XX":
+            for n in m["nombres"]:
+                anotar(n, "XX")
+    for frase in crudo["fuera_de_latam"]:
+        anotar(frase, "XX")
+    for f, c in curadas.items():
+        lugares[f] = c
+    ambiguas = {f for f, c in lugares.items() if len(c) > 1} | {normalizar.texto(f) for f in crudo.get("ambiguas", [])}
+    ciudades = {f: sorted(c) for f, c in lugares.items() if "XX" not in c and f not in ambiguas}
+    fuera_lugares = {f for f, c in lugares.items() if c == {"XX"} and f not in ambiguas}
+    fuera_lugares |= {normalizar.texto(x) for x in crudo["fuera_de_latam"] if len(normalizar.texto(x)) <= 2}  # "us", "uk"
+    # Las provincias extranjeras solo se buscan en el campo de ubicación; en frases de la descripción, solo países y la
+    # lista hecha a mano (una provincia puede llamarse como una palabra corriente).
+    fuera = fuera_lugares - provincias_fuera
+    nombres_pais = []  # con los otros nombres de la tabla mundial («equador», «united mexican states»)
+    for p in paises:
+        extra = next((m["nombres"] for m in mundo if m["iso2"] == p["codigo"]), [])
+        nombres_pais.append((p["codigo"], [normalizar.texto(x) for x in p["nombres"] + extra + p["gentilicios"]]))
+    todos_nombres = [n for _, ns in nombres_pais for n in ns]
+    # Lugares extranjeros que contienen el nombre de un país propio («New Mexico», «Nuevo México»): se quitan antes de
+    # buscar nombres de país, así no se leen como México.
+    fuera_con_propio = sorted((f for f in fuera_lugares if any(normalizar.contiene_frase(f, n) and f != n for n in todos_nombres)),
+                              key=len, reverse=True)
+    # Lugares propios que contienen un lugar extranjero («Baja California», «Nuevo León»?): se quitan antes de buscar
+    # lugares extranjeros, así «California» no convierte a Baja California en EE. UU.
+    propios_con_fuera = sorted((f for f in ciudades if _patron(tuple(fuera_lugares)).search(f)), key=len, reverse=True)
     claves.sort(key=lambda x: -len(x[0]))  # las frases largas primero ("santiago de chile" antes que "santiago")
     # Contrato v12: «paises» son todos los que se reconocen en un aviso; «codigos», «latam» y «europa», solo los cubiertos.
     cubiertos = [p for p in paises if p.get("cobertura", True)]
@@ -61,12 +115,20 @@ def datos():
         "europa": [p["codigo"] for p in cubiertos if p.get("region") == "europa"],
         "utc": {p["codigo"]: p["utc"] for p in paises},
         "claves": claves,
-        "nombres_pais": [(p["codigo"],[normalizar.texto(x) for x in p["nombres"]+p["gentilicios"]]) for p in paises],
+        "nombres_pais": nombres_pais,
         "ciudades": ciudades,
+        "ambiguas": ambiguas,
+        "fuera_con_propio": fuera_con_propio,
+        "propios_con_fuera": propios_con_fuera,
+        "palabras_comunes": comunes,
+        "iso2_extranjeros": {m["iso2"].lower() for m in mundo if m["iso2"] not in propios},
+        "iso3": {m["iso3"]: m["iso2"] for m in mundo if m["iso2"] in propios},
+        "iso3_extranjeros": {m["iso3"] for m in mundo if m["iso2"] not in propios},
         "toda_latam": sorted({normalizar.texto(x) for x in crudo["toda_latam"]}, key=len, reverse=True),
         "mundo": sorted({normalizar.texto(x) for x in crudo["todo_el_mundo"]}, key=len, reverse=True),
         "toda_europa": sorted({normalizar.texto(x) for x in crudo["toda_europa"]}, key=len, reverse=True),
-        "fuera": sorted({normalizar.texto(x) for x in crudo["fuera_de_latam"]}, key=len, reverse=True),
+        "fuera": sorted(fuera, key=len, reverse=True),
+        "fuera_lugares": sorted(fuera_lugares, key=len, reverse=True),
         "subregiones": crudo.get("subregiones", []),
     }
 
@@ -89,7 +151,17 @@ def _pais_por_nombre(t, codigos):
 
 
 def _nombra(t, frases):
-    return any(normalizar.contiene_frase(t, f) for f in frases)
+    """¿Aparece alguna de las frases como palabras completas? Una sola expresión compilada por lista (la de lugares
+    extranjeros tiene más de 1.700 frases y se consulta varias veces por vacante en cada captura)."""
+    if not t or not frases:
+        return False
+    return _patron(tuple(frases)).search(t) is not None
+
+
+@lru_cache(maxsize=256)
+def _patron(frases):
+    alternativas = "|".join(re.escape(f) for f in sorted(set(frases), key=len, reverse=True) if f)
+    return re.compile(r"(?<![a-z0-9])(?:" + alternativas + r")(?![a-z0-9])")
 
 
 def _por_zona_horaria(t):
@@ -198,20 +270,10 @@ def combinar(resultados):
 
 # Contrato v13: códigos al final de la ubicación. LinkedIn y los portales escriben «Bucharest, ro» o «Barcelona, es»
 # (país ISO en minúsculas) y «San Jose, CA» (estado de EE. UU. en mayúsculas). Antes quedaban «por confirmar».
-_ISO_EXTRANJEROS = set("""us ca gb uk ie fr de it pl ro pt nl be lu ch at se no dk fi is cz sk hu gr bg hr si rs ua by ru
-    lt lv ee md al ba me mk tr cy mt il ae sa qa kw bh om eg ma tn dz za ng ke gh et in pk bd lk np cn hk tw jp kr sg my
-    th vn ph id au nz""".split())
 _ESTADOS_EEUU = set("""AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC
     ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC""".split())
 _CODIGO_FINAL = re.compile(r"(?:,|\s[-–]|^)\s*([A-Za-z]{2}|[A-Z]{3})\s*$")
 _SOLO_CODIGOS = re.compile(r"^\s*([A-Za-z]{2}|[A-Z]{3})(?:\s+\1)*\s*$")
-# Contrato v14: códigos de tres letras (ISO 3166 alfa-3), solo en mayúsculas para no confundirlos con palabras.
-_ISO3 = {"ARG": "AR", "BOL": "BO", "BRA": "BR", "CHL": "CL", "COL": "CO", "CRI": "CR", "CUB": "CU", "DOM": "DO",
-         "ECU": "EC", "ESP": "ES", "GTM": "GT", "HND": "HN", "MEX": "MX", "NIC": "NI", "PAN": "PA", "PER": "PE",
-         "PRI": "PR", "PRY": "PY", "SLV": "SV", "URY": "UY", "VEN": "VE"}
-_ISO3_EXTRANJEROS = set("""USA GBR IND CAN FRA DEU ITA POL ROU PRT NLD BEL CHE AUT SWE NOR DNK FIN IRL CZE HUN GRC TUR
-    ISR ARE SAU EGY MAR ZAF NGA KEN PAK BGD LKA NPL CHN HKG TWN JPN KOR SGP MYS THA VNM PHL IDN AUS NZL UKR RUS KAZ
-    GEO""".split())
 
 
 def _sin_repeticion(texto):
@@ -233,9 +295,9 @@ def _expandir_codigos(ubicacion):
 
     def por_codigo(codigo, ciudad):
         if len(codigo) == 3:
-            if codigo in _ISO3:
-                return nombres[_ISO3[codigo]]
-            return "pais extranjero" if codigo in _ISO3_EXTRANJEROS else None
+            if codigo in d["iso3"]:
+                return nombres[d["iso3"][codigo]]
+            return "pais extranjero" if codigo in d["iso3_extranjeros"] else None
         mayus = codigo.upper()
         if ciudad and codigo.isupper() and mayus in _ESTADOS_EEUU:
             if mayus in nombres:
@@ -244,7 +306,7 @@ def _expandir_codigos(ubicacion):
             return "pais extranjero"
         if mayus in nombres:
             return nombres[mayus]
-        return "pais extranjero" if codigo.lower() in _ISO_EXTRANJEROS else None
+        return "pais extranjero" if codigo.lower() in d["iso2_extranjeros"] | {"uk"} else None
 
     partes = []
     for parte in re.split(r"([;|])", str(ubicacion or "")):
@@ -265,7 +327,8 @@ def _expandir_codigos(ubicacion):
 def _ciudad_dentro(texto, ciudades):
     """Contrato v14: una ciudad conocida dentro de un texto más largo («Área metropolitana de Bogotá D.C.»,
     «Las Rozas de Madrid»). Solo si todas las ciudades halladas son de un único país cubierto."""
-    frases = [f for f in ciudades if f not in _CIUDADES_AMBIGUAS and (" " in f or len(f) >= 6)
+    ambiguas = datos()["ambiguas"] | _CIUDADES_AMBIGUAS
+    frases = [f for f in ciudades if f not in ambiguas and (" " in f or len(f) >= 6)
               and normalizar.contiene_frase(texto, f)]
     frases = [f for f in frases if not any(f != otra and normalizar.contiene_frase(otra, f) for otra in frases)]
     hallados = {c for f in frases for c in ciudades[f]}
@@ -291,18 +354,24 @@ def elegibles(titulo, ubicacion, descripcion="", remoto=None):
     mod = modalidad(titulo, ubicacion, descripcion, remoto)
     # El título no puede convertir una oficina de otro país en una ubicación permitida.
     geografia = _sin_repeticion(normalizar.texto(ubicacion))
-    nombres_pais = [codigo for codigo,nombres in d["nombres_pais"] if _nombra(geografia,nombres)]
+    sin_homonimos = geografia
+    for frase in d["fuera_con_propio"]:  # «New Mexico» no es México
+        sin_homonimos = re.sub(r"(?<![a-z0-9])" + re.escape(frase) + r"(?![a-z0-9])", " ", sin_homonimos)
+    nombres_pais = [codigo for codigo,nombres in d["nombres_pais"] if _nombra(sin_homonimos,nombres)]
     ciudad_sola = normalizar.texto(_REMOTO.sub(" ",_HIBRIDO.sub(" ",_PRESENCIAL.sub(" ",geografia))))
     ciudad_sola = re.sub(r"^(?:area metropolitana de |region metropolitana de |greater )", "", ciudad_sola)
     ciudad_sola = re.sub(r" (?:y alrededores|and surrounding areas|metropolitan area|area)$", "", ciudad_sola)
     ciudades = d["ciudades"].get(ciudad_sola,[])
-    if not nombres_pais and not ciudades and not _nombra(ciudad_sola, d["fuera"]):
+    if not nombres_pais and not ciudades and not _nombra(ciudad_sola, d["fuera_lugares"]):
         ciudades = _ciudad_dentro(ciudad_sola, d["ciudades"])
     nombrados = nombres_pais or ciudades
     es_latam = _nombra(ambito, d["toda_latam"])
     es_mundo = _nombra(ambito, d["mundo"])
     es_europa = _nombra(ambito, d["toda_europa"])
-    fuera = _nombra(ambito, d["fuera"])
+    ambito_sin_propios = ambito
+    for frase in d["propios_con_fuera"]:
+        ambito_sin_propios = re.sub(r"(?<![a-z0-9])" + re.escape(frase) + r"(?![a-z0-9])", " ", ambito_sin_propios)
+    fuera = _nombra(ambito_sin_propios, d["fuera_lugares"])
     def subregion(texto):
         return next((r["paises"] for r in d["subregiones"] if _nombra(texto, r["nombres"])), None)
 
