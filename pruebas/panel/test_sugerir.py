@@ -44,11 +44,21 @@ def test_paises_cubiertos_y_latam():
     assert s["decision"] == "sirve" and s["paises"] == ["ES"]
 
 
-def test_mezcla_o_europa_hay_que_leerla():
+def test_emea_es_espana_y_la_mezcla_hay_que_leerla():
+    # «EMEA - Remote»: hay que residir en Europa, Oriente Medio o África; España está dentro (Oscar, 13 nov).
     s = _s("Remote in AMER", "This is a 100% remote role open to those who reside in the US, UK, or EMEA region.")
+    assert s["decision"] == "sirve" and s["paises"] == ["ES"] and "EMEA" in s["motivo"]
+    s = _s("Remote", "Covering the region, based in Europe.", "Sr. Customer Success Manager - EMEA")
+    assert s["decision"] == "sirve" and s["paises"] == ["ES"]
+    s = _s("Remote", "Candidates based in Colombia or the United States are welcome.")
     assert s["decision"] == "" and s["motivo"].startswith("Léela")
-    s = _s("Remote", "Sr. Customer Success Manager covering the EMEA region, based in Europe.")
-    assert s["decision"] == "" and "EMEA" in s["motivo"]
+
+
+def test_latam_publicada_en_guyana_y_anywhere_in_the_us():
+    s = _s("Linden, Guyana Linden, Guyana", "", "Product Manager - Remote, Latin America")
+    assert s["decision"] == "sirve" and len(s["paises"]) == 19
+    s = _s("Remote", "We are open to candidates located anywhere in the US.", "MVP Account Executive")
+    assert s["decision"] == "otro_pais"
 
 
 def test_csv_trae_la_sugerencia_escrita_y_se_puede_subir_tal_cual():

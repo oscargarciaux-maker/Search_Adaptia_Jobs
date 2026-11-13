@@ -38,6 +38,13 @@ _MAXIMO_FRASE = 260
 _EXCLUYE = re.compile(r"\b(excluding|excludes|except|excepto|exceptuando|salvo|sin incluir|other than|not open to|"
                       r"not available in|no disponible en|no aplica para)\b")
 
+# «Anywhere in the US» no es «cualquier lugar»: es solo EE. UU. (PrizePicks, 13 nov).
+_CUALQUIER_PARTE_DE = re.compile(r"\banywhere in (?:the )?(us|usa|u s|united states|canada|uk|united kingdom|australia)\b")
+# Países de LATAM sin cobertura: un aviso «Remote, Latin America» publicado en Guyana o Belice sigue siendo para LATAM.
+_LATAM_SIN_COBERTURA = {"guyana", "suriname", "surinam", "belize", "belice", "brazil", "brasil", "jamaica", "haiti",
+                        "trinidad and tobago", "trinidad y tobago", "bahamas", "barbados", "french guiana",
+                        "guayana francesa"}
+
 ETIQUETA = {"sirve": "sí", "otro_pais": "otro país", "no_sirve": "no sirve", "": ""}
 GRUPOS = {"otro_pais": 0, "no_sirve": 1, "sirve": 2, "": 3}
 
@@ -98,7 +105,10 @@ def sugerir(datos):
         fuera = _extranjeros(original, t, d)
         es_latam = paises._nombra(t, d["toda_latam"])
         es_europa = paises._nombra(t, d["toda_europa"])
-        es_mundo = paises._nombra(t, d["mundo"])
+        acotado = _CUALQUIER_PARTE_DE.search(t)
+        es_mundo = paises._nombra(t, d["mundo"]) and not acotado
+        if acotado and acotado.group(1) not in fuera:
+            fuera.append(acotado.group(1))
         es_zona = bool(paises._ZONA.search(t)) and not propios and not fuera
         cubiertos += [c for c in propios if c not in cubiertos]
         extranjeros += [f for f in fuera if f not in extranjeros]
@@ -118,6 +128,13 @@ def sugerir(datos):
             frase_duda = original
     nombres = {p["codigo"]: p["nombre"] for p in d["paises"]}
     cubiertos = [c for c in cubiertos if c not in excluidos]
+    if latam and extranjeros and all(e in _LATAM_SIN_COBERTURA for e in extranjeros):
+        extranjeros = []  # «Remote, Latin America» publicado en Guyana: sigue siendo para toda LATAM
+    if europa and not cubiertos and not latam and not mundo:
+        # EMEA / Europa exige residir en esa región, y España está dentro (explicación de Oscar, 13 nov).
+        otros = (" (también nombra " + ", ".join(extranjeros[:3]) + ")") if extranjeros else ""
+        return {"decision": "sirve", "paises": ["ES"], "motivo": "Pide residir en Europa/EMEA: España cuenta" + otros + ".",
+                "frase": _cita(frase_duda), "grupo": GRUPOS["sirve"]}
     positivos = bool(cubiertos or latam)
     if positivos and not extranjeros and not europa and not mundo:
         if latam:  # «LATAM» vale para todos los de LATAM (menos los excluidos), más España si la nombra

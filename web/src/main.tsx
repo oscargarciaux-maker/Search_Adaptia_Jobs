@@ -707,6 +707,14 @@ const estadosMensaje: Record<Borrador["estado"], string> = {
   descartado: "Descartado",
 };
 
+// Contrato v19: regiones que se eligen de una vez (el servidor las convierte en sus países).
+const REGIONES: { codigo: string; nombre: string }[] = [
+  { codigo: "LATAM", nombre: "LATAM (todos los países)" },
+  { codigo: "SUD_CENTRO_MX", nombre: "Sudamérica, Centroamérica y México" },
+  { codigo: "SUDAMERICA", nombre: "Sudamérica" },
+  { codigo: "CENTROAMERICA", nombre: "Centroamérica" },
+  { codigo: "LATAM_ES", nombre: "LATAM y España" },
+];
 const ETIQUETA_SUGERIDA: Record<string, string> = {
   sirve: "sirve",
   otro_pais: "solo para otro país",
@@ -740,7 +748,9 @@ function PorConfirmar({
     cargar();
   }, []);
   const nombre = (codigo: string) =>
-    paises.find((p) => p.codigo === codigo)?.nombre || codigo;
+    paises.find((p) => p.codigo === codigo)?.nombre ||
+    REGIONES.find((r) => r.codigo === codigo)?.nombre ||
+    codigo;
   async function decidir(r: Revision, decision: string, codigos?: string[]) {
     const pais = elegido[r.vacante_id] ?? r.sugerencia[0] ?? "";
     if (decision === "sirve" && !pais && !codigos?.length) {
@@ -997,11 +1007,20 @@ function PorConfirmar({
                   }
                 >
                   <option value="">Elige…</option>
-                  {paises.map((p) => (
-                    <option key={p.codigo} value={p.codigo}>
-                      {p.nombre}
-                    </option>
-                  ))}
+                  <optgroup label="Regiones">
+                    {REGIONES.map((g) => (
+                      <option key={g.codigo} value={g.codigo}>
+                        {g.nombre}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Países">
+                    {paises.map((p) => (
+                      <option key={p.codigo} value={p.codigo}>
+                        {p.nombre}
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
               </label>
               <button

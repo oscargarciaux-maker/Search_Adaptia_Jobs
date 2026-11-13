@@ -20,6 +20,52 @@ TOPE = 10  # las que se muestran a la vez en el panel
 GUARDADAS = 300  # las que se guardan (para el CSV de revisión grande, contrato v17)
 GUARDADAS_COMPLETA = 3000  # depuración completa de la base: todas las dudosas
 DEPURACION = "depuración completa"
+POR_CONFIRMAR = "elegibilidad regional por confirmar"  # razón del catálogo mientras el país no se confirma
+RESUELTA_SOLA = "resuelta sola"
+POSIBLE_CIERRE = "posiblemente cerrada"
+DIAS_SIN_VER = 7     # una vacante que ninguna fuente lista hace una semana probablemente cerró (Expel, 13 nov)
+DIAS_PUBLICADA = 30  # la misma antigüedad máxima de la entrega
+
+
+def grupos_paises():
+    """Regiones que el operador puede elegir de una vez (contrato v19): LATAM, Sudamérica, Centroamérica…"""
+    d = paises.datos()
+    cubiertos = set(d["codigos"])
+    sub = {r["nombres"][0]: [c for c in r["paises"] if c in cubiertos] for r in d["subregiones"]}
+    sud, centro = sub.get("south america", []), sub.get("central america", [])
+    return {"LATAM": list(d["latam"]), "SUDAMERICA": sud, "CENTROAMERICA": centro,
+            "SUD_CENTRO_MX": paises.ordenar(sud + centro + ["MX"]), "LATAM_ES": list(d["codigos"])}
+
+
+def expandir(codigos):
+    """Códigos de país con las regiones ya convertidas en sus países."""
+    grupos = grupos_paises()
+    salida = []
+    for c in codigos or []:
+        for x in grupos.get(str(c).upper(), [c]):
+            if x not in salida:
+                salida.append(x)
+    return salida
+
+
+def _sin_revisar(datos, fecha):
+    """'' si la vacante debe preguntarse; si no, por qué no: ya resuelta con las reglas vigentes o posiblemente cerrada."""
+    hoy = datetime.fromisoformat(fecha).date()
+    visto = str(datos.get("visto_ultima_vez") or "")[:10]
+    publicada = str(datos.get("fecha_publicacion") or "")[:10]
+    try:
+        if visto and (hoy - datetime.fromisoformat(visto).date()).days > DIAS_SIN_VER:
+            return POSIBLE_CIERRE
+        if publicada and (hoy - datetime.fromisoformat(publicada).date()).days > DIAS_PUBLICADA:
+            return POSIBLE_CIERRE
+    except ValueError:
+        pass
+    # Contratos v18/v19: la lectura de lugares mejoró; si ahora se confirma (o se descarta) sola, no se pregunta.
+    r = paises.elegibles(datos.get("titulo", ""), datos.get("ubicacion", ""), datos.get("_descripcion", ""),
+                         True if datos.get("modalidad") == "remoto" else None)
+    if r["confianza"] in ("alta", "media") and r["nota"] != "por zona horaria":
+        return RESUELTA_SOLA
+    return ""
 DIAS_PENDIENTE = 7
 MOTIVO = "ubicación por confirmar"
 # Lo único que una confirmación de país puede resolver; cualquier otro motivo deja fuera la vacante para ese perfil.
@@ -94,7 +140,8 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False):
         if datos.get("idioma") not in ("es", "en") or not datos.get("titulo"):
             fuera_idioma += 1
             continue
-        if datos.get("confianza_pais") != "baja" and datos.get("nota_pais") != "por zona horaria":
+        if datos.get("confianza_pais") != "baja" and datos.get("nota_pais") != "por zona horaria" or \
+                _sin_revisar(datos, fecha):
             ya_claras += 1
             continue
         sirve = []
@@ -124,6 +171,16 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False):
         creada = (r.get("creada_en") or ahora.isoformat()).replace("Z", "+00:00")
         edad = ahora - datetime.fromisoformat(creada)
         if r.get("estado") != "pendiente":
+            continue
+        catalogo_fila = r.get("catalogo_vacantes") or {}
+        if catalogo_fila and catalogo_fila.get("reason") != POR_CONFIRMAR:
+            # El sistema ya la resolvió (ficha, Get on Board, reglas) o dejó de ser entregable: no hace falta preguntar.
+            repo.actualizar_revision(vid, {"estado": "vencida", "motivo": RESUELTA_SOLA})
+            continue
+        datos_fila = _datos(catalogo_fila) if (catalogo_fila.get("datos") or {}).get("titulo") else {}
+        motivo_fuera = _sin_revisar(datos_fila, fecha) if datos_fila else ""
+        if motivo_fuera:
+            repo.actualizar_revision(vid, {"estado": "vencida", "motivo": motivo_fuera})
             continue
         if r.get("motivo") == DEPURACION:  # las de la depuración completa esperan a la persona (hasta 30 días)
             if edad > timedelta(days=30):
@@ -205,7 +262,7 @@ def decidir(repo, vacante_id, decision, codigos=(), aplicar_a_iguales=False, fec
     if not filas or filas[0].get("estado") not in ("pendiente", "saltada"):
         raise ErrorRepositorio("Esta vacante ya se decidió. Recarga la bandeja.", 409)
     rev = filas[0]
-    codigos = [c for c in dict.fromkeys(codigos or [])]
+    codigos = expandir(codigos)
     asignadas = 0
     if decision == "sirve":
         cubiertos = set(paises.datos()["codigos"])
@@ -353,10 +410,14 @@ def leer_paises(texto):
     d = paises.datos()
     nombres = {normalizar.texto(p["nombre"]): p["codigo"] for p in d["cubiertos"]}
     codigos = []
-    for crudo in [x.strip() for x in re.split(r"[,/;]| y | e ", texto or "") if x.strip()]:
+    for crudo in [x.strip() for x in re.split(r"[,/;]| y | e | o | u | and | or ", texto or "") if x.strip()]:
         t = normalizar.texto(crudo)
         if t in ("latam", "latinoamerica", "america latina", "latin america"):
             nuevos = list(d["latam"])
+        elif t in ("sudamerica", "suramerica", "south america"):
+            nuevos = grupos_paises()["SUDAMERICA"]
+        elif t in ("centroamerica", "central america"):
+            nuevos = grupos_paises()["CENTROAMERICA"]
         elif t in ("todos", "todas", "latam y espana"):
             nuevos = list(d["codigos"])
         elif len(crudo) == 2 and crudo.upper() in d["codigos"]:
