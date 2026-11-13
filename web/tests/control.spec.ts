@@ -43,6 +43,7 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await dialog.getByLabel("Presencial en el perfil 1").check();
   await expect(dialog.getByText("También se mudaría a…")).toBeVisible();
   // Estimación en vivo: en demostración usa avisos ficticios y no sale a internet.
+  await expect(dialog.getByText(/No gasta Apify/)).toBeVisible();
   await dialog
     .getByRole("button", { name: "Estimar con búsqueda en vivo" })
     .click();

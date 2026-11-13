@@ -16,7 +16,7 @@ import requests
 
 from buscador import paises
 from panel import servicio
-from panel.modelos import AjustesAlertas, CambioBorrador, Configuracion, Contacto, DecisionRevision, EstadoRegla, SubirRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia
+from panel.modelos import AjustesAlertas, CambioBorrador, Configuracion, Contacto, DecisionRevision, EstadoRegla, SubirRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia, explicar, solo_perfil
 from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase, hoy
 from panel.terminos import sugerir
 
@@ -163,16 +163,17 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
     def vista_previa(body: VistaPrevia):
         try:
             cfg = Configuracion.model_validate(body.configuracion)
-        except ValueError:  # incluye ValidationError: borrador a medio editar
-            return {"incompleto": True}
+        except ValueError as e:  # incluye ValidationError: borrador a medio editar
+            return {"incompleto": True, "motivo": explicar(e)}
         return servicio.vista_previa(repo, cfg)
 
     @app.post("/api/estimacion-en-vivo")
     def en_vivo(body: EnVivo):
+        # Solo el perfil, su cliente y su cargo: el resto del borrador puede estar a medio editar (sección 4, 13 nov).
         try:
-            cfg = Configuracion.model_validate(body.configuracion)
-        except ValueError:
-            return {"incompleto": True}
+            cfg = solo_perfil(body.configuracion, body.perfil_id)
+        except ValueError as e:  # incluye ValidationError
+            return {"incompleto": True, "motivo": explicar(e)}
         return servicio.estimacion_en_vivo(repo, cfg, body.perfil_id)
 
     @app.get("/api/ajustes/alertas")

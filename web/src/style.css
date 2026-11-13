@@ -2933,6 +2933,12 @@ h1 {
   border: 1px solid #e0e5ef;
   font-size: 12px;
 }
+.live-gratis {
+  margin-left: 10px;
+  font-size: 12px;
+  font-style: italic;
+  color: #5f6b62;
+}
 .live-note {
   margin: 6px 0 0;
   font-size: 12px;

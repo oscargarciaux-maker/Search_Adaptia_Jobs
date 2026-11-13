@@ -115,6 +115,7 @@ export type EstimacionCargo = {
 };
 export type VistaPrevia = {
   incompleto?: boolean;
+  motivo?: string;
   catalogo?: { vacantes: number; actualizado: string };
   perfiles?: Record<string, EstimacionPerfil>;
   cargos?: Record<string, EstimacionCargo>;
@@ -122,6 +123,7 @@ export type VistaPrevia = {
 };
 export type EstimacionEnVivo = {
   incompleto?: boolean;
+  motivo?: string;
   ocupado?: boolean;
   espera?: number;
   error?: string;

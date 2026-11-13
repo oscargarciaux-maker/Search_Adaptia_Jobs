@@ -429,6 +429,7 @@ type EstadoPrevia = "listo" | "cargando" | "incompleto" | "error";
 function useVistaPrevia(config: Configuracion | null) {
   const [datos, setDatos] = useState<VistaPrevia | null>(null);
   const [estado, setEstado] = useState<EstadoPrevia>("cargando");
+  const [motivo, setMotivo] = useState("");
   const turno = useRef(0);
   const cuerpo = config ? JSON.stringify({ configuracion: config }) : "";
   useEffect(() => {
@@ -443,6 +444,7 @@ function useVistaPrevia(config: Configuracion | null) {
         });
         if (mio !== turno.current) return;
         if (r.incompleto) {
+          setMotivo(r.motivo || "");
           setEstado("incompleto");
         } else {
           setDatos(r);
@@ -457,7 +459,7 @@ function useVistaPrevia(config: Configuracion | null) {
     }, 450);
     return () => clearTimeout(espera);
   }, [cuerpo]);
-  return { datos, estado };
+  return { datos, estado, motivo };
 }
 
 const ajustesSinDato: Record<string, Partial<Perfil>> = {
@@ -473,16 +475,18 @@ const ajustesSinDato: Record<string, Partial<Perfil>> = {
 function PreviewPerfil({
   info,
   estado,
+  motivo,
   onAjustar,
 }: {
   info?: EstimacionPerfil;
   estado: EstadoPrevia;
+  motivo?: string;
   onAjustar: (cambio: Partial<Perfil>) => void;
 }) {
   if (estado === "incompleto")
     return (
       <p className="preview muted-preview" role="status">
-        Completa el perfil para ver cuántas vacantes lo cumplen.
+        Aún no se puede estimar: {motivo || "revisa los campos del perfil."}
       </p>
     );
   if (!info)
@@ -551,6 +555,23 @@ function PreviewPerfil({
   );
 }
 
+// Por qué falló la petición, para que el operador sepa si esperar, volver a entrar o revisar el registro (13 nov).
+function motivoFalloEnVivo(e: unknown) {
+  if (e instanceof DOMException && e.name === "TimeoutError")
+    return "La búsqueda tardó más de un minuto y se canceló. Inténtalo de nuevo en un rato.";
+  if (e instanceof ErrorAPI) {
+    if (e.status === 401)
+      return "Tu sesión se cerró: vuelve a entrar al panel.";
+    if (e.status === 403)
+      return "El panel rechazó la petición. Recarga la página y vuelve a intentarlo.";
+    if (e.status === 422) return "Aún no se puede buscar: " + e.message;
+    if (e.status >= 502)
+      return "El servidor del panel no respondió a tiempo (puede estar despertando). Espera un minuto y vuelve a intentarlo.";
+    return "La búsqueda falló por un error del servidor. Inténtalo de nuevo en un minuto.";
+  }
+  return "No hubo conexión con el panel. Revisa tu internet y vuelve a intentarlo.";
+}
+
 function EnVivo({
   config,
   perfilId,
@@ -570,13 +591,18 @@ function EnVivo({
       const x = await api<EstimacionEnVivo>("/estimacion-en-vivo", {
         method: "POST",
         body: JSON.stringify({ configuracion: config, perfil_id: perfilId }),
+        signal: AbortSignal.timeout(75000),
       });
-      if (x.incompleto) setError("Completa el perfil antes de buscar.");
+      if (x.incompleto)
+        setError(
+          "Aún no se puede buscar: " +
+            (x.motivo || "revisa los campos del perfil."),
+        );
       else if (x.ocupado || x.espera || x.error)
         setError(x.nota || x.error || "");
       else setR(x);
-    } catch {
-      setError("No se pudo buscar en este momento. Inténtalo más tarde.");
+    } catch (e) {
+      setError(motivoFalloEnVivo(e));
     } finally {
       setCargando(false);
     }
@@ -605,6 +631,11 @@ function EnVivo({
             ? "Repetir búsqueda en vivo"
             : "Estimar con búsqueda en vivo"}
       </button>
+      {!cargando && (
+        <span className="live-gratis">
+          No gasta Apify: solo LinkedIn público y Get on Board, sin cuentas.
+        </span>
+      )}
       {error && (
         <p className="live-note" role="status">
           {error}
@@ -1921,6 +1952,7 @@ function ClienteDialog({
             <PreviewPerfil
               info={previa.datos?.perfiles?.[p.id]}
               estado={previa.estado}
+              motivo={previa.motivo}
               onAjustar={(cambio) => patch(p.id, cambio)}
             />
             <EnVivo
