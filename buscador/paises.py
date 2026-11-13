@@ -371,8 +371,10 @@ def _ciudad_dentro(texto, ciudades):
     """Contrato v14: una ciudad conocida dentro de un texto más largo («Área metropolitana de Bogotá D.C.»,
     «Las Rozas de Madrid»). Solo si todas las ciudades halladas son de un único país cubierto."""
     ambiguas = datos()["ambiguas"] | _CIUDADES_AMBIGUAS
-    frases = [f for f in ciudades if f not in ambiguas and (" " in f or len(f) >= 6)
-              and normalizar.contiene_frase(texto, f)]
+    posibles = tuple(f for f in ciudades if f not in ambiguas and (" " in f or len(f) >= 6))
+    if not _nombra(texto, posibles):  # una sola expresión compilada: casi ningún texto nombra una ciudad (v19)
+        return []
+    frases = [f for f in posibles if normalizar.contiene_frase(texto, f)]
     frases = [f for f in frases if not any(f != otra and normalizar.contiene_frase(otra, f) for otra in frases)]
     hallados = {c for f in frases for c in ciudades[f]}
     return sorted(hallados) if len(hallados) == 1 else []

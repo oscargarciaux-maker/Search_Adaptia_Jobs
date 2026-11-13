@@ -148,6 +148,16 @@ class RepositorioSupabase:
                    headers={"Prefer": "return=minimal"},
                    json={**cambios, "actualizada_en": datetime.now(timezone.utc).isoformat()})
 
+    def vencer_revisiones(self, vacante_ids, motivo=""):
+        """Pasa a «vencida» varias pendientes en pocas peticiones (lotes de 100)."""
+        cambios = {"estado": "vencida", **({"motivo": motivo} if motivo else {}),
+                   "actualizada_en": datetime.now(timezone.utc).isoformat()}
+        ids = list(vacante_ids)
+        for i in range(0, len(ids), 100):
+            self.pedir("PATCH", "panel_revisiones", params={"vacante_id": "in.(" + ",".join(ids[i:i + 100]) + ")",
+                                                          "estado": "eq.pendiente"},
+                       headers={"Prefer": "return=minimal"}, json=cambios)
+
     def reglas(self):
         return self.pedir("GET", "panel_reglas_ubicacion", params={"select": "*", "limit": 5000}) or []
 
@@ -427,6 +437,10 @@ class RepositorioDemo:
                 if r["vacante_id"] == vacante_id:
                     r.update(deepcopy(cambios))
             self._guardar()
+
+    def vencer_revisiones(self, vacante_ids, motivo=""):
+        for vid in vacante_ids:
+            self.actualizar_revision(vid, {"estado": "vencida", **({"motivo": motivo} if motivo else {})})
 
     def reglas(self):
         with self.lock:

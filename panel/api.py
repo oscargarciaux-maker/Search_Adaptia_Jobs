@@ -247,7 +247,12 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
     @app.post("/api/revisiones/cargar")
     def cargar_revisiones():
         from panel import revision
-        return revision.cargar_todas(repo, hoy())
+        return revision.iniciar_carga(repo, hoy())  # en segundo plano: el panel consulta el avance
+
+    @app.get("/api/revisiones/cargar")
+    def avance_revisiones():
+        from panel import revision
+        return revision.estado_carga()
 
     @app.get("/api/revisiones.csv")
     def descargar_revisiones():

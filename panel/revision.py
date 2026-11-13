@@ -61,7 +61,7 @@ def _sin_revisar(datos, fecha):
     except ValueError:
         pass
     # Contratos v18/v19: la lectura de lugares mejoró; si ahora se confirma (o se descarta) sola, no se pregunta.
-    r = paises.elegibles(datos.get("titulo", ""), datos.get("ubicacion", ""), datos.get("_descripcion", ""),
+    r = paises.elegibles(datos.get("titulo", ""), datos.get("ubicacion", ""), (datos.get("_descripcion") or "")[:8000],
                          True if datos.get("modalidad") == "remoto" else None)
     if r["confianza"] in ("alta", "media") and r["nota"] != "por zona horaria":
         return RESUELTA_SOLA
@@ -116,13 +116,21 @@ def con_paises(datos, codigos, por="operador"):
     return dict(datos, paises=list(codigos), confianza_pais="alta", nota_pais=f"confirmada por {por}")
 
 
+def _datos_ligeros(fila_catalogo):
+    """Los datos que guardó la búsqueda nocturna más la descripción, sin volver a calcular etiquetas: para recorrer
+    cientos de vacantes rápido (botón «Cargar todas», contrato v19). Las tarjetas usan `_datos`."""
+    datos = dict((fila_catalogo or {}).get("datos") or {})
+    datos["_descripcion"] = (fila_catalogo or {}).get("description_full") or ""
+    return datos
+
+
 def _datos(fila_catalogo):
     datos = dict((fila_catalogo or {}).get("datos") or {})
     return vacante.reetiquetar(dict(datos, _descripcion=(fila_catalogo or {}).get("description_full") or ""),
                                publicada=True)
 
 
-def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False):
+def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, avance=None):
     """Arma la cola del día al final de la búsqueda (panel/ejecutor.registrar). Devuelve solo conteos.
     `completa` (contrato v17, botón «Cargar todas las dudosas»): todas las vacantes por confirmar del catálogo, también
     las que hoy no le sirven a ningún cliente, para depurar la base entera."""
@@ -134,14 +142,23 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False):
     for f in filas_hoy:
         recibidas.setdefault(f["perfil_id"], set()).add(f["vacante_id"])
     candidatos, leidas, fuera_idioma, ya_claras = [], 0, 0, 0
-    for fila in repo.candidatas_por_confirmar(desde):
+    filas_catalogo = list(repo.candidatas_por_confirmar(desde))
+    sin_revisar = {}  # vacante_id → motivo: cada vacante se evalúa una sola vez por llamada
+
+    def motivo_de(vid, datos):
+        if vid not in sin_revisar:
+            sin_revisar[vid] = _sin_revisar(datos, fecha)
+        return sin_revisar[vid]
+    for fila in filas_catalogo:
         leidas += 1
-        datos = _datos(fila)
+        if avance and leidas % 20 == 0:
+            avance(leidas, len(filas_catalogo))
+        datos = _datos_ligeros(fila)
         if datos.get("idioma") not in ("es", "en") or not datos.get("titulo"):
             fuera_idioma += 1
             continue
         if datos.get("confianza_pais") != "baja" and datos.get("nota_pais") != "por zona horaria" or \
-                _sin_revisar(datos, fecha):
+                motivo_de(fila["id"], datos):
             ya_claras += 1
             continue
         sirve = []
@@ -167,6 +184,7 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False):
               and c["ubicacion"] in reglas and not es_generica(c["ubicacion"])]
     por_regla = len(nuevas)
     ahora = datetime.now(timezone.utc)
+    vencer = {}  # motivo → [vacante_id]: se actualizan en lote al final (una petición por motivo)
     for vid, r in existentes.items():  # pendientes viejas o que ya no le sirven a nadie: vencidas
         creada = (r.get("creada_en") or ahora.isoformat()).replace("Z", "+00:00")
         edad = ahora - datetime.fromisoformat(creada)
@@ -175,26 +193,32 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False):
         catalogo_fila = r.get("catalogo_vacantes") or {}
         if catalogo_fila and catalogo_fila.get("reason") != POR_CONFIRMAR:
             # El sistema ya la resolvió (ficha, Get on Board, reglas) o dejó de ser entregable: no hace falta preguntar.
-            repo.actualizar_revision(vid, {"estado": "vencida", "motivo": RESUELTA_SOLA})
+            vencer.setdefault(RESUELTA_SOLA, []).append(vid)
             continue
-        datos_fila = _datos(catalogo_fila) if (catalogo_fila.get("datos") or {}).get("titulo") else {}
-        motivo_fuera = _sin_revisar(datos_fila, fecha) if datos_fila else ""
+        datos_fila = _datos_ligeros(catalogo_fila) if (catalogo_fila.get("datos") or {}).get("titulo") else {}
+        motivo_fuera = motivo_de(vid, datos_fila) if datos_fila else ""
         if motivo_fuera:
-            repo.actualizar_revision(vid, {"estado": "vencida", "motivo": motivo_fuera})
+            vencer.setdefault(motivo_fuera, []).append(vid)
             continue
         if r.get("motivo") == DEPURACION:  # las de la depuración completa esperan a la persona (hasta 30 días)
             if edad > timedelta(days=30):
-                repo.actualizar_revision(vid, {"estado": "vencida"})
+                vencer.setdefault("", []).append(vid)
         elif not completa and (vid not in ids or edad > timedelta(days=DIAS_PENDIENTE)):
-            repo.actualizar_revision(vid, {"estado": "vencida"})
+            vencer.setdefault("", []).append(vid)
+    for motivo, vids in vencer.items():
+        for vid in vids:
+            existentes[vid] = dict(existentes[vid], estado="vencida")
+        repo.vencer_revisiones(vids, motivo)
     pendientes = sum(1 for vid, r in existentes.items() if r.get("estado") == "pendiente" and vid in ids)
     limite = GUARDADAS_COMPLETA if completa else GUARDADAS
+    ya_nuevas = {n["vacante_id"] for n in nuevas}
     for c in sorted(candidatos, key=lambda x: -x["prioridad"]):
         if pendientes >= limite:
             break
-        if c["vacante_id"] in existentes or any(n["vacante_id"] == c["vacante_id"] for n in nuevas):
+        if c["vacante_id"] in existentes or c["vacante_id"] in ya_nuevas:
             continue
         nuevas.append(dict(c, estado="pendiente"))
+        ya_nuevas.add(c["vacante_id"])
         pendientes += 1
     if nuevas:
         repo.guardar_revisiones(nuevas)
@@ -383,7 +407,7 @@ def exportar_csv(repo, fecha):
     escritor.writerow(["", "", PREGUNTA] + [""] * (len(COLUMNAS_CSV) - 3))  # sin vacante_id: al subir se ignora
     filas = []
     for r in repo.revisiones(estado="pendiente"):
-        datos = _datos(r.get("catalogo_vacantes"))
+        datos = _datos_ligeros(r.get("catalogo_vacantes"))
         s = sugerir(datos)
         nombres = sorted({clientes.get(p["cliente_id"], "") for p in r.get("perfiles") or []} - {""})
         filas.append(((s["grupo"], -r.get("prioridad", 0)), [
@@ -502,7 +526,41 @@ def decisiones_para_busqueda(filas):
     return salida
 
 
-def cargar_todas(repo, fecha):
+_TRABAJO = {"estado": "inactivo", "avance": {"leidas": 0, "total": 0}, "resultado": None, "error": ""}
+_CANDADO_TRABAJO = __import__("threading").Lock()
+
+
+def estado_carga():
+    """Lo que el panel consulta cada 2 s mientras corre «Cargar todas» (sin datos de clientes)."""
+    return {k: (dict(v) if isinstance(v, dict) else v) for k, v in _TRABAJO.items()}
+
+
+def iniciar_carga(repo, fecha):
+    """Arranca «Cargar todas» en segundo plano (una a la vez) y responde al instante: una petición larga podía
+    cortarse en el alojamiento y el botón se quedaba sin respuesta (13 nov)."""
+    import threading
+    with _CANDADO_TRABAJO:
+        if _TRABAJO["estado"] == "en_curso":
+            return estado_carga()
+        _TRABAJO.update(estado="en_curso", avance={"leidas": 0, "total": 0}, resultado=None, error="")
+
+    def avance(leidas, total):
+        _TRABAJO["avance"] = {"leidas": leidas, "total": total}
+
+    def correr():
+        from panel.repositorio import ErrorRepositorio
+        try:
+            resultado = cargar_todas(repo, fecha, avance)
+            _TRABAJO.update(estado="listo", resultado=resultado)
+        except ErrorRepositorio as e:
+            _TRABAJO.update(estado="error", error=getattr(e, "mensaje", "") or "No se pudo cargar la bandeja.")
+        except Exception:  # noqa: BLE001 — nunca se muestran datos internos; el panel ofrece reintentar
+            _TRABAJO.update(estado="error", error="No se pudo cargar la bandeja. Inténtalo de nuevo en unos minutos.")
+    threading.Thread(target=correr, name="cargar-dudosas", daemon=True).start()
+    return estado_carga()
+
+
+def cargar_todas(repo, fecha, avance=None):
     """Botón «Cargar todas las dudosas de la base»: llena la bandeja al momento, sin esperar la búsqueda."""
     from panel.ejecutor import validar_version
     from panel.repositorio import ErrorRepositorio
@@ -513,4 +571,4 @@ def cargar_todas(repo, fecha):
     ejecucion = repo.ejecucion(fecha)
     conteo = repo.conteo_asignaciones(ejecucion["id"], [str(p.id) for p in cfg.perfiles]) if ejecucion else {}
     estrictas = {p.id: conteo.get(str(p.id), 0) for p in cfg.perfiles}
-    return preparar_cola(repo, cfg, fecha, estrictas, completa=True)
+    return preparar_cola(repo, cfg, fecha, estrictas, completa=True, avance=avance)

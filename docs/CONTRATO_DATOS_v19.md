@@ -59,6 +59,25 @@ No se pregunta, y si ya estaba pendiente pasa a `vencida` con su motivo:
 - lo que **las reglas vigentes ya resuelven** (lugares, regiones, Get on Board…) → «resuelta sola», sin esperar a que la
   búsqueda nocturna actualice el catálogo.
 
+## 5. Carga en segundo plano y rápida (ampliación del 13 nov, noche)
+
+- **El problema:** tras el PR #44, «Cargar todas las dudosas» no terminaba en el panel. En una sola petición evaluaba
+  cada dudosa dos veces (candidatas y pendientes guardadas), recalculaba todas sus etiquetas y vencía las pendientes
+  una por una. Con 264 dudosas reales tardaba 16 s en una máquina rápida y más en el servidor.
+- **Ahora:**
+  - `POST /api/revisiones/cargar` arranca el trabajo en segundo plano (uno a la vez) y responde al instante;
+  - `GET /api/revisiones/cargar` da el avance (`leidas`/`total`) y el resultado, o un error en lenguaje sencillo;
+  - el panel muestra «Cargando… N de M» y, si se recarga la página, retoma el avance.
+- **Más rápido, con el mismo resultado:**
+  - datos guardados por la nocturna sin recalcular etiquetas (`_datos_ligeros`);
+  - cada vacante se evalúa una sola vez por carga;
+  - las vencidas se actualizan en lotes;
+  - `_ciudad_dentro` descarta con una expresión compilada los textos sin ninguna ciudad.
+- **Medición:**
+  - con las 264 dudosas reales: de 16,3 s a 1,5 s, con el mismo resultado (213 por revisar);
+  - las 8.306 vacantes del inventario dan exactamente la misma elegibilidad que antes;
+  - toda la suite de pruebas baja de 37 s a 10 s.
+
 ## Medición (13 nov, inventario de 8.306 vacantes, solo conteos)
 
 | Resultado | Vacantes |
