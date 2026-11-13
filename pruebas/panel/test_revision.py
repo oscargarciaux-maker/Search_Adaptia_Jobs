@@ -201,9 +201,16 @@ def test_decisiones_para_busqueda():
 
 
 def test_api_cargar_todas_en_demostracion():
+    import time
     api = TestClient(crear_app(demo=True, repositorio=RepositorioDemo()))
     r = api.post("/api/revisiones/cargar", headers={"origin": "http://testserver"})
-    assert r.status_code == 200 and r.json()["por_confirmar"] == 3  # la demostración conserva su bandeja
+    assert r.status_code == 200 and r.json()["estado"] in ("en_curso", "listo")  # responde al instante
+    for _ in range(100):
+        estado = api.get("/api/revisiones/cargar").json()
+        if estado["estado"] != "en_curso":
+            break
+        time.sleep(0.05)
+    assert estado["estado"] == "listo" and estado["resultado"]["por_confirmar"] == 3  # la demostración conserva su bandeja
     assert api.post("/api/revisiones/cargar").status_code in (401, 403)
 
 
@@ -240,3 +247,44 @@ def test_regiones_que_elige_el_operador():
     sud_centro = revision.expandir(["SUD_CENTRO_MX"])
     assert {"AR", "CR", "MX"} <= set(sud_centro) and "BR" not in sud_centro and "ES" not in sud_centro
     assert set(revision.leer_paises("Sudamérica, Centroamérica o México")) == set(sud_centro)
+
+
+def test_carga_en_segundo_plano_una_a_la_vez_y_con_avance():
+    import threading
+    import time
+    cfg, _ = _cfg()
+    r = RepoCatalogo([_fila(n, f"Lugar Ejemplo {n}") for n in range(45)])
+    r.operativa = lambda fecha: {"revision": 1, "configuracion": configuracion_demo()}
+    r.ejecucion = lambda fecha: None
+    puerta = threading.Event()
+    original = r.candidatas_por_confirmar
+
+    def lenta(desde=None):
+        puerta.wait(5)
+        return original(desde)
+    r.candidatas_por_confirmar = lenta
+    primero = revision.iniciar_carga(r, hoy())
+    segundo = revision.iniciar_carga(r, hoy())  # mientras corre no arranca otro
+    assert primero["estado"] == segundo["estado"] == "en_curso"
+    puerta.set()
+    for _ in range(200):
+        if revision.estado_carga()["estado"] != "en_curso":
+            break
+        time.sleep(0.05)
+    final = revision.estado_carga()
+    assert final["estado"] == "listo" and final["resultado"]["leidas_del_catalogo"] == 45
+    assert final["avance"]["total"] == 45 and final["avance"]["leidas"] == 40  # avisa cada 20
+
+
+def test_cada_vacante_se_evalua_una_vez_y_las_vencidas_van_en_lote(monkeypatch):
+    cfg, _ = _cfg()
+    filas = [_fila(n, f"Lugar Ejemplo {n}") for n in range(5)]
+    r = Repo(filas)
+    revision.preparar_cola(r, cfg, hoy(), {p.id: 0 for p in cfg.perfiles}, completa=True)
+    llamadas, lotes = [], []
+    original = revision._sin_revisar
+    monkeypatch.setattr(revision, "_sin_revisar", lambda d, f: llamadas.append(d.get("ubicacion")) or original(d, f))
+    r.vencer_revisiones = lambda ids, motivo="": lotes.append((list(ids), motivo))
+    revision.preparar_cola(r, cfg, hoy(), {p.id: 0 for p in cfg.perfiles}, completa=True)
+    assert len(llamadas) == len(set(llamadas)) == 5  # candidatas y pendientes guardadas: una sola vez cada una
+    assert not lotes  # nada que vencer: ninguna petición

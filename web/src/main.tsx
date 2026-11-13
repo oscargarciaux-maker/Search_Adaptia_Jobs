@@ -817,42 +817,89 @@ function PorConfirmar({
       setOcupado("");
     }
   }
-  async function cargarTodas() {
+  type ResultadoCarga = {
+    por_confirmar: number;
+    agregadas?: number;
+    resueltas_por_regla?: number;
+    leidas_del_catalogo?: number;
+    fuera_por_idioma?: number;
+    ya_claras?: number;
+  };
+  type EstadoCarga = {
+    estado: "inactivo" | "en_curso" | "listo" | "error";
+    avance: { leidas: number; total: number };
+    resultado: ResultadoCarga | null;
+    error: string;
+  };
+  const [avanceCarga, setAvanceCarga] = useState("");
+  function avisarResultado(r: ResultadoCarga) {
+    if (!r.por_confirmar) {
+      notify(
+        `No hay dudosas para revisar: el catálogo tiene ${r.leidas_del_catalogo ?? 0} vacantes con país por confirmar` +
+          (r.ya_claras ? `, ${r.ya_claras} ya resueltas o cerradas` : "") +
+          (r.fuera_por_idioma
+            ? ` y ${r.fuera_por_idioma} quedan fuera por idioma`
+            : "") +
+          ".",
+        true,
+      );
+    } else {
+      notify(
+        `Bandeja lista: ${r.por_confirmar} por confirmar` +
+          (r.agregadas ? ` (${r.agregadas} nuevas)` : "") +
+          (r.resueltas_por_regla
+            ? `, ${r.resueltas_por_regla} resueltas solas por reglas`
+            : "") +
+          ".",
+      );
+    }
+  }
+  // Contrato v19: la carga corre en segundo plano en el servidor; aquí solo se consulta su avance.
+  async function esperarCarga() {
     setOcupado("todas");
     try {
-      const r = await api<{
-        por_confirmar: number;
-        agregadas?: number;
-        resueltas_por_regla?: number;
-        leidas_del_catalogo?: number;
-        fuera_por_idioma?: number;
-      }>("/revisiones/cargar", { method: "POST" });
-      if (!r.por_confirmar) {
-        notify(
-          `No hay dudosas para revisar: el catálogo tiene ${r.leidas_del_catalogo ?? 0} vacantes con país por confirmar` +
-            (r.fuera_por_idioma
-              ? ` y ${r.fuera_por_idioma} quedan fuera por idioma`
-              : "") +
-            ".",
-          true,
-        );
-      } else {
-        notify(
-          `Bandeja lista: ${r.por_confirmar} por confirmar` +
-            (r.agregadas ? ` (${r.agregadas} nuevas)` : "") +
-            (r.resueltas_por_regla
-              ? `, ${r.resueltas_por_regla} resueltas solas por reglas`
-              : "") +
-            ".",
-        );
+      for (;;) {
+        const e = await api<EstadoCarga>("/revisiones/cargar");
+        if (e.estado === "en_curso") {
+          setAvanceCarga(
+            e.avance.total
+              ? `Cargando… ${e.avance.leidas} de ${e.avance.total}`
+              : "Cargando…",
+          );
+          await new Promise((listo) => setTimeout(listo, 2000));
+          continue;
+        }
+        if (e.estado === "error") notify(e.error, true);
+        if (e.estado === "listo" && e.resultado) avisarResultado(e.resultado);
+        break;
       }
       await cargar();
     } catch (e) {
       notify((e as Error).message, true);
     } finally {
       setOcupado("");
+      setAvanceCarga("");
     }
   }
+  async function cargarTodas() {
+    setOcupado("todas");
+    try {
+      await api<EstadoCarga>("/revisiones/cargar", { method: "POST" });
+    } catch (e) {
+      notify((e as Error).message, true);
+      setOcupado("");
+      return;
+    }
+    await esperarCarga();
+  }
+  useEffect(() => {
+    // Si una carga sigue corriendo (por ejemplo, tras recargar la página), retomar su avance.
+    api<EstadoCarga>("/revisiones/cargar")
+      .then((e) => {
+        if (e.estado === "en_curso") esperarCarga();
+      })
+      .catch(() => undefined);
+  }, []);
   const masiva = (
     <div className="revision-masiva">
       <button
@@ -862,7 +909,7 @@ function PorConfirmar({
       >
         <RefreshCw size={15} />
         {ocupado === "todas"
-          ? "Cargando…"
+          ? avanceCarga || "Cargando…"
           : "Cargar todas las dudosas de la base"}
       </button>
       <a className="button secondary" href="/api/revisiones.csv" download>
