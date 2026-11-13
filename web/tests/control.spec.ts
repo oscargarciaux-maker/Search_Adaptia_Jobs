@@ -1,4 +1,25 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+
+// Sección 5 (13 nov): sin menú lateral; cada sección se abre desde su tarjeta del resumen.
+const accion: Record<string, string> = {
+  Clientes: "Ver clientes",
+  "Cargos y cupos": "Editar cupos",
+  Vacantes: "Ver vacantes",
+  "Por confirmar": "Revisar",
+  Mensajes: "Ver mensajes",
+  Actividad: "Ver actividad",
+};
+const tarjeta = (page: Page, seccion: string) =>
+  page.getByRole("button", { name: new RegExp(accion[seccion] + "$") });
+async function ir(page: Page, seccion: string) {
+  await page.getByRole("heading", { level: 1 }).waitFor(); // tras recargar
+  const volver = page.getByRole("button", { name: "Volver al resumen" });
+  if (await volver.count()) await volver.click();
+  await tarjeta(page, seccion).click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: seccion, exact: true }),
+  ).toBeVisible();
+}
 
 test("gestión completa: clientes, términos abiertos, cupos, programación y WhatsApp", async ({
   page,
@@ -11,14 +32,14 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   });
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Cada búsqueda, con propósito." }),
+    page.getByRole("heading", { level: 1, name: "Resumen" }),
   ).toBeVisible();
   await expect(page.getByText("Mi espacio de trabajo")).toHaveCount(0);
   await expect(page.getByText("Menos ruido.")).toHaveCount(0);
   await expect(
     page.getByText(/guarda tus cambios y los aplica desde la búsqueda/),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Clientes", exact: true }).click();
+  await ir(page, "Clientes");
   await page
     .getByRole("button", { name: "Nuevo cliente", exact: true })
     .click();
@@ -76,7 +97,7 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
     page.getByText("Borrador guardado.", { exact: false }),
   ).toBeVisible();
   await page.reload();
-  await page.getByRole("button", { name: "Clientes", exact: true }).click();
+  await ir(page, "Clientes");
   await expect(
     page.getByRole("heading", { name: "Prueba operadora" }),
   ).toBeVisible();
@@ -89,9 +110,7 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   ).toHaveCount(0);
   await page.getByText("Clientes archivados (1)").click();
   await page.getByRole("button", { name: "Reactivar", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Cargos y cupos", exact: true })
-    .click();
+  await ir(page, "Cargos y cupos");
   await page.getByLabel("Vacantes de QA", { exact: true }).fill("29");
   await expect(
     page.getByRole("button", { name: "Programar para mañana", exact: true }),
@@ -154,7 +173,7 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
       0,
     ),
   ).toBe(120);
-  await page.getByRole("button", { name: "Vacantes", exact: true }).click();
+  await ir(page, "Vacantes");
   await expect(page.locator(".vacancy")).toHaveCount(50);
   await page
     .getByRole("button", { name: "Copiar WhatsApp", exact: true })
@@ -184,7 +203,7 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   expect(conflicto.status()).toBe(409);
   // Actividad: embudo por cargo para ver dónde se pierden las vacantes.
   // Mensajes: se preparan, se abren en WhatsApp con el texto y se marcan como enviados.
-  await page.getByRole("button", { name: "Mensajes", exact: true }).click();
+  await ir(page, "Mensajes");
   await page.getByRole("button", { name: "Preparar mensajes" }).click();
   const abrir = page.getByRole("link", { name: "Abrir en WhatsApp" }).first();
   await expect(abrir).toHaveAttribute("href", /^https:\/\/wa\.me\/\d+\?text=/);
@@ -198,7 +217,7 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await expect(
     page.getByRole("link", { name: "Abrir en WhatsApp" }),
   ).toHaveCount(antes - 1);
-  await page.getByRole("button", { name: "Actividad", exact: true }).click();
+  await ir(page, "Actividad");
   // Sin avisos por correo: el operador no quiere servicios externos (13 nov).
   await expect(page.getByText("Avisos por correo")).toHaveCount(0);
   await page.getByText("Dónde se pierden las vacantes de cada cargo").click();
@@ -219,7 +238,7 @@ test("móvil: navegación accesible y sin desbordamiento horizontal", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Cada búsqueda, con propósito." }),
+    page.getByRole("heading", { level: 1, name: "Resumen" }),
   ).toBeVisible();
   expect(
     await page.evaluate(
@@ -230,11 +249,7 @@ test("móvil: navegación accesible y sin desbordamiento horizontal", async ({
     path: "/tmp/adaptia-panel-movil.png",
     fullPage: true,
   });
-  await page.getByRole("button", { name: "Abrir menú" }).click();
-  await page.getByRole("button", { name: "Clientes", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Personas, no búsquedas genéricas." }),
-  ).toBeVisible();
+  await ir(page, "Clientes");
 });
 
 test("bandeja Por confirmar: un clic confirma, atajo 4 aparta y el contador baja", async ({
@@ -243,14 +258,8 @@ test("bandeja Por confirmar: un clic confirma, atajo 4 aparta y el contador baja
   const errores: string[] = [];
   page.on("pageerror", (e) => errores.push(e.message));
   await page.goto("/");
-  const menu = page.getByRole("button", { name: "Por confirmar", exact: true });
-  await expect(menu).toContainText("3");
-  await menu.click();
-  await expect(
-    page.getByRole("heading", {
-      name: "Unos segundos para no perder vacantes.",
-    }),
-  ).toBeVisible();
+  await expect(tarjeta(page, "Por confirmar")).toContainText("3");
+  await ir(page, "Por confirmar");
   await expect(page.locator(".revision")).toHaveCount(3);
   const primera = page.locator(".revision").first();
   await expect(primera.locator(".revision-pista")).toBeVisible();
@@ -267,7 +276,6 @@ test("bandeja Por confirmar: un clic confirma, atajo 4 aparta y el contador baja
     page.getByText(/Confirmada: se asignó a \d+ cliente/),
   ).toBeVisible();
   await expect(page.locator(".revision")).toHaveCount(2);
-  await expect(menu).toContainText("2");
   const otra = page.locator(".revision").first();
   await otra.focus();
   await page.keyboard.press("4");
@@ -293,6 +301,9 @@ test("bandeja Por confirmar: un clic confirma, atajo 4 aparta y el contador baja
     path: "/tmp/adaptia-por-confirmar.png",
     fullPage: true,
   });
+  // Al volver, la tarjeta del resumen muestra el contador al día.
+  await page.getByRole("button", { name: "Volver al resumen" }).click();
+  await expect(tarjeta(page, "Por confirmar")).toContainText("1");
   expect(errores).toEqual([]);
 });
 
@@ -301,9 +312,7 @@ test("revisión masiva por CSV y reglas aprendidas sin IA", async ({
   request,
 }) => {
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Por confirmar", exact: true })
-    .click();
+  await ir(page, "Por confirmar");
   await expect(
     page.getByRole("link", { name: "Descargar todas (CSV)" }),
   ).toHaveAttribute("href", "/api/revisiones.csv");
@@ -333,14 +342,55 @@ test("revisión masiva por CSV y reglas aprendidas sin IA", async ({
     buffer: Buffer.from(csvLlenado),
   });
   await expect(page.getByText(/Revisión aplicada: 1 decididas/)).toBeVisible();
-  await page.getByRole("button", { name: "Actividad", exact: true }).click();
+  await ir(page, "Actividad");
   const regla = page.locator(".reglas-lista li", { hasText: "«granada»" });
   await expect(regla).toContainText("España");
   await regla.getByRole("button", { name: "Desactivar" }).click();
   await expect(page.getByText("Regla desactivada.")).toBeVisible();
   await expect(regla.getByRole("button", { name: "Activar" })).toBeVisible();
   // Descarga de la base desde Vacantes, con el conteo a la vista.
-  await page.getByRole("button", { name: "Vacantes", exact: true }).click();
+  await ir(page, "Vacantes");
   await page.getByRole("button", { name: "Descargar base (CSV)" }).click();
   await expect(page.getByText(/Base descargada: 1 vacantes/)).toBeVisible();
+});
+
+test("resumen: tablero de una pantalla, sin menú propio, con dirección por sección", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Resumen" }),
+  ).toBeVisible();
+  await expect(page.locator(".tarjeta-resumen")).toHaveCount(6);
+  await expect(page.locator("aside, header.topbar, footer")).toHaveCount(0);
+  await expect(page.getByText("TU CENTRO DE OPORTUNIDADES")).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollHeight <= innerHeight,
+    ),
+  ).toBe(true);
+  await page.screenshot({ path: "/tmp/adaptia-resumen.png" });
+  await tarjeta(page, "Clientes").click();
+  await expect(page).toHaveURL(/#clientes$/);
+  await page.goBack();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Resumen" }),
+  ).toBeVisible();
+  await page.goto("/#actividad");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Actividad" }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await expect(page.locator(".tarjeta-resumen")).toHaveCount(6);
+  const cajas = await page
+    .locator(".tarjeta-resumen")
+    .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().left));
+  expect(new Set(cajas).size).toBe(1); // una columna en el móvil
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
 });

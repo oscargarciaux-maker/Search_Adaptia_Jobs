@@ -100,17 +100,6 @@ input[type="range"] {
   display: flex;
   min-height: 100vh;
 }
-.sidebar {
-  width: 248px;
-  position: fixed;
-  inset: 0 auto 0 0;
-  background: #fff;
-  border-right: 1px solid var(--line);
-  padding: 32px 19px 18px;
-  display: flex;
-  flex-direction: column;
-  z-index: 30;
-}
 .brand {
   display: flex;
   align-items: center;
@@ -183,52 +172,6 @@ input[type="range"] {
   font-weight: 650;
   margin: 33px 13px 15px;
 }
-.sidebar nav {
-  display: grid;
-  gap: 6px;
-}
-.sidebar nav button {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  position: relative;
-  border: 0;
-  background: transparent;
-  color: #5f6a62;
-  padding: 13px 14px;
-  border-radius: 7px;
-  text-align: left;
-  font-size: 12px;
-  font-weight: 550;
-}
-.sidebar nav button:hover {
-  background: #f7f9f6;
-  color: #3b614a;
-}
-.sidebar nav button.active {
-  color: #32694e;
-  background: #edf4ed;
-  font-weight: 650;
-}
-.sidebar nav button > span {
-  margin-left: auto;
-  background: #e9eee9;
-  border-radius: 5px;
-  padding: 1px 6px;
-  font-size: 12px;
-  color: #5e6b5e;
-}
-.nav-dot {
-  width: 5px;
-  height: 5px;
-  background: #4b8d61;
-  border-radius: 50%;
-  margin-left: auto;
-}
-.sidebar-bottom {
-  margin-top: auto;
-  padding-top: 40px;
-}
 .sidebar-tip {
   margin: 0 6px 20px;
   background: #f7f8f4;
@@ -265,26 +208,6 @@ input[type="range"] {
   width: 100%;
   text-align: left;
 }
-.operator {
-  border-top: 1px solid var(--line);
-  padding: 20px 8px 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.operator strong {
-  font-size: 12px;
-  display: block;
-}
-.operator > div {
-  flex: 1;
-}
-.operator > div > span {
-  font-size: 12px;
-  color: #646964;
-  display: block;
-  margin-top: 3px;
-}
 .avatar {
   height: 43px;
   width: 43px;
@@ -310,53 +233,8 @@ input[type="range"] {
   width: 30px;
 }
 .main-shell {
-  margin-left: 248px;
   flex: 1;
   min-width: 0;
-}
-.topbar {
-  height: 72px;
-  background: #ffffffbd;
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 42px;
-}
-.breadcrumbs {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  font-size: 12px;
-  color: #656a65;
-}
-.breadcrumbs strong {
-  color: #51644e;
-  font-weight: 550;
-}
-.topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 21px;
-}
-.demo-badge {
-  border: 1px solid #dce5d7;
-  color: #616c59;
-  background: #f8faf5;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 5px 9px;
-  border-radius: 20px;
-  font-size: 12px;
-}
-.demo-badge > span,
-.hero-label > span {
-  background: #85a970;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
 }
 .main {
   max-width: 1600px;
@@ -502,11 +380,6 @@ h1 {
   border-radius: 11px;
   box-shadow: 0 2px 4px #20382402;
 }
-.overview-top {
-  display: grid;
-  grid-template-columns: 1.3fr 1fr;
-  gap: 21px;
-}
 .hero {
   background: #173f35;
   border-radius: 11px;
@@ -530,21 +403,6 @@ h1 {
 .hero-content {
   position: relative;
   z-index: 1;
-}
-.hero-label {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: #bed0b8;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 1.3px;
-  margin-bottom: 19px;
-}
-.hero-label > span {
-  background: #c2d694;
-  width: 4px;
-  height: 4px;
 }
 .hero h2 {
   font-size: 31px;
@@ -653,20 +511,6 @@ h1 {
   width: 29px;
   height: 29px;
 }
-.quota-summary {
-  padding: 21px 24px;
-  display: flex;
-  flex-direction: column;
-}
-.card-label {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 12px;
-  font-weight: 650;
-  letter-spacing: 1.2px;
-  color: #616b60;
-}
 .pill {
   display: inline-flex;
   align-items: center;
@@ -689,28 +533,6 @@ h1 {
   background: #faf2e1;
   color: #7a653c;
 }
-.quota-main {
-  margin: 21px 0 22px;
-}
-.quota-number {
-  font-family: "Manrope Variable", sans-serif;
-  font-size: 43px;
-  line-height: 1;
-  font-weight: 650;
-  letter-spacing: -1.8px;
-  color: #304d3a;
-}
-.quota-number > span {
-  font-size: 19px;
-  color: #656a61;
-  font-weight: 400;
-  letter-spacing: -0.4px;
-}
-.quota-main > p {
-  color: #63695e;
-  font-size: 12px;
-  margin-top: 10px;
-}
 .quota-track {
   height: 7px;
   border-radius: 4px;
@@ -723,104 +545,11 @@ h1 {
   display: block;
   border-radius: 3px;
 }
-.quota-legend {
-  display: grid;
-  gap: 12px;
-  margin-top: 21px;
-}
-.quota-legend > div {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-size: 12px;
-  color: #616a5d;
-}
-.quota-legend > div > span,
 .color-dot {
   height: 6px;
   width: 6px;
   border-radius: 2px;
   flex-shrink: 0;
-}
-.quota-legend strong {
-  margin-left: auto;
-  font-size: 12px;
-  color: #5b6e50;
-  font-weight: 550;
-}
-.quota-link {
-  margin-top: 21px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
-  width: 100%;
-  justify-content: space-between;
-  font-size: 12px;
-}
-.stat-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1.15fr;
-  gap: 18px;
-  margin: 21px 0 30px;
-}
-.stat {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  padding: 20px;
-}
-.stat-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-.stat-icon.mint {
-  background: #edf3e9;
-  color: #576d4c;
-}
-.stat-icon.blue {
-  background: #ecf0f6;
-  color: #58697d;
-}
-.stat-icon.sand {
-  background: #f5f0e5;
-  color: #766648;
-}
-.stat > div > span {
-  font-size: 12px;
-  color: #636a5e;
-  display: block;
-  margin-bottom: 6px;
-}
-.stat strong {
-  font-size: 22px;
-  font-family: "Manrope Variable", sans-serif;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 650;
-  color: #4c6243;
-  letter-spacing: -0.4px;
-}
-.stat small {
-  font-size: 12px;
-  font-weight: 400;
-  color: #64685b;
-  letter-spacing: 0;
-  line-height: 1.4;
-}
-.stat strong.date-stat {
-  display: block;
-  font-size: 15px;
-  line-height: 1.5;
-  font-weight: 600;
-}
-.date-stat small {
-  display: block;
-  font-size: 12px;
 }
 .section-title {
   display: flex;
@@ -844,14 +573,6 @@ h1 {
   font-size: 12px;
   color: #64695e;
   margin-top: 5px;
-}
-.count-badge {
-  background: #e9eee2;
-  padding: 3px 6px;
-  border-radius: 5px;
-  color: #5e6a55;
-  font-size: 12px;
-  font-weight: 500;
 }
 .client-grid {
   display: grid;
@@ -977,35 +698,6 @@ h1 {
   font-size: 12px;
   color: #636a5a;
   line-height: 1.7;
-}
-.footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 36px;
-  padding: 22px 0;
-  border-top: 1px solid #e9ede3;
-  color: #63695d;
-  font-size: 12px;
-  gap: 15px;
-}
-.footer > span {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.footer > span:first-child {
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  color: #5e6c53;
-  font-size: 12px;
-}
-.footer > span:first-child > span:last-child {
-  font-weight: 400;
-  letter-spacing: 0;
-  color: #65695f;
-  font-size: 12px;
-  margin-left: 10px;
 }
 .dirty-bar {
   display: flex;
@@ -1872,12 +1564,6 @@ h1 {
   font-size: 12px;
   margin-top: 24px;
 }
-.mobile-menu {
-  display: none;
-}
-.nav-backdrop {
-  display: none;
-}
 @media (min-width: 1500px) {
   .main {
     padding: 35px 55px 0;
@@ -1901,21 +1587,6 @@ h1 {
   .orbit-center {
     inset: 80px;
   }
-  .quota-summary {
-    padding: 27px 29px;
-  }
-  .card-label {
-    font-size: 12px;
-  }
-  .quota-number {
-    font-size: 49px;
-  }
-  .quota-main {
-    margin: 25px 0;
-  }
-  .quota-legend {
-    gap: 15px;
-  }
   .client-card {
     padding: 24px 23px 0;
   }
@@ -1931,9 +1602,6 @@ h1 {
   .client-details > div {
     font-size: 12px;
   }
-  .stat small {
-    font-size: 12px;
-  }
   h1 {
     font-size: 30px;
   }
@@ -1943,25 +1611,11 @@ h1 {
   .button {
     font-size: 12px;
   }
-  .hero-label {
-    font-size: 12px;
-  }
 }
 @media (max-width: 1200px) {
-  .sidebar {
-    width: 218px;
-    padding-left: 14px;
-    padding-right: 14px;
-  }
-  .main-shell {
-    margin-left: 218px;
-  }
   .main {
     padding-left: 25px;
     padding-right: 25px;
-  }
-  .topbar {
-    padding: 0 25px;
   }
   .page-heading {
     align-items: flex-start;
@@ -2026,41 +1680,11 @@ h1 {
     margin-top: 15px;
     margin-bottom: 15px;
   }
-  .stat-grid {
-    gap: 11px;
-  }
-  .stat {
-    padding: 17px 13px;
-    gap: 10px;
-  }
-  .stat-icon {
-    width: 34px;
-    height: 34px;
-  }
-  .stat strong {
-    display: block;
-  }
-  .stat small {
-    display: block;
-    margin-top: 5px;
-  }
-  .stat strong.date-stat {
-    font-size: 12px;
-  }
-  .stat > div > span {
-    font-size: 12px;
-  }
   .toast {
     left: calc(50% + 109px);
   }
 }
 @media (max-width: 980px) {
-  .sidebar {
-    width: 195px;
-  }
-  .main-shell {
-    margin-left: 195px;
-  }
   .workspace {
     padding: 10px 6px;
   }
@@ -2076,17 +1700,9 @@ h1 {
   .workspace > svg {
     display: none;
   }
-  .sidebar nav button {
-    font-size: 12px;
-    padding: 12px;
-  }
   .brand {
     font-size: 27px;
     gap: 8px;
-  }
-  .overview-top {
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
   }
   .hero-art {
     display: none;
@@ -2094,37 +1710,8 @@ h1 {
   .hero {
     min-height: 277px;
   }
-  .quota-summary {
-    padding: 20px 18px;
-  }
-  .quota-main {
-    margin: 19px 0;
-  }
-  .quota-number {
-    font-size: 37px;
-  }
   .client-grid {
     grid-template-columns: 1fr 1fr;
-  }
-  .section-block .client-grid > .client-card:last-child:nth-child(3) {
-    display: none;
-  }
-  .stat-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-  .stat-grid > .stat:last-child {
-    grid-column: 1/-1;
-  }
-  .stat-grid > .stat:last-child .stat-icon {
-    width: 34px;
-  }
-  .stat-grid > .stat:last-child .date-stat {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-  }
-  .stat-grid {
-    margin-bottom: 25px;
   }
   .vacancy-grid {
     grid-template-columns: 1fr;
@@ -2161,45 +1748,8 @@ h1 {
   }
 }
 @media (max-width: 720px) {
-  .sidebar {
-    transform: translateX(-100%);
-    transition: transform 0.2s;
-    width: 248px;
-    padding: 27px 20px 20px;
-    z-index: 50;
-  }
-  .sidebar.open {
-    transform: translateX(0);
-  }
-  .nav-backdrop {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: #18302555;
-    z-index: 40;
-  }
   .main-shell {
     margin-left: 0;
-  }
-  .topbar {
-    height: 61px;
-    padding: 0 18px;
-  }
-  .mobile-menu {
-    display: inline-flex;
-    padding: 5px;
-    margin-left: -5px;
-  }
-  .breadcrumbs {
-    gap: 8px;
-    font-size: 12px;
-  }
-  .topbar-right {
-    gap: 11px;
-  }
-  .demo-badge {
-    font-size: 12px;
-    padding: 5px 7px;
   }
   .main {
     padding: 20px 18px 0;
@@ -2235,17 +1785,9 @@ h1 {
     min-height: 38px;
     font-size: 12px;
   }
-  .overview-top {
-    gap: 15px;
-  }
   .hero {
     min-height: 283px;
     padding: 24px 20px 49px;
-  }
-  .hero-label {
-    font-size: 12px;
-    letter-spacing: 0.6px;
-    margin-bottom: 20px;
   }
   .hero h2 {
     font-size: 28px;
@@ -2261,76 +1803,6 @@ h1 {
     padding-left: 20px;
     font-size: 12px;
     gap: 5px;
-  }
-  .quota-summary {
-    padding: 20px 16px;
-  }
-  .card-label {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-    letter-spacing: 0.8px;
-    font-size: 12px;
-  }
-  .quota-number {
-    font-size: 35px;
-  }
-  .quota-number > span {
-    font-size: 15px;
-  }
-  .quota-main {
-    margin: 17px 0;
-  }
-  .quota-legend {
-    gap: 11px;
-    margin-top: 17px;
-  }
-  .quota-legend > div {
-    font-size: 12px;
-    gap: 5px;
-  }
-  .quota-legend strong {
-    font-size: 12px;
-  }
-  .quota-link {
-    font-size: 12px;
-    margin-top: 17px;
-    padding-top: 12px;
-  }
-  .stat-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-top: 15px;
-  }
-  .stat {
-    padding: 15px 12px;
-    gap: 10px;
-  }
-  .stat strong {
-    font-size: 21px;
-  }
-  .stat small {
-    font-size: 12px;
-    line-height: 1.7;
-  }
-  .stat > div > span {
-    font-size: 12px;
-    margin-bottom: 5px;
-  }
-  .stat-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-  }
-  .stat-icon svg {
-    width: 17px;
-    height: 17px;
-  }
-  .stat strong.date-stat {
-    font-size: 13px;
-  }
-  .stat-grid > .stat:last-child .date-stat {
-    gap: 12px;
   }
   .section-title h2 {
     font-size: 14px;
@@ -2408,17 +1880,6 @@ h1 {
     line-height: 1.8;
   }
   .workflow-note > svg {
-    display: none;
-  }
-  .footer {
-    margin-top: 25px;
-    padding: 20px 0;
-    align-items: flex-start;
-  }
-  .footer > span:last-child {
-    font-size: 12px;
-  }
-  .footer > span:first-child > span:last-child {
     display: none;
   }
   .toolbar {
@@ -2594,9 +2055,6 @@ h1 {
   }
 }
 @media (max-width: 390px) {
-  .overview-top {
-    grid-template-columns: 1fr;
-  }
   .hero {
     min-height: 277px;
   }
@@ -2612,25 +2070,6 @@ h1 {
   }
   .hero p {
     max-width: 180px;
-  }
-  .quota-summary {
-    padding: 21px;
-  }
-  .card-label {
-    flex-direction: row;
-    align-items: center;
-  }
-  .quota-main {
-    margin: 20px 0;
-  }
-  .quota-number {
-    font-size: 38px;
-  }
-  .quota-legend > div {
-    font-size: 12px;
-  }
-  .quota-link {
-    font-size: 12px;
   }
   .client-grid {
     grid-template-columns: 1fr;
@@ -2649,9 +2088,6 @@ h1 {
   }
   .client-bottom .text-button {
     font-size: 12px;
-  }
-  .section-block .client-grid > .client-card:last-child:nth-child(3) {
-    display: block;
   }
   .page-heading h1 {
     font-size: 22px;
@@ -2679,9 +2115,6 @@ h1 {
 .results-date {
   color: #606c5b;
 }
-.quota-legend > div,
-.stat > div > span,
-.stat small,
 .client-tags > span,
 .client-details > div,
 .client-title > span,
@@ -2701,17 +2134,8 @@ h1 {
 .hero p {
   font-size: 12px;
 }
-.quota-main > p {
-  font-size: 12px;
-}
-.hero-label {
-  font-size: 12px;
-}
 .button {
   font-size: 12px;
-}
-.sidebar nav button {
-  font-size: 13px;
 }
 @media (max-width: 720px) {
   .client-title h3 {
@@ -2726,16 +2150,6 @@ h1 {
     font-size: 12px;
   }
   .hero p {
-    font-size: 12px;
-  }
-  .quota-legend > div,
-  .quota-main > p {
-    font-size: 12px;
-  }
-  .stat small {
-    font-size: 12px;
-  }
-  .hero-label {
     font-size: 12px;
   }
 }
@@ -2860,9 +2274,7 @@ h1 {
 }
 
 /* Resumen sin la tarjeta grande: la distribución ocupa todo el ancho */
-.overview-top.solo {
-  grid-template-columns: 1fr !important;
-}
+
 /* Estado del borrador y ayuda Guardar / Programar */
 .flow-status {
   display: flex;
@@ -3233,4 +2645,106 @@ a.button {
   background: #fbf3e2;
   color: #3d2f0c;
   font-size: 14px;
+}
+
+/* Sección 5 (13 nov): panel sin menú propio; el resumen es un tablero de tarjetas. */
+.page-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.page-top .text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.resumen-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.tarjeta-resumen {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 150px;
+  padding: 16px 18px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.tarjeta-resumen:hover {
+  border-color: #b9ccb0;
+  box-shadow: 0 4px 14px #2b3b2a14;
+}
+.tarjeta-resumen:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+.tarjeta-cabeza {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 650;
+  color: #56625a;
+}
+.tarjeta-numero {
+  font-size: 28px;
+  font-weight: 750;
+  letter-spacing: -0.6px;
+  line-height: 1.15;
+  color: #273127;
+}
+.tarjeta-numero small {
+  font-size: 14px;
+  font-weight: 600;
+  color: #636b64;
+}
+.tarjeta-texto {
+  font-size: 19px;
+}
+.tarjeta-resumen.amber .tarjeta-numero {
+  color: #7a5a17;
+}
+.tarjeta-resumen.green .tarjeta-numero {
+  color: #2b6a55;
+}
+.tarjeta-barra {
+  width: 100%;
+  height: 6px;
+}
+.tarjeta-detalle {
+  font-size: 13px;
+  color: #5f6b62;
+}
+.tarjeta-accion {
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--green);
+}
+@media (max-width: 1000px) {
+  .resumen-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 620px) {
+  .resumen-grid {
+    grid-template-columns: 1fr;
+  }
+  .tarjeta-resumen {
+    min-height: 0;
+  }
 }

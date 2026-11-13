@@ -16,6 +16,11 @@ Ambas se aplican por el instalador automático tras el respaldo; no hace falta c
 
 ## 1. Cómo preparar la búsqueda del siguiente día
 
+**Navegación (13 nov).** El panel no tiene menú propio: será una opción («Scraper») dentro de Adaptia. El **Resumen**
+muestra seis tarjetas (Clientes, Cargos y cupos, Vacantes, Por confirmar, Mensajes de hoy y Actividad); cada una abre su
+sección y «Volver al resumen» regresa. Cada sección tiene su dirección (`#clientes`, `#cargos`, `#vacantes`,
+`#por-confirmar`, `#mensajes`, `#actividad`), así que el botón atrás del navegador funciona y se puede enlazar directo.
+
 1. Abrir **Cargos y cupos**. Añadir los cargos necesarios y repartir 120 vacantes diarias entre ellos. Por ejemplo,
    Product Designer 50, Frontend 40 y QA 30. Se permite un borrador inferior a 120; solo se programa al completar 120.
 2. En cada cargo, revisar sus denominaciones principales, afines y exclusiones. **Buscar denominaciones afines** ofrece
