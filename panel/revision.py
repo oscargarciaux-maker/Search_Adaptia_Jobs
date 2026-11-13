@@ -592,34 +592,48 @@ def sin_confirmar(fila):
     return cat.get("confianza") == "baja" or razon.startswith(POR_CONFIRMAR) or razon in EXCLUIDAS_BASE
 
 
-def _celda(valor):
-    """Un valor por celda y en una sola línea: los saltos de línea de las descripciones hacían que Excel mostrara miles
-    de filas (13 nov). Listas y objetos van como JSON."""
-    import json
-    if valor is None:
+def _celda(columna, valor):
+    """Un valor con el formato CSV del contrato v1: listas separadas por «|», idiomas como «en:B2:1», fecha y hora
+    `AAAA-MM-DDThh:mm:ssZ`. Los textos (descripción incluida) van tal cual: el CSV pone comillas a sus saltos de línea."""
+    from buscador import contrato
+    if valor is None or valor == "":
         return ""
-    texto = json.dumps(valor, ensure_ascii=False) if isinstance(valor, (list, dict)) else str(valor)
-    return re.sub(r"\s*[\r\n\t]+\s*", " ", texto).strip()
+    if columna == "language_requirements" and isinstance(valor, list):
+        partes = []
+        for x in valor:
+            if isinstance(x, dict):
+                partes.append(f'{x.get("language") or ""}:{x.get("level") or ""}:{0 if x.get("required") is False else 1}')
+            else:
+                partes.append(str(x))
+        return "|".join(partes)
+    if isinstance(valor, list):
+        return "|".join(str(x) for x in valor if x not in (None, ""))
+    if columna == "scraped_at":
+        from datetime import datetime, timezone
+        try:
+            instante = datetime.fromisoformat(str(valor).replace("Z", "+00:00"))
+            return instante.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        except ValueError:
+            return str(valor)
+    if columna in ("published_date", "delivery_date"):
+        return str(valor)[:10]
+    if columna in contrato.NUMEROS and isinstance(valor, float) and valor.is_integer():
+        return str(int(valor))
+    return str(valor)
 
 
 def exportar_base(repo):
-    """CSV con todas las columnas de `ofertas` más «estado_en_catalogo» (activa, cerrada, enlace roto…), sin las sin
-    confirmar. Las listas y objetos van como JSON. Devuelve (texto, incluidas, omitidas)."""
+    """CSV de `ofertas` con las columnas y el formato del contrato (v1 y sus extras, `buscador/contrato.py`), sin las
+    vacantes con país sin confirmar ni las descartadas. Devuelve (texto, incluidas, omitidas)."""
     import csv
     import io
-    import json
+    from buscador import contrato
     filas = repo.base_ofertas()
     incluidas = [f for f in filas if not sin_confirmar(f)]
-    columnas = []
-    for f in incluidas:
-        for k in f:
-            if k != "catalogo_vacantes" and k not in columnas:
-                columnas.append(k)
+    columnas = contrato.COLUMNAS + contrato.EXTRAS
     salida = io.StringIO()
     escritor = csv.writer(salida)
-    escritor.writerow(columnas + ["estado_en_catalogo"])
+    escritor.writerow(columnas)
     for f in incluidas:
-        cat = f.get("catalogo_vacantes") or {}
-        valores = [_celda(f.get(k)) for k in columnas]
-        escritor.writerow(valores + [cat.get("reason") or ("activa" if cat else "sin catálogo")])
+        escritor.writerow([_celda(c, f.get(c)) for c in columnas])
     return "\ufeff" + salida.getvalue(), len(incluidas), len(filas) - len(incluidas)
