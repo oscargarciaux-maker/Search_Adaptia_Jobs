@@ -3218,3 +3218,13 @@ a.button {
   color: #3e4b45;
   border-style: dashed;
 }
+
+.aviso-busqueda {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid #e2c78a;
+  background: #fbf3e2;
+  color: #3d2f0c;
+  font-size: 14px;
+}

@@ -1443,130 +1443,6 @@ function ReglasAprendidas({
   );
 }
 
-function AvisosCorreo({
-  notify,
-}: {
-  notify: (s: string, error?: boolean) => void;
-}) {
-  const [a, setA] = useState<AjustesAlertas | null>(null);
-  const [texto, setTexto] = useState("");
-  const [ocupado, setOcupado] = useState(false);
-  useEffect(() => {
-    api<AjustesAlertas>("/ajustes/alertas")
-      .then((r) => {
-        setA(r);
-        setTexto(r.destinatarios.join(", "));
-      })
-      .catch(() => setA({ destinatarios: [], tipos: [] }));
-  }, []);
-  if (!a) return null;
-  async function guardar() {
-    setOcupado(true);
-    try {
-      const r = await api<AjustesAlertas>("/ajustes/alertas", {
-        method: "PUT",
-        body: JSON.stringify({
-          destinatarios: texto
-            .split(/[,;\s]+/)
-            .map((x) => x.trim())
-            .filter(Boolean),
-          tipos: a!.tipos,
-        }),
-      });
-      setA({ ...a!, ...r });
-      setTexto(r.destinatarios.join(", "));
-      notify("Avisos por correo guardados.");
-    } catch (e) {
-      notify((e as Error).message, true);
-    } finally {
-      setOcupado(false);
-    }
-  }
-  async function probar() {
-    setOcupado(true);
-    try {
-      const r = await api<{ nota: string }>("/alertas/prueba", {
-        method: "POST",
-      });
-      notify(r.nota);
-    } catch (e) {
-      notify((e as Error).message, true);
-    } finally {
-      setOcupado(false);
-    }
-  }
-  return (
-    <section className="card activity alerts">
-      <div className="section-title">
-        <h2>
-          <Mail size={18} /> Avisos por correo
-        </h2>
-      </div>
-      <p className="helper">
-        Recibe un correo cuando la búsqueda se completa, cuando quedan pocas
-        vacantes (tras la pasada de la mañana) o si algo falla. No incluye datos
-        de tus clientes.
-      </p>
-      <div className="field">
-        <label htmlFor="alertas-correos">Correos que reciben los avisos</label>
-        <input
-          id="alertas-correos"
-          type="text"
-          inputMode="email"
-          autoComplete="email"
-          placeholder="nombre@example.com, otra@example.com"
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-        />
-      </div>
-      <fieldset className="check-line">
-        <legend className="sr-only">Qué avisos enviar</legend>
-        {tiposAlerta.map(([v, t]) => (
-          <label key={v}>
-            <input
-              type="checkbox"
-              checked={a.tipos.includes(v)}
-              onChange={(e) =>
-                setA({
-                  ...a,
-                  tipos: e.target.checked
-                    ? [...a.tipos, v]
-                    : a.tipos.filter((x) => x !== v),
-                })
-              }
-            />
-            {t}
-          </label>
-        ))}
-      </fieldset>
-      {a.envio_configurado === false && (
-        <p className="form-error">
-          Falta configurar el envío (RESEND_API_KEY y ALERTAS_REMITENTE). Los
-          correos guardados se usarán en cuanto esté listo.
-        </p>
-      )}
-      <div className="alerts-actions">
-        <button
-          type="button"
-          className="button secondary"
-          disabled={ocupado || !a.destinatarios.length}
-          onClick={probar}
-        >
-          Enviar correo de prueba
-        </button>
-        <button
-          type="button"
-          className="button primary"
-          disabled={ocupado}
-          onClick={guardar}
-        >
-          Guardar avisos
-        </button>
-      </div>
-    </section>
-  );
-}
-
 const etapasEmbudo: [keyof Embudo, string][] = [
   ["encontradas", "Encontradas"],
   ["con_descripcion", "Con descripción"],
@@ -2618,6 +2494,7 @@ function App() {
           )}
           {tab === "Resumen" && (
             <>
+              <AvisoUltimaBusqueda ultima={runs?.[0]} />
               <section className="overview-top solo">
                 <div className="quota-summary card">
                   <div className="card-label">
@@ -3185,7 +3062,6 @@ function App() {
           {tab === "Mensajes" && (
             <Mensajes clientes={draft.clientes} notify={notify} />
           )}
-          {tab === "Actividad" && <AvisosCorreo notify={notify} />}
           {tab === "Actividad" && <ReglasAprendidas notify={notify} />}
           {tab === "Actividad" && (
             <section className="card activity">
@@ -3488,6 +3364,32 @@ function App() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+// Avisos dentro del panel, sin correo ni servicios externos (decisión del operador, 13 nov).
+function AvisoUltimaBusqueda({ ultima }: { ultima?: Ejecucion }) {
+  if (!ultima) return null;
+  const r = ultima.resumen || {};
+  const faltan = Object.entries(r.faltantes || {})
+    .filter(([, n]) => n > 0)
+    .map(([cargo]) => cargo);
+  const corta =
+    ultima.estado === "parcial" ||
+    (r.meta !== undefined && (r.vacantes ?? 0) < r.meta);
+  if (ultima.estado !== "fallida" && !corta) return null;
+  return (
+    <div className="aviso-busqueda" role="status">
+      <strong>
+        {ultima.estado === "fallida"
+          ? `La búsqueda del ${fecha(ultima.fecha)} falló.`
+          : `La búsqueda del ${fecha(ultima.fecha)} trajo ${r.vacantes ?? 0} de ${r.meta ?? 120} vacantes.`}
+      </strong>{" "}
+      {ultima.estado === "fallida"
+        ? "Revisa «Actividad»; la siguiente búsqueda lo intentará de nuevo."
+        : faltan.length
+          ? `Faltan vacantes en ${faltan.join(", ")}: revisa los filtros de sus clientes en «Dónde se pierden las vacantes de cada cargo».`
+          : ""}
     </div>
   );
 }

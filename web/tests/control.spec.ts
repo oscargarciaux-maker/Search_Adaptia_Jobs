@@ -198,14 +198,8 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
     page.getByRole("link", { name: "Abrir en WhatsApp" }),
   ).toHaveCount(antes - 1);
   await page.getByRole("button", { name: "Actividad", exact: true }).click();
-  // Avisos por correo: se guardan y la prueba responde (en demostración no envía).
-  await page
-    .getByLabel("Correos que reciben los avisos")
-    .fill("operador@example.org");
-  await page.getByRole("button", { name: "Guardar avisos" }).click();
-  await expect(page.getByText("Avisos por correo guardados.")).toBeVisible();
-  await page.getByRole("button", { name: "Enviar correo de prueba" }).click();
-  await expect(page.getByText(/Demostración: no se envía/)).toBeVisible();
+  // Sin avisos por correo: el operador no quiere servicios externos (13 nov).
+  await expect(page.getByText("Avisos por correo")).toHaveCount(0);
   await page.getByText("Dónde se pierden las vacantes de cada cargo").click();
   await expect(
     page.getByRole("columnheader", { name: "Enlace comprobado" }),

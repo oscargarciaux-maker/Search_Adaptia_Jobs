@@ -183,6 +183,11 @@ el tamaño de cómputo del proyecto (Project Settings → Compute and Disk).
 
 ## Avisos por correo (Resend) — una sola vez
 
+> **Desactivado por decisión del operador (13 nov):** no se conectan servicios externos. El panel ya no muestra
+> «Avisos por correo». Los avisos se ven en el propio panel (franja en «Resumen» cuando la última búsqueda falla o no
+> llega a la meta), y GitHub avisa por correo al dueño del repositorio cuando falla un flujo (GitHub → Settings →
+> Notifications → Actions). Los pasos de abajo quedan solo por si algún día se quiere activar.
+
 1. Crear una cuenta en resend.com (idealmente del cliente) y en **Domains → Add domain** escribir el dominio del cliente
    (p. ej. adaptiajobs.com).
 2. Resend muestra 3 registros DNS (SPF, DKIM y MX/Return-Path). Añadirlos donde se administra el dominio y pulsar
