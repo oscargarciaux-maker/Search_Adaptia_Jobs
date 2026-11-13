@@ -313,3 +313,22 @@ def test_pasada_que_completa_el_dia_no_reescribe_el_snapshot_registrado(monkeypa
     registrado = next(v for v, _ in guardados[0]["elegidas"]["ux-ui-designer"] if v["id"] == registrada["id"])
     assert {k: v for k, v in registrado.items() if k != "_capturada_entrega"} == \
         {k: v for k, v in registrada.items() if k != "_capturada_entrega"}
+
+
+def test_afinidad_vigente_acepta_empatados_y_ampliadas_y_no_lo_cerrado():
+    """13 nov: la validación final marcaba «fuera del perfil» vacantes que estaban bien elegidas."""
+    from buscador.bodega import afinidad_vigente
+    pd = {"id": "pd", "nombre": "Product Designer", "familias": ["diseno"]}
+    ux = {"id": "ux", "nombre": "Diseñador UX/UI", "familias": ["diseno"]}
+    qa = {"id": "qa", "nombre": "QA", "familias": ["qa"]}
+    roles = [pd, ux, qa]
+    v = {"id": "v1", "titulo": "Product Designer", "familias": [{"familia": "diseno", "coincidencia": "exacto"}]}
+    inventario = {"v1": v}
+    # Encaja igual en dos cargos (se reparten por turnos): vale para el segundo, no solo para el primero.
+    assert afinidad_vigente(v, v, ux, roles, inventario)
+    assert afinidad_vigente(v, v, pd, roles, inventario)
+    # No encaja en QA, salvo que haya entrado por ampliación (v9/v11), que va marcada a propósito.
+    assert not afinidad_vigente(v, v, qa, roles, inventario)
+    assert afinidad_vigente(dict(v, _ampliacion="remota_cercana"), v, qa, roles, inventario)
+    # Fuera del inventario (cerrada o vieja): nunca vale.
+    assert not afinidad_vigente(dict(v, _ampliacion="remota_cercana"), v, qa, roles, {})

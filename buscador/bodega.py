@@ -28,6 +28,22 @@ RAIZ = Path(__file__).resolve().parent.parent
 _config_operativa = None
 
 
+def afinidad_vigente(original, actual, rol, roles, inventario):
+    """¿La vacante elegida hoy para `rol` le sigue sirviendo? Sale de la validación final (13 nov).
+    - Si ya no está en el inventario (cerrada o vieja), no.
+    - Si entró por ampliación (contratos v9 y v11: filtros relajados para llegar a 5), sí: entró así a propósito y va
+      marcada; compararla con los filtros estrictos daba una falsa alarma (QA, 13 nov).
+    - Si encaja igual de bien en varios cargos, vale cualquiera de los empatados: esas vacantes se reparten por turnos
+      entre los cargos, y comparar solo con el primero daba otra falsa alarma (UX/UI frente a Product Designer)."""
+    if actual["id"] not in inventario:
+        return False
+    if original.get("_ampliacion"):
+        return True
+    from buscador import entrega
+    empatados, _ = entrega.roles_de(actual, roles)
+    return any(r["id"] == rol["id"] for r in empatados)
+
+
 def config():
     if _config_operativa is not None:
         return deepcopy(_config_operativa)
@@ -575,7 +591,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
             actual = dict(por_id_vigente.get(original["id"], original))
             revision = verificar_enlaces.anotar(actual, cache_enlaces)
             entradas.append({"id": actual["id"], "catalog_status": estados_catalogo.get(actual["id"], "sin_catalogo"), "afinidad_vigente":
-                actual.get("rol_entrega_actual") == rol["id"] if actual["id"] in por_id_vigente else False,
+                afinidad_vigente(original, actual, rol, roles_actuales, por_id_vigente),
                 "enlace": actual.get("enlace", ""), "enlace_directo": actual.get("enlace_directo", ""),
                 "verificacion": revision})
         seleccion_actual["roles"][rol["id"]] = {"nombre": rol["nombre"], "meta": entrega.meta_de(rol, config_entrega), "vacantes": entradas}
