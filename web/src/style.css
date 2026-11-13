@@ -2931,3 +2931,28 @@ legend .ayuda-texto,
   left: -8px;
   right: auto;
 }
+
+/* Arreglos de la auditoría (13 nov). */
+/* H5: botones de texto fáciles de tocar en el celular (≥ 40 px de alto). */
+.page-top .text-button,
+.client-bottom .editar {
+  min-height: 40px;
+  padding: 0 4px;
+}
+/* H3: nota bajo «Entregadas» en el embudo. */
+.embudo-nota {
+  font-style: italic;
+}
+.embudo-etapas span.ayuda-texto {
+  right: -8px;
+  left: auto;
+  color: #f4f7f3;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.reglas .plegable {
+  margin-top: 4px;
+}
+.reglas .plegable-contenido {
+  margin-top: 10px;
+}

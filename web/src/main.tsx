@@ -110,7 +110,7 @@ function vacioVacantes(estado: EstadoConfig | null, r: Resultados | null) {
     return {
       title: "Programa la configuración para empezar",
       texto:
-        "Las vacantes de cada cliente aparecen después de la primera búsqueda nocturna con su configuración. Ve a «Cargos y cupos» y pulsa «Programar para mañana».",
+        "Las vacantes de cada cliente aparecen después de la primera búsqueda (6:30 a. m.) con su configuración. Ve a «Cargos y cupos» y pulsa «Programar para mañana».",
     };
   const desde = estado.publicada.vigente_desde;
   if (!r?.ejecucion || r.ejecucion.fecha < desde)
@@ -1059,7 +1059,7 @@ function PorConfirmar({
       <Empty
         icon={CheckCheck}
         title="Todo al día"
-        texto="No hay vacantes por confirmar en la bandeja. La búsqueda de la noche trae las que ayudan a tus clientes; para depurar toda la base ahora, carga todas las dudosas."
+        texto="No hay vacantes por confirmar en la bandeja. La búsqueda diaria trae las que ayudan a tus clientes; para depurar toda la base ahora, carga todas las dudosas."
         action={ocupado === "todas" ? undefined : cargarTodas}
         label="Cargar todas las dudosas de la base"
       />
@@ -1073,14 +1073,14 @@ function PorConfirmar({
           : `${datos.total} por confirmar`}
         {datos.ayudan_faltantes
           ? ` · ${datos.ayudan_faltantes} ayudan a clientes con menos de 5 vacantes`
-          : ""}
-        . Atajos con la tarjeta seleccionada: Enter acepta la sugerencia · 1
-        Sirve · 2 Otro país · 3 No sirve · 4 Saltar.
-      </p>
-      <p className="revision-pregunta">
-        <strong>Una sola pregunta:</strong> ¿puede postularse alguien que vive
-        en LATAM o en España? Cada tarjeta trae la respuesta sugerida y por qué;
-        corrige solo si la ves mal.
+          : ""}{" "}
+        <Ayuda etiqueta="cómo decidir">
+          <strong>Una sola pregunta:</strong> ¿puede postularse alguien que vive
+          en LATAM o en España? Cada tarjeta trae la respuesta sugerida y por
+          qué; corrige solo si la ves mal. Atajos con la tarjeta seleccionada:
+          Enter acepta la sugerencia · 1 Sirve · 2 Otro país · 3 No sirve · 4
+          Saltar.
+        </Ayuda>
       </p>
       {datos.pendientes.map((r) => {
         const pais = elegido[r.vacante_id] ?? r.sugerencia[0] ?? "";
@@ -1347,7 +1347,15 @@ function Mensajes({
   return (
     <section className="card activity mensajes">
       <div className="section-title">
-        <h2>Mensajes de hoy</h2>
+        <h2>
+          Mensajes de hoy{" "}
+          <Ayuda etiqueta="mensajes">
+            Para que una persona reciba su mensaje, en «Clientes» añade su
+            WhatsApp y marca que aceptó recibir vacantes. Nada se envía solo:
+            «Abrir en WhatsApp» abre su chat con el mensaje escrito para que lo
+            revises y lo envíes.
+          </Ayuda>
+        </h2>
         <div className="alerts-actions">
           <label className="check-line">
             <input
@@ -1367,12 +1375,6 @@ function Mensajes({
           </button>
         </div>
       </div>
-      <p className="helper">
-        Para que una persona reciba su mensaje, en «Clientes» añade su WhatsApp
-        y marca que aceptó recibir vacantes. Nada se envía solo: «Abrir en
-        WhatsApp» abre su chat con el mensaje escrito para que lo revises y lo
-        envíes.
-      </p>
       {lista === null ? (
         <p className="muted">
           <Loader2 size={14} className="spin" /> Cargando mensajes…
@@ -1510,47 +1512,58 @@ function ReglasAprendidas({
   return (
     <section className="card activity reglas">
       <div className="section-title">
-        <h2>Reglas de ubicación</h2>
+        <h2>
+          Reglas de ubicación{" "}
+          <Ayuda etiqueta="reglas de ubicación">
+            Las del operador salen de «Aplicar a las iguales». Las aprendidas
+            las crea el sistema solo, sin IA, cuando dos o más de tus decisiones
+            coinciden en un lugar; si una decisión nueva las contradice, se
+            desactivan solas. Solo resuelven ubicaciones dudosas: nunca cambian
+            un país ya reconocido.
+          </Ayuda>
+        </h2>
       </div>
-      <p className="helper">
-        Las del operador salen de «Aplicar a las iguales». Las aprendidas las
-        crea el sistema solo, sin IA, cuando dos o más de tus decisiones
-        coinciden en un lugar; si una decisión nueva las contradice, se
-        desactivan solas. Solo resuelven ubicaciones dudosas: nunca cambian un
-        país ya reconocido.
-      </p>
-      {!reglas ? (
-        <p className="helper">Cargando…</p>
-      ) : !reglas.length ? (
-        <p className="helper">
-          Todavía no hay reglas. Aparecerán cuando confirmes vacantes en «Por
-          confirmar».
-        </p>
-      ) : (
-        <ul className="reglas-lista">
-          {reglas.map((r) => (
-            <li key={r.texto} className={r.activa ? "" : "inactiva"}>
-              <div>
-                <strong>«{r.texto}»</strong> → {r.resultado}
-                <span className="helper">
-                  {" "}
-                  · {r.origen === "aprendida" ? "aprendida" : "del operador"} ·
-                  usada {r.usos} {r.usos === 1 ? "vez" : "veces"}
-                  {r.conflictos ? ` · ${r.conflictos} en conflicto` : ""}
-                  {r.activa ? "" : " · desactivada"}
-                </span>
-              </div>
-              <button
-                type="button"
-                className="text-button"
-                onClick={() => cambiar(r)}
-              >
-                {r.activa ? "Desactivar" : "Activar"}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <Plegable
+        mostrar={
+          "Ver reglas de ubicación" + (reglas ? ` (${reglas.length})` : "")
+        }
+        ocultar="Ocultar reglas de ubicación"
+      >
+        {!reglas ? (
+          <p className="helper">Cargando…</p>
+        ) : !reglas.length ? (
+          <p className="helper">
+            Todavía no hay reglas. Aparecerán cuando confirmes vacantes en «Por
+            confirmar».
+          </p>
+        ) : (
+          <ul className="reglas-lista">
+            {reglas.map((r) => (
+              <li key={r.texto} className={r.activa ? "" : "inactiva"}>
+                <div>
+                  <strong>«{r.texto}»</strong> → {r.resultado}
+                  <span className="helper">
+                    {" "}
+                    · {r.origen === "aprendida"
+                      ? "aprendida"
+                      : "del operador"}{" "}
+                    · usada {r.usos} {r.usos === 1 ? "vez" : "veces"}
+                    {r.conflictos ? ` · ${r.conflictos} en conflicto` : ""}
+                    {r.activa ? "" : " · desactivada"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => cambiar(r)}
+                >
+                  {r.activa ? "Desactivar" : "Activar"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Plegable>
     </section>
   );
 }
@@ -1601,14 +1614,29 @@ function EmbudoCargos({
                 <span>{cargo}</span>
                 <span className="embudo-entregadas">
                   Entregadas {e.entregadas}
-                  {e.ampliadas > 0 && ` (${e.ampliadas} ampliadas)`}
                 </span>
               </h4>
               <ol className="embudo-etapas">
                 {etapasEmbudo.map(([k, t], n) => (
                   <li key={k} className={n === peor ? "mayor-perdida" : ""}>
                     <strong>{e[k] as number}</strong>
-                    <span>{t}</span>
+                    <span>
+                      {t}
+                      {k === "entregadas" && (
+                        <Ayuda etiqueta={"entregadas de " + cargo}>
+                          Puede ser más que la etapa anterior: además de las
+                          nuevas de esta búsqueda, incluye vacantes por
+                          ampliación (para que cada persona llegue a 5) y
+                          vacantes de días anteriores que esa persona aún no
+                          había recibido.
+                        </Ayuda>
+                      )}
+                    </span>
+                    {k === "entregadas" && e.ampliadas > 0 && (
+                      <span className="embudo-nota">
+                        incluye {e.ampliadas} por ampliación
+                      </span>
+                    )}
                   </li>
                 ))}
               </ol>
@@ -2407,6 +2435,7 @@ function App() {
     [password, setPassword] = useState("");
   const peticionResultados = useRef(0);
   const [loadingResults, setLoadingResults] = useState(false);
+  const [errorResultados, setErrorResultados] = useState(false);
   const [porConfirmar, setPorConfirmar] = useState(0);
   const [borradoresHoy, setBorradoresHoy] = useState<Borrador[] | null>(null);
   const previaCargos = useVistaPrevia(
@@ -2474,6 +2503,10 @@ function App() {
       .then((r) => setPorConfirmar(r.total))
       .catch(() => undefined);
   }, [tab, sesion?.sesion]);
+  // Auditoría H8: la pestaña del navegador dice en qué sección estás.
+  useEffect(() => {
+    document.title = tab + " · Scraper";
+  }, [tab]);
   useEffect(() => {
     const seguir = () => setTab(seccionDeHash());
     window.addEventListener("hashchange", seguir);
@@ -2498,6 +2531,7 @@ function App() {
     if (!sesion?.sesion) return;
     setLoadingResults(true);
     setResults(null);
+    setErrorResultados(false);
     try {
       const r = await api<Resultados>(
         "/resultados?" +
@@ -2508,8 +2542,10 @@ function App() {
       );
       if (turno === peticionResultados.current) setResults(r);
     } catch (e) {
-      if (turno === peticionResultados.current)
+      if (turno === peticionResultados.current) {
+        setErrorResultados(true);
         notify((e as Error).message, true);
+      }
     } finally {
       if (turno === peticionResultados.current) setLoadingResults(false);
     }
@@ -2808,7 +2844,7 @@ function App() {
                           : tab === "Mensajes"
                             ? "Cada mañana cada persona tiene su mensaje con sus vacantes. Ábrelo en WhatsApp, revísalo y envíalo."
                             : tab === "Actividad"
-                              ? "Cada noche: cuántas vacantes trajo la búsqueda con tu configuración y qué cargos quedaron cortos."
+                              ? "Cada día: cuántas vacantes trajo la búsqueda con tu configuración y qué cargos quedaron cortos."
                               : "Información sobre la conexión y el funcionamiento del espacio."}
               </p>
             </div>
@@ -3279,7 +3315,18 @@ function App() {
                   Consultando vacantes…
                 </p>
               )}
-              {!loadingResults && !shown.length && (
+              {/* Auditoría H1: un fallo no se confunde con «no hay vacantes». */}
+              {!loadingResults && errorResultados && (
+                <Empty
+                  icon={BriefcaseBusiness}
+                  title="No se pudieron cargar las vacantes"
+                  texto="El panel no recibió respuesta del servidor. Revisa tu conexión y vuelve a intentarlo; tu configuración no cambió."
+                  action={cargarResultados}
+                  actionIcon={RefreshCw}
+                  label="Reintentar"
+                />
+              )}
+              {!loadingResults && !errorResultados && !shown.length && (
                 <Empty
                   icon={BriefcaseBusiness}
                   {...vacioVacantes(estado, results)}
@@ -3297,11 +3344,10 @@ function App() {
           {tab === "Mensajes" && (
             <Mensajes clientes={draft.clientes} notify={notify} />
           )}
-          {tab === "Actividad" && <ReglasAprendidas notify={notify} />}
           {tab === "Actividad" && (
             <section className="card activity">
               <div className="section-title">
-                <h2>Resultado de cada búsqueda nocturna</h2>
+                <h2>Resultado de cada búsqueda diaria</h2>
                 <button
                   className="icon"
                   aria-label="Actualizar actividad"
@@ -3379,6 +3425,7 @@ function App() {
               )}
             </section>
           )}
+          {tab === "Actividad" && <ReglasAprendidas notify={notify} />}
         </main>
       </div>
       {modal === "cargo" && (
@@ -3624,12 +3671,14 @@ function Empty({
   texto,
   action,
   label,
+  actionIcon: ActionIcon = Plus,
 }: {
   icon: React.ComponentType<{ size: number }>;
   title: string;
   texto: string;
   action?: () => void;
   label?: string;
+  actionIcon?: React.ComponentType<{ size: number }>;
 }) {
   return (
     <div className="empty">
@@ -3640,7 +3689,7 @@ function Empty({
       <p>{texto}</p>
       {action && (
         <button className="button primary" onClick={action}>
-          <Plus size={16} />
+          <ActionIcon size={16} />
           {label}
         </button>
       )}
@@ -3812,9 +3861,13 @@ function VacancyCard({ v }: { v: Vacante }) {
           {v.publicada ? fecha(v.publicada) : "Fecha por confirmar"}
         </span>
         <span>
-          {v.experiencia !== null
-            ? v.experiencia + " años exigidos"
-            : "Experiencia no informada"}
+          {v.experiencia === null
+            ? "Experiencia no informada"
+            : v.experiencia === 0
+              ? "Sin años exigidos"
+              : v.experiencia === 1
+                ? "1 año exigido"
+                : v.experiencia + " años exigidos"}
         </span>
       </div>
       <details>

@@ -446,6 +446,8 @@ test("revisión masiva por CSV y reglas aprendidas sin IA", async ({
   });
   await expect(page.getByText(/Revisión aplicada: 1 decididas/)).toBeVisible();
   await ir(page, "Actividad");
+  // Auditoría H4: el resultado de la búsqueda va primero; las reglas, al final y plegadas.
+  await page.getByRole("button", { name: /Ver reglas de ubicación/ }).click();
   const regla = page.locator(".reglas-lista li", { hasText: "«granada»" });
   await expect(regla).toContainText("España");
   await regla.getByRole("button", { name: "Desactivar" }).click();
@@ -496,4 +498,55 @@ test("resumen: tablero de una pantalla, sin menú propio, con dirección por sec
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+});
+
+test("arreglos de la auditoría: error de carga, textos, título y botones táctiles", async ({
+  page,
+}) => {
+  // H1: si el servidor falla, Vacantes lo dice y ofrece reintentar (no «Programa la configuración»).
+  await page.route(/\/api\/resultados/, (r) =>
+    r.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: '{"detail":"x"}',
+    }),
+  );
+  await page.goto("/#vacantes");
+  await expect(
+    page.getByText("No se pudieron cargar las vacantes"),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Programa la configuración para empezar"),
+  ).toHaveCount(0);
+  await page.unroute(/\/api\/resultados/);
+  await page.getByRole("button", { name: "Reintentar" }).click();
+  await expect(page.locator(".vacancy").first()).toBeVisible();
+  // H6: «1 año», nunca «1 años».
+  await expect(page.getByText("1 años exigidos")).toHaveCount(0);
+  // H8: la pestaña dice en qué sección estás.
+  await expect(page).toHaveTitle("Vacantes · Scraper");
+  // H2 y H4: sin «noche»; primero el resultado, luego las reglas.
+  await page.goto("/#actividad");
+  await expect(page.getByText(/Cada noche|búsqueda nocturna/)).toHaveCount(0);
+  const orden = await page
+    .locator("main h2")
+    .evaluateAll((hs) => hs.map((h) => h.textContent || ""));
+  expect(orden[0]).toContain("Resultado de cada búsqueda diaria");
+  // H3: «Entregadas» explica por qué puede superar a la etapa anterior.
+  await expect(
+    page
+      .getByRole("button", { name: /Más información: entregadas de/ })
+      .first(),
+  ).toBeVisible();
+  // H5: botones de texto con al menos 40 px de alto en el celular.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/#clientes");
+  await page.locator(".client-card").first().waitFor();
+  for (const boton of [
+    page.getByRole("button", { name: "Volver al resumen" }),
+    page.getByRole("button", { name: /^Editar / }).first(),
+  ]) {
+    const caja = await boton.boundingBox();
+    expect(caja!.height).toBeGreaterThanOrEqual(40);
+  }
 });
