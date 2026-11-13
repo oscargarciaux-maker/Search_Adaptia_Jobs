@@ -20,6 +20,8 @@ TOPE = 10  # las que se muestran a la vez en el panel
 GUARDADAS = 300  # las que se guardan (para el CSV de revisión grande, contrato v17)
 GUARDADAS_COMPLETA = 3000  # depuración completa de la base: todas las dudosas
 DEPURACION = "depuración completa"
+POR_CONFIRMAR = "elegibilidad regional por confirmar"  # razón del catálogo mientras el país no se confirma
+RESUELTA_SOLA = "resuelta sola"
 DIAS_PENDIENTE = 7
 MOTIVO = "ubicación por confirmar"
 # Lo único que una confirmación de país puede resolver; cualquier otro motivo deja fuera la vacante para ese perfil.
@@ -124,6 +126,11 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False):
         creada = (r.get("creada_en") or ahora.isoformat()).replace("Z", "+00:00")
         edad = ahora - datetime.fromisoformat(creada)
         if r.get("estado") != "pendiente":
+            continue
+        catalogo_fila = r.get("catalogo_vacantes") or {}
+        if catalogo_fila and catalogo_fila.get("reason") != POR_CONFIRMAR:
+            # El sistema ya la resolvió (ficha, Get on Board, reglas) o dejó de ser entregable: no hace falta preguntar.
+            repo.actualizar_revision(vid, {"estado": "vencida", "motivo": RESUELTA_SOLA})
             continue
         if r.get("motivo") == DEPURACION:  # las de la depuración completa esperan a la persona (hasta 30 días)
             if edad > timedelta(days=30):

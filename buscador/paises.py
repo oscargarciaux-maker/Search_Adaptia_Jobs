@@ -429,7 +429,9 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
         ambito_sin_propios = re.sub(r"(?<![a-z0-9])" + re.escape(frase) + r"(?![a-z0-9])", " ", ambito_sin_propios)
     fuera = _nombra(ambito_sin_propios, d["fuera_lugares"])
     def subregion(texto):
-        return next((r["paises"] for r in d["subregiones"] if _nombra(texto, r["nombres"])), None)
+        # Contrato v18: todas las subregiones nombradas («Sudamérica, Centroamérica o México»), no solo la primera.
+        hallados = [c for r in d["subregiones"] if _nombra(texto, r["nombres"]) for c in r["paises"]]
+        return ordenar(hallados) if hallados else None
 
     def r(paises, confianza, nota):
         # Contrato v12: un país reconocido pero sin cobertura (Brasil) nunca queda como país desde el que se aplica.
@@ -447,7 +449,8 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
     def interpretar(restringe):
         r_paises = _paises_nombrados(restringe)
         if r_paises:
-            return r_paises
+            region = subregion(restringe)  # «Centroamérica, Chile o México»: la región más los países
+            return ordenar(r_paises + region) if region else r_paises
         # «Authorized to work in the country»: el país es el del propio aviso, si la ubicación lo nombra.
         if nombrados and re.match(r"(?:and |y )?(?:authorized to work in |autorizad[oa] para trabajar en )?"
                                   r"(?:(?:the|this|that|el|este|dicho) )?(?:country|pais)\b", restringe):
@@ -493,7 +496,7 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
         return r(todos, "alta", "")
     region = subregion(ambito)
     if region:
-        return r(region, "alta", "restricción regional")
+        return r(ordenar(region + nombrados), "alta", "restricción regional")
     if es_latam:
         return r(sorted(set(latam) | (set(europa) & set(nombrados))), "alta", "")
     if nombrados:

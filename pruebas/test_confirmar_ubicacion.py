@@ -75,3 +75,30 @@ def test_v17_decisiones_del_operador_valen_en_cada_busqueda():
     assert a["paises"] == ["EC"] and a["confianza_pais"] in ("alta", "media")
     assert b["paises"] == [] and b["confianza_pais"] == "alta"
     assert d["descartada_operador"] and contrato.entregable(d, HOY) == "descartada por el operador"
+
+
+def test_v18_politica_remota_de_get_on_board_en_la_ficha():
+    mundo_en = "<html><h3>Remote work policy</h3><p>Fully remote</p><p>Candidates can reside anywhere in the world.</p></html>"
+    mundo_es = "<p>Política de trabajo remoto</p><p>Totalmente remoto</p><p>El trabajo es 100% remoto desde cualquier país.</p>"
+    local_es = ("<p>Remoto sólo localmente</p><p>El trabajo es 100% remoto, pero los candidatos deben residir en "
+                "Sudamérica, Centroamérica o México para postular.</p>")
+    local_en = "<p>Locally remote only</p><p>Position is 100% remote, but candidates must reside in United States.</p>"
+    assert c.observacion(mundo_en, "X") == c.observacion(mundo_es, "X") == ("Remote - Worldwide", True)
+    assert c.observacion(local_es, "X") == ("Remote - Sudamérica, Centroamérica o México", True)
+    assert c.observacion(local_en, "X") == ("Remote - United States", True)
+    v = _vacante(9)
+    v.update(enlace="https://www.linkedin.com/jobs/view/1", enlace_directo="https://www.getonbrd.com/jobs/design/x",
+             confianza_pais="baja")
+    assert c.enlace_ficha(v) == "https://www.getonbrd.com/jobs/design/x"
+    leidas = []
+    stats = c.confirmar([v], {}, HOY, obtener=lambda url: leidas.append(url) or local_es)
+    assert leidas == ["https://www.getonbrd.com/jobs/design/x"] and stats["confirmadas"] == 1
+    assert set(v["paises"]) >= {"AR", "CR", "MX"} and "ES" not in v["paises"]
+
+
+def test_v18_varias_subregiones_y_paises_juntos():
+    from buscador import paises
+    r = paises.elegibles("X", "Remote - Sudamérica, Centroamérica o México", "", True)
+    assert {"AR", "CR", "MX"} <= set(r["paises"]) and "ES" not in r["paises"]
+    r = paises.elegibles("X", "Remote", "Candidates must reside in Central America, Chile or Mexico.", True)
+    assert {"CR", "CL", "MX"} <= set(r["paises"]) and "AR" not in r["paises"]

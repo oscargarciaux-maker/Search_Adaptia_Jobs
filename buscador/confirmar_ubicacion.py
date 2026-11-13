@@ -8,6 +8,7 @@ Un 403 o una página sin datos no prueban nada: la vacante sigue por confirmar. 
 `trabajo/ubicacion_fichas.json` (solo enlace y ubicación pública del aviso; ningún dato de clientes).
 """
 import json
+import re
 import time
 from datetime import date, datetime, timedelta, timezone
 
@@ -18,6 +19,10 @@ from buscador import tiempos, vacante
 from buscador.verificar_enlaces import NAVEGADOR, _coincide, _jobs, publica
 
 VIGENCIA_DIAS = 7
+# Contrato v18: la ficha de Get on Board no trae JobPosting, pero escribe su política remota (inglés o español).
+_GOB_MUNDO = re.compile(r"candidates can reside anywhere in the world|100\s*% remoto desde cualquier pa[ií]s", re.I)
+_GOB_LOCAL = re.compile(r"(?:candidates must reside in|los candidatos deben residir en)\s+([^.]{2,80}?)"
+                        r"(?:\s+(?:to apply|para postular))?\s*\.", re.I)
 
 
 def _texto(valor):
@@ -30,8 +35,25 @@ def _lista(valor):
     return valor if isinstance(valor, list) else [valor] if valor else []
 
 
+def politica_remota(html):
+    """(ubicación, True) según la política remota escrita en la ficha (Get on Board), o None."""
+    texto = re.sub(r"\s+", " ", BeautifulSoup(html or "", "html.parser").get_text(" "))
+    if _GOB_MUNDO.search(texto):
+        return "Remote - Worldwide", True
+    m = _GOB_LOCAL.search(texto)
+    if m:
+        return "Remote - " + m.group(1).strip(), True
+    return None
+
+
 def observacion(html, titulo):
-    """(ubicación como texto, remoto) a partir del JobPosting de la ficha, o None si no trae datos de lugar."""
+    """(ubicación como texto, remoto) a partir del JobPosting de la ficha (o, si no lo trae, de su política remota
+    escrita), o None si no trae datos de lugar."""
+    estructurada = _observacion_estructurada(html, titulo)
+    return estructurada or politica_remota(html)
+
+
+def _observacion_estructurada(html, titulo):
     sopa = BeautifulSoup(html or "", "html.parser")
     trabajos = []
     for s in sopa.find_all("script", type="application/ld+json"):
@@ -76,13 +98,21 @@ def _obtener(url, sesion, plazo):
     return None
 
 
+def enlace_ficha(v):
+    """La ficha a leer: la de Get on Board si la vacante tiene una (dice su política remota), si no la principal."""
+    todos = [u for u in (v.get("enlace"), v.get("enlace_directo"), *(v.get("_enlaces") or [])) if u]
+    return next((u for u in todos if "getonbrd.com/" in u), todos[0] if todos else "")
+
+
 def candidatas(vacantes, familias, hoy, dias=30):
     """Por confirmar, en español o inglés, recientes y del cargo de algún rol de la entrega; las más nuevas primero."""
     desde = (date.fromisoformat(hoy) - timedelta(days=dias)).isoformat()
     lista = [v for v in vacantes if v.get("confianza_pais") == "baja" and v.get("idioma") in ("es", "en")
              and (v.get("fecha_publicacion") or v.get("visto_primera_vez") or "") >= desde
              and (not familias or {f["familia"] for f in v.get("familias", [])} & set(familias))]
-    return sorted(lista, key=lambda v: v.get("fecha_publicacion") or "", reverse=True)
+    # Las de Get on Board primero: su ficha siempre dice la política remota (contrato v18).
+    lista.sort(key=lambda v: v.get("fecha_publicacion") or "", reverse=True)
+    return sorted(lista, key=lambda v: "getonbrd.com/" not in enlace_ficha(v))
 
 
 def confirmar(vacantes, cache, hoy, familias=(), maximo=60, segundos=180, sesion=None, obtener=None, ahora=None):
@@ -97,7 +127,7 @@ def confirmar(vacantes, cache, hoy, familias=(), maximo=60, segundos=180, sesion
     try:
         for v in candidatas(vacantes, familias, hoy):
             stats["candidatas"] += 1
-            url = v.get("enlace") or v.get("enlace_directo") or ""
+            url = enlace_ficha(v)
             if not url:
                 continue
             previo = cache.get(url)

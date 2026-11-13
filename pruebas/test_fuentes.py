@@ -252,3 +252,20 @@ def test_relectura_se_detiene_ante_bloqueos_seguidos():
             return type("R", (), {"status_code": 429, "text": ""})()
     _, stats = linkedin_publico.completar_descripciones(Bloqueado(), previas, 50, hoy="2026-11-11")
     assert len(pedidas) == 4 and stats["bloqueos_seguidos"] == 4
+
+
+def test_v18_get_on_board_politica_remota():
+    def item(**a):
+        base = {"title": "Product Designer", "published_at": 1792000000, "remote": True, "countries": ["Remote"],
+                "company": {"data": {"attributes": {"name": "Buk"}}}, "description": "<p>Figma</p>"}
+        return {"attributes": {**base, **a}, "links": {"public_url": "https://www.getonbrd.com/jobs/design/x"}}
+    assert getonbrd.vacante(item(remote_modality="fully_remote"))["ubicacion"] == "Remote - Worldwide"
+    local = item(remote_modality="remote_local", location_tenants={"data": [
+        {"id": "united_states", "type": "country", "attributes": {"name": "United States"}}]})
+    assert getonbrd.vacante(local)["ubicacion"] == "Remote - United States"
+    assert getonbrd.vacante(item(remote_modality="remote_local"))["ubicacion"] == "Remote"  # sin país: por confirmar
+    hibrida = item(remote=False, remote_modality="hybrid", countries=["Peru"])
+    assert getonbrd.vacante(hibrida)["ubicacion"] == "Peru" and getonbrd.vacante(hibrida)["remoto"] is None
+    from buscador import paises
+    assert paises.elegibles("Product Designer", "Remote - Worldwide", "", True)["confianza"] == "alta"
+    assert paises.elegibles("Product Designer", "Remote - United States", "", True)["paises"] == []
