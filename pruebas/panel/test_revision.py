@@ -321,7 +321,7 @@ def test_descargar_base_sin_las_sin_confirmar():
     assert r.headers["x-incluidas"] == "1" and r.headers["x-omitidas-sin-confirmar"] == "1"
     filas = list(csv.DictReader(io.StringIO(r.text.lstrip("﻿"))))
     assert [f["external_id"] for f in filas] == ["demo-1"]
-    assert filas[0]["hire_countries"] == '["CO"]' and filas[0]["estado_en_catalogo"] == "activa"
+    assert filas[0]["hire_countries"] == "CO" and "estado_en_catalogo" not in filas[0]
     descartada = {"catalogo_vacantes": {"reason": "descartada por el operador", "confianza": "alta"}}
     cerrada = {"catalogo_vacantes": {"reason": "vacante cerrada", "confianza": "alta"}}
     assert revision.sin_confirmar(descartada) and not revision.sin_confirmar(cerrada)
@@ -344,10 +344,29 @@ def test_base_ofertas_lee_mas_de_una_pagina_con_ids_numericos(monkeypatch):
     assert incluidas == 592 and omitidas == 0 and texto.count("\n") == 593
 
 
-def test_base_una_fila_por_vacante_aunque_haya_saltos_de_linea():
+def test_base_sigue_el_contrato_v1():
+    import csv
+    import io
+    from buscador import contrato
+
     class R(RepositorioDemo):
         def base_ofertas(self):
-            return [{"id": 1, "external_id": "a", "description": "Línea uno\nLínea dos\r\n\tTres",
+            return [{"id": 7, "created_at": "2026-11-10T00:00:00+00:00", "external_id": "a", "job_title": "QA",
+                     "company_name": "Lumen", "description_full": "Línea uno\nLínea dos", "hire_countries": ["CO", "MX"],
+                     "language_requirements": [{"language": "en", "level": "B2", "required": True},
+                                               {"language": "fr", "level": None, "required": False}],
+                     "scraped_at": "2026-11-10T07:12:34.123456+00:00", "published_date": "2026-11-09",
+                     "years_experience_min": 3, "enlaces_alternativos": ["https://a.example/1", "https://b.example/2"],
                      "catalogo_vacantes": {"reason": None, "confianza": "alta"}}]
     texto, incluidas, _ = revision.exportar_base(R())
-    assert incluidas == 1 and texto.count("\n") == 2 and "Línea uno Línea dos Tres" in texto
+    lector = csv.reader(io.StringIO(texto.lstrip("\ufeff")))
+    cabecera = next(lector)
+    assert cabecera == contrato.COLUMNAS + contrato.EXTRAS  # orden del contrato, sin id/created_at/estado
+    filas = [dict(zip(cabecera, f)) for f in lector]
+    assert incluidas == 1 and len(filas) == 1  # el salto de línea va entre comillas: sigue siendo una sola fila
+    f = filas[0]
+    assert f["description_full"] == "Línea uno\nLínea dos"  # el texto no se altera
+    assert f["hire_countries"] == "CO|MX" and f["language_requirements"] == "en:B2:1|fr::0"
+    assert f["scraped_at"] == "2026-11-10T07:12:34Z" and f["published_date"] == "2026-11-09"
+    assert f["years_experience_min"] == "3" and f["enlaces_alternativos"] == "https://a.example/1|https://b.example/2"
+    assert f["salary_min"] == "" and f["external_id"] == "a"
