@@ -148,6 +148,7 @@ export type Embudo = {
   entregadas: number;
   ampliadas: number;
   principal_perdida: string;
+  filtros_que_cortan?: Record<string, number>;
 };
 export type Contacto = {
   telefono: string;

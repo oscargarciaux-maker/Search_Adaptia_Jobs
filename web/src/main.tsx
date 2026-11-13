@@ -1547,8 +1547,8 @@ const etapasEmbudo: [keyof Embudo, string][] = [
   ["con_descripcion", "Con descripción"],
   ["entregables", "País e idioma confirmados"],
   ["nuevas", "Nuevas"],
+  ["cumplen_filtros", "Cumplen filtros del cliente"],
   ["enlace_comprobado", "Enlace comprobado"],
-  ["cumplen_filtros", "Cumplen filtros"],
   ["entregadas", "Entregadas"],
 ];
 
