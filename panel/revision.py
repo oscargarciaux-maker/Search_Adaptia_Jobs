@@ -177,10 +177,14 @@ def listar(repo, fecha):
     for r in todas:
         if not es_generica(r.get("ubicacion")):
             por_ubicacion[r["ubicacion"]] = por_ubicacion.get(r["ubicacion"], 0) + 1
+    from panel.sugerir import sugerir
     salida = []
     for r in pendientes:
         datos = _datos(r.get("catalogo_vacantes"))
+        s = sugerir(datos) if datos.get("titulo") else {"decision": "", "paises": [], "motivo": "", "frase": ""}
         salida.append({"vacante_id": r["vacante_id"], "titulo": datos.get("titulo", ""), "empresa": datos.get("empresa", ""),
+                       "sugerida": s["decision"], "paises_sugeridos": s["paises"], "por_que": s["motivo"],
+                       "frase": s["frase"],
                        "ubicacion": datos.get("ubicacion", ""), "modalidad": datos.get("modalidad", ""),
                        "idioma": datos.get("idioma", ""), "publicada": datos.get("fecha_publicacion", ""),
                        "enlace": datos.get("enlace", ""), "pista": r.get("pista", ""), "sugerencia": r.get("sugerencia", []),
@@ -297,8 +301,12 @@ def aplicar_confirmacion(actual, explicacion):
 
 
 # ── Contrato v17: revisión masiva por CSV (sin IA) y lista de reglas ───────────────────────────────────────────────
-COLUMNAS_CSV = ["vacante_id", "cargo", "empresa", "ubicacion", "pista", "le_serviria_a", "pais_sugerido", "decision",
-                "pais", "aplicar_a_iguales", "comentario"]
+# Se lee de izquierda a derecha: la respuesta sugerida, por qué, y los datos para comprobarla (ampliación v17).
+COLUMNAS_CSV = ["decision", "pais", "por_que", "cargo", "empresa", "ubicacion", "modalidad", "frase_del_aviso", "enlace",
+                "le_serviria_a", "aplicar_a_iguales", "comentario", "vacante_id"]
+PREGUNTA = ("¿Puede postularse alguien que vive en LATAM o en España? Sí → «sí» y el país (o LATAM). Solo de otro país → "
+            "«otro país». No se puede saber → «no sirve». La columna «decision» ya trae una sugerencia: corrige solo las "
+            "que veas mal y lee las que vienen vacías.")
 _DECISIONES_CSV = {"sirve": "sirve", "si": "sirve", "si sirve": "sirve", "otro pais": "otro_pais",
                    "otro_pais": "otro_pais", "solo otro pais": "otro_pais", "no sirve": "no_sirve", "no_sirve": "no_sirve",
                    "no": "no_sirve", "saltar": "saltar"}
@@ -311,15 +319,52 @@ def exportar_csv(repo, fecha):
     import io
     version = repo.operativa(fecha) or {}
     clientes = {c["id"]: c["nombre"] for c in (version.get("configuracion") or {}).get("clientes", [])}
+    from panel.sugerir import ETIQUETA, sugerir
     salida = io.StringIO()
     escritor = csv.writer(salida)
     escritor.writerow(COLUMNAS_CSV)
-    for r in sorted(repo.revisiones(estado="pendiente"), key=lambda x: -x.get("prioridad", 0)):
+    escritor.writerow(["", "", PREGUNTA] + [""] * (len(COLUMNAS_CSV) - 3))  # sin vacante_id: al subir se ignora
+    filas = []
+    for r in repo.revisiones(estado="pendiente"):
         datos = _datos(r.get("catalogo_vacantes"))
+        s = sugerir(datos)
         nombres = sorted({clientes.get(p["cliente_id"], "") for p in r.get("perfiles") or []} - {""})
-        escritor.writerow([r["vacante_id"], datos.get("titulo", ""), datos.get("empresa", ""), datos.get("ubicacion", ""),
-                           r.get("pista", ""), ", ".join(nombres), " ".join(r.get("sugerencia") or []), "", "", "", ""])
+        filas.append(((s["grupo"], -r.get("prioridad", 0)), [
+            ETIQUETA[s["decision"]], texto_paises(s["paises"]), s["motivo"], datos.get("titulo", ""),
+            datos.get("empresa", ""), datos.get("ubicacion", ""), datos.get("modalidad", ""), s["frase"],
+            datos.get("enlace", ""), ", ".join(nombres), "", "", r["vacante_id"]]))
+    for _, fila in sorted(filas, key=lambda x: x[0]):
+        escritor.writerow(fila)
     return "﻿" + salida.getvalue()  # BOM: Excel lo abre con tildes correctas
+
+
+def texto_paises(codigos):
+    """«LATAM», «LATAM y España» o los nombres: lo que se escribe en la columna «pais»."""
+    d = paises.datos()
+    codigos = list(codigos or [])
+    if set(d["latam"]) <= set(codigos):
+        return "LATAM y España" if "ES" in codigos else "LATAM"
+    nombres = {p["codigo"]: p["nombre"] for p in d["cubiertos"]}
+    return ", ".join(nombres.get(c, c) for c in codigos)
+
+
+def leer_paises(texto):
+    """Lo contrario de `texto_paises`: acepta nombres, siglas, «LATAM», «LATAM y España» o «todos». '?' si no se entiende."""
+    d = paises.datos()
+    nombres = {normalizar.texto(p["nombre"]): p["codigo"] for p in d["cubiertos"]}
+    codigos = []
+    for crudo in [x.strip() for x in re.split(r"[,/;]| y | e ", texto or "") if x.strip()]:
+        t = normalizar.texto(crudo)
+        if t in ("latam", "latinoamerica", "america latina", "latin america"):
+            nuevos = list(d["latam"])
+        elif t in ("todos", "todas", "latam y espana"):
+            nuevos = list(d["codigos"])
+        elif len(crudo) == 2 and crudo.upper() in d["codigos"]:
+            nuevos = [crudo.upper()]
+        else:
+            nuevos = [nombres.get(t, "?")]
+        codigos += [c for c in nuevos if c not in codigos]
+    return codigos
 
 
 def importar_csv(repo, contenido, fecha=None, comprobar=None):
@@ -331,10 +376,11 @@ def importar_csv(repo, contenido, fecha=None, comprobar=None):
         dialecto = csv.Sniffer().sniff(texto[:4000], delimiters=",;\t")
     except csv.Error:
         dialecto = csv.excel
-    filas = list(csv.DictReader(io.StringIO(texto), dialect=dialecto))[:500]
-    nombres = {normalizar.texto(p["nombre"]): p["codigo"] for p in paises.datos()["cubiertos"]}
+    filas = list(csv.DictReader(io.StringIO(texto), dialect=dialecto))[:GUARDADAS_COMPLETA + 1]
     resultado = {"aplicadas": 0, "omitidas": 0, "errores": []}
     for n, fila in enumerate(filas, start=2):
+        if not (fila.get("vacante_id") or "").strip():
+            continue  # la fila de instrucciones
         decision = _DECISIONES_CSV.get(normalizar.texto(fila.get("decision") or ""))
         if not decision:
             if (fila.get("decision") or "").strip():
@@ -342,8 +388,7 @@ def importar_csv(repo, contenido, fecha=None, comprobar=None):
             else:
                 resultado["omitidas"] += 1
             continue
-        crudos = [x.strip() for x in re.split(r"[,/;]| y ", fila.get("pais") or "") if x.strip()]
-        codigos = [x.upper() if len(x) == 2 else nombres.get(normalizar.texto(x), "?") for x in crudos]
+        codigos = leer_paises(fila.get("pais") or "")
         if decision == "sirve" and not codigos:
             codigos = (fila.get("pais_sugerido") or "").split()
         try:

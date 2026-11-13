@@ -707,6 +707,11 @@ const estadosMensaje: Record<Borrador["estado"], string> = {
   descartado: "Descartado",
 };
 
+const ETIQUETA_SUGERIDA: Record<string, string> = {
+  sirve: "sirve",
+  otro_pais: "solo para otro país",
+  no_sirve: "no sirve",
+};
 // Contrato v16: vacantes que le servirían a un cliente pero cuyo país no se pudo confirmar solo. Un clic por vacante.
 function PorConfirmar({
   paises,
@@ -736,9 +741,9 @@ function PorConfirmar({
   }, []);
   const nombre = (codigo: string) =>
     paises.find((p) => p.codigo === codigo)?.nombre || codigo;
-  async function decidir(r: Revision, decision: string) {
+  async function decidir(r: Revision, decision: string, codigos?: string[]) {
     const pais = elegido[r.vacante_id] ?? r.sugerencia[0] ?? "";
-    if (decision === "sirve" && !pais) {
+    if (decision === "sirve" && !pais && !codigos?.length) {
       notify("Elige el país antes de confirmar.", true);
       return;
     }
@@ -750,7 +755,8 @@ function PorConfirmar({
           method: "POST",
           body: JSON.stringify({
             decision,
-            paises: decision === "sirve" ? [pais] : [],
+            paises:
+              decision === "sirve" ? (codigos?.length ? codigos : [pais]) : [],
             aplicar_a_iguales: Boolean(iguales[r.vacante_id]),
           }),
         },
@@ -891,8 +897,13 @@ function PorConfirmar({
         {datos.ayudan_faltantes
           ? ` · ${datos.ayudan_faltantes} ayudan a clientes con menos de 5 vacantes`
           : ""}
-        . Atajos con la tarjeta seleccionada: 1 Sirve · 2 Otro país · 3 No sirve
-        · 4 Saltar.
+        . Atajos con la tarjeta seleccionada: Enter acepta la sugerencia · 1
+        Sirve · 2 Otro país · 3 No sirve · 4 Saltar.
+      </p>
+      <p className="revision-pregunta">
+        <strong>Una sola pregunta:</strong> ¿puede postularse alguien que vive
+        en LATAM o en España? Cada tarjeta trae la respuesta sugerida y por qué;
+        corrige solo si la ves mal.
       </p>
       {datos.pendientes.map((r) => {
         const pais = elegido[r.vacante_id] ?? r.sugerencia[0] ?? "";
@@ -904,6 +915,16 @@ function PorConfirmar({
             aria-label={`${r.titulo} en ${r.empresa}`}
             onKeyDown={(e) => {
               if ((e.target as HTMLElement).tagName === "SELECT") return;
+              if (
+                e.key === "Enter" &&
+                e.target === e.currentTarget &&
+                r.sugerida &&
+                !ocupado
+              ) {
+                e.preventDefault();
+                decidir(r, r.sugerida, r.paises_sugeridos);
+                return;
+              }
               const accion = {
                 "1": "sirve",
                 "2": "otro_pais",
@@ -928,12 +949,39 @@ function PorConfirmar({
                 </span>
               )}
             </div>
+            {r.por_que && (
+              <div className={"revision-sugerencia " + (r.sugerida || "leer")}>
+                <p>
+                  <strong>
+                    {r.sugerida
+                      ? `Sugerencia: ${ETIQUETA_SUGERIDA[r.sugerida]}`
+                      : "Para leer"}
+                  </strong>{" "}
+                  — {r.por_que}
+                </p>
+                {r.sugerida && (
+                  <button
+                    type="button"
+                    className="button primary"
+                    disabled={ocupado === r.vacante_id}
+                    onClick={() =>
+                      decidir(r, r.sugerida as string, r.paises_sugeridos)
+                    }
+                  >
+                    <CheckCheck size={15} />
+                    Aceptar sugerencia
+                  </button>
+                )}
+              </div>
+            )}
             <p className="revision-lugar">
               <MapPin size={14} />
               Ubicación del aviso: <strong>{r.ubicacion || "sin dato"}</strong>
             </p>
-            {r.pista && (
-              <blockquote className="revision-pista">{r.pista}</blockquote>
+            {(r.frase ?? r.pista) && (
+              <blockquote className="revision-pista">
+                {r.frase ?? r.pista}
+              </blockquote>
             )}
             <p className="helper">
               Le serviría a: {r.clientes.join(", ") || "—"}
@@ -958,7 +1006,7 @@ function PorConfirmar({
               </label>
               <button
                 type="button"
-                className="button primary"
+                className={r.sugerida ? "button secondary" : "button primary"}
                 disabled={ocupado === r.vacante_id}
                 onClick={() => decidir(r, "sirve")}
               >

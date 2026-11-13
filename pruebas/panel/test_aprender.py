@@ -86,7 +86,7 @@ def test_preparar_guarda_carga_y_cuenta_usos():
 def test_csv_ida_y_vuelta_con_punto_y_coma_nombres_y_errores():
     r = RepositorioDemo()
     exportado = revision.exportar_csv(r, hoy())
-    assert exportado.startswith("﻿") and exportado.count("\n") == 4  # cabecera + 3 pendientes
+    assert exportado.startswith("﻿") and exportado.count("\n") == 5  # cabecera + instrucciones + 3 pendientes
     contenido = ("vacante_id;decision;pais;aplicar_a_iguales\n"
                  "rev-demo-0;sí;Colombia;no\nrev-demo-1;otro país;;\nrev-demo-2;tal vez;;\nrev-demo-9;;;\n")
     res = revision.importar_csv(r, contenido)
