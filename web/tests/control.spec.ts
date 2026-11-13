@@ -243,6 +243,29 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   ).toBe(120);
   await ir(page, "Vacantes");
   await expect(page.locator(".vacancy")).toHaveCount(50);
+  // Sección 9: al menos 3 vacantes por fila a 1366 px; «Recargar lista» y las ayudas explican qué hace cada cosa.
+  await page.setViewportSize({ width: 1366, height: 900 });
+  const arriba = await page
+    .locator(".vacancy")
+    .evaluateAll((els) =>
+      els.slice(0, 3).map((e) => Math.round(e.getBoundingClientRect().top)),
+    );
+  expect(new Set(arriba).size).toBe(1);
+  await expect(
+    page.getByRole("button", { name: "Recargar lista", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Más información: Recargar lista" })
+    .hover();
+  await expect(page.getByText(/No\s+busca vacantes nuevas/)).toBeVisible();
+  await expect(
+    page
+      .getByRole("button", {
+        name: "Más información: comprobación del enlace",
+      })
+      .first(),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page
     .getByRole("button", { name: "Copiar WhatsApp", exact: true })
     .click();

@@ -3253,8 +3253,13 @@ function App() {
                     onClick={cargarResultados}
                   >
                     <RefreshCw size={15} />
-                    Actualizar estado
+                    Recargar lista
                   </button>
+                  <Ayuda etiqueta="Recargar lista">
+                    Vuelve a leer las vacantes de este día desde la base. No
+                    busca vacantes nuevas ni vuelve a comprobar los enlaces: eso
+                    lo hacen las búsquedas programadas.
+                  </Ayuda>
                 </div>
               </div>
               {results?.ejecucion && (
@@ -3850,6 +3855,13 @@ function VacancyCard({ v }: { v: Vacante }) {
               : v.tipo === "post"
                 ? "Post leído en las últimas 24 h"
                 : "Enlace con comprobación vigente"}
+          {v.estado === "lista" && v.tipo !== "post" && (
+            <Ayuda etiqueta="comprobación del enlace">
+              El enlace se abrió hace menos de 6 horas y la vacante seguía
+              publicada. Es la comprobación más reciente, no una garantía: la
+              empresa puede cerrarla después sin avisar.
+            </Ayuda>
+          )}
         </span>
         {v.enlace && (
           <a
