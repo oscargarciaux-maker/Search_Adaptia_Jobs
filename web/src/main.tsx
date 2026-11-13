@@ -824,6 +824,11 @@ function PorConfirmar({
     leidas_del_catalogo?: number;
     fuera_por_idioma?: number;
     ya_claras?: number;
+    diagnostico?: {
+      catalogo?: number | null;
+      por_confirmar?: number | null;
+      confianza_baja?: number | null;
+    };
   };
   type EstadoCarga = {
     estado: "inactivo" | "en_curso" | "listo" | "error";
@@ -840,7 +845,10 @@ function PorConfirmar({
           (r.fuera_por_idioma
             ? ` y ${r.fuera_por_idioma} quedan fuera por idioma`
             : "") +
-          ".",
+          "." +
+          (r.diagnostico && Object.keys(r.diagnostico).length
+            ? ` Conteo directo en la base: ${r.diagnostico.catalogo ?? "?"} vacantes en total, ${r.diagnostico.por_confirmar ?? "?"} por confirmar, ${r.diagnostico.confianza_baja ?? "?"} con país dudoso.`
+            : ""),
         true,
       );
     } else {

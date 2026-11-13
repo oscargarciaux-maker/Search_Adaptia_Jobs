@@ -107,11 +107,31 @@ class RepositorioSupabase:
         return filas[0]
 
     # Contrato v16: bandeja «Por confirmar» y reglas de ubicación (tablas privadas, SQL 014).
+    # Patrón sin espacios (los «*» son comodines de PostgREST): un texto con espacios en la URL puede no llegar igual
+    # a Supabase, y la consulta devolvía 0 aunque el catálogo tenía cientos de dudosas (13 nov).
+    RAZON_POR_CONFIRMAR = "like.elegibilidad*regional*por*confirmar"
+
     def candidatas_por_confirmar(self, desde=None):
-        params = {"reason": "eq.elegibilidad regional por confirmar", "select": "id,datos,description_full"}
+        params = {"reason": self.RAZON_POR_CONFIRMAR, "select": "id,datos,description_full"}
         if desde:
             params["observed_at"] = "gte." + desde
         return self._paginas("catalogo_vacantes", "id", params, 500)
+
+    def contar(self, tabla, params):
+        """Cuántas filas cumplen el filtro (cabecera Content-Range con count=exact); None si no se pudo contar."""
+        try:
+            r = self.sesion.get(self.url + "/rest/v1/" + tabla, params={**params, "select": "id", "limit": 1},
+                                headers={**self.cabeceras, "Prefer": "count=exact"}, timeout=45)
+            total = (r.headers.get("Content-Range") or "").rsplit("/", 1)[-1]
+            return int(total) if 200 <= r.status_code < 300 and total.isdigit() else None
+        except (requests.RequestException, ValueError):
+            return None
+
+    def conteo_dudosas(self):
+        """Solo conteos, para explicar una carga vacía: total del catálogo, por razón y por confianza baja."""
+        return {"catalogo": self.contar("catalogo_vacantes", {}),
+                "por_confirmar": self.contar("catalogo_vacantes", {"reason": self.RAZON_POR_CONFIRMAR}),
+                "confianza_baja": self.contar("catalogo_vacantes", {"datos->>confianza_pais": "eq.baja"})}
 
     def archivar_catalogo(self, vacante_id, razon):
         self.pedir("PATCH", "catalogo_vacantes", params={"id": "eq." + vacante_id},
@@ -172,7 +192,8 @@ class RepositorioSupabase:
                              "select": "vacante_id,estado,motivo,ubicacion,paises"}, 1000)
 
     def actualizar_regla(self, texto, cambios):
-        self.pedir("PATCH", "panel_reglas_ubicacion", params={"texto": "eq." + texto},
+        from urllib.parse import quote  # «%20» viaja intacto; un espacio como «+» podía no coincidir (13 nov)
+        self.pedir("PATCH", "panel_reglas_ubicacion?texto=eq." + quote(texto, safe=""),
                    headers={"Prefer": "return=minimal"},
                    json={**cambios, "actualizada_en": datetime.now(timezone.utc).isoformat()})
 
