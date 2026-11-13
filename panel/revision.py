@@ -234,7 +234,14 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, ava
             except Exception:  # noqa: BLE001 — una regla que no aplica no impide armar la cola
                 pass
     actuales = repo.revisiones(estado="pendiente")
+    diagnostico = {}
+    if completa and not leidas and hasattr(repo, "conteo_dudosas"):
+        try:  # una carga vacía se explica con conteos (sin datos de clientes)
+            diagnostico = repo.conteo_dudosas()
+        except Exception:  # noqa: BLE001
+            diagnostico = {}
     return {"por_confirmar": len(actuales), "resueltas_por_regla": por_regla, "agregadas": len(nuevas) - por_regla,
+            "diagnostico": diagnostico,
             "leidas_del_catalogo": leidas, "fuera_por_idioma": fuera_idioma, "ya_claras": ya_claras,
             "por_confirmar_faltantes": sum(1 for r in actuales if any(p.get("faltan") for p in r.get("perfiles") or []))}
 

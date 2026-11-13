@@ -288,3 +288,25 @@ def test_cada_vacante_se_evalua_una_vez_y_las_vencidas_van_en_lote(monkeypatch):
     revision.preparar_cola(r, cfg, hoy(), {p.id: 0 for p in cfg.perfiles}, completa=True)
     assert len(llamadas) == len(set(llamadas)) == 5  # candidatas y pendientes guardadas: una sola vez cada una
     assert not lotes  # nada que vencer: ninguna petición
+
+
+def test_consulta_de_dudosas_sin_espacios_y_conteos(monkeypatch):
+    from types import SimpleNamespace
+    from urllib.parse import urlencode
+    from panel.repositorio import RepositorioSupabase
+    monkeypatch.setattr("buscador.supabase.credenciales", lambda: ("https://prueba.supabase.co", "clave-ficticia"))
+    vistas = []
+
+    def request(metodo, url, **op):
+        vistas.append(op["params"])
+        return SimpleNamespace(status_code=200, content=b"[]", json=lambda: [])
+
+    def get(url, **op):
+        filtro = op["params"]
+        total = {"reason": "7", "datos->>confianza_pais": "9"}.get(next((k for k in filtro if k not in ("select", "limit")), ""), "8306")
+        return SimpleNamespace(status_code=206, headers={"Content-Range": "0-0/" + total})
+    repo = RepositorioSupabase(SimpleNamespace(request=request, get=get))
+    assert list(repo.candidatas_por_confirmar()) == []
+    consulta = urlencode(vistas[0])
+    assert " " not in vistas[0]["reason"] and "+" not in consulta.split("reason=")[1].split("&")[0]
+    assert repo.conteo_dudosas() == {"catalogo": 8306, "por_confirmar": 7, "confianza_baja": 9}
