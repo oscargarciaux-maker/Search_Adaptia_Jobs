@@ -165,3 +165,25 @@ export type Borrador = {
   enlace: string;
   pocas: boolean;
 };
+
+// Contrato v16: bandeja «Por confirmar».
+export type Revision = {
+  vacante_id: string;
+  titulo: string;
+  empresa: string;
+  ubicacion: string;
+  modalidad: string;
+  idioma: string;
+  publicada: string;
+  enlace: string;
+  pista: string;
+  sugerencia: string[];
+  clientes: string[];
+  ayuda_faltantes: boolean;
+  iguales: number;
+};
+export type Revisiones = {
+  pendientes: Revision[];
+  total: number;
+  ayudan_faltantes: number;
+};

@@ -140,6 +140,11 @@ def contenido(tipo, modo, salud, panel=None, enlace_ejecucion="", enlace_panel="
     if resumen.get("perfiles_bajo_minimo"):
         lineas.append(f"{resumen['perfiles_bajo_minimo']} perfil(es) de clientes quedaron con menos de 5 vacantes. "
                       "Revisa sus filtros con «Estimar con búsqueda en vivo».")
+    if resumen.get("por_confirmar"):
+        ayudan = resumen.get("por_confirmar_faltantes", 0)
+        lineas.append(f"{resumen['por_confirmar']} vacante(s) por confirmar en el panel"
+                      + (f" ({ayudan} ayudan a clientes con faltantes)" if ayudan else "")
+                      + ": revísalas en «Por confirmar», toma un par de minutos.")
     enlaces = [(t, u) for t, u in (("Ver en el panel", enlace_panel), ("Ver el registro de la ejecución", enlace_ejecucion)) if u]
     texto = "\n".join(lineas + [f"{t}: {u}" for t, u in enlaces])
     cuerpo = "".join(f"<p>{html.escape(l)}</p>" for l in lineas)

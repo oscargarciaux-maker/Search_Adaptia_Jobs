@@ -3069,3 +3069,73 @@ a.button {
   font-weight: 600;
   padding: 0 4px;
 }
+
+/* Contrato v16: bandeja «Por confirmar». */
+.revisiones {
+  display: grid;
+  gap: 14px;
+}
+.revision-ayuda {
+  margin: 0 0 2px;
+}
+.revision {
+  padding: 18px 20px;
+}
+.revision-acciones .text-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+}
+.revision:focus-visible {
+  outline: 3px solid #2f6b4f;
+  outline-offset: 2px;
+}
+.revision-lugar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 6px;
+  color: #3b4a43;
+  font-size: 14px;
+}
+.revision-pista {
+  margin: 6px 0 8px;
+  padding: 10px 12px;
+  border-left: 4px solid #c99a2e;
+  background: #fbf3e2;
+  color: #3d2f0c;
+  font-size: 14px;
+  border-radius: 6px;
+}
+.revision-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+.revision-pais {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: #3b4a43;
+}
+.revision-pais select {
+  min-height: 38px;
+  min-width: 170px;
+}
+.revision-pie {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 14px;
+}
+@media (max-width: 640px) {
+  .revision-acciones .button,
+  .revision-pais,
+  .revision-pais select {
+    width: 100%;
+  }
+}

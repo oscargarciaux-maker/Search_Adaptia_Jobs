@@ -232,3 +232,10 @@ class Contacto(Modelo):
 class CambioBorrador(Modelo):
     texto: str | None = Field(default=None, min_length=1, max_length=4000)
     estado: Literal["pendiente", "abierto", "enviado", "descartado"] | None = None
+
+
+class DecisionRevision(Modelo):
+    """Contrato v16: decisión del operador en la bandeja «Por confirmar»."""
+    decision: Literal["sirve", "otro_pais", "no_sirve", "saltar"]
+    paises: list[str] = Field(default_factory=list, max_length=21)
+    aplicar_a_iguales: bool = False

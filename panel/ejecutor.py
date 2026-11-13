@@ -262,6 +262,13 @@ def registrar(repo, version, fecha, reporte=None):
     for inicio in range(0, len(filas), 250):
         repo.pedir("POST", "panel_asignaciones", params={"on_conflict": "ejecucion_id,perfil_id,vacante_id"},
                     json=filas[inicio:inicio + 250], headers={"Prefer":"resolution=ignore-duplicates"})
+    por_confirmar = {}
+    if hasattr(repo, "candidatas_por_confirmar"):
+        try:  # contrato v16: bandeja «Por confirmar» (y lo que las reglas del operador ya resuelven solas)
+            from panel import revision
+            por_confirmar = revision.preparar_cola(repo, cfg, fecha, estrictas, filas)
+        except Exception:  # noqa: BLE001 — la bandeja es una ayuda; nunca impide registrar lo del día
+            por_confirmar = {}
     faltantes = {c.nombre: max(0, c.cupo - conteos.get(str(c.id), 0)) for c in cfg.cargos if c.activo}
     from buscador.validacion import errores_catalogo, errores
     confirmado = reporte is None or not (errores_catalogo(reporte) if reporte.get("modo") == "incremental" else errores(reporte))
@@ -270,7 +277,7 @@ def registrar(repo, version, fecha, reporte=None):
               "resumen": {"vacantes": sum(conteos.values()), "meta": 120, "faltantes": faltantes,
                           "asignaciones": len(filas),
                           "ampliadas": sum(any(isinstance(e, dict) and e.get("ampliacion") for e in f["explicacion"]) for f in filas),
-                          "reutilizadas": reutilizadas, "posts": posts,
+                          "reutilizadas": reutilizadas, "posts": posts, **por_confirmar,
                           "perfiles_bajo_minimo": sum(1 for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id))
                                                       if estrictas.get(p.id, 0) < MINIMO_POR_PERFIL),
                           **({"embudo": embudo} if (embudo := _embudo_por_nombre(reporte) or
