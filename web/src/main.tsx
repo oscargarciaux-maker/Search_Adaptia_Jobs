@@ -808,15 +808,28 @@ function PorConfirmar({
         por_confirmar: number;
         agregadas?: number;
         resueltas_por_regla?: number;
+        leidas_del_catalogo?: number;
+        fuera_por_idioma?: number;
       }>("/revisiones/cargar", { method: "POST" });
-      notify(
-        `Bandeja lista: ${r.por_confirmar} por confirmar` +
-          (r.agregadas ? ` (${r.agregadas} nuevas)` : "") +
-          (r.resueltas_por_regla
-            ? `, ${r.resueltas_por_regla} resueltas solas por reglas`
-            : "") +
-          ".",
-      );
+      if (!r.por_confirmar) {
+        notify(
+          `No hay dudosas para revisar: el catálogo tiene ${r.leidas_del_catalogo ?? 0} vacantes con país por confirmar` +
+            (r.fuera_por_idioma
+              ? ` y ${r.fuera_por_idioma} quedan fuera por idioma`
+              : "") +
+            ".",
+          true,
+        );
+      } else {
+        notify(
+          `Bandeja lista: ${r.por_confirmar} por confirmar` +
+            (r.agregadas ? ` (${r.agregadas} nuevas)` : "") +
+            (r.resueltas_por_regla
+              ? `, ${r.resueltas_por_regla} resueltas solas por reglas`
+              : "") +
+            ".",
+        );
+      }
       await cargar();
     } catch (e) {
       notify((e as Error).message, true);
