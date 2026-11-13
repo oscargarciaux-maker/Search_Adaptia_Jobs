@@ -36,9 +36,16 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   ).toBeVisible();
   await expect(page.getByText("Mi espacio de trabajo")).toHaveCount(0);
   await expect(page.getByText("Menos ruido.")).toHaveCount(0);
-  await expect(
-    page.getByText(/guarda tus cambios y los aplica desde la búsqueda/),
-  ).toBeVisible();
+  // Sección 6: la explicación de Guardar / Programar va en una ayuda (ⓘ), no en una franja.
+  const explicacion = page.getByText(/los guarda y los usa desde la búsqueda/);
+  await expect(explicacion).toBeHidden();
+  const ayuda = page.getByRole("button", {
+    name: "Más información: Guardar y programar",
+  });
+  await ayuda.focus();
+  await expect(explicacion).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(explicacion).toBeHidden();
   await ir(page, "Clientes");
   await page
     .getByRole("button", { name: "Nuevo cliente", exact: true })
@@ -57,11 +64,14 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await dialog
     .getByLabel("País de residencia del perfil 1")
     .selectOption({ label: "México" });
-  await expect(
-    dialog.getByText(/Remoto incluye vacantes de LATAM/),
-  ).toBeVisible();
   await expect(dialog.getByText("Seleccionar LATAM y España")).toHaveCount(0);
   await dialog.getByLabel("Presencial en el perfil 1").check();
+  // La explicación de las modalidades está en su ayuda, no a la vista.
+  await expect(dialog.getByText(/solo con oficina en su país/)).toBeHidden();
+  await dialog
+    .getByRole("button", { name: "Más información: modalidades" })
+    .hover();
+  await expect(dialog.getByText(/solo con oficina en su país/)).toBeVisible();
   await expect(dialog.getByText("También se mudaría a…")).toBeVisible();
   // Estimación en vivo: en demostración usa avisos ficticios y no sale a internet.
   await expect(dialog.getByText(/No gasta Apify/)).toBeVisible();
@@ -104,6 +114,9 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await page
     .getByRole("button", { name: "Archivar Prueba operadora", exact: true })
     .click();
+  await expect(
+    dialog.getByText(/Las vacantes que ya recibió se conservan/),
+  ).toBeVisible();
   await dialog.getByRole("button", { name: "Archivar", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Prueba operadora" }),
