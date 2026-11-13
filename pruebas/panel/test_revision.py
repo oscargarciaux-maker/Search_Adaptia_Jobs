@@ -8,7 +8,7 @@ from panel.ejecutor import validar_version
 from panel.repositorio import RepositorioDemo, configuracion_demo, hoy
 
 TEXTO = ("We are looking for a Product Designer to join our team. We require 2 years of experience. English B2 "
-         "required. You must be based in Colombia or Mexico to apply. We build digital products. ") * 3
+         "required. Preferably based in Colombia or Mexico. We build digital products. ") * 3
 
 
 def _fila(n, ubicacion, titulo="Product Designer", texto=TEXTO):
@@ -221,3 +221,22 @@ def test_pendiente_que_el_sistema_ya_resolvio_sale_sola_de_la_bandeja():
     estados = {x["vacante_id"]: (x["estado"], x["motivo"]) for x in super(Repo, r).revisiones()}
     assert estados[resuelta] == ("vencida", revision.RESUELTA_SOLA)
     assert estados[filas[1]["id"]][0] == "pendiente"
+
+
+def test_vacante_vieja_sin_ver_o_ya_resuelta_no_se_pregunta():
+    from datetime import date, timedelta
+    hoy_ = hoy()
+    base = {"titulo": "Product Designer", "ubicacion": "Remote Remoto", "modalidad": "remoto",
+            "_descripcion": "Preferably based in Colombia or Mexico."}
+    assert revision._sin_revisar(dict(base, visto_ultima_vez=hoy_), hoy_) == ""
+    viejo = (date.fromisoformat(hoy_) - timedelta(days=10)).isoformat()
+    assert revision._sin_revisar(dict(base, visto_ultima_vez=viejo), hoy_) == revision.POSIBLE_CIERRE
+    assert revision._sin_revisar(dict(base, ubicacion="Inca"), hoy_) == revision.RESUELTA_SOLA
+    assert revision._sin_revisar(dict(base, ubicacion="Harrisburg, PA"), hoy_) == revision.RESUELTA_SOLA
+
+
+def test_regiones_que_elige_el_operador():
+    assert len(revision.expandir(["LATAM"])) == 19 and revision.expandir(["LATAM_ES"])[-1] == "ES"
+    sud_centro = revision.expandir(["SUD_CENTRO_MX"])
+    assert {"AR", "CR", "MX"} <= set(sud_centro) and "BR" not in sud_centro and "ES" not in sud_centro
+    assert set(revision.leer_paises("Sudamérica, Centroamérica o México")) == set(sud_centro)

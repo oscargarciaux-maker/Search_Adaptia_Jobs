@@ -384,11 +384,11 @@ class RepositorioDemo:
             perfil = lambda i, faltan: {"perfil_id": cfg["perfiles"][i]["id"], "cliente_id": cfg["perfiles"][i]["cliente_id"],  # noqa: E731
                                         "cargo_id": cfg["perfiles"][i]["cargo_id"], "faltan": faltan}
             fecha = hoy()
-            casos = [("QA Engineer", "Lumen", "Remote Remoto", "You must be based in Colombia or Mexico to apply.",
+            casos = [("QA Engineer", "Lumen", "Remote Remoto", "Preferably based in Colombia or Mexico.",
                       ["CO", "MX"], [perfil(4, True)], 160),
                      ("Product Designer", "Orbita", "Granada", "Trabajarás en nuestra oficina de Granada, España, dos "
                       "días por semana.", ["ES"], [perfil(1, False)], 40),
-                     ("Product Designer", "Forma", "Remote Remoto", "Open to candidates in Latin America.", [],
+                     ("Product Designer", "Forma", "Remote Remoto", "Preferably located in Latin America.", [],
                       [perfil(0, True), perfil(2, True)], 230)]
             filas = []
             for n, (titulo, empresa, lugar, frase, sugerida, perfiles, prioridad) in enumerate(casos):

@@ -18,6 +18,7 @@ from buscador import normalizar
 
 RUTA = Path(__file__).resolve().parent.parent / "datos" / "paises.yaml"
 RUTA_MUNDO = RUTA.parent / "paises_mundo.yaml"
+RUTA_LUGARES = RUTA.parent / "lugares_mundo.json.gz"  # contrato v19: GeoNames (CC BY 4.0), generado
 
 _REMOTO = re.compile(r"\b(remote|remoto|remota|remotely|teletrabajo|home ?office|work from home|wfh|trabajo a distancia|"
                      r"100% remoto|distributed|fully distributed|anywhere|desde casa|trabajo desde casa|remote work)\b")
@@ -280,6 +281,44 @@ _CODIGO_FINAL = re.compile(r"(?:,|\s[-–]|^)\s*([A-Za-z]{2}|[A-Z]{3})\s*$")
 _SOLO_CODIGOS = re.compile(r"^\s*([A-Za-z]{2}|[A-Z]{3})(?:\s+\1)*\s*$")
 
 
+@lru_cache(maxsize=1)
+def _lugares_mundo():
+    import gzip
+    import json
+    try:
+        with gzip.open(RUTA_LUGARES, "rt", encoding="utf-8") as f:
+            crudo = json.load(f)
+    except (OSError, ValueError):
+        return {}, frozenset()
+    return crudo.get("cubiertos", {}), frozenset(crudo.get("extranjeros", []))
+
+
+_GENERICAS_LUGAR = {"", "na", "n a", "job", "location", "locations", "multiple locations", "various locations",
+                    "varias ubicaciones", "anywhere", "global", "worldwide", "open to", "open"}
+
+
+def lugar_conocido(ubicacion):
+    """Contrato v19, último recurso: el país de un municipio o ciudad de GeoNames que la ubicación nombra por sí sola
+    («Inca» → ES, «Harrisburg, PA» → extranjero). Devuelve un código cubierto, "fuera" o None. Solo la ubicación (nunca
+    la descripción), por tramos separados por comas; un tramo ambiguo no cuenta y tramos contradictorios no deciden."""
+    cubiertos, extranjeros = _lugares_mundo()
+    if not cubiertos and not extranjeros:
+        return None
+    resultados = set()
+    for tramo in re.split(r"[,;|/()]| - | – ", ubicacion or ""):
+        t = normalizar.texto(_REMOTO.sub(" ", _HIBRIDO.sub(" ", _PRESENCIAL.sub(" ", normalizar.texto(tramo)))))
+        t = re.sub(r"^(?:area metropolitana de |region metropolitana de |greater )", "", t)
+        t = re.sub(r" (?:y alrededores|and surrounding areas|metropolitan area|area)$", "", t)
+        for candidato in (t, re.sub(r" [a-z]{2}$", "", t)):  # «harrisburg pa» → «harrisburg»
+            if candidato in cubiertos:
+                resultados.add(cubiertos[candidato])
+                break
+            if candidato in extranjeros:
+                resultados.add("fuera")
+                break
+    return next(iter(resultados)) if len(resultados) == 1 else None
+
+
 def _sin_repeticion(texto):
     """«Buenos Aires Buenos Aires» → «Buenos Aires»: algunas fuentes repiten la ubicación pegada."""
     anterior = None
@@ -428,6 +467,20 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
     for frase in d["propios_con_fuera"]:
         ambito_sin_propios = re.sub(r"(?<![a-z0-9])" + re.escape(frase) + r"(?![a-z0-9])", " ", ambito_sin_propios)
     fuera = _nombra(ambito_sin_propios, d["fuera_lugares"])
+    if not nombrados and not fuera and not es_latam and not es_mundo and not es_europa:
+        por_lugar = lugar_conocido(ubicacion)  # contrato v19: municipios y ciudades del mundo, solo si nada más decidió
+        if por_lugar == "fuera":
+            fuera = True
+        elif por_lugar:
+            ciudades = nombrados = [por_lugar]
+    if not nombrados and not fuera and not es_latam and not es_mundo and not es_europa and \
+            ciudad_sola in _GENERICAS_LUGAR:
+        # Ubicación sin lugar («Remote job», «N/A»): la región del título vale («Latam | Code Tutor», «CSM - EMEA»).
+        titulo_n = normalizar.texto(titulo)
+        es_latam = _nombra(titulo_n, d["toda_latam"])
+        es_europa = _nombra(titulo_n, d["toda_europa"])
+        if es_latam or es_europa:
+            ambito = f"{ambito} {titulo_n}"
     def subregion(texto):
         # Contrato v18: todas las subregiones nombradas («Sudamérica, Centroamérica o México»), no solo la primera.
         hallados = [c for r in d["subregiones"] if _nombra(texto, r["nombres"]) for c in r["paises"]]
@@ -478,6 +531,13 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
                 return r([], "alta", "fuera de LATAM y España")
         return r(todos, "baja", "restricción de residencia sin confirmar")
     if mod != "remoto":
+        explicita = _PRESENCIAL.search(f"{lugar} {desc}") or _HIBRIDO.search(f"{lugar} {desc}")
+        if not nombrados and not fuera and not explicita:
+            # Contrato v19: «Latin America» o «Sudamérica» como ubicación, sin decir presencial ni híbrida, es una
+            # región. Una presencial o híbrida sigue exigiendo un lugar concreto (contrato v8).
+            region = subregion(ambito)
+            if region or es_latam:
+                return r(region or latam, "alta", "región como ubicación")
         if nombrados and not (fuera and not nombres_pais):
             permitidos = set(nombrados).intersection(*(set(valor) for valor in limites))
             return r([c for c in nombrados if c in permitidos], "alta", "" if permitidos else "fuera de LATAM y España")
