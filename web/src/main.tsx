@@ -119,7 +119,7 @@ function vacioVacantes(estado: EstadoConfig | null, r: Resultados | null) {
       texto:
         "La primera búsqueda con tu configuración será el " +
         fecha(desde) +
-        " a la 1:17 a. m. (hora Colombia). Después aparecerán aquí sus vacantes.",
+        " a las 6:30 a. m. (hora Colombia). Después aparecerán aquí sus vacantes.",
     };
   return {
     title: "La búsqueda no encontró vacantes para este cliente",
@@ -2837,7 +2837,7 @@ function App() {
                   <strong>Guardar borrador</strong> conserva tus cambios sin
                   tocar la próxima búsqueda.{" "}
                   <strong>Programar para mañana</strong> los guarda y los usa
-                  desde la búsqueda de la 1:17 a. m. (hora Colombia).
+                  desde la búsqueda de las 6:30 a. m. (hora Colombia).
                   «Programado desde el …» es el día desde el que las búsquedas
                   usan esta configuración; las que ya empezaron siguen con la
                   anterior.
@@ -3253,8 +3253,13 @@ function App() {
                     onClick={cargarResultados}
                   >
                     <RefreshCw size={15} />
-                    Actualizar estado
+                    Recargar lista
                   </button>
+                  <Ayuda etiqueta="Recargar lista">
+                    Vuelve a leer las vacantes de este día desde la base. No
+                    busca vacantes nuevas ni vuelve a comprobar los enlaces: eso
+                    lo hacen las búsquedas programadas.
+                  </Ayuda>
                 </div>
               </div>
               {results?.ejecucion && (
@@ -3456,8 +3461,8 @@ function App() {
           </div>
           <p className="helper note">
             Al confirmar se guardan tus cambios y esta configuración se usa
-            desde la búsqueda del <strong>{fecha(manana())}</strong> a la 1:17
-            a. m. (hora Colombia). La de esta noche, si ya empezó, conserva la
+            desde la búsqueda del <strong>{fecha(manana())}</strong> a las 6:30
+            a. m. (hora Colombia). La de hoy, si ya empezó, conserva la
             anterior.
             {!estado?.publicada &&
               " Es tu primera configuración: desde entonces dejan de buscarse los seis cargos fijos anteriores; solo se buscarán los cargos de esta lista."}{" "}
@@ -3850,6 +3855,13 @@ function VacancyCard({ v }: { v: Vacante }) {
               : v.tipo === "post"
                 ? "Post leído en las últimas 24 h"
                 : "Enlace con comprobación vigente"}
+          {v.estado === "lista" && v.tipo !== "post" && (
+            <Ayuda etiqueta="comprobación del enlace">
+              El enlace se abrió hace menos de 6 horas y la vacante seguía
+              publicada. Es la comprobación más reciente, no una garantía: la
+              empresa puede cerrarla después sin avisar.
+            </Ayuda>
+          )}
         </span>
         {v.enlace && (
           <a
