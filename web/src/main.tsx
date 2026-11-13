@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   ArrowDownToLine,
+  Upload,
   ArrowLeft,
   ArrowRight,
   ArrowUpRight,
@@ -64,6 +65,7 @@ import type {
   VistaPrevia,
   Revision,
   Revisiones,
+  Regla,
 } from "./types";
 import "./style.css";
 
@@ -770,6 +772,58 @@ function PorConfirmar({
       setOcupado("");
     }
   }
+  async function subir(archivo: File) {
+    setOcupado("csv");
+    try {
+      const contenido = await archivo.text();
+      const r = await api<{
+        aplicadas: number;
+        omitidas: number;
+        errores: { fila: number; motivo: string }[];
+      }>("/revisiones/csv", {
+        method: "POST",
+        body: JSON.stringify({ contenido }),
+      });
+      notify(
+        `Revisión aplicada: ${r.aplicadas} decididas, ${r.omitidas} sin llenar` +
+          (r.errores.length
+            ? `. Revisar fila ${r.errores
+                .slice(0, 3)
+                .map((e) => e.fila)
+                .join(", ")}: ${r.errores[0].motivo}`
+            : "."),
+        r.errores.length > 0,
+      );
+      await cargar();
+    } catch (e) {
+      notify((e as Error).message, true);
+    } finally {
+      setOcupado("");
+    }
+  }
+  const masiva = (
+    <div className="revision-masiva">
+      <a className="button secondary" href="/api/revisiones.csv" download>
+        <ArrowDownToLine size={15} />
+        Descargar todas (CSV)
+      </a>
+      <label className="button secondary">
+        <Upload size={15} />
+        Subir revisión
+        <input
+          type="file"
+          accept=".csv,text/csv"
+          className="visually-hidden"
+          disabled={ocupado === "csv"}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) subir(f);
+            e.target.value = "";
+          }}
+        />
+      </label>
+    </div>
+  );
   if (!datos) return <div className="card loading-card">Cargando…</div>;
   if (!datos.pendientes.length)
     return (
@@ -781,8 +835,11 @@ function PorConfirmar({
     );
   return (
     <section className="revisiones">
+      {masiva}
       <p className="helper revision-ayuda">
-        {datos.total} por confirmar
+        {datos.en_espera && datos.en_espera > datos.total
+          ? `Mostrando las ${datos.total} más útiles de ${datos.en_espera}. Para revisar muchas de una vez, descarga el CSV, llena «decision» y «pais», y súbelo.`
+          : `${datos.total} por confirmar`}
         {datos.ayudan_faltantes
           ? ` · ${datos.ayudan_faltantes} ayudan a clientes con menos de 5 vacantes`
           : ""}
@@ -1112,6 +1169,84 @@ const tiposAlerta: [string, string][] = [
   ["pocas_vacantes", "Pocas vacantes"],
   ["fallo", "Fallos"],
 ];
+
+// Contrato v17: reglas de ubicación. Las «aprendidas» las crea el código solo a partir de tus decisiones.
+function ReglasAprendidas({
+  notify,
+}: {
+  notify: (s: string, error?: boolean) => void;
+}) {
+  const [reglas, setReglas] = useState<Regla[] | null>(null);
+  async function cargar() {
+    try {
+      setReglas((await api<{ reglas: Regla[] }>("/reglas")).reglas);
+    } catch (e) {
+      notify((e as Error).message, true);
+      setReglas([]);
+    }
+  }
+  useEffect(() => {
+    cargar();
+  }, []);
+  async function cambiar(r: Regla) {
+    try {
+      await api("/reglas/estado", {
+        method: "POST",
+        body: JSON.stringify({ texto: r.texto, activa: !r.activa }),
+      });
+      notify(r.activa ? "Regla desactivada." : "Regla activada.");
+      await cargar();
+    } catch (e) {
+      notify((e as Error).message, true);
+    }
+  }
+  return (
+    <section className="card activity reglas">
+      <div className="section-title">
+        <h2>Reglas de ubicación</h2>
+      </div>
+      <p className="helper">
+        Las del operador salen de «Aplicar a las iguales». Las aprendidas las
+        crea el sistema solo, sin IA, cuando dos o más de tus decisiones
+        coinciden en un lugar; si una decisión nueva las contradice, se
+        desactivan solas. Solo resuelven ubicaciones dudosas: nunca cambian un
+        país ya reconocido.
+      </p>
+      {!reglas ? (
+        <p className="helper">Cargando…</p>
+      ) : !reglas.length ? (
+        <p className="helper">
+          Todavía no hay reglas. Aparecerán cuando confirmes vacantes en «Por
+          confirmar».
+        </p>
+      ) : (
+        <ul className="reglas-lista">
+          {reglas.map((r) => (
+            <li key={r.texto} className={r.activa ? "" : "inactiva"}>
+              <div>
+                <strong>«{r.texto}»</strong> → {r.resultado}
+                <span className="helper">
+                  {" "}
+                  · {r.origen === "aprendida" ? "aprendida" : "del operador"} ·
+                  usada {r.usos} {r.usos === 1 ? "vez" : "veces"}
+                  {r.conflictos ? ` · ${r.conflictos} en conflicto` : ""}
+                  {r.activa ? "" : " · desactivada"}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => cambiar(r)}
+              >
+                {r.activa ? "Desactivar" : "Activar"}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
 
 function AvisosCorreo({
   notify,
@@ -2822,6 +2957,7 @@ function App() {
             <Mensajes clientes={draft.clientes} notify={notify} />
           )}
           {tab === "Actividad" && <AvisosCorreo notify={notify} />}
+          {tab === "Actividad" && <ReglasAprendidas notify={notify} />}
           {tab === "Actividad" && (
             <section className="card activity">
               <div className="section-title">

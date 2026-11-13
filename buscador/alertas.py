@@ -140,6 +140,14 @@ def contenido(tipo, modo, salud, panel=None, enlace_ejecucion="", enlace_panel="
     if resumen.get("perfiles_bajo_minimo"):
         lineas.append(f"{resumen['perfiles_bajo_minimo']} perfil(es) de clientes quedaron con menos de 5 vacantes. "
                       "Revisa sus filtros con «Estimar con búsqueda en vivo».")
+    reglas = resumen.get("reglas") or {}
+    if reglas.get("ubicaciones_resueltas_por_reglas") or reglas.get("aprendidas_nuevas") or reglas.get("desactivadas_por_conflicto"):
+        partes = [f"{reglas.get('ubicaciones_resueltas_por_reglas', 0)} ubicaciones resueltas solas con reglas"]
+        if reglas.get("aprendidas_nuevas"):
+            partes.append(f"{reglas['aprendidas_nuevas']} reglas nuevas aprendidas de tus decisiones")
+        if reglas.get("desactivadas_por_conflicto"):
+            partes.append(f"{reglas['desactivadas_por_conflicto']} desactivadas por contradecirse (revísalas en Actividad)")
+        lineas.append("Aprendizaje: " + "; ".join(partes) + ".")
     if resumen.get("por_confirmar"):
         ayudan = resumen.get("por_confirmar_faltantes", 0)
         lineas.append(f"{resumen['por_confirmar']} vacante(s) por confirmar en el panel"

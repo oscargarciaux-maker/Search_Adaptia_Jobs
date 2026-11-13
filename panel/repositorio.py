@@ -149,6 +149,16 @@ class RepositorioSupabase:
                    headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
                    json={**fila, "actualizada_en": datetime.now(timezone.utc).isoformat()})
 
+    # Contrato v17: decisiones para aprender y cambios de reglas.
+    def decisiones_ubicacion(self):
+        return self._paginas("panel_revisiones", "vacante_id", {"estado": "in.(confirmada,descartada)",
+                             "select": "vacante_id,estado,motivo,ubicacion,paises"}, 1000)
+
+    def actualizar_regla(self, texto, cambios):
+        self.pedir("PATCH", "panel_reglas_ubicacion", params={"texto": "eq." + texto},
+                   headers={"Prefer": "return=minimal"},
+                   json={**cambios, "actualizada_en": datetime.now(timezone.utc).isoformat()})
+
     def ejecucion(self, fecha):
         filas = self.pedir("GET", "panel_ejecuciones", params={"fecha": "eq." + fecha, "limit": 1})
         return filas[0] if filas else None
@@ -419,6 +429,18 @@ class RepositorioDemo:
         with self.lock:
             self.estado.setdefault("reglas", {})[fila["texto"]] = deepcopy(fila)
             self._guardar()
+
+    def decisiones_ubicacion(self):
+        with self.lock:
+            return deepcopy([{k: r.get(k) for k in ("vacante_id", "estado", "motivo", "ubicacion", "paises")}
+                             for r in self._revisiones() if r["estado"] in ("confirmada", "descartada")])
+
+    def actualizar_regla(self, texto, cambios):
+        with self.lock:
+            regla = self.estado.setdefault("reglas", {}).get(texto)
+            if regla:
+                regla.update(deepcopy(cambios))
+                self._guardar()
 
     def operativa(self, fecha):
         return {"revision": 1, "configuracion": configuracion_demo()}

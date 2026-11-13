@@ -185,5 +185,16 @@ export type Revision = {
 export type Revisiones = {
   pendientes: Revision[];
   total: number;
+  en_espera?: number;
   ayudan_faltantes: number;
+};
+// Contrato v17: reglas de ubicación (del operador o aprendidas por código).
+export type Regla = {
+  texto: string;
+  origen: string;
+  activa: boolean;
+  usos: number;
+  conflictos: number;
+  resultado: string;
+  ejemplos: string[];
 };

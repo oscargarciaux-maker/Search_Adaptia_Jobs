@@ -16,7 +16,8 @@ from buscador import entrega, normalizar, paises, vacante
 from panel.afinidad import MINIMO_POR_PERFIL, evaluar
 from panel.terminos import grado
 
-TOPE = 10
+TOPE = 10  # las que se muestran a la vez en el panel
+GUARDADAS = 300  # las que se guardan (para el CSV de revisión grande, contrato v17)
 DIAS_PENDIENTE = 7
 MOTIVO = "ubicación por confirmar"
 # Lo único que una confirmación de país puede resolver; cualquier otro motivo deja fuera la vacante para ese perfil.
@@ -31,7 +32,7 @@ _PISTA = re.compile(r"\b(based|located|reside|residing|resident|residents|living
 
 
 def clave_ubicacion(texto):
-    return paises._sin_repeticion(normalizar.texto(texto or ""))[:300]
+    return paises.clave(texto)
 
 
 def es_generica(texto):
@@ -116,9 +117,8 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=()):
         if r.get("estado") == "pendiente" and (vid not in ids or ahora - datetime.fromisoformat(creada) > timedelta(days=DIAS_PENDIENTE)):
             repo.actualizar_revision(vid, {"estado": "vencida"})
     pendientes = sum(1 for vid, r in existentes.items() if r.get("estado") == "pendiente" and vid in ids)
-    tope = int((repo.ajuste("revision", {}) or {}).get("tope", TOPE))
     for c in sorted(candidatos, key=lambda x: -x["prioridad"]):
-        if pendientes >= tope:
+        if pendientes >= GUARDADAS:
             break
         if c["vacante_id"] in existentes or any(n["vacante_id"] == c["vacante_id"] for n in nuevas):
             continue
@@ -152,11 +152,13 @@ def _edad(datos, fecha):
 def listar(repo, fecha):
     """Lo que ve el panel: pendientes ordenadas, con nombres de clientes (panel privado) y cuántas tienen la misma
     ubicación (para «aplicar a las iguales»)."""
-    pendientes = sorted(repo.revisiones(estado="pendiente"), key=lambda r: -r.get("prioridad", 0))
+    todas = sorted(repo.revisiones(estado="pendiente"), key=lambda r: -r.get("prioridad", 0))
+    tope = int((repo.ajuste("revision", {}) or {}).get("tope", TOPE))
+    pendientes = todas[:tope]
     version = repo.operativa(fecha) or {}
     clientes = {c["id"]: c["nombre"] for c in (version.get("configuracion") or {}).get("clientes", [])}
     por_ubicacion = {}
-    for r in pendientes:
+    for r in todas:
         if not es_generica(r.get("ubicacion")):
             por_ubicacion[r["ubicacion"]] = por_ubicacion.get(r["ubicacion"], 0) + 1
     salida = []
@@ -169,7 +171,8 @@ def listar(repo, fecha):
                        "clientes": sorted({clientes.get(p["cliente_id"], "") for p in r.get("perfiles") or []} - {""}),
                        "ayuda_faltantes": any(p.get("faltan") for p in r.get("perfiles") or []),
                        "iguales": max(0, por_ubicacion.get(r.get("ubicacion"), 0) - 1)})
-    return {"pendientes": salida, "total": len(salida), "ayudan_faltantes": sum(1 for s in salida if s["ayuda_faltantes"])}
+    return {"pendientes": salida, "total": len(salida), "en_espera": len(todas),
+            "ayudan_faltantes": sum(1 for s in salida if s["ayuda_faltantes"])}
 
 
 def decidir(repo, vacante_id, decision, codigos=(), aplicar_a_iguales=False, fecha=None, por="operador", comprobar=None):
@@ -194,6 +197,9 @@ def decidir(repo, vacante_id, decision, codigos=(), aplicar_a_iguales=False, fec
         cambios = {"estado": "saltada"}
     else:
         cambios = {"estado": "descartada", "paises": []}
+    if decision != "saltar":  # contrato v17: quién decidió y qué; el aprendizaje solo usa decisiones de lugar del operador
+        from panel.aprender import ETIQUETAS
+        cambios["motivo"] = ETIQUETAS[decision] if por == "operador" else "decidida por regla"
     repo.actualizar_revision(vacante_id, {**cambios, "decidida_en": datetime.now(timezone.utc).isoformat()})
     iguales, regla = 0, False
     if aplicar_a_iguales and decision in ("sirve", "otro_pais") and not es_generica(rev.get("ubicacion")):
@@ -269,3 +275,74 @@ def aplicar_confirmacion(actual, explicacion):
             return con_paises(actual, e["confirmada"].get("paises") or [], e["confirmada"].get("por", "operador"))
     return actual
 
+
+
+# ── Contrato v17: revisión masiva por CSV (sin IA) y lista de reglas ───────────────────────────────────────────────
+COLUMNAS_CSV = ["vacante_id", "cargo", "empresa", "ubicacion", "pista", "le_serviria_a", "pais_sugerido", "decision",
+                "pais", "aplicar_a_iguales", "comentario"]
+_DECISIONES_CSV = {"sirve": "sirve", "si": "sirve", "si sirve": "sirve", "otro pais": "otro_pais",
+                   "otro_pais": "otro_pais", "solo otro pais": "otro_pais", "no sirve": "no_sirve", "no_sirve": "no_sirve",
+                   "no": "no_sirve", "saltar": "saltar"}
+_SI = {"si", "x", "true", "1", "yes"}
+
+
+def exportar_csv(repo, fecha):
+    """Todas las pendientes (no solo las 10 de la vista) con columnas para llenar."""
+    import csv
+    import io
+    version = repo.operativa(fecha) or {}
+    clientes = {c["id"]: c["nombre"] for c in (version.get("configuracion") or {}).get("clientes", [])}
+    salida = io.StringIO()
+    escritor = csv.writer(salida)
+    escritor.writerow(COLUMNAS_CSV)
+    for r in sorted(repo.revisiones(estado="pendiente"), key=lambda x: -x.get("prioridad", 0)):
+        datos = _datos(r.get("catalogo_vacantes"))
+        nombres = sorted({clientes.get(p["cliente_id"], "") for p in r.get("perfiles") or []} - {""})
+        escritor.writerow([r["vacante_id"], datos.get("titulo", ""), datos.get("empresa", ""), datos.get("ubicacion", ""),
+                           r.get("pista", ""), ", ".join(nombres), " ".join(r.get("sugerencia") or []), "", "", "", ""])
+    return "﻿" + salida.getvalue()  # BOM: Excel lo abre con tildes correctas
+
+
+def importar_csv(repo, contenido, fecha=None, comprobar=None):
+    """Aplica cada fila llenada como un clic en la bandeja. Devuelve aplicadas, omitidas y errores por fila."""
+    import csv
+    import io
+    texto = (contenido or "").lstrip("﻿")
+    try:
+        dialecto = csv.Sniffer().sniff(texto[:4000], delimiters=",;\t")
+    except csv.Error:
+        dialecto = csv.excel
+    filas = list(csv.DictReader(io.StringIO(texto), dialect=dialecto))[:500]
+    nombres = {normalizar.texto(p["nombre"]): p["codigo"] for p in paises.datos()["cubiertos"]}
+    resultado = {"aplicadas": 0, "omitidas": 0, "errores": []}
+    for n, fila in enumerate(filas, start=2):
+        decision = _DECISIONES_CSV.get(normalizar.texto(fila.get("decision") or ""))
+        if not decision:
+            if (fila.get("decision") or "").strip():
+                resultado["errores"].append({"fila": n, "motivo": "Decisión no reconocida: usa sirve, otro país, no sirve o saltar."})
+            else:
+                resultado["omitidas"] += 1
+            continue
+        crudos = [x.strip() for x in re.split(r"[,/;]| y ", fila.get("pais") or "") if x.strip()]
+        codigos = [x.upper() if len(x) == 2 else nombres.get(normalizar.texto(x), "?") for x in crudos]
+        if decision == "sirve" and not codigos:
+            codigos = (fila.get("pais_sugerido") or "").split()
+        try:
+            decidir(repo, (fila.get("vacante_id") or "").strip(), decision, codigos,
+                    normalizar.texto(fila.get("aplicar_a_iguales") or "") in _SI, fecha, "operador", comprobar)
+            resultado["aplicadas"] += 1
+        except Exception as e:  # noqa: BLE001 — se informa la fila y se sigue con las demás
+            resultado["errores"].append({"fila": n, "motivo": getattr(e, "mensaje", None) or str(e)[:200]})
+    return resultado
+
+
+def listar_reglas(repo):
+    nombres = {p["codigo"]: p["nombre"] for p in paises.datos()["paises"]}
+    salida = []
+    for r in repo.reglas():
+        res = r.get("resultado") or {}
+        salida.append({"texto": r["texto"], "origen": r.get("origen", ""), "activa": r.get("activa", True),
+                       "usos": int(r.get("usos") or 0), "conflictos": int(r.get("conflictos") or 0),
+                       "resultado": ", ".join(nombres.get(c, c) for c in res.get("paises", [])) or "Solo otro país",
+                       "ejemplos": (r.get("ejemplos") or [])[:3]})
+    return {"reglas": sorted(salida, key=lambda x: (not x["activa"], x["origen"] != "aprendida", -x["usos"], x["texto"]))}

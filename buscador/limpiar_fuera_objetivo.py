@@ -198,7 +198,25 @@ def aplicar(conn, filas, numeros):
     return {"ofertas_borradas": borradas, "catalogo_archivado": archivadas}
 
 
+def _cargar_reglas(conn):
+    """Contrato v17: las reglas de ubicación del operador y aprendidas también cuentan al revisar `ofertas`."""
+    try:
+        with conn.transaction(), conn.cursor() as cur:
+            cur.execute("select texto, resultado, origen, activa from public.panel_reglas_ubicacion")
+            paises.cargar_reglas([{"texto": t, "resultado": r, "origen": o, "activa": a} for t, r, o, a in cur])
+    except Exception:  # noqa: BLE001 — sin la tabla (instalaciones anteriores a SQL 014) se revisa sin reglas
+        paises.cargar_reglas()
+
+
 def correr(conn, carpeta="revision", aplicar_cambios=False, huella_revisada="", conservar="", borrar_tambien=""):
+    _cargar_reglas(conn)
+    try:
+        return _correr(conn, carpeta, aplicar_cambios, huella_revisada, conservar, borrar_tambien)
+    finally:
+        paises.cargar_reglas()
+
+
+def _correr(conn, carpeta, aplicar_cambios, huella_revisada, conservar, borrar_tambien):
     catalogo, ofertas = leer(conn)
     filas = planificar(catalogo, ofertas)
     datos_resumen = resumen(filas, len(ofertas))

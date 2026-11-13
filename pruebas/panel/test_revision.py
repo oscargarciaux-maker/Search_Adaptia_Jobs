@@ -54,8 +54,10 @@ def test_cola_prioriza_faltantes_respeta_tope_y_filtros():
     estrictas[cfg.perfiles[0].id] = 1  # el perfil 0 tiene faltantes
     resumen = revision.preparar_cola(r, cfg, hoy(), estrictas)
     pendientes = r.revisiones(estado="pendiente")
-    assert resumen["por_confirmar"] == len(pendientes) == revision.TOPE  # tope de 10
-    assert resumen["por_confirmar_faltantes"] == revision.TOPE
+    assert resumen["por_confirmar"] == len(pendientes) == 14  # se guardan todas (para el CSV)
+    vista = revision.listar(r, hoy())
+    assert vista["total"] == revision.TOPE and vista["en_espera"] == 14  # el panel muestra solo las 10 más útiles
+    assert resumen["por_confirmar_faltantes"] == 14
     assert all(p["perfiles"] and any(x["faltan"] for x in p["perfiles"]) for p in pendientes)
     assert candidatas[-1]["id"] not in {p["vacante_id"] for p in pendientes}
     assert "Colombia" in pendientes[0]["pista"] and set(pendientes[0]["sugerencia"]) == {"CO", "MX"}
