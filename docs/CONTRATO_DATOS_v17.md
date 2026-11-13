@@ -91,6 +91,47 @@ Para depurar la base entera antes de entregarla:
   - lo saltado sigue en «revisar».
   Borrar sigue exigiendo la huella y «aplicar», como siempre.
 
+## Sugerencias de la revisión (ampliación del 13 nov)
+
+Revisar es responder **una sola pregunta**: ¿puede postularse alguien que vive en un país de LATAM o en España?
+
+`panel/sugerir.py` propone la respuesta y su motivo, solo con código. **Es una ayuda: decide la persona.**
+
+- **Qué cuenta como evidencia:** la ubicación del aviso, el título y las frases sobre dónde vive o trabaja la persona
+  («based in», «reside», «hiring in», «open to candidates», oficinas, «remoto desde», zonas horarias).
+- **Qué no cuenta:** las frases de beneficios, viajes, eventos o clientes («retreat», «trips», «clients», «customers»,
+  «lunch», «stipend»…). Un retiro en París o «clientes de EE. UU.» no dicen quién puede postularse.
+- **«us» no es EE. UU.** solo cuenta si aparece como «US/U.S.» en mayúsculas («join us» no). Los estados de EE. UU. se
+  leen en el formato «Ciudad, XX», salvo AR, CO y PA, que también son países cubiertos.
+- **Exclusiones:** «excluding / except / excepto / salvo» quita los países que vienen después.
+- **Reglas, en orden:**
+  1. Países cubiertos o LATAM, sin extranjeros → `sí`, con esos países (LATAM = los 19 de LATAM menos los excluidos,
+     más España si se nombra).
+  2. Mezcla, Europa/EMEA (incluye España), «cualquier lugar» o solo un horario → **sin sugerencia**: hay que leerla.
+  3. Solo lugares extranjeros → `otro país`.
+  4. Ninguna evidencia → `no sirve`, por la regla «en caso de duda, no entra» (decisión de Oscar, 13 nov).
+
+**CSV**
+- Columnas, en orden de lectura: `decision` y `pais` ya llenos con la sugerencia, `por_que`, `cargo`, `empresa`,
+  `ubicacion`, `modalidad`, `frase_del_aviso`, `enlace`, `le_serviria_a`, `aplicar_a_iguales`, `comentario` y
+  `vacante_id`.
+- La primera fila trae la pregunta. Al subir se ignora porque no tiene `vacante_id`.
+- Orden de las filas: otro país, no sirve, sí y, al final, las de leer.
+- `pais` acepta nombres, siglas, `LATAM`, `LATAM y España` o `todos`.
+- Los CSV de la versión anterior se siguen aceptando: las columnas se leen por nombre.
+
+**Panel:** cada tarjeta muestra la sugerencia y su motivo, con el botón «Aceptar sugerencia» (tecla Enter). Los
+botones 1–4 sirven para corregir.
+
+Medición en el inventario real del 13 nov (solo conteos), sobre 296 dudosas en español o inglés:
+
+| Sugerencia | Vacantes |
+|---|---|
+| No sirve (sin país) | 177 |
+| Otro país | 61 |
+| Sí | 32 |
+| Para leer | 26 |
+
 ## Garantía
 
 Todo el ciclo funciona solo con código:

@@ -178,6 +178,11 @@ export type Revision = {
   enlace: string;
   pista: string;
   sugerencia: string[];
+  // Ampliación v17: respuesta sugerida por código y su motivo ("" = hay que leerla).
+  sugerida?: "" | "sirve" | "otro_pais" | "no_sirve";
+  paises_sugeridos?: string[];
+  por_que?: string;
+  frase?: string;
   clientes: string[];
   ayuda_faltantes: boolean;
   iguales: number;

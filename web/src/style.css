@@ -3107,6 +3107,41 @@ a.button {
   font-size: 14px;
   border-radius: 6px;
 }
+.revision-pregunta {
+  margin: 0 0 12px;
+  color: var(--ink);
+  font-size: 14px;
+}
+.revision-sugerencia {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  font-size: 15px;
+  color: var(--ink);
+}
+.revision-sugerencia p {
+  margin: 0;
+  flex: 1 1 260px;
+}
+.revision-sugerencia.sirve {
+  background: #e7f3ec;
+  border-color: #9cc9b0;
+}
+.revision-sugerencia.otro_pais,
+.revision-sugerencia.no_sirve {
+  background: #f8ecea;
+  border-color: #dcaaa2;
+}
+.revision-sugerencia.leer {
+  background: #fbf3e2;
+  border-color: #e2c78a;
+}
 .revision-acciones {
   display: flex;
   flex-wrap: wrap;

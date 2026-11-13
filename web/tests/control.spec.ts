@@ -259,8 +259,15 @@ test("bandeja Por confirmar: un clic confirma, atajo 4 aparta y el contador baja
   await expect(page.locator(".revision")).toHaveCount(3);
   const primera = page.locator(".revision").first();
   await expect(primera.locator(".revision-pista")).toBeVisible();
-  await primera.getByLabel(/País de/).selectOption("CO");
-  await primera.getByRole("button", { name: "Sirve para Colombia" }).click();
+  // Ampliación v17: cada tarjeta trae la respuesta sugerida y por qué; Enter la acepta.
+  await expect(primera.locator(".revision-sugerencia")).toContainText(
+    "Sugerencia: sirve",
+  );
+  await expect(
+    primera.getByRole("button", { name: "Aceptar sugerencia" }),
+  ).toBeVisible();
+  await primera.focus();
+  await page.keyboard.press("Enter");
   await expect(
     page.getByText(/Confirmada: se asignó a \d+ cliente/),
   ).toBeVisible();
@@ -307,7 +314,7 @@ test("revisión masiva por CSV y reglas aprendidas sin IA", async ({
   ).toHaveAttribute("href", "/api/revisiones.csv");
   expect(
     (await (await request.get("/api/revisiones.csv")).text()).split("\n")[0],
-  ).toContain("vacante_id,cargo,empresa,ubicacion,pista");
+  ).toContain("decision,pais,por_que,cargo,empresa,ubicacion");
   // Depuración completa (v17): un botón llena la bandeja sin esperar la búsqueda de la noche.
   await page
     .getByRole("button", { name: "Cargar todas las dudosas de la base" })
