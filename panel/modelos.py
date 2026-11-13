@@ -201,6 +201,40 @@ def solo_perfil(datos, perfil_id):
     return Configuracion.model_validate({"clientes": cliente[:1], "cargos": cargo[:1], "perfiles": [perfil]})
 
 
+def parcial(datos):
+    """Sección 7a (13 nov): `(Configuracion, {perfil_id: motivo})` con lo que sí valida de un borrador a medio editar.
+    Un dato pendiente en otro cliente o cargo ya no deja sin estimación a los perfiles completos. Cada cliente, cargo y
+    perfil se valida por separado; la coherencia entre ellos se comprueba perfil a perfil con `solo_perfil`. Devuelve
+    `None` como configuración si ningún perfil valida."""
+    datos = datos if isinstance(datos, dict) else {}
+    clientes, cargos, perfiles, incompletos = {}, {}, {}, {}
+    for clase, filas, destino in ((Cliente, datos.get("clientes"), clientes), (Cargo, datos.get("cargos"), cargos)):
+        for fila in filas or []:
+            try:
+                x = clase.model_validate(fila)
+            except ValueError:
+                continue
+            destino.setdefault(x.id, x)
+    for fila in datos.get("perfiles") or []:
+        pid = str(fila.get("id", "")) if isinstance(fila, dict) else ""
+        if not pid or pid in perfiles or pid in incompletos:
+            continue
+        try:
+            mini = solo_perfil(datos, pid)
+        except ValueError as e:
+            incompletos[pid] = explicar(e)
+            continue
+        p = mini.perfiles[0]
+        if p.cliente_id not in clientes or p.cargo_id not in cargos:
+            incompletos[pid] = "Revisa el nombre del cliente y el cargo del perfil."
+            continue
+        perfiles[pid] = p
+    if not perfiles:
+        return None, incompletos
+    return Configuracion.model_construct(clientes=list(clientes.values()), cargos=list(cargos.values()),
+                                         perfiles=list(perfiles.values())), incompletos
+
+
 class Guardar(Modelo):
     revision: int = Field(ge=0, strict=True)
     configuracion: Configuracion

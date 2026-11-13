@@ -584,20 +584,35 @@ h1 {
   gap: 17px;
 }
 .client-card {
-  padding: 20px 19px 0;
+  padding: 16px 18px 0;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 .client-top {
   display: flex;
-  align-items: center;
-  gap: 11px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.client-lugar {
+  flex: none;
+  display: grid;
+  gap: 3px;
+  text-align: right;
+  font-size: 12px;
+  color: #5d6b5f;
+}
+.client-lugar > span:first-child {
+  font-weight: 600;
+  color: #4c5f4d;
 }
 .client-title {
   flex: 1;
   min-width: 0;
 }
 .client-title h3 {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   color: #51644b;
   overflow: hidden;
@@ -632,8 +647,8 @@ h1 {
 }
 .client-details {
   display: grid;
-  gap: 10px;
-  padding-bottom: 21px;
+  gap: 5px;
+  padding: 12px 0 14px;
 }
 .client-details > div {
   display: flex;
@@ -647,15 +662,29 @@ h1 {
   color: #636b58;
 }
 .client-bottom {
+  margin-top: auto;
   border-top: 1px solid #eef0e7;
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 13px 0;
+  gap: 8px;
+  padding: 10px 0;
 }
-.client-bottom > .text-button {
-  margin-left: auto;
+.client-bottom .editar {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 12px;
+}
+.client-bottom .vacantes {
+  margin-left: auto;
+}
+.client-bottom .sin-cupo {
+  font-size: 12px;
+}
+.icon.peligro:hover,
+.icon.peligro:focus-visible {
+  background: #fbeceb;
+  color: #a3392b;
 }
 .status-active {
   display: flex;
@@ -751,17 +780,28 @@ h1 {
   color: #57694c;
 }
 .search-input input::placeholder {
-  color: #63685d;
+  color: #8a938b;
+  font-style: italic;
 }
 .archived {
-  margin-top: 24px;
+  margin-top: 28px;
   font-size: 12px;
   color: #646b5e;
 }
-.archived summary {
-  cursor: pointer;
+.archived .plegable-boton {
+  background: #f0f3ec;
 }
-.archived > div {
+.archived .plegable-contenido {
+  margin-top: 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+}
+.archived .plegable-contenido > div:last-child {
+  border-bottom: 0;
+}
+.archived .plegable-contenido > div {
   display: flex;
   justify-content: space-between;
   border-bottom: 1px solid var(--line);
@@ -1220,8 +1260,10 @@ h1 {
   width: 100%;
   min-height: 39px;
 }
-.field input::placeholder {
-  color: #656b5d;
+.field input::placeholder,
+.field textarea::placeholder {
+  color: #8a938b;
+  font-style: italic;
 }
 .field textarea {
   min-height: 75px;
@@ -2283,8 +2325,8 @@ h1 {
   line-height: 1.45;
   color: #5d6d4e;
 }
-.mudanza summary {
-  cursor: pointer;
+.mudanza-titulo {
+  display: block;
   font-size: 12px;
   font-weight: 550;
   color: #5e6d52;
@@ -2777,4 +2819,57 @@ legend .ayuda-texto,
 .dialog .helper:not(.note) {
   font-style: italic;
   color: #5f6b62;
+}
+
+/* Sección 7a (13 nov): botón que muestra u oculta (en lugar de los triángulos), WhatsApp y perfiles. */
+.plegable-boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--green);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.plegable-boton:hover {
+  border-color: #b9ccb0;
+}
+.plegable-boton:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+.plegable-boton svg {
+  transition: transform 0.15s;
+}
+.plegable-boton svg.girado {
+  transform: rotate(180deg);
+}
+.mudanza .plegable-contenido {
+  margin-top: 8px;
+}
+.mudanza-acciones {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.mudanza-acciones .text-button {
+  font-size: 12px;
+}
+.whatsapp-datos {
+  margin-top: 4px;
+}
+.whatsapp-datos .field-help {
+  margin-top: 6px;
+}
+.otro-perfil {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  margin: 2px 0 6px;
 }

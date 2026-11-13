@@ -29,7 +29,6 @@ import {
   MapPin,
   Megaphone,
   MessageCircle,
-  MoreHorizontal,
   Pencil,
   Plus,
   RefreshCw,
@@ -181,6 +180,43 @@ function Ayuda({
         {children}
       </span>
     </span>
+  );
+}
+
+// Sección 7a (13 nov): en vez de los desplegables con triángulo, un botón que dice qué muestra y qué oculta.
+function Plegable({
+  mostrar,
+  ocultar,
+  className,
+  inicial = false,
+  children,
+}: {
+  mostrar: string;
+  ocultar: string;
+  className?: string;
+  inicial?: boolean;
+  children: React.ReactNode;
+}) {
+  const [abierto, setAbierto] = useState(inicial);
+  const id = useId();
+  return (
+    <div className={"plegable " + (className || "")}>
+      <button
+        type="button"
+        className="plegable-boton"
+        aria-expanded={abierto}
+        aria-controls={id}
+        onClick={() => setAbierto(!abierto)}
+      >
+        <ChevronDown size={16} className={abierto ? "girado" : ""} />
+        {abierto ? ocultar : mostrar}
+      </button>
+      {abierto && (
+        <div id={id} className="plegable-contenido">
+          {children}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -509,13 +545,21 @@ function PreviewPerfil({
   info,
   estado,
   motivo,
+  pendiente,
   onAjustar,
 }: {
   info?: EstimacionPerfil;
   estado: EstadoPrevia;
   motivo?: string;
+  pendiente?: string;
   onAjustar: (cambio: Partial<Perfil>) => void;
 }) {
+  if (pendiente)
+    return (
+      <p className="preview muted-preview" role="status">
+        Aún no se puede estimar este perfil: {pendiente}
+      </p>
+    );
   if (estado === "incompleto")
     return (
       <p className="preview muted-preview" role="status">
@@ -1591,19 +1635,24 @@ function ClienteDialog({
     api<Record<string, Contacto>>("/contactos")
       .then((r) => {
         if (r[cliente.id]) {
-          setCt(r[cliente.id]);
+          // Si ya se tocó el formulario mientras cargaba, se respeta lo escrito.
+          setCt((actual) =>
+            actual.telefono || actual.consentimiento ? actual : r[cliente.id],
+          );
           setTeniaContacto(true);
         }
       })
       .catch(() => undefined);
   }, [cliente]);
-  const [ps, setPs] = useState<Perfil[]>(
-    cliente
-      ? structuredClone(
-          config.perfiles.filter((p) => p.cliente_id === cliente.id),
-        )
-      : [],
-  );
+  const [ps, setPs] = useState<Perfil[]>(() => {
+    if (cliente)
+      return structuredClone(
+        config.perfiles.filter((p) => p.cliente_id === cliente.id),
+      );
+    // Un cliente nuevo empieza con un perfil listo para llenar (sección 7a).
+    const primero = config.cargos.find((x) => x.activo);
+    return primero ? [perfilNuevo(c.id, primero.id)] : [];
+  });
   const [error, setError] = useState("");
   const cargos = config.cargos.filter((c) => c.activo);
   function patch(id: string, v: Partial<Perfil>) {
@@ -1681,34 +1730,6 @@ function ClienteDialog({
         </div>
         <fieldset className="whatsapp-contacto">
           <legend>WhatsApp (opcional)</legend>
-          <div className="form-grid">
-            <div className="field">
-              <label htmlFor="cliente-telefono">
-                Número con código de país
-              </label>
-              <input
-                id="cliente-telefono"
-                type="tel"
-                inputMode="tel"
-                autoComplete="off"
-                placeholder="+57 300 123 4567"
-                value={ct.telefono}
-                onChange={(e) => setCt({ ...ct, telefono: e.target.value })}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="cliente-saludo">Nombre para saludar</label>
-              <input
-                id="cliente-saludo"
-                maxLength={60}
-                placeholder="Ana"
-                value={ct.nombre_saludo}
-                onChange={(e) =>
-                  setCt({ ...ct, nombre_saludo: e.target.value })
-                }
-              />
-            </div>
-          </div>
           <label className="check-line">
             <input
               type="checkbox"
@@ -1719,10 +1740,42 @@ function ClienteDialog({
             />
             Aceptó recibir vacantes por WhatsApp
           </label>
-          <p className="field-help">
-            Con número y aceptación, cada mañana tendrás su mensaje listo en
-            «Mensajes». Nada se envía solo.
-          </p>
+          {ct.consentimiento && (
+            <div className="whatsapp-datos">
+              <div className="form-grid">
+                <div className="field">
+                  <label htmlFor="cliente-telefono">
+                    Número con código de país
+                  </label>
+                  <input
+                    id="cliente-telefono"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="off"
+                    placeholder="+57 300 123 4567"
+                    value={ct.telefono}
+                    onChange={(e) => setCt({ ...ct, telefono: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="cliente-saludo">Nombre para saludar</label>
+                  <input
+                    id="cliente-saludo"
+                    maxLength={60}
+                    placeholder="Ana"
+                    value={ct.nombre_saludo}
+                    onChange={(e) =>
+                      setCt({ ...ct, nombre_saludo: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+              <p className="field-help">
+                Con número y aceptación, cada mañana tendrás su mensaje listo en
+                «Mensajes». Nada se envía solo.
+              </p>
+            </div>
+          )}
         </fieldset>
         <div className="section-title">
           <h3>Perfiles de búsqueda</h3>
@@ -1811,54 +1864,82 @@ function ClienteDialog({
               </div>
             </fieldset>
             {p.modalidades.some((m) => m !== "remoto") && (
-              <details
-                className="field mudanza"
-                open={p.paises_presenciales_extra.length > 0}
-              >
-                <summary>
+              <div className="field mudanza">
+                <span className="mudanza-titulo">
                   También se mudaría a…{" "}
-                  <span className="muted">
-                    {p.paises_presenciales_extra.length
-                      ? p.paises_presenciales_extra.length +
-                        (p.paises_presenciales_extra.length === 1
-                          ? " país"
-                          : " países")
-                      : "opcional"}
-                  </span>
-                </summary>
-                <div className="country-grid">
-                  {paises
-                    .filter((pais) => pais.codigo !== p.vive_en)
-                    .map((pais) => (
-                      <label
-                        className={
-                          "country " +
-                          (p.paises_presenciales_extra.includes(pais.codigo)
-                            ? "selected"
-                            : "")
-                        }
-                        key={pais.codigo}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={p.paises_presenciales_extra.includes(
-                            pais.codigo,
-                          )}
-                          onChange={(e) =>
-                            patch(p.id, {
-                              paises_presenciales_extra: e.target.checked
-                                ? [...p.paises_presenciales_extra, pais.codigo]
-                                : p.paises_presenciales_extra.filter(
-                                    (x) => x !== pais.codigo,
-                                  ),
-                            })
+                  <span className="muted">(opcional)</span>
+                </span>
+                <Plegable
+                  inicial={p.paises_presenciales_extra.length > 0}
+                  mostrar={
+                    "Mostrar países" +
+                    (p.paises_presenciales_extra.length
+                      ? ` (${p.paises_presenciales_extra.length} ${p.paises_presenciales_extra.length === 1 ? "elegido" : "elegidos"})`
+                      : "")
+                  }
+                  ocultar="Ocultar países"
+                >
+                  <div className="mudanza-acciones">
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() =>
+                        patch(p.id, {
+                          paises_presenciales_extra: paises
+                            .map((x) => x.codigo)
+                            .filter((x) => x !== p.vive_en),
+                        })
+                      }
+                    >
+                      Seleccionar todos
+                    </button>
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() =>
+                        patch(p.id, { paises_presenciales_extra: [] })
+                      }
+                    >
+                      Quitar todos
+                    </button>
+                  </div>
+                  <div className="country-grid">
+                    {paises
+                      .filter((pais) => pais.codigo !== p.vive_en)
+                      .map((pais) => (
+                        <label
+                          className={
+                            "country " +
+                            (p.paises_presenciales_extra.includes(pais.codigo)
+                              ? "selected"
+                              : "")
                           }
-                        />
-                        {pais.nombre}
-                      </label>
-                    ))}
-                </div>
-              </details>
+                          key={pais.codigo}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={p.paises_presenciales_extra.includes(
+                              pais.codigo,
+                            )}
+                            onChange={(e) =>
+                              patch(p.id, {
+                                paises_presenciales_extra: e.target.checked
+                                  ? [
+                                      ...p.paises_presenciales_extra,
+                                      pais.codigo,
+                                    ]
+                                  : p.paises_presenciales_extra.filter(
+                                      (x) => x !== pais.codigo,
+                                    ),
+                              })
+                            }
+                          />
+                          {pais.nombre}
+                        </label>
+                      ))}
+                  </div>
+                </Plegable>
+              </div>
             )}
             <div className="form-grid">
               <div className="field">
@@ -1988,6 +2069,7 @@ function ClienteDialog({
               info={previa.datos?.perfiles?.[p.id]}
               estado={previa.estado}
               motivo={previa.motivo}
+              pendiente={previa.datos?.incompletos?.[p.id]}
               onAjustar={(cambio) => patch(p.id, cambio)}
             />
             <EnVivo
@@ -1997,15 +2079,27 @@ function ClienteDialog({
             />
           </section>
         ))}
-        <button
-          type="button"
-          disabled={!cargos.length}
-          className="button secondary full dashed"
-          onClick={() => setPs([...ps, perfilNuevo(c.id, cargos[0].id)])}
-        >
-          <Plus size={16} />
-          Añadir perfil de búsqueda
-        </button>
+        {ps.length ? (
+          <button
+            type="button"
+            disabled={!cargos.length}
+            className="text-button otro-perfil"
+            onClick={() => setPs([...ps, perfilNuevo(c.id, cargos[0].id)])}
+          >
+            <Plus size={15} />
+            Añadir otro perfil
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={!cargos.length}
+            className="button secondary full dashed"
+            onClick={() => setPs([...ps, perfilNuevo(c.id, cargos[0].id)])}
+          >
+            <Plus size={16} />
+            Añadir perfil de búsqueda
+          </button>
+        )}
         {!cargos.length && (
           <p className="helper">Primero añade un cargo en «Cargos y cupos».</p>
         )}
@@ -2787,11 +2881,15 @@ function App() {
                 />
               )}
               {draft.clientes.some((c) => !c.activo) && (
-                <details className="archived">
-                  <summary>
-                    Clientes archivados (
-                    {draft.clientes.filter((c) => !c.activo).length})
-                  </summary>
+                <Plegable
+                  className="archived"
+                  mostrar={
+                    "Ver archivados (" +
+                    draft.clientes.filter((c) => !c.activo).length +
+                    ")"
+                  }
+                  ocultar="Ocultar archivados"
+                >
                   {draft.clientes
                     .filter((c) => !c.activo)
                     .map((c) => (
@@ -2812,7 +2910,7 @@ function App() {
                         </button>
                       </div>
                     ))}
-                </details>
+                </Plegable>
               )}
             </>
           )}
@@ -2974,11 +3072,15 @@ function App() {
               {previaCargos.datos?.nota && (
                 <p className="helper note">{previaCargos.datos.nota}</p>
               )}
-              <details className="archived">
-                <summary>
-                  Cargos archivados (
-                  {draft.cargos.filter((c) => !c.activo).length})
-                </summary>
+              <Plegable
+                className="archived"
+                mostrar={
+                  "Ver archivados (" +
+                  draft.cargos.filter((c) => !c.activo).length +
+                  ")"
+                }
+                ocultar="Ocultar archivados"
+              >
                 {draft.cargos
                   .filter((c) => !c.activo)
                   .map((c) => (
@@ -2999,7 +3101,7 @@ function App() {
                       </button>
                     </div>
                   ))}
-              </details>
+              </Plegable>
               <div className="info-line bottom-info">
                 <ShieldCheck size={18} />
                 <p>
@@ -3476,7 +3578,6 @@ function Empty({
 }
 function ClientCard({
   c,
-  index,
   perfiles,
   cargos,
   paises,
@@ -3485,7 +3586,7 @@ function ClientCard({
   onArchive,
 }: {
   c: Cliente;
-  index: number;
+  index?: number;
   perfiles: Perfil[];
   cargos: Cargo[];
   paises: Sesion["paises"];
@@ -3493,20 +3594,12 @@ function ClientCard({
   onResults: () => void;
   onArchive?: () => void;
 }) {
+  // Sección 7a (13 nov): más baja, sin foto ni «Activo»; editar y vacantes a la vista.
   const p = perfiles[0],
     cargo = cargos.find((x) => x.id === p?.cargo_id);
   return (
     <article className="client-card card">
       <div className="client-top">
-        <span
-          className="avatar"
-          style={{
-            background: colores[index % 5] + "18",
-            color: colores[index % 5],
-          }}
-        >
-          {iniciales(c.nombre)}
-        </span>
         <div className="client-title">
           <h3>{c.nombre}</h3>
           <span>
@@ -3514,26 +3607,15 @@ function ClientCard({
             {perfiles.length > 1 ? " + " + (perfiles.length - 1) : ""}
           </span>
         </div>
-        <button
-          className="icon"
-          aria-label={"Editar " + c.nombre}
-          onClick={onEdit}
-        >
-          <MoreHorizontal size={19} />
-        </button>
-      </div>
-      <div className="client-tags">
         {p && (
-          <>
+          <div className="client-lugar">
             <span>
-              <Globe2 size={12} />
-              Vive en{" "}
               {paises.find((x) => x.codigo === p.vive_en)?.nombre || p.vive_en}
               {p.paises_presenciales_extra.length > 0 &&
-                " · +" + p.paises_presenciales_extra.length}
+                " +" + p.paises_presenciales_extra.length}
             </span>
             <span>{p.modalidades.map((m) => modos[m]).join(" · ")}</span>
-          </>
+          </div>
         )}
       </div>
       <div className="client-details">
@@ -3565,22 +3647,30 @@ function ClientCard({
         </div>
       </div>
       <div className="client-bottom">
-        <span className="status-active">
-          <span />
-          {cargo?.activo && cargo.cupo > 0 ? "Activo" : "Sin cupo"}
-        </span>
+        <button
+          className="text-button editar"
+          aria-label={"Editar " + c.nombre}
+          onClick={onEdit}
+        >
+          <Pencil size={14} />
+          Editar
+        </button>
         {onArchive && (
           <button
-            className="icon"
+            className="icon peligro"
             aria-label={"Archivar " + c.nombre}
+            title="Archivar"
             onClick={onArchive}
           >
-            <Archive size={14} />
+            <Archive size={15} />
           </button>
         )}
-        <button className="text-button" onClick={onResults}>
-          Ver vacantes
-          <ArrowUpRight size={15} />
+        {!(cargo?.activo && cargo.cupo > 0) && (
+          <span className="pill amber sin-cupo">Sin cupo</span>
+        )}
+        <button className="button secondary small vacantes" onClick={onResults}>
+          Vacantes
+          <ArrowUpRight size={14} />
         </button>
       </div>
     </article>

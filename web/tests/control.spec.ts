@@ -54,9 +54,16 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await dialog
     .getByLabel("Nombre o referencia del cliente")
     .fill("Prueba operadora");
-  await dialog
-    .getByRole("button", { name: "Añadir perfil de búsqueda" })
-    .click();
+  // Sección 7a: el cliente nuevo ya trae su primer perfil; los demás, con un enlace discreto.
+  await expect(dialog.getByText("PERFIL 1")).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Añadir otro perfil" }),
+  ).toBeVisible();
+  // WhatsApp: el número aparece solo al marcar la casilla.
+  await expect(dialog.getByLabel("Número con código de país")).toHaveCount(0);
+  await dialog.getByLabel("Aceptó recibir vacantes por WhatsApp").check();
+  await expect(dialog.getByLabel("Número con código de país")).toBeVisible();
+  await dialog.getByLabel("Aceptó recibir vacantes por WhatsApp").uncheck();
   await dialog.getByLabel("Cargo del perfil 1").selectOption({ label: "QA" });
   await dialog.getByLabel("Antigüedad del perfil 1").selectOption("7");
   await dialog.getByLabel("Experiencia máxima del perfil 1").fill("4");
@@ -73,6 +80,16 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
     .hover();
   await expect(dialog.getByText(/solo con oficina en su país/)).toBeVisible();
   await expect(dialog.getByText("También se mudaría a…")).toBeVisible();
+  // Países a los que se mudaría: botón claro y «Seleccionar todos / Quitar todos».
+  await dialog.getByRole("button", { name: "Mostrar países" }).click();
+  await dialog.getByRole("button", { name: "Seleccionar todos" }).click();
+  const paisesMudanza = dialog.locator(".country-grid input");
+  expect(await paisesMudanza.count()).toBeGreaterThan(10);
+  await expect(dialog.locator(".country-grid input:not(:checked)")).toHaveCount(
+    0,
+  );
+  await dialog.getByRole("button", { name: "Quitar todos" }).click();
+  await expect(dialog.locator(".country-grid input:checked")).toHaveCount(0);
   // Estimación en vivo: en demostración usa avisos ficticios y no sale a internet.
   await expect(dialog.getByText(/No gasta Apify/)).toBeVisible();
   await dialog
@@ -100,6 +117,20 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await expect(
     page.getByRole("heading", { name: "Prueba operadora" }),
   ).toBeVisible();
+  // Tarjeta compacta: sin foto ni «Activo»; «Editar» y «Vacantes» a la vista.
+  const tarjetaCliente = page.locator(".client-card", {
+    hasText: "Prueba operadora",
+  });
+  await expect(tarjetaCliente.locator(".avatar")).toHaveCount(0);
+  await expect(tarjetaCliente.getByText("Activo", { exact: true })).toHaveCount(
+    0,
+  );
+  await expect(
+    tarjetaCliente.getByRole("button", { name: "Editar Prueba operadora" }),
+  ).toBeVisible();
+  await expect(
+    tarjetaCliente.getByRole("button", { name: "Vacantes" }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Guardar borrador", exact: true })
     .click();
@@ -121,7 +152,7 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await expect(
     page.getByRole("heading", { name: "Prueba operadora" }),
   ).toHaveCount(0);
-  await page.getByText("Clientes archivados (1)").click();
+  await page.getByRole("button", { name: "Ver archivados (1)" }).click();
   await page.getByRole("button", { name: "Reactivar", exact: true }).click();
   await ir(page, "Cargos y cupos");
   await page.getByLabel("Vacantes de QA", { exact: true }).fill("29");

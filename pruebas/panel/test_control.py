@@ -362,11 +362,20 @@ def test_vista_previa_api_no_guarda_ni_devuelve_vacantes_ni_clientes(cfg):
         assert "Nombre privado" not in r.text and "titulo" not in r.text and "example.org" not in r.text
         assert set(r.json()["perfiles"]) == {p["id"] for p in cfg["perfiles"]}
         assert c.get("/api/config").json()["revision"] == 1 and repo.config()["borrador"] == cfg
+        # Sección 7a: un perfil pendiente no deja sin estimación a los demás; dice qué le falta.
         incompleto = deepcopy(cfg)
         incompleto["perfiles"][0]["modalidades"] = []
+        incompleto["clientes"].append({"id": "00000000-0000-4000-8000-0000000000aa", "nombre": " "})  # a medio escribir
         r = c.post("/api/vista-previa", json={"configuracion": incompleto}, headers={"Origin": "http://testserver"})
-        assert r.status_code == 200 and r.json() == {
-            "incompleto": True, "motivo": "Elige al menos una modalidad: remoto, híbrido o presencial."}
+        pid = cfg["perfiles"][0]["id"]
+        assert r.status_code == 200 and r.json()["incompletos"] == {
+            pid: "Elige al menos una modalidad: remoto, híbrido o presencial."}
+        assert set(r.json()["perfiles"]) == {p["id"] for p in cfg["perfiles"][1:]}
+        assert "Nombre privado" not in r.text
+        for p in incompleto["perfiles"]:
+            p["modalidades"] = []
+        r = c.post("/api/vista-previa", json={"configuracion": incompleto}, headers={"Origin": "http://testserver"})
+        assert r.json()["incompleto"] is True and r.json()["motivo"] and "perfiles" not in r.json()
 
 
 def test_catalogo_vigente_lee_solo_campos_de_filtro_y_excluye_entregadas_copias_y_rechazadas(monkeypatch):
