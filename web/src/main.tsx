@@ -429,6 +429,7 @@ type EstadoPrevia = "listo" | "cargando" | "incompleto" | "error";
 function useVistaPrevia(config: Configuracion | null) {
   const [datos, setDatos] = useState<VistaPrevia | null>(null);
   const [estado, setEstado] = useState<EstadoPrevia>("cargando");
+  const [motivo, setMotivo] = useState("");
   const turno = useRef(0);
   const cuerpo = config ? JSON.stringify({ configuracion: config }) : "";
   useEffect(() => {
@@ -443,6 +444,7 @@ function useVistaPrevia(config: Configuracion | null) {
         });
         if (mio !== turno.current) return;
         if (r.incompleto) {
+          setMotivo(r.motivo || "");
           setEstado("incompleto");
         } else {
           setDatos(r);
@@ -457,7 +459,7 @@ function useVistaPrevia(config: Configuracion | null) {
     }, 450);
     return () => clearTimeout(espera);
   }, [cuerpo]);
-  return { datos, estado };
+  return { datos, estado, motivo };
 }
 
 const ajustesSinDato: Record<string, Partial<Perfil>> = {
@@ -473,16 +475,18 @@ const ajustesSinDato: Record<string, Partial<Perfil>> = {
 function PreviewPerfil({
   info,
   estado,
+  motivo,
   onAjustar,
 }: {
   info?: EstimacionPerfil;
   estado: EstadoPrevia;
+  motivo?: string;
   onAjustar: (cambio: Partial<Perfil>) => void;
 }) {
   if (estado === "incompleto")
     return (
       <p className="preview muted-preview" role="status">
-        Completa el perfil para ver cuántas vacantes lo cumplen.
+        Aún no se puede estimar: {motivo || "revisa los campos del perfil."}
       </p>
     );
   if (!info)
@@ -551,6 +555,23 @@ function PreviewPerfil({
   );
 }
 
+// Por qué falló la petición, para que el operador sepa si esperar, volver a entrar o revisar el registro (13 nov).
+function motivoFalloEnVivo(e: unknown) {
+  if (e instanceof DOMException && e.name === "TimeoutError")
+    return "La búsqueda tardó más de un minuto y se canceló. Inténtalo de nuevo en un rato.";
+  if (e instanceof ErrorAPI) {
+    if (e.status === 401)
+      return "Tu sesión se cerró: vuelve a entrar al panel.";
+    if (e.status === 403)
+      return "El panel rechazó la petición. Recarga la página y vuelve a intentarlo.";
+    if (e.status === 422) return "Aún no se puede buscar: " + e.message;
+    if (e.status >= 502)
+      return "El servidor del panel no respondió a tiempo (puede estar despertando). Espera un minuto y vuelve a intentarlo.";
+    return "La búsqueda falló por un error del servidor. Inténtalo de nuevo en un minuto.";
+  }
+  return "No hubo conexión con el panel. Revisa tu internet y vuelve a intentarlo.";
+}
+
 function EnVivo({
   config,
   perfilId,
@@ -570,13 +591,18 @@ function EnVivo({
       const x = await api<EstimacionEnVivo>("/estimacion-en-vivo", {
         method: "POST",
         body: JSON.stringify({ configuracion: config, perfil_id: perfilId }),
+        signal: AbortSignal.timeout(75000),
       });
-      if (x.incompleto) setError("Completa el perfil antes de buscar.");
+      if (x.incompleto)
+        setError(
+          "Aún no se puede buscar: " +
+            (x.motivo || "revisa los campos del perfil."),
+        );
       else if (x.ocupado || x.espera || x.error)
         setError(x.nota || x.error || "");
       else setR(x);
-    } catch {
-      setError("No se pudo buscar en este momento. Inténtalo más tarde.");
+    } catch (e) {
+      setError(motivoFalloEnVivo(e));
     } finally {
       setCargando(false);
     }
@@ -605,6 +631,11 @@ function EnVivo({
             ? "Repetir búsqueda en vivo"
             : "Estimar con búsqueda en vivo"}
       </button>
+      {!cargando && (
+        <span className="live-gratis">
+          No gasta Apify: solo LinkedIn público y Get on Board, sin cuentas.
+        </span>
+      )}
       {error && (
         <p className="live-note" role="status">
           {error}
@@ -1443,130 +1474,6 @@ function ReglasAprendidas({
   );
 }
 
-function AvisosCorreo({
-  notify,
-}: {
-  notify: (s: string, error?: boolean) => void;
-}) {
-  const [a, setA] = useState<AjustesAlertas | null>(null);
-  const [texto, setTexto] = useState("");
-  const [ocupado, setOcupado] = useState(false);
-  useEffect(() => {
-    api<AjustesAlertas>("/ajustes/alertas")
-      .then((r) => {
-        setA(r);
-        setTexto(r.destinatarios.join(", "));
-      })
-      .catch(() => setA({ destinatarios: [], tipos: [] }));
-  }, []);
-  if (!a) return null;
-  async function guardar() {
-    setOcupado(true);
-    try {
-      const r = await api<AjustesAlertas>("/ajustes/alertas", {
-        method: "PUT",
-        body: JSON.stringify({
-          destinatarios: texto
-            .split(/[,;\s]+/)
-            .map((x) => x.trim())
-            .filter(Boolean),
-          tipos: a!.tipos,
-        }),
-      });
-      setA({ ...a!, ...r });
-      setTexto(r.destinatarios.join(", "));
-      notify("Avisos por correo guardados.");
-    } catch (e) {
-      notify((e as Error).message, true);
-    } finally {
-      setOcupado(false);
-    }
-  }
-  async function probar() {
-    setOcupado(true);
-    try {
-      const r = await api<{ nota: string }>("/alertas/prueba", {
-        method: "POST",
-      });
-      notify(r.nota);
-    } catch (e) {
-      notify((e as Error).message, true);
-    } finally {
-      setOcupado(false);
-    }
-  }
-  return (
-    <section className="card activity alerts">
-      <div className="section-title">
-        <h2>
-          <Mail size={18} /> Avisos por correo
-        </h2>
-      </div>
-      <p className="helper">
-        Recibe un correo cuando la búsqueda se completa, cuando quedan pocas
-        vacantes (tras la pasada de la mañana) o si algo falla. No incluye datos
-        de tus clientes.
-      </p>
-      <div className="field">
-        <label htmlFor="alertas-correos">Correos que reciben los avisos</label>
-        <input
-          id="alertas-correos"
-          type="text"
-          inputMode="email"
-          autoComplete="email"
-          placeholder="nombre@example.com, otra@example.com"
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-        />
-      </div>
-      <fieldset className="check-line">
-        <legend className="sr-only">Qué avisos enviar</legend>
-        {tiposAlerta.map(([v, t]) => (
-          <label key={v}>
-            <input
-              type="checkbox"
-              checked={a.tipos.includes(v)}
-              onChange={(e) =>
-                setA({
-                  ...a,
-                  tipos: e.target.checked
-                    ? [...a.tipos, v]
-                    : a.tipos.filter((x) => x !== v),
-                })
-              }
-            />
-            {t}
-          </label>
-        ))}
-      </fieldset>
-      {a.envio_configurado === false && (
-        <p className="form-error">
-          Falta configurar el envío (RESEND_API_KEY y ALERTAS_REMITENTE). Los
-          correos guardados se usarán en cuanto esté listo.
-        </p>
-      )}
-      <div className="alerts-actions">
-        <button
-          type="button"
-          className="button secondary"
-          disabled={ocupado || !a.destinatarios.length}
-          onClick={probar}
-        >
-          Enviar correo de prueba
-        </button>
-        <button
-          type="button"
-          className="button primary"
-          disabled={ocupado}
-          onClick={guardar}
-        >
-          Guardar avisos
-        </button>
-      </div>
-    </section>
-  );
-}
-
 const etapasEmbudo: [keyof Embudo, string][] = [
   ["encontradas", "Encontradas"],
   ["con_descripcion", "Con descripción"],
@@ -2045,6 +1952,7 @@ function ClienteDialog({
             <PreviewPerfil
               info={previa.datos?.perfiles?.[p.id]}
               estado={previa.estado}
+              motivo={previa.motivo}
               onAjustar={(cambio) => patch(p.id, cambio)}
             />
             <EnVivo
@@ -2618,6 +2526,7 @@ function App() {
           )}
           {tab === "Resumen" && (
             <>
+              <AvisoUltimaBusqueda ultima={runs?.[0]} />
               <section className="overview-top solo">
                 <div className="quota-summary card">
                   <div className="card-label">
@@ -3185,7 +3094,6 @@ function App() {
           {tab === "Mensajes" && (
             <Mensajes clientes={draft.clientes} notify={notify} />
           )}
-          {tab === "Actividad" && <AvisosCorreo notify={notify} />}
           {tab === "Actividad" && <ReglasAprendidas notify={notify} />}
           {tab === "Actividad" && (
             <section className="card activity">
@@ -3488,6 +3396,32 @@ function App() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+// Avisos dentro del panel, sin correo ni servicios externos (decisión del operador, 13 nov).
+function AvisoUltimaBusqueda({ ultima }: { ultima?: Ejecucion }) {
+  if (!ultima) return null;
+  const r = ultima.resumen || {};
+  const faltan = Object.entries(r.faltantes || {})
+    .filter(([, n]) => n > 0)
+    .map(([cargo]) => cargo);
+  const corta =
+    ultima.estado === "parcial" ||
+    (r.meta !== undefined && (r.vacantes ?? 0) < r.meta);
+  if (ultima.estado !== "fallida" && !corta) return null;
+  return (
+    <div className="aviso-busqueda" role="status">
+      <strong>
+        {ultima.estado === "fallida"
+          ? `La búsqueda del ${fecha(ultima.fecha)} falló.`
+          : `La búsqueda del ${fecha(ultima.fecha)} trajo ${r.vacantes ?? 0} de ${r.meta ?? 120} vacantes.`}
+      </strong>{" "}
+      {ultima.estado === "fallida"
+        ? "Revisa «Actividad»; la siguiente búsqueda lo intentará de nuevo."
+        : faltan.length
+          ? `Faltan vacantes en ${faltan.join(", ")}: revisa los filtros de sus clientes en «Dónde se pierden las vacantes de cada cargo».`
+          : ""}
     </div>
   );
 }

@@ -2933,6 +2933,12 @@ h1 {
   border: 1px solid #e0e5ef;
   font-size: 12px;
 }
+.live-gratis {
+  margin-left: 10px;
+  font-size: 12px;
+  font-style: italic;
+  color: #5f6b62;
+}
 .live-note {
   margin: 6px 0 0;
   font-size: 12px;
@@ -3217,4 +3223,14 @@ a.button {
   background: #f1f4f2;
   color: #3e4b45;
   border-style: dashed;
+}
+
+.aviso-busqueda {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid #e2c78a;
+  background: #fbf3e2;
+  color: #3d2f0c;
+  font-size: 14px;
 }

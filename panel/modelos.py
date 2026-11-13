@@ -2,7 +2,7 @@
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from buscador import paises
 
@@ -157,6 +157,48 @@ class Configuracion(Modelo):
         if any(not self.perfiles_activos(c.id) for c in self.cargos if c.activo and c.cupo):
             raise ValueError("Cada cargo con cupo necesita al menos un perfil de cliente activo.")
         return self
+
+
+_MOTIVOS_CAMPO = {
+    ("clientes", "nombre"): "Escribe el nombre del cliente.",
+    ("cargos", "nombre"): "Escribe el nombre del cargo (al menos 2 letras).",
+    ("cargos", "cupo"): "El cupo de cada cargo va de 0 a 120.",
+    ("perfiles", "modalidades"): "Elige al menos una modalidad: remoto, híbrido o presencial.",
+    ("perfiles", "idiomas"): "Elige al menos un idioma de los avisos: español o inglés.",
+    ("perfiles", "experiencia_min"): "Los años de experiencia van de 0 a 40.",
+    ("perfiles", "experiencia_max"): "Los años de experiencia van de 0 a 40.",
+    ("perfiles", "antiguedad_dias"): "La antigüedad de publicación va de 1 a 30 días.",
+    ("perfiles", "vive_en"): "Elige en qué país vive: LATAM o España.",
+    ("perfiles", "cargo_id"): "Elige un cargo para el perfil.",
+}
+
+
+def explicar(error):
+    """Qué falta en un borrador que no valida, en una frase para el operador (sección 4, 13 nov). Sin nombres de
+    clientes: la respuesta solo repite reglas."""
+    for e in error.errors() if isinstance(error, ValidationError) else []:
+        mensaje = e.get("msg", "")
+        if mensaje.startswith("Value error, "):  # mensajes propios, ya en español
+            return mensaje.removeprefix("Value error, ")
+        nombres = [x for x in e.get("loc", ()) if isinstance(x, str)]
+        return _MOTIVOS_CAMPO.get((nombres[0], nombres[-1]) if nombres else (), "Revisa los campos del perfil.")
+    return str(error) if isinstance(error, ValueError) and not isinstance(error, ValidationError) else \
+        "Revisa los campos del perfil."
+
+
+def solo_perfil(datos, perfil_id):
+    """Configuración mínima con el perfil, su cliente y su cargo: para estimar un perfil no hace falta que el resto del
+    borrador esté completo (cupos que aún no suman, otro cliente a medio escribir)."""
+    datos = datos if isinstance(datos, dict) else {}
+    perfil = next((p for p in datos.get("perfiles") or [] if isinstance(p, dict) and str(p.get("id")) == str(perfil_id)),
+                  None)
+    if perfil is None:
+        raise ValueError("Este perfil no está en el borrador: vuelve a abrir el cliente.")
+    cliente = [c for c in datos.get("clientes") or [] if isinstance(c, dict) and str(c.get("id")) == str(perfil.get("cliente_id"))]
+    cargo = [c for c in datos.get("cargos") or [] if isinstance(c, dict) and str(c.get("id")) == str(perfil.get("cargo_id"))]
+    if not cargo:
+        raise ValueError("Elige un cargo para el perfil.")
+    return Configuracion.model_validate({"clientes": cliente[:1], "cargos": cargo[:1], "perfiles": [perfil]})
 
 
 class Guardar(Modelo):

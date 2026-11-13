@@ -365,7 +365,8 @@ def test_vista_previa_api_no_guarda_ni_devuelve_vacantes_ni_clientes(cfg):
         incompleto = deepcopy(cfg)
         incompleto["perfiles"][0]["modalidades"] = []
         r = c.post("/api/vista-previa", json={"configuracion": incompleto}, headers={"Origin": "http://testserver"})
-        assert r.status_code == 200 and r.json() == {"incompleto": True}
+        assert r.status_code == 200 and r.json() == {
+            "incompleto": True, "motivo": "Elige al menos una modalidad: remoto, híbrido o presencial."}
 
 
 def test_catalogo_vigente_lee_solo_campos_de_filtro_y_excluye_entregadas_copias_y_rechazadas(monkeypatch):
@@ -587,6 +588,55 @@ def test_api_en_vivo_en_demo_no_sale_a_internet(monkeypatch):
                  headers={"origin": "http://testserver"}).json()
     assert r["fuentes"] == {"Demostración": {"avisos": r["avisos"], "busquedas": 0, "fallidas": 0}}
     assert r["del_cargo"] >= r["compatibles"] >= 0
+
+
+def test_api_en_vivo_solo_exige_el_perfil_y_dice_que_falta(monkeypatch):
+    # Sección 4 (13 nov): con un cliente nuevo decía «no puede buscar» sin explicar por qué.
+    monkeypatch.setattr(servicio, "_ULTIMA", {})
+    api = TestClient(crear_app(demo=True, repositorio=RepositorioDemo()))
+    cfg = api.get("/api/config").json()["borrador"]
+    pid, otro = cfg["perfiles"][0]["id"], cfg["perfiles"][1]["id"]
+    for p in cfg["perfiles"]:
+        if p["id"] == otro:
+            p["modalidades"] = []  # otro perfil a medio editar
+    cfg["cargos"][0]["cupo"] = 120  # cupos que todavía no cuadran
+    pedir = lambda c, perfil: api.post("/api/estimacion-en-vivo", json={"configuracion": c, "perfil_id": perfil},
+                                       headers={"origin": "http://testserver"}).json()
+    assert "compatibles" in pedir(cfg, pid)
+    r = pedir(cfg, otro)
+    assert r == {"incompleto": True, "motivo": "Elige al menos una modalidad: remoto, híbrido o presencial."}
+    sin_cargo = deepcopy(cfg)
+    sin_cargo["cargos"] = []
+    assert pedir(sin_cargo, pid)["motivo"] == "Elige un cargo para el perfil."
+    assert "no está en el borrador" in pedir(cfg, "00000000-0000-4000-8000-000000000000")["motivo"]
+
+
+def test_en_vivo_un_error_interno_se_explica_y_libera_el_turno(cfg, en_vivo, caplog):
+    def rota(*a):
+        raise RuntimeError("detalle interno")
+    c = Configuracion.model_validate(cfg)
+    r = servicio.estimacion_en_vivo(RepositorioDemo(), c, cfg["perfiles"][0]["id"], fuentes=rota)
+    assert "error del servidor" in r["error"] and "detalle interno" not in r["error"]
+    assert "La estimación en vivo falló" in caplog.text
+    assert servicio._EN_CURSO.acquire(blocking=False)
+    servicio._EN_CURSO.release()
+
+
+def test_fuentes_publicas_no_espera_a_una_fuente_colgada(cfg, monkeypatch):
+    import threading
+    import time
+    from buscador.fuentes import getonbrd, linkedin_publico
+    soltar = threading.Event()
+    monkeypatch.setattr(linkedin_publico, "buscar", lambda *a, **k: (soltar.wait(10), ([], {}))[1])
+    monkeypatch.setattr(getonbrd, "buscar", lambda *a, **k: ([{"titulo": "x"}], {"avisos": 1}))
+    p = Perfil.model_validate({**cfg["perfiles"][0], "modalidades": ["remoto"]})
+    inicio = time.monotonic()
+    try:
+        crudas, fuentes = servicio.fuentes_publicas(cfg["cargos"][0], p, -4.5)  # medio segundo en total
+    finally:
+        soltar.set()
+    assert time.monotonic() - inicio < 3
+    assert fuentes["LinkedIn"] == {"error": True} and crudas == [{"titulo": "x"}]
 
 
 def test_pasada_posterior_fallida_no_borra_el_resultado_del_dia(cfg, monkeypatch, tmp_path):

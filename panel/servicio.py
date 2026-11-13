@@ -1,13 +1,14 @@
 """Vistas y texto para copiar; nunca se envía WhatsApp."""
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+import logging
 import threading
 import time
 
 from buscador import contrato, enlaces, vacante
 from panel.afinidad import (AMPLIACIONES, ETIQUETAS_AMPLIACION, MINIMO_POR_PERFIL, enlace_utilizable, evaluar,
                             evaluar_ampliada)
-from panel.repositorio import hoy
+from panel.repositorio import ErrorRepositorio, hoy
 from panel.terminos import grado, sugerir
 
 # Qué puede hacer el operador cuando un filtro, por sí solo, deja fuera vacantes. Sin sugerencia si no depende de él.
@@ -23,6 +24,7 @@ SUGERENCIAS = {
 }
 SIN_DATO = {"experiencia no informada", "inglés requerido sin confirmar"}
 _POR_CARGO = {}
+_log = logging.getLogger(__name__)
 
 
 def _del_cargo(catalogo, cargo, cercanas=False):
@@ -155,14 +157,19 @@ def fuentes_publicas(cargo, perfil, limite_segundos):
         return getonbrd.buscar(_SinInsistir(Cliente(pausa=(0.2, 0.4), timeout=6)), terminos[:2])
 
     crudas, fuentes = [], {}
-    with ThreadPoolExecutor(2) as hilos:
+    hilos = ThreadPoolExecutor(2)
+    fin = time.monotonic() + limite_segundos + 5
+    try:
         for nombre, futuro in (("LinkedIn", hilos.submit(linkedin)), ("Get on Board", hilos.submit(getonboard))):
             try:
-                filas, stats = futuro.result(timeout=limite_segundos + 5)
+                filas, stats = futuro.result(timeout=max(0.1, fin - time.monotonic()))
                 crudas += filas
                 fuentes[nombre] = {k: stats.get(k, 0) for k in ("busquedas", "fallidas", "avisos")}
-            except Exception:  # noqa: BLE001 - una fuente caída no impide estimar con la otra
+            except Exception:  # noqa: BLE001 - una fuente caída o lenta no impide estimar con la otra
                 fuentes[nombre] = {"error": True}
+    finally:
+        # Sin esperar a una fuente colgada: si no, la búsqueda quedaba «en curso» y bloqueaba las siguientes (13 nov).
+        hilos.shutdown(wait=False, cancel_futures=True)
     return crudas, fuentes
 
 
@@ -174,43 +181,55 @@ def estimacion_en_vivo(repo, cfg, perfil_id, fecha=None, fuentes=None, reloj=tim
     if not c:
         return {"error": "Perfil o cargo no encontrado en la configuración."}
     if not _EN_CURSO.acquire(blocking=False):
-        return {"ocupado": True, "nota": "Ya hay una búsqueda en vivo en curso. Inténtalo en un minuto."}
+        return {"ocupado": True, "nota": "Ya hay otra búsqueda en vivo en curso (quizá en otra pestaña). Espera unos "
+                                         "30 segundos y vuelve a intentarlo."}
     try:
-        inicio = reloj()
-        falta = ESPERA_PERFIL - (inicio - _ULTIMA.get(str(perfil_id), -ESPERA_PERFIL))
-        if falta > 0:
-            return {"espera": int(falta) + 1,
-                    "nota": f"Para no saturar las fuentes, espera {int(falta) + 1} s antes de repetir este perfil."}
-        _ULTIMA[str(perfil_id)] = inicio
-        raw = c.model_dump(mode="json")
-        if not raw["terminos_exactos"]:
-            raw["terminos_exactos"] = sugerir(c.nombre, consultar_esco=False)["terminos_exactos"]
-        buscar = fuentes or getattr(repo, "fuentes_en_vivo", None) or fuentes_publicas
-        crudas, por_fuente = buscar(raw, p, LIMITE_SEGUNDOS)
-        catalogo = repo.catalogo_vigente()
-        guardadas = {v["id"] for v in catalogo["vacantes"]}
-        entregadas = set(catalogo.get("entregadas") or ())
-        vistas, del_cargo, ya_entregadas = set(), [], 0
-        for x in crudas:
-            if not grado(x.get("titulo") or "", raw)[0]:
-                continue
-            # `consulta` = el propio título: el cargo ya se comprobó con sus términos, no con el mapa nocturno.
-            v = vacante.crear(x.get("titulo"), x.get("empresa"), x.get("enlace"), x.get("fuente", ""),
-                              ubicacion=x.get("ubicacion", ""), descripcion=x.get("descripcion", ""),
-                              fecha=x.get("fecha", ""), remoto=x.get("remoto"), hoy=fecha, consulta=x.get("titulo"))
-            if not v or v["id"] in vistas or contrato.url_limpia(v["enlace"]) in vistas:
-                continue
-            vistas |= {v["id"], contrato.url_limpia(v["enlace"])}
-            if v["id"] in entregadas:
-                ya_entregadas += 1
-                continue
-            del_cargo.append(v)
-        ids, limitantes = _contar(del_cargo, p, fecha)
-        return {"compatibles": len(ids), "del_cargo": len(del_cargo), "nuevas": len(ids - guardadas),
-                "ya_entregadas": ya_entregadas, "avisos": len(crudas), "limitantes": limitantes,
-                "fuentes": por_fuente, "segundos": round(reloj() - inicio, 1), "nota": NOTA_EN_VIVO}
+        return _estimar_en_vivo(repo, p, c, perfil_id, fecha, fuentes, reloj)
+    except ErrorRepositorio as e:  # la base no respondió: su mensaje ya está en lenguaje sencillo
+        return {"error": e.mensaje}
+    except Exception:  # noqa: BLE001 - el operador recibe una frase; el detalle queda en el registro del servidor
+        _log.exception("La estimación en vivo falló")
+        return {"error": "La búsqueda en vivo falló por un error del servidor. Inténtalo de nuevo en un minuto; "
+                         "el detalle quedó en el registro del panel."}
     finally:
         _EN_CURSO.release()
+
+
+def _estimar_en_vivo(repo, p, c, perfil_id, fecha, fuentes, reloj):
+    """Cuerpo de `estimacion_en_vivo`, ya con el turno tomado."""
+    inicio = reloj()
+    falta = ESPERA_PERFIL - (inicio - _ULTIMA.get(str(perfil_id), -ESPERA_PERFIL))
+    if falta > 0:
+        return {"espera": int(falta) + 1,
+                "nota": f"Para no saturar las fuentes, espera {int(falta) + 1} s antes de repetir este perfil."}
+    _ULTIMA[str(perfil_id)] = inicio
+    raw = c.model_dump(mode="json")
+    if not raw["terminos_exactos"]:
+        raw["terminos_exactos"] = sugerir(c.nombre, consultar_esco=False)["terminos_exactos"]
+    buscar = fuentes or getattr(repo, "fuentes_en_vivo", None) or fuentes_publicas
+    crudas, por_fuente = buscar(raw, p, LIMITE_SEGUNDOS)
+    catalogo = repo.catalogo_vigente()
+    guardadas = {v["id"] for v in catalogo["vacantes"]}
+    entregadas = set(catalogo.get("entregadas") or ())
+    vistas, del_cargo, ya_entregadas = set(), [], 0
+    for x in crudas:
+        if not grado(x.get("titulo") or "", raw)[0]:
+            continue
+        # `consulta` = el propio título: el cargo ya se comprobó con sus términos, no con el mapa nocturno.
+        v = vacante.crear(x.get("titulo"), x.get("empresa"), x.get("enlace"), x.get("fuente", ""),
+                          ubicacion=x.get("ubicacion", ""), descripcion=x.get("descripcion", ""),
+                          fecha=x.get("fecha", ""), remoto=x.get("remoto"), hoy=fecha, consulta=x.get("titulo"))
+        if not v or v["id"] in vistas or contrato.url_limpia(v["enlace"]) in vistas:
+            continue
+        vistas |= {v["id"], contrato.url_limpia(v["enlace"])}
+        if v["id"] in entregadas:
+            ya_entregadas += 1
+            continue
+        del_cargo.append(v)
+    ids, limitantes = _contar(del_cargo, p, fecha)
+    return {"compatibles": len(ids), "del_cargo": len(del_cargo), "nuevas": len(ids - guardadas),
+            "ya_entregadas": ya_entregadas, "avisos": len(crudas), "limitantes": limitantes,
+            "fuentes": por_fuente, "segundos": round(reloj() - inicio, 1), "nota": NOTA_EN_VIVO}
 
 
 def resultados(repo, cliente_id=None, fecha=None):
