@@ -317,12 +317,22 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificac
     return salida, {"roles": resumen, "descartadas": dict(motivos)}
 
 
-ETAPAS_EMBUDO = ("encontradas", "con_descripcion", "entregables", "nuevas", "enlace_comprobado", "cumplen_filtros")
+# Los filtros van antes que el enlace: la comprobación de enlaces ya prioriza lo que la selección elegiría, así que
+# culpar al enlace ocultaba que los perfiles del cargo cortan casi todo (13 nov).
+ETAPAS_EMBUDO = ("encontradas", "con_descripcion", "entregables", "nuevas", "cumplen_filtros", "enlace_comprobado")
 PERDIDA = {"con_descripcion": "sin descripción completa (no se sabe el idioma)",
            "entregables": "país o idioma sin confirmar",
            "nuevas": "ya entregadas antes o vistas hace demasiado",
-           "enlace_comprobado": "enlace sin comprobar a tiempo",
-           "cumplen_filtros": "no cumplen los filtros de ningún perfil del cargo"}
+           "cumplen_filtros": "no cumplen los filtros de los clientes del cargo",
+           "enlace_comprobado": "enlace sin comprobar a tiempo"}
+# Motivo de `panel.afinidad.evaluar` → filtro del perfil (solo categorías genéricas, nunca datos de clientes).
+FILTRO_DE_MOTIVO = {"modalidad diferente": "modalidad", "país sin elegibilidad confirmada": "país",
+                    "oficina en otro país": "país", "no admite postular desde su país": "país",
+                    "idioma del aviso diferente": "idioma del aviso", "publicación fuera del plazo": "antigüedad",
+                    "fecha de publicación sin confirmar": "antigüedad", "experiencia no informada": "años de experiencia",
+                    "experiencia fuera del rango": "años de experiencia",
+                    "inglés requerido sin confirmar": "nivel de inglés",
+                    "inglés requerido superior al indicado": "nivel de inglés"}
 
 
 def embudo(vacantes, entregadas, hoy, cfg=None, resumen=None):
@@ -333,6 +343,7 @@ def embudo(vacantes, entregadas, hoy, cfg=None, resumen=None):
     desde = (date.fromisoformat(hoy) - timedelta(days=cfg.get("dias_frescura", 14))).isoformat()
     idiomas = tuple(cfg.get("idiomas", ["es", "en"]))
     salida = {r["id"]: {"nombre": r["nombre"], **{e: 0 for e in ETAPAS_EMBUDO}} for r in roles}
+    filtros = {r["id"]: Counter() for r in roles}
     for v in vacantes:
         grados = {f["familia"]: f["coincidencia"] for f in v.get("familias", [])}
         propios = [r for r in roles if any(grados.get(f) in ("exacto", "similar") for f in r["familias"])]
@@ -345,20 +356,31 @@ def embudo(vacantes, entregadas, hoy, cfg=None, resumen=None):
                 pasos.append("entregables")
                 if not any(h in entregadas for h in huellas(v)) and (v.get("visto_primera_vez") or "") >= desde:
                     pasos.append("nuevas")
-                    if (v.get("verificacion") or {}).get("estado") == "verificada":
-                        pasos.append("enlace_comprobado")
-        asignado = rol_de(v, roles)[0] if "enlace_comprobado" in pasos else None
+        aceptan = roles_de(v, roles)[0] if "nuevas" in pasos else []
+        verificada = (v.get("verificacion") or {}).get("estado") == "verificada"
         for r in propios:
             for e in pasos:
                 salida[r["id"]][e] += 1
-            if asignado is r:
+            if "nuevas" not in pasos:
+                continue
+            if any(x is r for x in aceptan):
                 salida[r["id"]]["cumplen_filtros"] += 1
+                if verificada:
+                    salida[r["id"]]["enlace_comprobado"] += 1
+            elif "_perfiles" in r:
+                from panel.afinidad import evaluar
+                categorias = {FILTRO_DE_MOTIVO.get(m, "otros") for p in r["_perfiles"]
+                              for m in evaluar(v, p, r["_hoy"])["motivos"]}
+                filtros[r["id"]].update(categorias)
     for rid, e in salida.items():
         r = ((resumen or {}).get("roles") or {}).get(rid, {})
         e["entregadas"], e["ampliadas"] = r.get("entregadas", 0), sum((r.get("ampliadas") or {}).values())
         caidas = {etapa: e[anterior] - e[etapa] for anterior, etapa in zip(ETAPAS_EMBUDO, ETAPAS_EMBUDO[1:])}
         mayor = max(caidas, key=caidas.get) if any(caidas.values()) else None
         e["principal_perdida"] = PERDIDA[mayor] if mayor else ""
+        e["filtros_que_cortan"] = dict(filtros[rid].most_common())
+        if mayor == "cumplen_filtros" and filtros[rid]:
+            e["principal_perdida"] += f" (sobre todo: {filtros[rid].most_common(1)[0][0]})"
     return salida
 
 

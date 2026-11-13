@@ -750,6 +750,21 @@ def test_sugerencias_traen_cercanos_y_la_estimacion_cuenta_la_ampliacion(cfg_un_
     assert info["compatibles"] >= 5 or info["compatibles"] + info["ampliables"] <= 5
 
 
+def test_embudo_dice_que_filtro_del_cliente_corta(cfg_un_perfil):
+    con_dato = trabajo()["_descripcion"]
+    ofertas = [_oferta("Product Designer", n, con_dato) for n in range(3)]
+    activo = next(p for p in cfg_un_perfil["perfiles"] if p.get("activo", True) and p["cargo_id"] == cfg_un_perfil["cargos"][0]["id"])
+    activo["modalidades"] = ["presencial"]  # las ofertas de prueba son remotas: el filtro que corta es la modalidad
+    with ejecutor.activar({"configuracion": cfg_un_perfil}, hoy()):
+        for v in ofertas:
+            v["familias"] = familias.clasificar(v["titulo"], v["_descripcion"])
+        _, resumen = entrega.elegir(ofertas, {}, hoy())
+        e = entrega.embudo(ofertas, {}, hoy(), resumen=resumen)["cargo:" + cfg_un_perfil["cargos"][0]["id"]]
+    assert e["nuevas"] == 3 and e["cumplen_filtros"] == 0 and e["enlace_comprobado"] == 0
+    assert e["filtros_que_cortan"].get("modalidad") == 3
+    assert e["principal_perdida"].startswith("no cumplen los filtros") and "modalidad" in e["principal_perdida"]
+
+
 def test_embudo_por_cargo_sin_datos_de_clientes_y_se_conserva_entre_capturas(cfg_un_perfil):
     con_dato = trabajo()["_descripcion"]
     ofertas = [_oferta("Product Designer", n, con_dato) for n in range(3)] + [_oferta("Product Designer", 9, "corta")]
@@ -759,7 +774,7 @@ def test_embudo_por_cargo_sin_datos_de_clientes_y_se_conserva_entre_capturas(cfg
             v["familias"] = familias.clasificar(v["titulo"], v["_descripcion"])
         _, resumen = entrega.elegir(ofertas, {}, hoy())
         e = entrega.embudo(ofertas, {}, hoy(), resumen=resumen)["cargo:" + cfg_un_perfil["cargos"][0]["id"]]
-    assert (e["encontradas"], e["con_descripcion"], e["enlace_comprobado"], e["cumplen_filtros"]) == (4, 3, 2, 2)
+    assert (e["encontradas"], e["con_descripcion"], e["cumplen_filtros"], e["enlace_comprobado"]) == (4, 3, 3, 2)
     assert e["principal_perdida"] and "Cliente" not in str(e)
     # El registro guarda el embudo por nombre de cargo y una captura horaria sin embudo no lo borra.
     assert ejecutor._embudo_por_nombre({"entrega": {"embudo": {"cargo:x": dict(e, nombre="QA")}}})["QA"]["encontradas"] == 4
