@@ -592,6 +592,16 @@ def sin_confirmar(fila):
     return cat.get("confianza") == "baja" or razon.startswith(POR_CONFIRMAR) or razon in EXCLUIDAS_BASE
 
 
+def _celda(valor):
+    """Un valor por celda y en una sola línea: los saltos de línea de las descripciones hacían que Excel mostrara miles
+    de filas (13 nov). Listas y objetos van como JSON."""
+    import json
+    if valor is None:
+        return ""
+    texto = json.dumps(valor, ensure_ascii=False) if isinstance(valor, (list, dict)) else str(valor)
+    return re.sub(r"\s*[\r\n\t]+\s*", " ", texto).strip()
+
+
 def exportar_base(repo):
     """CSV con todas las columnas de `ofertas` más «estado_en_catalogo» (activa, cerrada, enlace roto…), sin las sin
     confirmar. Las listas y objetos van como JSON. Devuelve (texto, incluidas, omitidas)."""
@@ -610,7 +620,6 @@ def exportar_base(repo):
     escritor.writerow(columnas + ["estado_en_catalogo"])
     for f in incluidas:
         cat = f.get("catalogo_vacantes") or {}
-        valores = [json.dumps(f.get(k), ensure_ascii=False) if isinstance(f.get(k), (list, dict)) else
-                   ("" if f.get(k) is None else f.get(k)) for k in columnas]
+        valores = [_celda(f.get(k)) for k in columnas]
         escritor.writerow(valores + [cat.get("reason") or ("activa" if cat else "sin catálogo")])
     return "\ufeff" + salida.getvalue(), len(incluidas), len(filas) - len(incluidas)
