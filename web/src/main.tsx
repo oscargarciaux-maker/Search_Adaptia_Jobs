@@ -2230,49 +2230,22 @@ const estadosEjecucion: Record<string, string> = {
   en_curso: "En curso",
 };
 
-function TarjetaResumen({
-  icono: Icono,
-  titulo,
-  numero,
-  extra,
-  detalle,
-  accion,
-  tono,
-  onClick,
-  children,
-}: {
-  icono: typeof Users;
-  titulo: string;
-  numero: React.ReactNode;
-  extra?: string;
-  detalle: string;
-  accion: string;
-  tono?: "green" | "amber";
-  onClick: () => void;
-  children?: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      className={"tarjeta-resumen card" + (tono ? " " + tono : "")}
-      onClick={onClick}
-    >
-      <span className="tarjeta-cabeza">
-        <Icono size={17} />
-        {titulo}
-      </span>
-      <strong className="tarjeta-numero">
-        {numero}
-        {extra && <small>{extra}</small>}
-      </strong>
-      {children}
-      <span className="tarjeta-detalle">{detalle}</span>
-      <span className="tarjeta-accion">
-        {accion}
-        <ArrowRight size={14} />
-      </span>
-    </button>
+// Resumen con jerarquía (13 nov, pedido de Oscar): Clientes y Cargos y cupos mandan; Vacantes, Por confirmar y
+// Mensajes acompañan; Actividad es una franja tipo «entrada de evento» con la próxima búsqueda. La rejilla no es
+// uniforme a propósito: tamaños distintos y una franja desplazada guían la mirada de lo más usado a lo demás.
+function proximaBusqueda(ahora = new Date()) {
+  // 6:30 a. m. de Bogotá (UTC−5, sin horario de verano) = 11:30 UTC.
+  const hoy = new Date(
+    Date.UTC(
+      ahora.getUTCFullYear(),
+      ahora.getUTCMonth(),
+      ahora.getUTCDate(),
+      11,
+      30,
+    ),
   );
+  if (ahora >= hoy) hoy.setUTCDate(hoy.getUTCDate() + 1);
+  return hoy;
 }
 
 function TarjetasResumen({
@@ -2285,7 +2258,7 @@ function TarjetasResumen({
   borradores,
   go,
 }: {
-  clientes: number;
+  clientes: { nombre: string; cargo: string }[];
   perfiles: number;
   cargos: Cargo[];
   total: number;
@@ -2297,107 +2270,217 @@ function TarjetasResumen({
   const r = ultima?.resumen || {};
   const vivos = (borradores || []).filter((b) => b.estado !== "descartado");
   const enviados = vivos.filter((b) => b.estado === "enviado").length;
-  const hora = ultima
-    ? new Date(ultima.terminada_en || ultima.iniciada_en).toLocaleTimeString(
-        "es-CO",
-        { hour: "numeric", minute: "2-digit", timeZone: "America/Bogota" },
-      )
-    : "";
+  const proxima = proximaBusqueda();
+  const dia = proxima.toLocaleDateString("es-CO", {
+    day: "numeric",
+    timeZone: "America/Bogota",
+  });
+  const mes = proxima
+    .toLocaleDateString("es-CO", { month: "short", timeZone: "America/Bogota" })
+    .replace(".", "");
+  const semana = proxima.toLocaleDateString("es-CO", {
+    weekday: "long",
+    timeZone: "America/Bogota",
+  });
+  const conCupo = cargos.filter((c) => c.cupo > 0);
   return (
     <section className="resumen-grid" aria-label="Resumen del panel">
-      <TarjetaResumen
-        icono={Users}
-        titulo="Clientes"
-        numero={clientes}
-        detalle={`${perfiles} ${perfiles === 1 ? "perfil" : "perfiles"} de búsqueda`}
-        accion="Ver clientes"
+      <button
+        type="button"
+        className="tarjeta-resumen tarjeta-clientes"
         onClick={() => go("Clientes")}
-      />
-      <TarjetaResumen
-        icono={SlidersHorizontal}
-        titulo="Cargos y cupos"
-        numero={total}
-        extra=" / 120"
-        tono={total === 120 ? "green" : "amber"}
-        detalle={
-          total === 120
-            ? "Distribución completa"
-            : total > 120
-              ? `Sobran ${total - 120}: quita cupos`
-              : `Faltan ${120 - total} por repartir`
+      >
+        <span className="tarjeta-cabeza">
+          <Users size={18} />
+          Clientes
+        </span>
+        <strong className="tarjeta-numero">
+          {clientes.length}
+          <small>
+            {" "}
+            {clientes.length === 1 ? "activo" : "activos"} · {perfiles}{" "}
+            {perfiles === 1 ? "perfil" : "perfiles"}
+          </small>
+        </strong>
+        <ul className="clientes-mini">
+          {clientes.slice(0, 4).map((c, i) => (
+            <li key={i}>
+              <span>{c.nombre}</span>
+              <span>{c.cargo}</span>
+            </li>
+          ))}
+          {clientes.length > 4 && (
+            <li className="mas">y {clientes.length - 4} más</li>
+          )}
+        </ul>
+        <span className="tarjeta-accion">
+          Ver clientes
+          <ArrowRight size={15} />
+        </span>
+        <span className="marca-agua" aria-hidden="true">
+          {clientes.length}
+        </span>
+      </button>
+
+      <button
+        type="button"
+        className={
+          "tarjeta-resumen tarjeta-cupos " + (total === 120 ? "green" : "amber")
         }
-        accion="Editar cupos"
         onClick={() => go("Cargos y cupos")}
       >
-        <span className="quota-track tarjeta-barra" aria-hidden="true">
-          {cargos.map((c, i) => (
+        <span className="tarjeta-cabeza">
+          <SlidersHorizontal size={17} />
+          Cargos y cupos
+        </span>
+        <div className="cupos-fila">
+          <strong className="tarjeta-numero">
+            {total}
+            <small> / 120</small>
+          </strong>
+          <span className="tarjeta-detalle">
+            {total === 120
+              ? "Distribución completa"
+              : total > 120
+                ? `Sobran ${total - 120}: quita cupos`
+                : `Faltan ${120 - total} por repartir`}
+          </span>
+        </div>
+        <span className="cupos-barra" aria-hidden="true">
+          {conCupo.map((c, i) => (
             <span
               key={c.id}
               style={{
                 width: (c.cupo / Math.max(total, 120)) * 100 + "%",
                 background: colores[i % 5],
+                animationDelay: 120 + i * 70 + "ms",
               }}
             />
           ))}
         </span>
-      </TarjetaResumen>
-      <TarjetaResumen
-        icono={BriefcaseBusiness}
-        titulo="Vacantes"
-        numero={ultima ? (r.vacantes ?? 0) : "—"}
-        extra={ultima ? ` / ${r.meta ?? 120}` : undefined}
-        detalle={
-          ultima ? `Búsqueda del ${fecha(ultima.fecha)}` : "Sin búsquedas aún"
-        }
-        accion="Ver vacantes"
+        <span className="cupos-leyenda">
+          {conCupo.map((c, i) => (
+            <span key={c.id}>
+              <i style={{ background: colores[i % 5] }} />
+              {c.nombre} <b>{c.cupo}</b>
+            </span>
+          ))}
+        </span>
+        <span className="tarjeta-accion">
+          Editar cupos
+          <ArrowRight size={15} />
+        </span>
+      </button>
+
+      <button
+        type="button"
+        className="tarjeta-resumen tarjeta-chica tarjeta-vacantes"
         onClick={() => go("Vacantes")}
-      />
-      <TarjetaResumen
-        icono={MapPin}
-        titulo="Por confirmar"
-        numero={porConfirmar}
-        tono={porConfirmar ? "amber" : undefined}
-        detalle={
-          porConfirmar ? "Vacantes esperando tu decisión" : "Nada pendiente"
+      >
+        <span className="tarjeta-cabeza">
+          <BriefcaseBusiness size={16} />
+          Vacantes
+        </span>
+        <strong className="tarjeta-numero">
+          {ultima ? (r.vacantes ?? 0) : "—"}
+          {ultima && <small> / {r.meta ?? 120}</small>}
+        </strong>
+        <span className="tarjeta-detalle">
+          {ultima ? `Búsqueda del ${fecha(ultima.fecha)}` : "Sin búsquedas aún"}
+        </span>
+        <span className="tarjeta-accion">
+          Ver vacantes
+          <ArrowRight size={14} />
+        </span>
+      </button>
+
+      <button
+        type="button"
+        className={
+          "tarjeta-resumen tarjeta-chica tarjeta-confirmar" +
+          (porConfirmar ? " pendiente" : "")
         }
-        accion="Revisar"
         onClick={() => go("Por confirmar")}
-      />
-      <TarjetaResumen
-        icono={MessageCircle}
-        titulo="Mensajes de hoy"
-        numero={borradores ? vivos.length : "—"}
-        detalle={
-          !borradores
+      >
+        <span className="tarjeta-cabeza">
+          <MapPin size={16} />
+          Por confirmar
+          {porConfirmar > 0 && (
+            <span className="punto-vivo" aria-hidden="true" />
+          )}
+        </span>
+        <strong className="tarjeta-numero">{porConfirmar}</strong>
+        <span className="tarjeta-detalle">
+          {porConfirmar ? "Esperan tu decisión" : "Nada pendiente"}
+        </span>
+        <span className="tarjeta-accion">
+          Revisar
+          <ArrowRight size={14} />
+        </span>
+      </button>
+
+      <button
+        type="button"
+        className="tarjeta-resumen tarjeta-chica tarjeta-mensajes"
+        onClick={() => go("Mensajes")}
+      >
+        <span className="tarjeta-cabeza">
+          <MessageCircle size={16} />
+          Mensajes de hoy
+        </span>
+        <strong className="tarjeta-numero">
+          {borradores ? vivos.length : "—"}
+        </strong>
+        <span className="tarjeta-detalle">
+          {!borradores
             ? "Ábrelos para prepararlos"
             : vivos.length
               ? `${enviados} ${enviados === 1 ? "enviado" : "enviados"} de ${vivos.length}`
-              : "Aún no preparados"
-        }
-        accion="Ver mensajes"
-        onClick={() => go("Mensajes")}
-      />
-      <TarjetaResumen
-        icono={Clock3}
-        titulo="Actividad"
-        numero={
-          <span className="tarjeta-texto">
-            {ultima
-              ? estadosEjecucion[ultima.estado] || ultima.estado
-              : "Sin búsquedas"}
-          </span>
-        }
-        tono={
-          !ultima ? undefined : ultima.estado === "completa" ? "green" : "amber"
-        }
-        detalle={
-          ultima
-            ? `Última: ${fecha(ultima.fecha)} · ${hora}`
-            : "Aún no hay registro"
-        }
-        accion="Ver actividad"
+              : "Aún no preparados"}
+        </span>
+        <span className="tarjeta-accion">
+          Ver mensajes
+          <ArrowRight size={14} />
+        </span>
+      </button>
+
+      <button
+        type="button"
+        className="tarjeta-resumen tarjeta-actividad"
         onClick={() => go("Actividad")}
-      />
+      >
+        <span className="evento-fecha" aria-hidden="true">
+          <b>{dia}</b>
+          <span>{mes}</span>
+        </span>
+        <span className="evento-texto">
+          <span className="tarjeta-cabeza">
+            <Clock3 size={15} />
+            Actividad
+          </span>
+          <span className="evento-titulo">
+            Próxima búsqueda: {semana} {dia} de {mes} · 6:30 a. m.
+          </span>
+          <span className="tarjeta-detalle">
+            {ultima
+              ? `Última, del ${fecha(ultima.fecha)}: ${(estadosEjecucion[ultima.estado] || ultima.estado).toLowerCase()}`
+              : "Aún no hay búsquedas registradas"}
+          </span>
+        </span>
+        {ultima && (
+          <span
+            className={
+              "pill " + (ultima.estado === "completa" ? "green" : "amber")
+            }
+          >
+            {estadosEjecucion[ultima.estado] || ultima.estado}
+          </span>
+        )}
+        <span className="tarjeta-accion">
+          Ver actividad
+          <ArrowRight size={14} />
+        </span>
+      </button>
     </section>
   );
 }
@@ -2893,7 +2976,17 @@ function App() {
             <>
               <AvisoUltimaBusqueda ultima={runs?.[0]} />
               <TarjetasResumen
-                clientes={clientes.length}
+                clientes={clientes.map((c) => ({
+                  nombre: c.nombre,
+                  cargo:
+                    draft.cargos.find(
+                      (x) =>
+                        x.id ===
+                        draft.perfiles.find(
+                          (p) => p.cliente_id === c.id && p.activo,
+                        )?.cargo_id,
+                    )?.nombre || "Sin perfil",
+                }))}
                 perfiles={
                   draft.perfiles.filter(
                     (p) =>
