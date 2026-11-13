@@ -2235,6 +2235,31 @@ function App() {
       setBusy(false);
     }
   }
+  const [descargandoBase, setDescargandoBase] = useState(false);
+  // Descarga la base y dice cuántas vacantes trae (contarlas en Excel confundía: 13 nov).
+  async function descargarBase() {
+    setDescargandoBase(true);
+    try {
+      const r = await fetch("/api/base.csv", { credentials: "same-origin" });
+      if (!r.ok)
+        throw new Error("No se pudo descargar la base. Inténtalo de nuevo.");
+      const incluidas = r.headers.get("X-Incluidas") || "?";
+      const omitidas = r.headers.get("X-Omitidas-Sin-Confirmar") || "0";
+      const url = URL.createObjectURL(await r.blob());
+      const enlace = document.createElement("a");
+      enlace.href = url;
+      enlace.download = `base-vacantes-${new Date().toISOString().slice(0, 10)}.csv`;
+      enlace.click();
+      URL.revokeObjectURL(url);
+      notify(
+        `Base descargada: ${incluidas} vacantes (se dejaron fuera ${omitidas} sin confirmar).`,
+      );
+    } catch (e) {
+      notify((e as Error).message, true);
+    } finally {
+      setDescargandoBase(false);
+    }
+  }
   async function abrirWhatsApp() {
     setBusy(true);
     try {
@@ -3058,15 +3083,15 @@ function App() {
                   <MessageCircle size={18} />
                   Copiar WhatsApp
                 </button>
-                <a
+                <button
                   className="button secondary"
-                  href="/api/base.csv"
-                  download
+                  onClick={descargarBase}
+                  disabled={descargandoBase}
                   title="Todas las vacantes entregadas (tabla ofertas), sin las que tienen el país sin confirmar"
                 >
                   <ArrowDownToLine size={16} />
-                  Descargar base (CSV)
-                </a>
+                  {descargandoBase ? "Descargando…" : "Descargar base (CSV)"}
+                </button>
               </div>
               <div className="toolbar">
                 <div className="search-input">

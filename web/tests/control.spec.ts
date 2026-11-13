@@ -344,4 +344,8 @@ test("revisión masiva por CSV y reglas aprendidas sin IA", async ({
   await regla.getByRole("button", { name: "Desactivar" }).click();
   await expect(page.getByText("Regla desactivada.")).toBeVisible();
   await expect(regla.getByRole("button", { name: "Activar" })).toBeVisible();
+  // Descarga de la base desde Vacantes, con el conteo a la vista.
+  await page.getByRole("button", { name: "Vacantes", exact: true }).click();
+  await page.getByRole("button", { name: "Descargar base (CSV)" }).click();
+  await expect(page.getByText(/Base descargada: 1 vacantes/)).toBeVisible();
 });

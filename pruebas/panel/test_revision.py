@@ -342,3 +342,12 @@ def test_base_ofertas_lee_mas_de_una_pagina_con_ids_numericos(monkeypatch):
     assert len(repo.base_ofertas()) == 592
     texto, incluidas, omitidas = revision.exportar_base(repo)
     assert incluidas == 592 and omitidas == 0 and texto.count("\n") == 593
+
+
+def test_base_una_fila_por_vacante_aunque_haya_saltos_de_linea():
+    class R(RepositorioDemo):
+        def base_ofertas(self):
+            return [{"id": 1, "external_id": "a", "description": "Línea uno\nLínea dos\r\n\tTres",
+                     "catalogo_vacantes": {"reason": None, "confianza": "alta"}}]
+    texto, incluidas, _ = revision.exportar_base(R())
+    assert incluidas == 1 and texto.count("\n") == 2 and "Línea uno Línea dos Tres" in texto
