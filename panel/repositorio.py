@@ -119,8 +119,12 @@ class RepositorioSupabase:
 
     def base_ofertas(self):
         """Todas las filas de `ofertas` con la razón y la confianza de país de su vacante en el catálogo."""
-        params = {"select": "*,catalogo_vacantes(reason,status,confianza:datos->>confianza_pais)"}
-        return list(self._paginas("ofertas", "id", params, 500))
+        try:
+            params = {"select": "*,catalogo_vacantes(reason,status,confianza:datos->>confianza_pais)"}
+            return list(self._paginas("ofertas", "id", params, 500))
+        except ErrorRepositorio:
+            # Respaldo: sin el campo calculado de `datos`; la razón del catálogo basta para omitir las sin confirmar.
+            return list(self._paginas("ofertas", "id", {"select": "*,catalogo_vacantes(reason,status)"}, 500))
 
     def contar(self, tabla, params):
         """Cuántas filas cumplen el filtro (cabecera Content-Range con count=exact); None si no se pudo contar."""
@@ -240,7 +244,7 @@ class RepositorioSupabase:
         ultimo = ""
         while True:
             lote = self.pedir("GET", ruta, params={**params, "order": clave, "limit": tamano,
-                                                    **({clave: "gt." + ultimo} if ultimo else {})})
+                                                    **({clave: "gt." + str(ultimo)} if ultimo else {})})
             yield from lote
             if len(lote) < tamano:
                 return

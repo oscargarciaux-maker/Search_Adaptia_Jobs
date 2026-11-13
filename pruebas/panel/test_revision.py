@@ -325,3 +325,20 @@ def test_descargar_base_sin_las_sin_confirmar():
     descartada = {"catalogo_vacantes": {"reason": "descartada por el operador", "confianza": "alta"}}
     cerrada = {"catalogo_vacantes": {"reason": "vacante cerrada", "confianza": "alta"}}
     assert revision.sin_confirmar(descartada) and not revision.sin_confirmar(cerrada)
+
+
+def test_base_ofertas_lee_mas_de_una_pagina_con_ids_numericos(monkeypatch):
+    from types import SimpleNamespace
+    from panel.repositorio import RepositorioSupabase
+    monkeypatch.setattr("buscador.supabase.credenciales", lambda: ("https://prueba.supabase.co", "clave-ficticia"))
+    todas = [{"id": n, "external_id": f"x{n}", "catalogo_vacantes": {"reason": None, "confianza": "alta"}}
+             for n in range(1, 593)]  # 592 filas: más de una página de 500, como la base real
+
+    def request(metodo, url, **op):
+        desde = int(op["params"].get("id", "gt.0")[3:])
+        lote = [f for f in todas if f["id"] > desde][:op["params"]["limit"]]
+        return SimpleNamespace(status_code=200, content=b"[]", json=lambda: lote)
+    repo = RepositorioSupabase(SimpleNamespace(request=request))
+    assert len(repo.base_ofertas()) == 592
+    texto, incluidas, omitidas = revision.exportar_base(repo)
+    assert incluidas == 592 and omitidas == 0 and texto.count("\n") == 593
