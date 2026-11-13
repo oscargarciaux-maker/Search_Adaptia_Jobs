@@ -87,12 +87,15 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False):
     recibidas = repo.recibidas([str(p.id) for _, p in perfiles])
     for f in filas_hoy:
         recibidas.setdefault(f["perfil_id"], set()).add(f["vacante_id"])
-    candidatos = []
+    candidatos, leidas, fuera_idioma, ya_claras = [], 0, 0, 0
     for fila in repo.candidatas_por_confirmar(desde):
+        leidas += 1
         datos = _datos(fila)
         if datos.get("idioma") not in ("es", "en") or not datos.get("titulo"):
+            fuera_idioma += 1
             continue
         if datos.get("confianza_pais") != "baja" and datos.get("nota_pais") != "por zona horaria":
+            ya_claras += 1
             continue
         sirve = []
         for cargo, p in perfiles:
@@ -104,7 +107,8 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False):
                           "faltan": estrictas.get(p.id, 0) < MINIMO_POR_PERFIL})
         if sirve or completa:
             texto = pista(datos.get("_descripcion", ""), datos.get("ubicacion", ""))
-            candidatos.append({"vacante_id": fila["id"], "motivo": MOTIVO if sirve else DEPURACION, "pista": texto,
+            # Las cargadas a mano (botón) siempre son «depuración completa»: la búsqueda siguiente no las vence.
+            candidatos.append({"vacante_id": fila["id"], "motivo": DEPURACION if completa else MOTIVO, "pista": texto,
                                "ubicacion": clave_ubicacion(datos.get("ubicacion", "")), "sugerencia": sugerencia(texto),
                                "perfiles": sirve, "prioridad": sum(100 if s["faltan"] else 10 for s in sirve)
                                + max(0, 30 - _edad(datos, fecha))})
@@ -150,6 +154,7 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False):
                 pass
     actuales = repo.revisiones(estado="pendiente")
     return {"por_confirmar": len(actuales), "resueltas_por_regla": por_regla, "agregadas": len(nuevas) - por_regla,
+            "leidas_del_catalogo": leidas, "fuera_por_idioma": fuera_idioma, "ya_claras": ya_claras,
             "por_confirmar_faltantes": sum(1 for r in actuales if any(p.get("faltan") for p in r.get("perfiles") or []))}
 
 

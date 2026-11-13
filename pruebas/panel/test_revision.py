@@ -170,7 +170,8 @@ def test_depuracion_completa_carga_todas_incluso_las_que_no_sirven_a_nadie():
     r._candidatas = []
     revision.preparar_cola(r, cfg, hoy(), {p.id: 5 for p in cfg.perfiles})
     estados = {p["vacante_id"]: p["estado"] for p in super(Repo, r).revisiones()}
-    assert estados[ajena["id"]] == "pendiente"
+    assert set(estados.values()) == {"pendiente"}  # también las que sirven a un cliente: las cargó la persona
+    assert resumen["leidas_del_catalogo"] == 4 and resumen["fuera_por_idioma"] == 0
 
 
 def test_decidir_actualiza_el_catalogo_al_momento_y_sin_perfiles_no_exige_busqueda():

@@ -136,8 +136,11 @@ def datos():
 
 def _paises_nombrados(t):
     """Códigos de los países de LATAM nombrados en el texto normalizado (por país, gentilicio o ciudad)."""
+    claves = datos()["claves"]
+    if not _nombra(t, [frase for frase, _ in claves]):  # una sola expresión compilada: casi ningún texto nombra un país
+        return []
     hallados, usado = [], t
-    for frase, codigo in datos()["claves"]:
+    for frase, codigo in claves:
         if normalizar.contiene_frase(usado, frase):
             if codigo not in hallados:
                 hallados.append(codigo)
