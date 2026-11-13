@@ -310,3 +310,18 @@ def test_consulta_de_dudosas_sin_espacios_y_conteos(monkeypatch):
     consulta = urlencode(vistas[0])
     assert " " not in vistas[0]["reason"] and "+" not in consulta.split("reason=")[1].split("&")[0]
     assert repo.conteo_dudosas() == {"catalogo": 8306, "por_confirmar": 7, "confianza_baja": 9}
+
+
+def test_descargar_base_sin_las_sin_confirmar():
+    import csv
+    import io
+    api = TestClient(crear_app(demo=True, repositorio=RepositorioDemo()))
+    r = api.get("/api/base.csv")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/csv")
+    assert r.headers["x-incluidas"] == "1" and r.headers["x-omitidas-sin-confirmar"] == "1"
+    filas = list(csv.DictReader(io.StringIO(r.text.lstrip("﻿"))))
+    assert [f["external_id"] for f in filas] == ["demo-1"]
+    assert filas[0]["hire_countries"] == '["CO"]' and filas[0]["estado_en_catalogo"] == "activa"
+    descartada = {"catalogo_vacantes": {"reason": "descartada por el operador", "confianza": "alta"}}
+    cerrada = {"catalogo_vacantes": {"reason": "vacante cerrada", "confianza": "alta"}}
+    assert revision.sin_confirmar(descartada) and not revision.sin_confirmar(cerrada)

@@ -261,6 +261,15 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         return Response(revision.exportar_csv(repo, hoy()), media_type="text/csv; charset=utf-8",
                         headers={"Content-Disposition": f'attachment; filename="por-confirmar-{hoy()}.csv"'})
 
+    @app.get("/api/base.csv")
+    def descargar_base():
+        from fastapi.responses import Response
+        from panel import revision
+        texto, incluidas, omitidas = revision.exportar_base(repo)
+        return Response(texto, media_type="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": f'attachment; filename="base-vacantes-{hoy()}.csv"',
+                                 "X-Incluidas": str(incluidas), "X-Omitidas-Sin-Confirmar": str(omitidas)})
+
     @app.post("/api/revisiones/csv")
     def subir_revisiones(body: SubirRevision):
         from panel import revision

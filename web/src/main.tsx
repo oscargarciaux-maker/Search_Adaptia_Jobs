@@ -3058,6 +3058,15 @@ function App() {
                   <MessageCircle size={18} />
                   Copiar WhatsApp
                 </button>
+                <a
+                  className="button secondary"
+                  href="/api/base.csv"
+                  download
+                  title="Todas las vacantes entregadas (tabla ofertas), sin las que tienen el país sin confirmar"
+                >
+                  <ArrowDownToLine size={16} />
+                  Descargar base (CSV)
+                </a>
               </div>
               <div className="toolbar">
                 <div className="search-input">

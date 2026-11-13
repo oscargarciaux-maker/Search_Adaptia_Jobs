@@ -117,6 +117,11 @@ class RepositorioSupabase:
             params["observed_at"] = "gte." + desde
         return self._paginas("catalogo_vacantes", "id", params, 500)
 
+    def base_ofertas(self):
+        """Todas las filas de `ofertas` con la razón y la confianza de país de su vacante en el catálogo."""
+        params = {"select": "*,catalogo_vacantes(reason,status,confianza:datos->>confianza_pais)"}
+        return list(self._paginas("ofertas", "id", params, 500))
+
     def contar(self, tabla, params):
         """Cuántas filas cumplen el filtro (cabecera Content-Range con count=exact); None si no se pudo contar."""
         try:
@@ -518,6 +523,16 @@ class RepositorioDemo:
 
     def candidatas_por_confirmar(self, desde=None):
         return []  # la demostración trae su bandeja ya preparada
+
+    def base_ofertas(self):
+        """Dos filas ficticias de `ofertas` (una confirmada y una por confirmar) para probar la descarga."""
+        return [{"id": 1, "external_id": "demo-1", "job_title": "Product Designer", "company_name": "Orbita",
+                 "offer_url": "https://example.org/empleos/demo-1", "location": "Bogotá, Colombia",
+                 "hire_countries": ["CO"], "catalogo_vacantes": {"reason": None, "status": "active", "confianza": "alta"}},
+                {"id": 2, "external_id": "demo-2", "job_title": "QA Engineer", "company_name": "Lumen",
+                 "offer_url": "https://example.org/empleos/demo-2", "location": "Remote", "hire_countries": [],
+                 "catalogo_vacantes": {"reason": "elegibilidad regional por confirmar", "status": "archived",
+                                       "confianza": "baja"}}]
 
     def _guardar(self):
         if self.archivo:

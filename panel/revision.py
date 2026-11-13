@@ -579,3 +579,38 @@ def cargar_todas(repo, fecha, avance=None):
     conteo = repo.conteo_asignaciones(ejecucion["id"], [str(p.id) for p in cfg.perfiles]) if ejecucion else {}
     estrictas = {p.id: conteo.get(str(p.id), 0) for p in cfg.perfiles}
     return preparar_cola(repo, cfg, fecha, estrictas, completa=True, avance=avance)
+
+
+# ── Descarga de la base para el cliente (13 nov): `ofertas` sin las vacantes con país sin confirmar ──────────────────
+EXCLUIDAS_BASE = {"descartada por el operador"}
+
+
+def sin_confirmar(fila):
+    """True si la vacante de esta fila de `ofertas` tiene el país sin confirmar o el operador la descartó."""
+    cat = fila.get("catalogo_vacantes") or {}
+    razon = cat.get("reason") or ""
+    return cat.get("confianza") == "baja" or razon.startswith(POR_CONFIRMAR) or razon in EXCLUIDAS_BASE
+
+
+def exportar_base(repo):
+    """CSV con todas las columnas de `ofertas` más «estado_en_catalogo» (activa, cerrada, enlace roto…), sin las sin
+    confirmar. Las listas y objetos van como JSON. Devuelve (texto, incluidas, omitidas)."""
+    import csv
+    import io
+    import json
+    filas = repo.base_ofertas()
+    incluidas = [f for f in filas if not sin_confirmar(f)]
+    columnas = []
+    for f in incluidas:
+        for k in f:
+            if k != "catalogo_vacantes" and k not in columnas:
+                columnas.append(k)
+    salida = io.StringIO()
+    escritor = csv.writer(salida)
+    escritor.writerow(columnas + ["estado_en_catalogo"])
+    for f in incluidas:
+        cat = f.get("catalogo_vacantes") or {}
+        valores = [json.dumps(f.get(k), ensure_ascii=False) if isinstance(f.get(k), (list, dict)) else
+                   ("" if f.get(k) is None else f.get(k)) for k in columnas]
+        escritor.writerow(valores + [cat.get("reason") or ("activa" if cat else "sin catálogo")])
+    return "\ufeff" + salida.getvalue(), len(incluidas), len(filas) - len(incluidas)
