@@ -315,6 +315,10 @@ test("revisión masiva por CSV y reglas aprendidas sin IA", async ({
   expect(
     (await (await request.get("/api/revisiones.csv")).text()).split("\n")[0],
   ).toContain("decision,pais,por_que,cargo,empresa,ubicacion");
+  // Descarga de la base para el cliente: sin las vacantes con país sin confirmar.
+  const base = await (await request.get("/api/base.csv")).text();
+  expect(base).toContain("demo-1");
+  expect(base).not.toContain("demo-2");
   // Depuración completa (v17): un botón llena la bandeja sin esperar la búsqueda de la noche.
   await page
     .getByRole("button", { name: "Cargar todas las dudosas de la base" })
