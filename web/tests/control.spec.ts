@@ -66,7 +66,11 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await dialog.getByLabel("Aceptó recibir vacantes por WhatsApp").uncheck();
   await dialog.getByLabel("Cargo del perfil 1").selectOption({ label: "QA" });
   await dialog.getByLabel("Antigüedad del perfil 1").selectOption("7");
-  await dialog.getByLabel("Experiencia máxima del perfil 1").fill("4");
+  // Contrato v20: un solo campo de años; busca de 3 menos a 3 más.
+  await dialog.getByLabel("Años de experiencia del perfil 1").fill("4");
+  await expect(
+    dialog.getByText("Busca vacantes que pidan de 1 a 7 años."),
+  ).toBeVisible();
   // Contrato v8: país de residencia y varias modalidades, sin las 21 casillas.
   await dialog
     .getByLabel("País de residencia del perfil 1")

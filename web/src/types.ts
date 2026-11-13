@@ -22,6 +22,7 @@ export type Perfil = {
   ingles_maximo: string;
   experiencia_min: number | null;
   experiencia_max: number | null;
+  experiencia_anos?: number | null;
   aceptar_experiencia_sin_dato: boolean;
   aceptar_ingles_sin_dato: boolean;
 };

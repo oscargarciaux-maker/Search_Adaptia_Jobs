@@ -55,6 +55,9 @@ class Cargo(Modelo):
         return salida
 
 
+RANGO_EXPERIENCIA = 3  # contrato v20: de 3 años menos a 3 años más
+
+
 class Perfil(Modelo):
     id: UUID
     cliente_id: UUID
@@ -70,6 +73,9 @@ class Perfil(Modelo):
     ingles_maximo: Literal["sin_filtro", "A1", "A2", "B1", "B2", "C1", "C2", "native"] = "sin_filtro"
     experiencia_min: int | None = Field(default=None, ge=0, le=40)
     experiencia_max: int | None = Field(default=None, ge=0, le=40)
+    # Contrato v20: años que tiene la persona; el rango buscado (±3) se calcula aquí. Vacío: sin filtro, o el rango
+    # antiguo de un perfil guardado antes de v20.
+    experiencia_anos: int | None = Field(default=None, ge=0, le=40)
     aceptar_experiencia_sin_dato: bool = False
     aceptar_ingles_sin_dato: bool = False
 
@@ -115,6 +121,9 @@ class Perfil(Modelo):
 
     @model_validator(mode="after")
     def rango(self):
+        if self.experiencia_anos is not None:
+            self.experiencia_min = max(0, self.experiencia_anos - RANGO_EXPERIENCIA)
+            self.experiencia_max = min(40, self.experiencia_anos + RANGO_EXPERIENCIA)
         if self.experiencia_min is not None and self.experiencia_max is not None and self.experiencia_min > self.experiencia_max:
             raise ValueError("El mínimo de experiencia no puede superar al máximo.")
         self.paises_presenciales_extra = [c for c in self.paises_presenciales_extra if c != self.vive_en]
@@ -167,6 +176,7 @@ _MOTIVOS_CAMPO = {
     ("perfiles", "idiomas"): "Elige al menos un idioma de los avisos: español o inglés.",
     ("perfiles", "experiencia_min"): "Los años de experiencia van de 0 a 40.",
     ("perfiles", "experiencia_max"): "Los años de experiencia van de 0 a 40.",
+    ("perfiles", "experiencia_anos"): "Los años de experiencia van de 0 a 40.",
     ("perfiles", "antiguedad_dias"): "La antigüedad de publicación va de 1 a 30 días.",
     ("perfiles", "vive_en"): "Elige en qué país vive: LATAM o España.",
     ("perfiles", "cargo_id"): "Elige un cargo para el perfil.",
