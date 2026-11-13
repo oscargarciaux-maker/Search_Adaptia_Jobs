@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   ArrowDownToLine,
+  Info,
   Upload,
   ArrowLeft,
   ArrowRight,
@@ -147,6 +148,40 @@ function perfilNuevo(cliente: string, cargo: string): Perfil {
     aceptar_experiencia_sin_dato: false,
     aceptar_ingles_sin_dato: false,
   };
+}
+
+// Sección 6 (13 nov): explicación a demanda (ⓘ). Se ve al pasar el ratón, al enfocar con teclado o al tocar; Escape la
+// cierra. Así las explicaciones no ocupan pantalla todo el tiempo.
+function Ayuda({
+  etiqueta,
+  children,
+}: {
+  etiqueta: string;
+  children: React.ReactNode;
+}) {
+  const id = useId();
+  return (
+    <span className="ayuda">
+      <button
+        type="button"
+        className="ayuda-boton"
+        aria-label={"Más información: " + etiqueta}
+        aria-describedby={id}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.preventDefault(); // cierra la ayuda, no el diálogo
+            e.stopPropagation();
+            e.currentTarget.blur();
+          }
+        }}
+      >
+        <Info size={15} aria-hidden="true" />
+      </button>
+      <span role="tooltip" id={id} className="ayuda-texto">
+        {children}
+      </span>
+    </span>
+  );
 }
 
 function Dialog({
@@ -710,7 +745,6 @@ function PreviewCargo({
       className={
         "preview-chip " + info.estado + (estado === "cargando" ? " stale" : "")
       }
-      title="Vacantes ya guardadas, aún no entregadas, que cumplen los filtros de algún perfil de este cargo."
     >
       <Target size={12} />≈ {info.disponibles} guardadas sin entregar ·{" "}
       {textoEstadoCargo[info.estado]}
@@ -719,12 +753,16 @@ function PreviewCargo({
           {" "}
           · comparte{" "}
           {info.solapes
-            .map((s) => s.vacantes + " vacantes con «" + s.cargo + "»")
+            .map((s) => s.vacantes + " con «" + s.cargo + "»")
             .join(", ")}
-          : se reparten por turnos según lo que le falta a cada uno. Mejor un
-          solo cargo con varios perfiles.
         </span>
       )}
+      <Ayuda etiqueta="vacantes del cargo">
+        Vacantes ya guardadas, aún no entregadas, que cumplen los filtros de
+        algún perfil de este cargo.
+        {!!info.solapes?.length &&
+          " Las que sirven a dos cargos se reparten por turnos según lo que le falta a cada uno. Mejor un solo cargo con varios perfiles."}
+      </Ayuda>
     </div>
   );
 }
@@ -1744,7 +1782,14 @@ function ClienteDialog({
               </div>
             </div>
             <fieldset className="field plain">
-              <legend>¿Qué modalidades acepta?</legend>
+              <legend>
+                ¿Qué modalidades acepta?{" "}
+                <Ayuda etiqueta="modalidades">
+                  Remoto: vacantes de LATAM, España o del mundo abiertas a su
+                  país. Híbrido y presencial: solo con oficina en su país o en
+                  los países a los que se mudaría (se eligen abajo).
+                </Ayuda>
+              </legend>
               <div className="check-line">
                 {Object.entries(modos).map(([v, t]) => (
                   <label key={v}>
@@ -1764,14 +1809,6 @@ function ClienteDialog({
                   </label>
                 ))}
               </div>
-              <p className="field-help">
-                {p.modalidades.includes("remoto")
-                  ? "Remoto incluye vacantes de LATAM, España o del mundo abiertas a su país. "
-                  : ""}
-                {p.modalidades.some((m) => m !== "remoto")
-                  ? "Híbrido y presencial: solo con oficina en su país o en los que elija abajo."
-                  : ""}
-              </p>
             </fieldset>
             {p.modalidades.some((m) => m !== "remoto") && (
               <details
@@ -2623,6 +2660,17 @@ function App() {
             </div>
             {["Resumen", "Clientes", "Cargos y cupos"].includes(tab) && (
               <div className="heading-actions">
+                <span className={"flow-pill" + (dirty ? " pending" : "")}>
+                  {dirty
+                    ? "Cambios sin guardar"
+                    : estado?.publicada &&
+                        estado.publicada.revision === estado.revision
+                      ? "Programado desde el " +
+                        fecha(estado.publicada.vigente_desde)
+                      : estado?.revision
+                        ? "Borrador guardado, sin programar"
+                        : "Sin configuración programada"}
+                </span>
                 <button
                   className="button secondary"
                   onClick={guardarClick}
@@ -2631,6 +2679,15 @@ function App() {
                   <Save size={16} />
                   {busy ? "Guardando…" : "Guardar borrador"}
                 </button>
+                <Ayuda etiqueta="Guardar y programar">
+                  <strong>Guardar borrador</strong> conserva tus cambios sin
+                  tocar la próxima búsqueda.{" "}
+                  <strong>Programar para mañana</strong> los guarda y los usa
+                  desde la búsqueda de la 1:17 a. m. (hora Colombia).
+                  «Programado desde el …» es el día desde el que las búsquedas
+                  usan esta configuración; las que ya empezaron siguen con la
+                  anterior.
+                </Ayuda>
                 <button
                   className="button primary"
                   onClick={() => setModal("publicar")}
@@ -2642,27 +2699,6 @@ function App() {
               </div>
             )}
           </div>
-          {["Resumen", "Clientes", "Cargos y cupos"].includes(tab) && (
-            <div className={"flow-status" + (dirty ? " pending" : "")}>
-              <span className="flow-pill">
-                {dirty
-                  ? "Cambios sin guardar"
-                  : estado?.publicada &&
-                      estado.publicada.revision === estado.revision
-                    ? "Programado desde el " +
-                      fecha(estado.publicada.vigente_desde)
-                    : estado?.revision
-                      ? "Borrador guardado, sin programar"
-                      : "Sin configuración programada"}
-              </span>
-              <span>
-                <strong>Programar para mañana</strong> guarda tus cambios y los
-                aplica desde la búsqueda de la 1:17 a. m. (hora Colombia).{" "}
-                <strong>Guardar borrador</strong> solo los conserva, sin cambiar
-                la próxima búsqueda.
-              </span>
-            </div>
-          )}
           {tab === "Resumen" && (
             <>
               <AvisoUltimaBusqueda ultima={runs?.[0]} />
@@ -2785,43 +2821,31 @@ function App() {
               <div
                 className={"allocation card " + (total > 120 ? "invalid" : "")}
               >
-                <div>
-                  <span className="tiny-kicker">DISTRIBUCIÓN DIARIA</span>
-                  <h2>
-                    {total}
-                    <span> / 120 vacantes</span>
-                  </h2>
-                  <p>
-                    {total === 120
-                      ? "Tu distribución está completa. Puedes programar la búsqueda."
-                      : total < 120
-                        ? "Te faltan " +
-                          (120 - total) +
-                          " vacantes por distribuir."
-                        : "Reduce " +
-                          (total - 120) +
-                          " vacantes para respetar el objetivo diario."}
-                  </p>
-                </div>
-                <div className="allocation-right">
-                  <div className="allocation-track">
-                    <span
-                      style={{
-                        width: Math.min((total / 120) * 100, 100) + "%",
-                      }}
-                    />
-                  </div>
-                  <button
-                    className="button secondary"
-                    onClick={() => {
-                      setEditCargo(null);
-                      setModal("cargo");
+                <p className="allocation-texto">
+                  <strong>{total}</strong> / 120 vacantes ·{" "}
+                  {total === 120
+                    ? "Distribución completa"
+                    : total < 120
+                      ? "Faltan " + (120 - total) + " por repartir"
+                      : "Sobran " + (total - 120) + ": quita cupos"}
+                </p>
+                <div className="allocation-track">
+                  <span
+                    style={{
+                      width: Math.min((total / 120) * 100, 100) + "%",
                     }}
-                  >
-                    <Plus size={16} />
-                    Añadir cargo
-                  </button>
+                  />
                 </div>
+                <button
+                  className="button secondary small"
+                  onClick={() => {
+                    setEditCargo(null);
+                    setModal("cargo");
+                  }}
+                >
+                  <Plus size={16} />
+                  Añadir cargo
+                </button>
               </div>
               <div className="role-list">
                 {cargos.map((c, i) => (
@@ -3307,8 +3331,9 @@ function App() {
           onClose={() => setModal(null)}
         >
           <p className="dialog-copy">
-            «{archive.nombre}» dejará de participar en la próxima configuración.
-            Su historial se conservará.
+            {archive.tipo === "cliente"
+              ? `Desde la próxima búsqueda programada, «${archive.nombre}» deja de recibir vacantes. Las vacantes que ya recibió se conservan y puedes reactivarlo cuando quieras.`
+              : `Desde la próxima búsqueda programada se deja de buscar «${archive.nombre}». Las vacantes ya entregadas se conservan.`}
           </p>
           <div className="dialog-actions">
             <button className="button secondary" onClick={() => setModal(null)}>
@@ -3333,7 +3358,9 @@ function App() {
                       },
                 );
                 setModal(null);
-                notify("Archivado en el borrador. El historial se conserva.");
+                notify(
+                  "Archivado en el borrador. Sus vacantes ya recibidas se conservan.",
+                );
               }}
             >
               <Archive size={16} />

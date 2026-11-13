@@ -1,4 +1,5 @@
 @import "@fontsource-variable/dm-sans";
+@import "@fontsource-variable/dm-sans/wght-italic.css";
 @import "@fontsource-variable/manrope";
 :root {
   font-family:
@@ -281,6 +282,9 @@ h1 {
 }
 .heading-actions {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 9px;
   flex-shrink: 0;
   padding-top: 18px;
@@ -764,57 +768,41 @@ h1 {
   padding: 15px 5px;
   color: #5c6d50;
 }
-.allocation {
-  padding: 25px 27px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 28px;
-  margin-bottom: 24px;
-}
 .tiny-kicker {
   font-size: 12px;
   letter-spacing: 1.2px;
   font-weight: 650;
   color: #636b59;
 }
-.allocation h2 {
-  font-size: 33px;
-  margin-top: 7px;
-  letter-spacing: -1px;
+.allocation {
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+.allocation-texto {
+  flex: none;
+  font-size: 13px;
+  color: #56625a;
+}
+.allocation-texto strong {
+  font-size: 24px;
+  letter-spacing: -0.5px;
   color: #42643e;
-}
-.allocation h2 > span {
-  font-size: 16px;
-  font-weight: 400;
-  color: #636b59;
-  letter-spacing: -0.3px;
-}
-.allocation p {
-  font-size: 12px;
-  color: #626b57;
-  margin-top: 6px;
-  line-height: 1.6;
 }
 .allocation.invalid {
   border-color: #d9ac9c;
 }
-.allocation.invalid h2,
-.allocation.invalid p {
+.allocation.invalid .allocation-texto,
+.allocation.invalid .allocation-texto strong {
   color: #905a46;
 }
-.allocation-right {
-  width: 35%;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 20px;
-}
 .allocation-track {
+  flex: 1;
   height: 7px;
   background: #eef2e8;
   border-radius: 10px;
-  width: 100%;
   overflow: hidden;
 }
 .allocation-track > span {
@@ -1897,19 +1885,12 @@ h1 {
     padding: 9px;
   }
   .allocation {
-    padding: 21px;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 20px;
+    flex-wrap: wrap;
+    gap: 10px 14px;
   }
-  .allocation h2 {
-    font-size: 31px;
-  }
-  .allocation-right {
-    width: 100%;
-    flex-direction: row;
-    align-items: center;
-    gap: 20px;
+  .allocation-track {
+    flex-basis: 100%;
+    order: 3;
   }
   .role-card {
     padding: 20px 17px;
@@ -2275,25 +2256,7 @@ h1 {
 
 /* Resumen sin la tarjeta grande: la distribución ocupa todo el ancho */
 
-/* Estado del borrador y ayuda Guardar / Programar */
-.flow-status {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin: -6px 0 18px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: #f1f6f2;
-  border: 1px solid #dfeae2;
-  font-size: 12px;
-  color: #4f5e55;
-  line-height: 1.5;
-}
-.flow-status.pending {
-  background: #fbf6ee;
-  border-color: #efe2c9;
-}
+/* Estado del borrador (sección 6: sin franja; la explicación va en «Más información») */
 .flow-pill {
   flex: none;
   padding: 3px 10px;
@@ -2303,7 +2266,7 @@ h1 {
   font-weight: 600;
   font-size: 12px;
 }
-.flow-status.pending .flow-pill {
+.flow-pill.pending {
   background: #f6e8cc;
   color: #7e5f25;
 }
@@ -2747,4 +2710,71 @@ a.button {
   .tarjeta-resumen {
     min-height: 0;
   }
+}
+
+/* Sección 6 (13 nov): ayuda a demanda (ⓘ) y explicaciones en cursiva. */
+.ayuda {
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
+}
+.ayuda-boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #5f6b62;
+  cursor: help;
+}
+.ayuda-boton:hover,
+.ayuda-boton:focus-visible {
+  background: #e8efe9;
+  color: var(--green);
+}
+.ayuda-boton:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+}
+.ayuda-texto {
+  display: none;
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  right: -8px;
+  width: min(280px, 86vw);
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #24302a;
+  color: #f4f7f3;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0;
+  text-align: left;
+  text-transform: none;
+  white-space: normal;
+  box-shadow: 0 6px 18px #1b261f33;
+}
+.ayuda-texto strong {
+  color: #fff;
+}
+.ayuda:hover .ayuda-texto,
+.ayuda:focus-within .ayuda-texto {
+  display: block;
+}
+legend .ayuda-texto,
+.preview-chip .ayuda-texto {
+  left: -8px;
+  right: auto;
+}
+.field-help,
+.dialog .helper:not(.note) {
+  font-style: italic;
+  color: #5f6b62;
 }
