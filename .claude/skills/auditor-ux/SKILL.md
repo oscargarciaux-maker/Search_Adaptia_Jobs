@@ -85,7 +85,7 @@ Para cada punto, anotar «cumple / no cumple / no aplica» con evidencia.
   el producto (cargo/rol/puesto; perfil/cliente).
 - Etiquetas que dicen qué se pide y en qué formato; ayudas cortas junto al campo, no en un manual.
 - Mensajes de error: qué pasó, por qué y cómo arreglarlo, sin culpar ni códigos técnicos.
-- Fechas y horas con zona («1:17 a. m. hora de Colombia»), números con separadores locales.
+- Fechas y horas con zona («6:30 a. m. hora de Colombia»), números con separadores locales.
 
 ### 3.6 Estados vacíos, carga y error
 - Vacío: explica por qué está vacío y ofrece la acción siguiente (no una página en blanco).
@@ -158,6 +158,6 @@ de personas viendo el informe van a `deviceScaleFactor: 2`; las de comprobación
 - Recorrido mínimo: crear o editar cargos y cupos (suman 120) → crear cliente y perfil (país donde vive, modalidades,
   filtros) → leer la estimación y la búsqueda en vivo → guardar borrador o programar → ver Vacantes del cliente →
   copiar WhatsApp → revisar Actividad.
-- Conceptos que suelen confundir y hay que verificar: borrador vs programado; «desde mañana a la 1:17 a. m.»; estimación
+- Conceptos que suelen confundir y hay que verificar: borrador vs programado; «desde mañana a las 6:30 a. m.»; estimación
   (guardadas sin entregar) vs búsqueda en vivo (muestra) vs resultado real de la noche; un cargo por vacante.
 - No proponer funciones fuera de alcance vigente (agente WhatsApp, seguimiento de candidaturas, IA en la búsqueda).

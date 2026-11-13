@@ -77,7 +77,7 @@ catálogo/estado central tras respaldar e importar el corte. Requiere configurar
 de cifrado como Secrets. La alternativa manual conserva variables anteriores. La activación se acredita por la ejecución,
 no solo por la fusión. Repetir una entrega completa reintenta el mismo lote; las cachés siguen en GitHub.
 La copia manual de WhatsApp está en el panel; el agente y los envíos automáticos siguen fuera del alcance.
-La programación solicita 1:17 a. m. Colombia para la nocturna y minuto 23 de cada hora para la captura; GitHub puede
+La programación solicita 6:30 a. m. Colombia para la búsqueda diaria (segunda pasada 8:30) y minuto 23 de cada hora para la captura; GitHub puede
 retrasar/saltar ejecuciones. El límite de USD 5 es Apify, no un precio total garantizado de todos los proveedores.
 
 ## Pruebas

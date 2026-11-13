@@ -54,7 +54,7 @@ Fuera de la configuración versionada para no copiar teléfonos en cada versión
 
 `fecha`, `cliente_id`, `texto`, `vacantes` (ids), `cargos`, `estado` (`pendiente`, `abierto`, `enviado`, `descartado`) y
 `editado`. Reglas de `panel/borradores.generar`:
-- Se prepara tras la búsqueda de la noche, otra vez tras la pasada de la mañana y, como respaldo, a las 8:05 Bogotá
+- Se prepara tras la búsqueda de la noche, otra vez tras la pasada de la mañana y, como respaldo, a las 10:15 Bogotá (desde el 13 nov; antes 8:05)
   (`mensajes.yml`) o con «Preparar mensajes» en el panel.
 - Solo vacantes asignadas a ese cliente con **enlace comprobado para compartir** (≤6 h), incluidas las «ampliadas».
   Máximo 10. Si hoy hay menos de 5, completa con días anteriores (hasta 3) y el panel avisa al operador; el mensaje no.
