@@ -216,7 +216,7 @@ def _posts(repo, cfg, fecha, estrictas, filas, fila):
     return añadidos
 
 
-def registrar(repo, version, fecha, reporte=None):
+def registrar(repo, version, fecha, reporte=None, reglas_info=None):
     """Reconstruible desde la selección confirmada, incluso tras perder el proceso anterior."""
     ejecucion = iniciar(repo, version, fecha)
     cfg = validar_version(version)
@@ -278,6 +278,7 @@ def registrar(repo, version, fecha, reporte=None):
                           "asignaciones": len(filas),
                           "ampliadas": sum(any(isinstance(e, dict) and e.get("ampliacion") for e in f["explicacion"]) for f in filas),
                           "reutilizadas": reutilizadas, "posts": posts, **por_confirmar,
+                          **({"reglas": reglas_info} if reglas_info else {}),
                           "perfiles_bajo_minimo": sum(1 for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id))
                                                       if estrictas.get(p.id, 0) < MINIMO_POR_PERFIL),
                           **({"embudo": embudo} if (embudo := _embudo_por_nombre(reporte) or
@@ -294,14 +295,33 @@ def correr(salida, modo="diario", prueba=False, repo=None):
     if not version:
         return bodega.correr(salida, modo=modo)
     ejecucion = iniciar(repo, version, fecha)
+    reglas_info, reglas = {}, []
+    if hasattr(repo, "decisiones_ubicacion"):
+        try:  # contrato v17: aprender de las decisiones del operador y cargar todas las reglas activas, sin IA
+            from panel import aprender
+            reglas_info, reglas = aprender.preparar(repo)
+        except Exception:  # noqa: BLE001 — sin reglas la búsqueda sigue igual que antes
+            paises.cargar_reglas()
     try:
         with activar(version, fecha):
+            if hasattr(repo, "decisiones_ubicacion"):
+                try:  # contrato v17: cada decisión de la bandeja vale en esta búsqueda
+                    from panel.revision import decisiones_para_busqueda
+                    bodega._config_operativa["decisiones_operador"] = decisiones_para_busqueda(repo.decisiones_ubicacion())
+                except Exception:  # noqa: BLE001
+                    pass
             previas = bodega._leer_json(Path(salida) / "trabajo/bodega.json.gz", [])
             cargos = version["configuracion"]["cargos"]
             bodega._config_operativa["empresas_objetivo"] = sorted({v["empresa"] for v in previas
                 if any(c["activo"] and grado(v["titulo"],c)[0] for c in cargos)})[:120]
             reporte = bodega.correr(salida, modo=modo, hoy=fecha)
-            registrar(repo, version, fecha, reporte)
+            if reglas:
+                try:
+                    from panel import aprender
+                    reglas_info["ubicaciones_resueltas_por_reglas"] = aprender.guardar_usos(repo, reglas)
+                except Exception:  # noqa: BLE001
+                    pass
+            registrar(repo, version, fecha, reporte, reglas_info)
             if modo != "incremental":
                 try:  # borradores de WhatsApp listos para revisar; un fallo aquí nunca tumba la búsqueda
                     from panel import borradores
@@ -322,6 +342,8 @@ def correr(salida, modo="diario", prueba=False, repo=None):
         except Exception:
             pass
         raise
+    finally:
+        paises.cargar_reglas()  # las reglas viven solo durante esta búsqueda
 
 
 def main():

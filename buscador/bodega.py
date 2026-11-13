@@ -414,6 +414,9 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
             else:
                 salida_verificada.append(v)
         return salida_verificada
+    if cfg.get("decisiones_operador"):
+        from buscador import confirmar_ubicacion
+        salud["Decisiones del operador"] = {"aplicadas": confirmar_ubicacion.aplicar_operador(vacantes, cfg["decisiones_operador"])}
     if modo != "incremental" and not consulta and not prueba and cfg.get("confirmar_ubicacion", {}).get("fichas_por_corrida"):
         # Contrato v16: antes de dejar una vacante «por confirmar», leer el país en los datos estructurados de su ficha.
         from buscador import confirmar_ubicacion

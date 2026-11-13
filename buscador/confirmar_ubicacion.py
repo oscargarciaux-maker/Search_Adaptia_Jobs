@@ -128,3 +128,27 @@ def confirmar(vacantes, cache, hoy, familias=(), maximo=60, segundos=180, sesion
         if propia and sesion is not None:
             sesion.close()
     return stats
+
+
+def aplicar_operador(vacantes, decisiones):
+    """Contrato v17: lo que el operador decidió en la bandeja vale en cada búsqueda (noche, mañana y cada hora).
+    `decisiones`: {vacante_id: {"paises": [...]} | {"extranjero": True} | {"descartada": True}}. Devuelve cuántas tocó."""
+    from buscador import paises
+    nombres = {p["codigo"]: p["nombre"] for p in paises.datos()["paises"]}
+    tocadas = 0
+    for v in vacantes:
+        ids = [v.get("id"), *v.get("_ids_fusionados", [])]
+        decision = next((decisiones[i] for i in ids if i in decisiones), None)
+        if not decision:
+            continue
+        tocadas += 1
+        if decision.get("descartada"):
+            v["descartada_operador"] = True
+            continue
+        ubicacion = "; ".join(nombres.get(c, c) for c in decision.get("paises") or []) or "pais extranjero"
+        v.setdefault("_lugares", vacante._lugares(v))
+        v["_lugares"][str(v.get("id")) + "#operador"] = {
+            "titulo": v.get("titulo", ""), "ubicacion": ubicacion, "fuente": "operador",
+            "remoto": True if v.get("modalidad") == "remoto" else None, "vista_en": v.get("vista_en", "")}
+        vacante._aplicar_lugar(v, vacante._evaluar_lugares(v["_lugares"], v.get("_descripcion", "")))
+    return tocadas

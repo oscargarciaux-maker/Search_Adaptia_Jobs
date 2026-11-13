@@ -8,6 +8,7 @@ Si nadie de esos países puede aplicar, "paises" queda vacío. Remoto para LATAM
 mundo sí; remoto para Europa es solo España.
 """
 import re
+from collections import Counter
 from functools import lru_cache
 from pathlib import Path
 
@@ -343,8 +344,60 @@ _CIUDADES_AMBIGUAS = {"santiago", "cordoba", "valencia", "granada", "merida", "l
                       "san miguel", "san isidro", "san francisco", "santa marta", "barcelona", "palma"}
 
 
+# Contrato v17: reglas de ubicación del operador (exactas) y aprendidas por código (frases). Las carga la búsqueda en
+# modo panel desde Supabase (nunca desde archivos públicos). Solo resuelven lo que la tabla oficial deja «por
+# confirmar»: nunca cambian un país ya reconocido.
+_REGLAS = {"exactas": {}, "frases": []}
+USOS = Counter()
+
+
+def clave(texto):
+    """Ubicación normalizada, igual en la bandeja, las reglas y la búsqueda."""
+    return _sin_repeticion(normalizar.texto(texto or ""))[:300]
+
+
+def cargar_reglas(reglas=()):
+    """Activa las reglas (filas de `panel_reglas_ubicacion`); sin argumento, las retira."""
+    exactas, frases = {}, []
+    for r in reglas or []:
+        if not r.get("activa", True) or not isinstance(r.get("resultado"), dict):
+            continue
+        texto = clave(r.get("texto"))
+        if len(texto) < 2:
+            continue
+        if r.get("origen") == "aprendida":
+            frases.append((texto, r["resultado"]))
+        else:
+            exactas[texto] = r["resultado"]
+    _REGLAS["exactas"], _REGLAS["frases"] = exactas, sorted(frases, key=lambda x: -len(x[0]))
+    USOS.clear()
+
+
 def elegibles(titulo, ubicacion, descripcion="", remoto=None):
     """Países desde los que se puede aplicar, con modalidad, confianza y una nota corta."""
+    r = _elegibles(titulo, ubicacion, descripcion, remoto)
+    if r["confianza"] != "baja" or not (_REGLAS["exactas"] or _REGLAS["frases"]):
+        return r
+    texto = clave(ubicacion)
+    resultado, origen = _REGLAS["exactas"].get(texto), "operador"
+    if resultado is None:
+        hallados = [(f, res) for f, res in _REGLAS["frases"] if normalizar.contiene_frase(texto, f)]
+        if hallados and all(res == hallados[0][1] for _, res in hallados):  # si dos reglas se contradicen, no decide
+            (texto, resultado), origen = hallados[0], "aprendida"
+    if resultado is None:
+        return r
+    USOS[texto] += 1
+    if resultado.get("paises"):
+        cubiertos = [c for c in resultado["paises"] if c in datos()["codigos"]]
+        if cubiertos:
+            return {**r, "paises": cubiertos, "confianza": "alta",
+                    "nota": "regla del operador" if origen == "operador" else "regla aprendida"}
+        return r
+    return {**r, "paises": [], "confianza": "alta", "nota": "regla: solo otro país"}
+
+
+def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
+    """Lo que dicen la ubicación, el título y la descripción con la tabla oficial (sin reglas)."""
     d = datos()
     todos, latam, europa = d["codigos"], d["latam"], d["europa"]
     ubicacion = _expandir_codigos(ubicacion)

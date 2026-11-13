@@ -239,3 +239,13 @@ class DecisionRevision(Modelo):
     decision: Literal["sirve", "otro_pais", "no_sirve", "saltar"]
     paises: list[str] = Field(default_factory=list, max_length=21)
     aplicar_a_iguales: bool = False
+
+
+class SubirRevision(Modelo):
+    """Contrato v17: CSV de revisión masiva llenado por el operador."""
+    contenido: str = Field(min_length=1, max_length=2_000_000)
+
+
+class EstadoRegla(Modelo):
+    texto: str = Field(min_length=2, max_length=300)
+    activa: bool

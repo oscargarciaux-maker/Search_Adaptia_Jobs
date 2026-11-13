@@ -51,7 +51,10 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   ).toBeVisible();
   await expect(dialog.getByText(/Es una muestra/)).toBeVisible();
   // Vista previa: estima con el catálogo y permite admitir datos no informados.
-  await expect(dialog.getByText(/cumplen? este perfil/)).toBeVisible();
+  // La estimación en vivo también dice «cumple(n) este perfil»: buscar la frase propia de la vista previa.
+  await expect(
+    dialog.getByText(/guardadas? aún no entregadas? cumplen? este perfil/),
+  ).toBeVisible();
   const aplicar = dialog.getByRole("button", { name: "Aplicar", exact: true });
   if (await aplicar.count()) {
     await aplicar.first().click();
@@ -289,4 +292,45 @@ test("bandeja Por confirmar: un clic confirma, atajo 4 aparta y el contador baja
     fullPage: true,
   });
   expect(errores).toEqual([]);
+});
+
+test("revisión masiva por CSV y reglas aprendidas sin IA", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Por confirmar", exact: true })
+    .click();
+  await expect(
+    page.getByRole("link", { name: "Descargar todas (CSV)" }),
+  ).toHaveAttribute("href", "/api/revisiones.csv");
+  expect(
+    (await (await request.get("/api/revisiones.csv")).text()).split("\n")[0],
+  ).toContain("vacante_id,cargo,empresa,ubicacion,pista");
+  // Depuración completa (v17): un botón llena la bandeja sin esperar la búsqueda de la noche.
+  await page
+    .getByRole("button", { name: "Cargar todas las dudosas de la base" })
+    .click();
+  await expect(
+    page.getByText(/Bandeja lista: \d+ por confirmar/),
+  ).toBeVisible();
+  // Basta con las columnas que se llenan; los demás datos del CSV descargado son para leer.
+  const revisiones = await (await request.get("/api/revisiones")).json();
+  const granada = revisiones.pendientes.find(
+    (r: { ubicacion: string }) => r.ubicacion === "Granada",
+  );
+  const csvLlenado = `vacante_id;decision;pais;aplicar_a_iguales\n${granada.vacante_id};sí;España;sí\n`;
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "revision.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(csvLlenado),
+  });
+  await expect(page.getByText(/Revisión aplicada: 1 decididas/)).toBeVisible();
+  await page.getByRole("button", { name: "Actividad", exact: true }).click();
+  const regla = page.locator(".reglas-lista li", { hasText: "«granada»" });
+  await expect(regla).toContainText("España");
+  await regla.getByRole("button", { name: "Desactivar" }).click();
+  await expect(page.getByText("Regla desactivada.")).toBeVisible();
+  await expect(regla.getByRole("button", { name: "Activar" })).toBeVisible();
 });

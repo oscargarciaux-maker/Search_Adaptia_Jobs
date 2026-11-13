@@ -48,7 +48,18 @@ def main():
             c.execute("""insert into public.panel_reglas_ubicacion(texto,resultado,origen)
                          values('pueblo ejemplo','{"paises":["CO"]}','operador')""")
             assert c.execute("select count(*) from public.panel_reglas_ubicacion").fetchone()[0] == 1
-        print("Bandeja SQL 014: solo servicio con RLS, estados válidos, vacante existente y reglas con origen y forma: aprobados.")
+            # Contrato v17: la limpieza de `ofertas` lee lo decidido en la bandeja.
+            c.execute("reset role")
+            c.execute("insert into public.catalogo_vacantes(id,datos,status,observed_at) values('bbbbbbbbbbbbbbbb','{}','archived',now())")
+            c.execute("set role service_role")
+            c.execute("""insert into public.panel_revisiones(vacante_id,pista,ubicacion,sugerencia,perfiles,prioridad,estado,motivo)
+                         values('bbbbbbbbbbbbbbbb','Paris','paris','[]','[]',1,'descartada','no sirve (operador)')""")
+            from buscador import limpiar_fuera_objetivo, paises
+            try:
+                assert limpiar_fuera_objetivo._cargar_reglas(c) == {"aaaaaaaaaaaaaaaa": "conservar", "bbbbbbbbbbbbbbbb": "borrar"}
+            finally:
+                paises.cargar_reglas()
+        print("Bandeja SQL 014: solo servicio con RLS, estados válidos, vacante existente y reglas con origen y forma, decisiones leídas por la limpieza: aprobados.")
     finally:
         with conectar() as c:
             c.execute(sql.SQL("drop database if exists {} with (force)").format(sql.Identifier(nombre)))

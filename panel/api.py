@@ -16,7 +16,7 @@ import requests
 
 from buscador import paises
 from panel import servicio
-from panel.modelos import AjustesAlertas, CambioBorrador, Configuracion, Contacto, DecisionRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia
+from panel.modelos import AjustesAlertas, CambioBorrador, Configuracion, Contacto, DecisionRevision, EstadoRegla, SubirRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia
 from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase, hoy
 from panel.terminos import sugerir
 
@@ -243,6 +243,37 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
     def leer_revisiones():
         from panel import revision
         return revision.listar(repo, hoy())
+
+    @app.post("/api/revisiones/cargar")
+    def cargar_revisiones():
+        from panel import revision
+        return revision.cargar_todas(repo, hoy())
+
+    @app.get("/api/revisiones.csv")
+    def descargar_revisiones():
+        from fastapi.responses import Response
+        from panel import revision
+        return Response(revision.exportar_csv(repo, hoy()), media_type="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": f'attachment; filename="por-confirmar-{hoy()}.csv"'})
+
+    @app.post("/api/revisiones/csv")
+    def subir_revisiones(body: SubirRevision):
+        from panel import revision
+        comprobar = None
+        if not demo:
+            from buscador import verificar_enlaces
+            comprobar = verificar_enlaces.comprobar
+        return revision.importar_csv(repo, body.contenido, comprobar=comprobar)
+
+    @app.get("/api/reglas")
+    def leer_reglas():
+        from panel import revision
+        return revision.listar_reglas(repo)
+
+    @app.post("/api/reglas/estado")
+    def cambiar_regla(body: EstadoRegla):
+        repo.actualizar_regla(body.texto, {"activa": body.activa})
+        return {"texto": body.texto, "activa": body.activa}
 
     @app.post("/api/revisiones/{vacante_id}")
     def decidir_revision(vacante_id: str, body: DecisionRevision):

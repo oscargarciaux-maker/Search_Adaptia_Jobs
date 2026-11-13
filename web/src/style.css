@@ -3139,3 +3139,43 @@ a.button {
     width: 100%;
   }
 }
+
+/* Contrato v17: revisión masiva y reglas de ubicación. */
+.revision-masiva {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.revision-masiva label.button {
+  cursor: pointer;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.reglas-lista {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.reglas-lista li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #d8e0dc;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.reglas-lista li.inactiva {
+  background: #f1f4f2;
+  color: #3e4b45;
+  border-style: dashed;
+}

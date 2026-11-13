@@ -16,7 +16,10 @@ from buscador import entrega, normalizar, paises, vacante
 from panel.afinidad import MINIMO_POR_PERFIL, evaluar
 from panel.terminos import grado
 
-TOPE = 10
+TOPE = 10  # las que se muestran a la vez en el panel
+GUARDADAS = 300  # las que se guardan (para el CSV de revisión grande, contrato v17)
+GUARDADAS_COMPLETA = 3000  # depuración completa de la base: todas las dudosas
+DEPURACION = "depuración completa"
 DIAS_PENDIENTE = 7
 MOTIVO = "ubicación por confirmar"
 # Lo único que una confirmación de país puede resolver; cualquier otro motivo deja fuera la vacante para ese perfil.
@@ -31,7 +34,7 @@ _PISTA = re.compile(r"\b(based|located|reside|residing|resident|residents|living
 
 
 def clave_ubicacion(texto):
-    return paises._sin_repeticion(normalizar.texto(texto or ""))[:300]
+    return paises.clave(texto)
 
 
 def es_generica(texto):
@@ -73,12 +76,14 @@ def _datos(fila_catalogo):
                                publicada=True)
 
 
-def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=()):
-    """Arma la cola del día al final de la búsqueda (panel/ejecutor.registrar). Devuelve solo conteos."""
+def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False):
+    """Arma la cola del día al final de la búsqueda (panel/ejecutor.registrar). Devuelve solo conteos.
+    `completa` (contrato v17, botón «Cargar todas las dudosas»): todas las vacantes por confirmar del catálogo, también
+    las que hoy no le sirven a ningún cliente, para depurar la base entera."""
     perfiles = [(c, p) for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id))]
-    if not perfiles:
+    if not perfiles and not completa:
         return {"por_confirmar": 0}
-    desde = (datetime.fromisoformat(fecha) - timedelta(days=2)).date().isoformat()
+    desde = None if completa else (datetime.fromisoformat(fecha) - timedelta(days=2)).date().isoformat()
     recibidas = repo.recibidas([str(p.id) for _, p in perfiles])
     for f in filas_hoy:
         recibidas.setdefault(f["perfil_id"], set()).add(f["vacante_id"])
@@ -97,9 +102,9 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=()):
                 continue
             sirve.append({"perfil_id": str(p.id), "cliente_id": str(p.cliente_id), "cargo_id": str(cargo.id),
                           "faltan": estrictas.get(p.id, 0) < MINIMO_POR_PERFIL})
-        if sirve:
+        if sirve or completa:
             texto = pista(datos.get("_descripcion", ""), datos.get("ubicacion", ""))
-            candidatos.append({"vacante_id": fila["id"], "motivo": MOTIVO, "pista": texto,
+            candidatos.append({"vacante_id": fila["id"], "motivo": MOTIVO if sirve else DEPURACION, "pista": texto,
                                "ubicacion": clave_ubicacion(datos.get("ubicacion", "")), "sugerencia": sugerencia(texto),
                                "perfiles": sirve, "prioridad": sum(100 if s["faltan"] else 10 for s in sirve)
                                + max(0, 30 - _edad(datos, fecha))})
@@ -113,12 +118,18 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=()):
     ahora = datetime.now(timezone.utc)
     for vid, r in existentes.items():  # pendientes viejas o que ya no le sirven a nadie: vencidas
         creada = (r.get("creada_en") or ahora.isoformat()).replace("Z", "+00:00")
-        if r.get("estado") == "pendiente" and (vid not in ids or ahora - datetime.fromisoformat(creada) > timedelta(days=DIAS_PENDIENTE)):
+        edad = ahora - datetime.fromisoformat(creada)
+        if r.get("estado") != "pendiente":
+            continue
+        if r.get("motivo") == DEPURACION:  # las de la depuración completa esperan a la persona (hasta 30 días)
+            if edad > timedelta(days=30):
+                repo.actualizar_revision(vid, {"estado": "vencida"})
+        elif not completa and (vid not in ids or edad > timedelta(days=DIAS_PENDIENTE)):
             repo.actualizar_revision(vid, {"estado": "vencida"})
     pendientes = sum(1 for vid, r in existentes.items() if r.get("estado") == "pendiente" and vid in ids)
-    tope = int((repo.ajuste("revision", {}) or {}).get("tope", TOPE))
+    limite = GUARDADAS_COMPLETA if completa else GUARDADAS
     for c in sorted(candidatos, key=lambda x: -x["prioridad"]):
-        if pendientes >= tope:
+        if pendientes >= limite:
             break
         if c["vacante_id"] in existentes or any(n["vacante_id"] == c["vacante_id"] for n in nuevas):
             continue
@@ -138,7 +149,7 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=()):
             except Exception:  # noqa: BLE001 — una regla que no aplica no impide armar la cola
                 pass
     actuales = repo.revisiones(estado="pendiente")
-    return {"por_confirmar": len(actuales), "resueltas_por_regla": por_regla,
+    return {"por_confirmar": len(actuales), "resueltas_por_regla": por_regla, "agregadas": len(nuevas) - por_regla,
             "por_confirmar_faltantes": sum(1 for r in actuales if any(p.get("faltan") for p in r.get("perfiles") or []))}
 
 
@@ -152,11 +163,13 @@ def _edad(datos, fecha):
 def listar(repo, fecha):
     """Lo que ve el panel: pendientes ordenadas, con nombres de clientes (panel privado) y cuántas tienen la misma
     ubicación (para «aplicar a las iguales»)."""
-    pendientes = sorted(repo.revisiones(estado="pendiente"), key=lambda r: -r.get("prioridad", 0))
+    todas = sorted(repo.revisiones(estado="pendiente"), key=lambda r: -r.get("prioridad", 0))
+    tope = int((repo.ajuste("revision", {}) or {}).get("tope", TOPE))
+    pendientes = todas[:tope]
     version = repo.operativa(fecha) or {}
     clientes = {c["id"]: c["nombre"] for c in (version.get("configuracion") or {}).get("clientes", [])}
     por_ubicacion = {}
-    for r in pendientes:
+    for r in todas:
         if not es_generica(r.get("ubicacion")):
             por_ubicacion[r["ubicacion"]] = por_ubicacion.get(r["ubicacion"], 0) + 1
     salida = []
@@ -169,7 +182,8 @@ def listar(repo, fecha):
                        "clientes": sorted({clientes.get(p["cliente_id"], "") for p in r.get("perfiles") or []} - {""}),
                        "ayuda_faltantes": any(p.get("faltan") for p in r.get("perfiles") or []),
                        "iguales": max(0, por_ubicacion.get(r.get("ubicacion"), 0) - 1)})
-    return {"pendientes": salida, "total": len(salida), "ayudan_faltantes": sum(1 for s in salida if s["ayuda_faltantes"])}
+    return {"pendientes": salida, "total": len(salida), "en_espera": len(todas),
+            "ayudan_faltantes": sum(1 for s in salida if s["ayuda_faltantes"])}
 
 
 def decidir(repo, vacante_id, decision, codigos=(), aplicar_a_iguales=False, fecha=None, por="operador", comprobar=None):
@@ -194,7 +208,11 @@ def decidir(repo, vacante_id, decision, codigos=(), aplicar_a_iguales=False, fec
         cambios = {"estado": "saltada"}
     else:
         cambios = {"estado": "descartada", "paises": []}
+    if decision != "saltar":  # contrato v17: quién decidió y qué; el aprendizaje solo usa decisiones de lugar del operador
+        from panel.aprender import ETIQUETAS
+        cambios["motivo"] = ETIQUETAS[decision] if por == "operador" else "decidida por regla"
     repo.actualizar_revision(vacante_id, {**cambios, "decidida_en": datetime.now(timezone.utc).isoformat()})
+    _al_catalogo(repo, rev, decision, codigos, por)
     iguales, regla = 0, False
     if aplicar_a_iguales and decision in ("sirve", "otro_pais") and not es_generica(rev.get("ubicacion")):
         repo.guardar_regla({"texto": rev["ubicacion"], "origen": "operador", "activa": True,
@@ -219,6 +237,8 @@ def _asignar(repo, rev, codigos, fecha, por, comprobar):
     """Asignaciones para los perfiles a los que ayuda la vacante confirmada: solo hasta 5 y sin repetir a nadie."""
     from panel.ejecutor import validar_version
     from panel.repositorio import ErrorRepositorio
+    if not rev.get("perfiles"):
+        return 0  # depuración completa: hoy no le sirve a nadie; la decisión queda para la base y el aprendizaje
     ejecucion = repo.ejecucion(fecha)
     version = repo.operativa(fecha)
     if not ejecucion or not version:
@@ -269,3 +289,117 @@ def aplicar_confirmacion(actual, explicacion):
             return con_paises(actual, e["confirmada"].get("paises") or [], e["confirmada"].get("por", "operador"))
     return actual
 
+
+
+# ── Contrato v17: revisión masiva por CSV (sin IA) y lista de reglas ───────────────────────────────────────────────
+COLUMNAS_CSV = ["vacante_id", "cargo", "empresa", "ubicacion", "pista", "le_serviria_a", "pais_sugerido", "decision",
+                "pais", "aplicar_a_iguales", "comentario"]
+_DECISIONES_CSV = {"sirve": "sirve", "si": "sirve", "si sirve": "sirve", "otro pais": "otro_pais",
+                   "otro_pais": "otro_pais", "solo otro pais": "otro_pais", "no sirve": "no_sirve", "no_sirve": "no_sirve",
+                   "no": "no_sirve", "saltar": "saltar"}
+_SI = {"si", "x", "true", "1", "yes"}
+
+
+def exportar_csv(repo, fecha):
+    """Todas las pendientes (no solo las 10 de la vista) con columnas para llenar."""
+    import csv
+    import io
+    version = repo.operativa(fecha) or {}
+    clientes = {c["id"]: c["nombre"] for c in (version.get("configuracion") or {}).get("clientes", [])}
+    salida = io.StringIO()
+    escritor = csv.writer(salida)
+    escritor.writerow(COLUMNAS_CSV)
+    for r in sorted(repo.revisiones(estado="pendiente"), key=lambda x: -x.get("prioridad", 0)):
+        datos = _datos(r.get("catalogo_vacantes"))
+        nombres = sorted({clientes.get(p["cliente_id"], "") for p in r.get("perfiles") or []} - {""})
+        escritor.writerow([r["vacante_id"], datos.get("titulo", ""), datos.get("empresa", ""), datos.get("ubicacion", ""),
+                           r.get("pista", ""), ", ".join(nombres), " ".join(r.get("sugerencia") or []), "", "", "", ""])
+    return "﻿" + salida.getvalue()  # BOM: Excel lo abre con tildes correctas
+
+
+def importar_csv(repo, contenido, fecha=None, comprobar=None):
+    """Aplica cada fila llenada como un clic en la bandeja. Devuelve aplicadas, omitidas y errores por fila."""
+    import csv
+    import io
+    texto = (contenido or "").lstrip("﻿")
+    try:
+        dialecto = csv.Sniffer().sniff(texto[:4000], delimiters=",;\t")
+    except csv.Error:
+        dialecto = csv.excel
+    filas = list(csv.DictReader(io.StringIO(texto), dialect=dialecto))[:500]
+    nombres = {normalizar.texto(p["nombre"]): p["codigo"] for p in paises.datos()["cubiertos"]}
+    resultado = {"aplicadas": 0, "omitidas": 0, "errores": []}
+    for n, fila in enumerate(filas, start=2):
+        decision = _DECISIONES_CSV.get(normalizar.texto(fila.get("decision") or ""))
+        if not decision:
+            if (fila.get("decision") or "").strip():
+                resultado["errores"].append({"fila": n, "motivo": "Decisión no reconocida: usa sirve, otro país, no sirve o saltar."})
+            else:
+                resultado["omitidas"] += 1
+            continue
+        crudos = [x.strip() for x in re.split(r"[,/;]| y ", fila.get("pais") or "") if x.strip()]
+        codigos = [x.upper() if len(x) == 2 else nombres.get(normalizar.texto(x), "?") for x in crudos]
+        if decision == "sirve" and not codigos:
+            codigos = (fila.get("pais_sugerido") or "").split()
+        try:
+            decidir(repo, (fila.get("vacante_id") or "").strip(), decision, codigos,
+                    normalizar.texto(fila.get("aplicar_a_iguales") or "") in _SI, fecha, "operador", comprobar)
+            resultado["aplicadas"] += 1
+        except Exception as e:  # noqa: BLE001 — se informa la fila y se sigue con las demás
+            resultado["errores"].append({"fila": n, "motivo": getattr(e, "mensaje", None) or str(e)[:200]})
+    return resultado
+
+
+def listar_reglas(repo):
+    nombres = {p["codigo"]: p["nombre"] for p in paises.datos()["paises"]}
+    salida = []
+    for r in repo.reglas():
+        res = r.get("resultado") or {}
+        salida.append({"texto": r["texto"], "origen": r.get("origen", ""), "activa": r.get("activa", True),
+                       "usos": int(r.get("usos") or 0), "conflictos": int(r.get("conflictos") or 0),
+                       "resultado": ", ".join(nombres.get(c, c) for c in res.get("paises", [])) or "Solo otro país",
+                       "ejemplos": (r.get("ejemplos") or [])[:3]})
+    return {"reglas": sorted(salida, key=lambda x: (not x["activa"], x["origen"] != "aprendida", -x["usos"], x["texto"]))}
+
+
+def _al_catalogo(repo, rev, decision, codigos, por):
+    """Contrato v17: la base queda depurada al momento (la búsqueda siguiente lo mantiene con `decisiones_operador`)."""
+    if decision == "saltar" or not hasattr(repo, "archivar_catalogo"):
+        return
+    try:
+        if decision == "sirve":
+            datos = dict((rev.get("catalogo_vacantes") or {}).get("datos") or {})
+            if datos:
+                repo.actualizar_catalogo_datos(rev["vacante_id"], con_paises(datos, codigos, por))
+        else:
+            repo.archivar_catalogo(rev["vacante_id"], "descartada por el operador")
+    except Exception:  # noqa: BLE001 — la decisión ya quedó guardada; la búsqueda siguiente la aplica igual
+        pass
+
+
+def decisiones_para_busqueda(filas):
+    """{vacante_id: decisión} para `bodega` (`confirmar_ubicacion.aplicar_operador`)."""
+    from panel.aprender import ETIQUETAS
+    salida = {}
+    for f in filas or []:
+        if f.get("estado") == "confirmada" and f.get("paises"):
+            salida[f["vacante_id"]] = {"paises": list(f["paises"])}
+        elif f.get("estado") == "descartada" and f.get("motivo") == ETIQUETAS["otro_pais"]:
+            salida[f["vacante_id"]] = {"extranjero": True}
+        elif f.get("estado") == "descartada" and f.get("motivo") == ETIQUETAS["no_sirve"]:
+            salida[f["vacante_id"]] = {"descartada": True}
+    return salida
+
+
+def cargar_todas(repo, fecha):
+    """Botón «Cargar todas las dudosas de la base»: llena la bandeja al momento, sin esperar la búsqueda."""
+    from panel.ejecutor import validar_version
+    from panel.repositorio import ErrorRepositorio
+    version = repo.operativa(fecha)
+    if not version:
+        raise ErrorRepositorio("Primero programa una configuración en «Cargos y cupos».", 409)
+    cfg = validar_version(version)
+    ejecucion = repo.ejecucion(fecha)
+    conteo = repo.conteo_asignaciones(ejecucion["id"], [str(p.id) for p in cfg.perfiles]) if ejecucion else {}
+    estrictas = {p.id: conteo.get(str(p.id), 0) for p in cfg.perfiles}
+    return preparar_cola(repo, cfg, fecha, estrictas, completa=True)

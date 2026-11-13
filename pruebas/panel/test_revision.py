@@ -54,8 +54,10 @@ def test_cola_prioriza_faltantes_respeta_tope_y_filtros():
     estrictas[cfg.perfiles[0].id] = 1  # el perfil 0 tiene faltantes
     resumen = revision.preparar_cola(r, cfg, hoy(), estrictas)
     pendientes = r.revisiones(estado="pendiente")
-    assert resumen["por_confirmar"] == len(pendientes) == revision.TOPE  # tope de 10
-    assert resumen["por_confirmar_faltantes"] == revision.TOPE
+    assert resumen["por_confirmar"] == len(pendientes) == 14  # se guardan todas (para el CSV)
+    vista = revision.listar(r, hoy())
+    assert vista["total"] == revision.TOPE and vista["en_espera"] == 14  # el panel muestra solo las 10 más útiles
+    assert resumen["por_confirmar_faltantes"] == 14
     assert all(p["perfiles"] and any(x["faltan"] for x in p["perfiles"]) for p in pendientes)
     assert candidatas[-1]["id"] not in {p["vacante_id"] for p in pendientes}
     assert "Colombia" in pendientes[0]["pista"] and set(pendientes[0]["sugerencia"]) == {"CO", "MX"}
@@ -140,3 +142,65 @@ def test_correo_menciona_las_por_confirmar():
     _, _, texto = alertas.contenido("exito", "diario", {"fecha": hoy(), "entrega": {"vacantes": 120, "roles": {}}},
                                     {"resumen": {"por_confirmar": 4, "por_confirmar_faltantes": 2}})
     assert "4 vacante(s) por confirmar" in texto and "2 ayudan" in texto
+
+
+class RepoCatalogo(Repo):
+    """Registra lo que la bandeja cambia en el catálogo al decidir."""
+    def __init__(self, candidatas):
+        super().__init__(candidatas)
+        self.catalogo_cambios, self.archivadas = {}, {}
+
+    def actualizar_catalogo_datos(self, vacante_id, datos):
+        self.catalogo_cambios[vacante_id] = datos
+
+    def archivar_catalogo(self, vacante_id, razon):
+        self.archivadas[vacante_id] = razon
+
+
+def test_depuracion_completa_carga_todas_incluso_las_que_no_sirven_a_nadie():
+    cfg, _ = _cfg()
+    ajena = _fila(99, "Remote Remoto x")
+    ajena["datos"] = dict(ajena["datos"], titulo="Chef de cocina")
+    r = RepoCatalogo([_fila(n, f"Lugar Ejemplo {n}") for n in range(3)] + [ajena])
+    resumen = revision.preparar_cola(r, cfg, hoy(), {p.id: 5 for p in cfg.perfiles}, completa=True)
+    pendientes = {p["vacante_id"]: p for p in r.revisiones(estado="pendiente")}
+    assert resumen["por_confirmar"] == 4 and ajena["id"] in pendientes
+    assert pendientes[ajena["id"]]["motivo"] == revision.DEPURACION and not pendientes[ajena["id"]]["perfiles"]
+    # La búsqueda de la noche siguiente no vence las cargadas para depurar.
+    r._candidatas = []
+    revision.preparar_cola(r, cfg, hoy(), {p.id: 5 for p in cfg.perfiles})
+    estados = {p["vacante_id"]: p["estado"] for p in super(Repo, r).revisiones()}
+    assert estados[ajena["id"]] == "pendiente"
+
+
+def test_decidir_actualiza_el_catalogo_al_momento_y_sin_perfiles_no_exige_busqueda():
+    cfg, _ = _cfg()
+    ajena = _fila(98, "Lugar Raro")
+    ajena["datos"] = dict(ajena["datos"], titulo="Chef de cocina")
+    otra = _fila(97, "Otro Raro")
+    otra["datos"] = dict(otra["datos"], titulo="Chef de cocina")
+    r = RepoCatalogo([ajena, otra])
+    r.ejecucion = lambda fecha: None  # sin búsqueda del día
+    revision.preparar_cola(r, cfg, hoy(), {}, completa=True)
+    res = revision.decidir(r, ajena["id"], "sirve", ["EC"])
+    assert res["asignadas"] == 0
+    assert r.catalogo_cambios[ajena["id"]]["paises"] == ["EC"]
+    revision.decidir(r, otra["id"], "no_sirve")
+    assert r.archivadas[otra["id"]] == "descartada por el operador"
+
+
+def test_decisiones_para_busqueda():
+    filas = [{"vacante_id": "a", "estado": "confirmada", "motivo": "confirmada por operador", "paises": ["EC"]},
+             {"vacante_id": "b", "estado": "descartada", "motivo": "otro país (operador)", "paises": []},
+             {"vacante_id": "c", "estado": "descartada", "motivo": "no sirve (operador)", "paises": []},
+             {"vacante_id": "d", "estado": "saltada", "motivo": "", "paises": []},
+             {"vacante_id": "e", "estado": "vencida", "motivo": "", "paises": []}]
+    assert revision.decisiones_para_busqueda(filas) == {
+        "a": {"paises": ["EC"]}, "b": {"extranjero": True}, "c": {"descartada": True}}
+
+
+def test_api_cargar_todas_en_demostracion():
+    api = TestClient(crear_app(demo=True, repositorio=RepositorioDemo()))
+    r = api.post("/api/revisiones/cargar", headers={"origin": "http://testserver"})
+    assert r.status_code == 200 and r.json()["por_confirmar"] == 3  # la demostración conserva su bandeja
+    assert api.post("/api/revisiones/cargar").status_code in (401, 403)
