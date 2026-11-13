@@ -17,27 +17,78 @@ _PT = {"em", "uma", "um", "da", "das", "ao", "aos", "pelo", "pela", "seu", "sua"
        "desejavel", "conhecimento", "conhecimentos", "trabalho", "trabalhar", "pessoas", "solucoes", "desenvolvimento",
        "atividades", "mais", "muito", "onde", "ate", "isso", "essa", "esse", "processo"}
 assert not _ES & _PT  # una palabra que se escribe igual en los dos idiomas no decide
-# Contrato v13: otros idiomas frecuentes en el inventario (Francia, Alemania, Italia). Solo palabras propias.
-_FR = {"les", "des", "du", "et", "vous", "nous", "est", "pour", "avec", "dans", "sur", "une", "votre", "notre", "poste",
-       "equipe", "au", "aux", "chez", "nos", "vos", "sont", "etes", "sera", "ainsi"}
-_DE = {"und", "der", "die", "das", "wir", "sie", "mit", "fur", "ihre", "unsere", "bei", "auf", "ist", "sind", "einen",
-       "eine", "ein", "oder", "werden", "zur", "zum", "uber", "kenntnisse", "erfahrung", "aufgaben"}
-_IT = {"il", "di", "che", "per", "con", "della", "delle", "degli", "nel", "nella", "sono", "siamo", "lavoro", "esperienza",
-       "conoscenza", "azienda", "gli", "dei", "alla", "anche", "nostro", "nostra", "ricerca"}
-_OTROS = {"fr": _FR - _ES - _EN - _PT, "de": _DE - _ES - _EN - _PT, "it": _IT - _ES - _EN - _PT}
+# Contrato v15: perfiles de palabras frecuentes de otros idiomas. No sirven para aceptar nada: solo para que el español
+# o el inglés tengan que ganarles con claridad. Un idioma que no esté aquí tampoco pasa: le falta la evidencia.
+_OTROS = {
+    "pt": _PT,
+    "fr": {"les", "des", "du", "et", "vous", "nous", "est", "pour", "avec", "dans", "sur", "une", "votre", "notre",
+           "poste", "equipe", "au", "aux", "chez", "nos", "vos", "sont", "etes", "sera", "ainsi", "le", "la", "de"},
+    "de": {"und", "der", "die", "das", "wir", "sie", "mit", "fur", "ihre", "unsere", "bei", "auf", "ist", "sind",
+           "einen", "eine", "ein", "oder", "werden", "zur", "zum", "uber", "kenntnisse", "erfahrung", "aufgaben", "du",
+           "dich", "deine", "nicht", "auch"},
+    "it": {"il", "di", "che", "per", "con", "della", "delle", "degli", "nel", "nella", "sono", "siamo", "lavoro",
+           "esperienza", "conoscenza", "azienda", "gli", "dei", "alla", "anche", "nostro", "nostra", "ricerca"},
+    "nl": {"de", "het", "een", "van", "en", "je", "wij", "ons", "voor", "met", "zijn", "niet", "ook", "op", "te", "dat",
+           "die", "wordt", "jouw", "onze", "ervaring", "werken", "bij", "naar", "wat", "heb", "hebt", "kun", "zoeken"},
+    "sv": {"och", "att", "det", "som", "ett", "ar", "med", "vi", "du", "pa", "av", "till", "har", "var", "ditt",
+           "erfarenhet", "arbeta", "inom", "kommer", "soker", "vart"},
+    "da_no": {"og", "er", "til", "af", "med", "vi", "du", "pa", "som", "har", "det", "en", "et", "for", "ikke", "vores",
+              "erfaring", "arbeide", "arbejde", "soker"},
+    "pl": {"i", "w", "na", "z", "do", "sie", "jest", "dla", "oraz", "nasz", "naszego", "zespolu", "bedziesz",
+           "doswiadczenie", "praca", "pracy", "jak", "ze", "nie", "to", "od", "przez", "szukamy"},
+    "tr": {"ve", "bir", "bu", "ile", "icin", "olarak", "deneyim", "calisma", "ekibimize", "ekip", "gibi", "daha", "olan",
+           "arıyoruz", "ariyoruz", "sunuyoruz", "becerisi"},
+    "ro": {"si", "de", "la", "cu", "pentru", "care", "este", "echipa", "noastra", "vei", "experienta", "lucra", "cautam",
+           "sau", "fi", "sunt"},
+    "id_ms": {"dan", "yang", "di", "untuk", "dengan", "kami", "anda", "akan", "tim", "pengalaman", "ini", "dari",
+              "atau", "dalam", "mencari", "bekerja"},
+    "vi": {"toi", "chung", "ban", "se", "lam", "viec", "voi", "cho", "cua", "va", "cac", "nhung", "trong", "duoc",
+           "kinh", "nghiem", "tim", "kiem"},
+    "cs_sk": {"a", "v", "na", "se", "je", "pro", "s", "ze", "do", "nas", "jsme", "hledame", "zkusenosti", "prace",
+              "budete", "tymu"},
+    "hu": {"es", "a", "az", "egy", "hogy", "nem", "vagy", "csapat", "tapasztalat", "keresunk", "munka", "szamara"},
+}
+# Palabras muy frecuentes que no son exclusivas (el español las comparte con el portugués; el inglés, con otros):
+# suman evidencia del idioma, pero no deciden entre español y portugués.
+_ES_COMUNES = {"de", "que", "para", "con", "por", "se", "como", "o", "a", "su", "este", "esta", "sobre", "entre",
+               "desde", "sin", "son", "ser", "tu", "te", "nos", "mas", "empresa", "experiencia", "requisitos", "area",
+               "si", "no", "estamos", "anos", "contar", "cuentas", "tienes", "buscando", "busqueda", "trabajar"}
+_EN_COMUNES = {"in", "on", "as", "an", "or", "be", "this", "that", "have", "has", "from", "work", "it", "by", "at",
+               "all", "can", "who", "what", "their", "they", "us", "join", "company", "years", "working", "including"}
+# Umbrales calibrados con el inventario real del 12 nov (contrato v15): proporción mínima de palabras del idioma y
+# ventaja mínima sobre el mejor de los otros.
+_MIN_PROPORCION = 0.035
+_MIN_PALABRAS = 3
+_VENTAJA = 1.4
+
+
+def _no_latino(texto):
+    letras = [c for c in texto[:6000] if c.isalpha()]
+    return bool(letras) and sum(ord(c) > 0x24F for c in letras) / len(letras) > 0.5  # mayoría en otro alfabeto
 
 
 def idioma(texto):
-    """'es', 'en', 'pt', 'fr', 'de' o 'it' según las palabras propias más frecuentes; '' si no hay texto."""
-    palabras = re.findall(r"[a-z]+", normalizar.sin_tildes(texto).lower()[:6000])
+    """Contrato v15: 'es' o 'en' solo con evidencia positiva y clara; si gana otro idioma, su código; si nada es claro,
+    '' (no confirmado). Solo 'es' y 'en' se pueden entregar, así que cualquier otro idioma queda fuera por defecto."""
+    if not texto or _no_latino(texto):
+        return ""
+    limpio = re.sub(r"\S+@\S+|https?://\S+|www\.\S+", " ", texto[:8000])  # «example.com» no es portugués
+    palabras = re.findall(r"[a-z]+", normalizar.sin_tildes(limpio).lower()[:6000])
     if not palabras:
         return ""
-    es = sum(p in _ES for p in palabras)
-    en = sum(p in _EN for p in palabras)
-    pt = sum(p in _PT for p in palabras)
-    otros = [(sum(p in conjunto for p in palabras), codigo) for codigo, conjunto in _OTROS.items()]
-    mejor = max([(en, "en"), (es, "es"), (pt, "pt")] + [(n * 0.9, c) for n, c in otros])
-    return mejor[1] if mejor[0] > 0 else ""
+    propias = {"es": sum(p in _ES for p in palabras), "en": sum(p in _EN for p in palabras)}
+    # Evidencia total: también las palabras frecuentes que el español comparte con el portugués («de», «que»…).
+    puntos = {"es": sum(p in _ES or p in _ES_COMUNES for p in palabras),
+              "en": sum(p in _EN or p in _EN_COMUNES for p in palabras)}
+    otros = {c: sum(p in conjunto for p in palabras) for c, conjunto in _OTROS.items()}
+    mejor = max(puntos, key=puntos.get)
+    rival = max((n for c, n in otros.items() if c != "pt"), default=0)
+    if (puntos[mejor] >= _MIN_PALABRAS and propias[mejor] >= 1 and puntos[mejor] / len(palabras) >= _MIN_PROPORCION
+            and puntos[mejor] >= _VENTAJA * rival
+            and propias[mejor] >= _VENTAJA * otros["pt"]):  # frente al portugués deciden solo las palabras propias
+        return mejor
+    otro = max(otros, key=otros.get)
+    return otro.split("_")[0] if otros[otro] >= _MIN_PALABRAS and otros[otro] > propias[mejor] else ""
 
 
 _INGLES = r"(?:ingl[eé]s|english|ingles)"

@@ -1,0 +1,2893 @@
+# Generado por `python -m buscador.generar_paises_mundo` (ISO 3166-1 y 3166-2 de pycountry). No editar a
+# mano: para nombres o lugares adicionales usar datos/paises.yaml. Contrato v15.
+paises:
+- iso2: AD
+  iso3: AND
+  nombres:
+  - andorra
+  - principality of andorra
+- iso2: AE
+  iso3: ARE
+  nombres:
+  - emirados arabes unidos
+  - emiratos
+  - emiratos arabes unidos
+  - u.a.e
+  - uae
+  - united arab emirates
+- iso2: AF
+  iso3: AFG
+  nombres:
+  - afeganistao
+  - afganistan
+  - afghanistan
+  - islamic republic of afghanistan
+- iso2: AG
+  iso3: ATG
+  nombres:
+  - antigua and barbuda
+  - antigua e barbuda
+  - antigua y barbuda
+- iso2: AI
+  iso3: AIA
+  nombres:
+  - anguila
+  - anguilla
+- iso2: AL
+  iso3: ALB
+  nombres:
+  - albania
+  - republic of albania
+- iso2: AM
+  iso3: ARM
+  nombres:
+  - armenia
+  - republic of armenia
+- iso2: AO
+  iso3: AGO
+  nombres:
+  - angola
+  - republic of angola
+- iso2: AQ
+  iso3: ATA
+  nombres:
+  - antarctica
+  - antartida
+- iso2: AR
+  iso3: ARG
+  nombres:
+  - argentina
+  - argentine republic
+  subdivisiones:
+  - buenos aires
+  - catamarca
+  - chaco
+  - chubut
+  - ciudad autonoma de buenos aires
+  - cordoba
+  - corrientes
+  - entre rios
+  - formosa
+  - jujuy
+  - la pampa
+  - la rioja
+  - mendoza
+  - misiones
+  - neuquen
+  - rio negro
+  - salta
+  - san juan
+  - san luis
+  - santa cruz
+  - santa fe
+  - santiago del estero
+  - tierra del fuego
+  - tucuman
+- iso2: AS
+  iso3: ASM
+  nombres:
+  - american samoa
+  - samoa americana
+  - samoa estadounidense
+- iso2: AT
+  iso3: AUT
+  nombres:
+  - austria
+  - republic of austria
+- iso2: AU
+  iso3: AUS
+  nombres:
+  - australia
+  subdivisiones:
+  - australia oeste
+  - australia sur
+  - australian capital territory
+  - new south wales
+  - northern territory
+  - nueva gales del sur
+  - queensland
+  - south australia
+  - tasmania
+  - territorio capital australiano
+  - territorio noroeste
+  - victoria
+  - western australia
+- iso2: AW
+  iso3: ABW
+  nombres:
+  - aruba
+- iso2: AX
+  iso3: ALA
+  nombres:
+  - aland islands
+  - ilhas aland
+  - islas aland
+- iso2: AZ
+  iso3: AZE
+  nombres:
+  - azerbaidjao
+  - azerbaijan
+  - azerbaiyan
+  - republic of azerbaijan
+- iso2: BA
+  iso3: BIH
+  nombres:
+  - bosnia and herzegovina
+  - bosnia herzegovina
+  - bosnia y herzegovina
+  - republic of bosnia and herzegovina
+- iso2: BB
+  iso3: BRB
+  nombres:
+  - barbados
+- iso2: BD
+  iso3: BGD
+  nombres:
+  - banglades
+  - bangladesh
+  - people s republic of bangladesh
+- iso2: BE
+  iso3: BEL
+  nombres:
+  - belgica
+  - belgium
+  - kingdom of belgium
+- iso2: BF
+  iso3: BFA
+  nombres:
+  - burkina faso
+  - burquina
+  - burquina faso
+- iso2: BG
+  iso3: BGR
+  nombres:
+  - bulgaria
+  - republic of bulgaria
+- iso2: BH
+  iso3: BHR
+  nombres:
+  - bahrain
+  - barein
+  - kingdom of bahrain
+- iso2: BI
+  iso3: BDI
+  nombres:
+  - burundi
+  - republic of burundi
+- iso2: BJ
+  iso3: BEN
+  nombres:
+  - benin
+  - republic of benin
+- iso2: BL
+  iso3: BLM
+  nombres:
+  - saint barthelemy
+  - san bartolome
+  - sao bartolomeu
+- iso2: BM
+  iso3: BMU
+  nombres:
+  - bermuda
+  - islas bermudas
+- iso2: BN
+  iso3: BRN
+  nombres:
+  - brunei
+  - brunei darussalam
+- iso2: BO
+  iso3: BOL
+  nombres:
+  - bolivia
+  - bolivia estado plurinacional da
+  - bolivia estado plurinacional de
+  - bolivia plurinational state of
+  - plurinational state of bolivia
+  subdivisiones:
+  - chuquisaca
+  - cochabamba
+  - el beni
+  - la paz
+  - oruro
+  - pando
+  - potosi
+  - santa cruz
+  - tarija
+- iso2: BQ
+  iso3: BES
+  nombres:
+  - bonaire saba e santo eustaquio
+  - bonaire sint eustatius and saba
+  - islas bes caribe neerlandes
+- iso2: BR
+  iso3: BRA
+  nombres:
+  - brasil
+  - brazil
+  - federative republic of brazil
+  subdivisiones:
+  - acre
+  - alagoas
+  - amapa
+  - amazonas
+  - bahia
+  - ceara
+  - distrito federal
+  - espirito santo
+  - espiritu santo
+  - goias
+  - maranhao
+  - maranon
+  - mato grosso
+  - mato grosso do sul
+  - minas gerais
+  - para
+  - paraiba
+  - parana
+  - pernambuco
+  - piaui
+  - rio de janeiro
+  - rio grande do norte
+  - rio grande do sul
+  - rondonia
+  - roraima
+  - santa catarina
+  - sao paulo
+  - sergipe
+  - tocantins
+- iso2: BS
+  iso3: BHS
+  nombres:
+  - bahamas
+  - commonwealth of the bahamas
+- iso2: BT
+  iso3: BTN
+  nombres:
+  - bhutan
+  - butan
+  - butao
+  - kingdom of bhutan
+- iso2: BV
+  iso3: BVT
+  nombres:
+  - bouvet island
+  - ilha bouvet
+  - isla bouvet
+- iso2: BW
+  iso3: BWA
+  nombres:
+  - botsuana
+  - botswana
+  - republic of botswana
+- iso2: BY
+  iso3: BLR
+  nombres:
+  - belarus
+  - bielo russia
+  - bielorrusia
+  - republic of belarus
+- iso2: BZ
+  iso3: BLZ
+  nombres:
+  - belice
+  - belize
+- iso2: CA
+  iso3: CAN
+  nombres:
+  - canada
+  subdivisiones:
+  - alberta
+  - british columbia
+  - columbia britanica
+  - isla del principe eduardo
+  - manitoba
+  - new brunswick
+  - newfoundland and labrador
+  - northwest territories
+  - nova scotia
+  - nueva escocia
+  - nuevo brunswick
+  - nunavut
+  - ontario
+  - prince edward island
+  - quebec
+  - saskatchewan
+  - terranova y labrador
+  - territorios del noroeste
+  - yukon
+- iso2: CC
+  iso3: CCK
+  nombres:
+  - cocos keeling islands
+  - ilhas cocos
+  - islas cocos keeling
+- iso2: CD
+  iso3: COD
+  nombres:
+  - congo
+  - congo republica democratica del
+  - congo republica democratica do
+  - congo the democratic republic of the
+- iso2: CF
+  iso3: CAF
+  nombres:
+  - central african republic
+  - republica centro africana
+  - republica centroafricana
+- iso2: CG
+  iso3: COG
+  nombres:
+  - congo
+  - republic of the congo
+- iso2: CH
+  iso3: CHE
+  nombres:
+  - suica
+  - suiza
+  - swiss confederation
+  - switzerland
+- iso2: CI
+  iso3: CIV
+  nombres:
+  - costa de marfil
+  - costa do marfim
+  - cote d ivoire
+  - ivory coast
+  - republic of cote d ivoire
+- iso2: CK
+  iso3: COK
+  nombres:
+  - cook islands
+  - ilhas cook
+  - islas cook
+- iso2: CL
+  iso3: CHL
+  nombres:
+  - chile
+  - republic of chile
+  subdivisiones:
+  - aisen del general carlos ibanez del campo
+  - antofagasta
+  - arica y parinacota
+  - atacama
+  - biobio
+  - coquimbo
+  - la araucania
+  - libertador general bernardo o higgins
+  - los lagos
+  - los rios
+  - magallanes
+  - maule
+  - nuble
+  - region metropolitana de santiago
+  - tarapaca
+  - valparaiso
+- iso2: CM
+  iso3: CMR
+  nombres:
+  - camaroes
+  - cameroon
+  - camerun
+  - republic of cameroon
+- iso2: CN
+  iso3: CHN
+  nombres:
+  - china
+  - people s republic of china
+  subdivisiones:
+  - anhui sheng
+  - beijing shi
+  - chongqing shi
+  - fujian sheng
+  - gansu sheng
+  - guangdong sheng
+  - guangxi zhuangzu zizhiqu
+  - guizhou sheng
+  - hainan sheng
+  - hebei sheng
+  - heilongjiang sheng
+  - henan sheng
+  - hong kong sar
+  - hubei sheng
+  - hunan sheng
+  - jiangsu sheng
+  - jiangxi sheng
+  - jilin sheng
+  - liaoning sheng
+  - macao sar
+  - nei mongol zizhiqu
+  - ningxia huizu zizhiqu
+  - qinghai sheng
+  - shaanxi sheng
+  - shandong sheng
+  - shanghai shi
+  - shanxi sheng
+  - sichuan sheng
+  - taiwan sheng
+  - tianjin shi
+  - xinjiang uygur zizhiqu
+  - xizang zizhiqu
+  - yunnan sheng
+  - zhejiang sheng
+- iso2: CO
+  iso3: COL
+  nombres:
+  - colombia
+  - republic of colombia
+  subdivisiones:
+  - amazonas
+  - antioquia
+  - arauca
+  - atlantico
+  - bolivar
+  - boyaca
+  - caldas
+  - caqueta
+  - casanare
+  - cauca
+  - cesar
+  - choco
+  - cordoba
+  - cundinamarca
+  - distrito capital de bogota
+  - guainia
+  - guaviare
+  - huila
+  - la guajira
+  - magdalena
+  - meta
+  - narino
+  - norte de santander
+  - putumayo
+  - quindio
+  - risaralda
+  - san andres providencia y santa catalina
+  - santander
+  - sucre
+  - tolima
+  - valle del cauca
+  - vaupes
+  - vichada
+- iso2: CR
+  iso3: CRI
+  nombres:
+  - costa rica
+  - republic of costa rica
+  subdivisiones:
+  - alajuela
+  - cartago
+  - guanacaste
+  - heredia
+  - limon
+  - puntarenas
+  - san jose
+- iso2: CU
+  iso3: CUB
+  nombres:
+  - cuba
+  - republic of cuba
+  subdivisiones:
+  - artemisa
+  - camaguey
+  - ciego de avila
+  - cienfuegos
+  - granma
+  - guantanamo
+  - holguin
+  - isla de la juventud
+  - la habana
+  - las tunas
+  - matanzas
+  - mayabeque
+  - pinar del rio
+  - sancti spiritus
+  - santiago de cuba
+  - villa clara
+- iso2: CV
+  iso3: CPV
+  nombres:
+  - cabo verde
+  - republic of cabo verde
+- iso2: CW
+  iso3: CUW
+  nombres:
+  - curacao
+  - curazao
+- iso2: CX
+  iso3: CXR
+  nombres:
+  - christmas island
+  - ilha christmas
+  - isla de navidad
+- iso2: CY
+  iso3: CYP
+  nombres:
+  - chipre
+  - cyprus
+  - republic of cyprus
+- iso2: CZ
+  iso3: CZE
+  nombres:
+  - chequia
+  - czech republic
+  - czechia
+- iso2: DE
+  iso3: DEU
+  nombres:
+  - alemanha
+  - alemania
+  - federal republic of germany
+  - germany
+  subdivisiones:
+  - baden wurttemberg
+  - bayern
+  - berlin
+  - brandenburg
+  - bremen
+  - hamburg
+  - hessen
+  - mecklenburg vorpommern
+  - niedersachsen
+  - nordrhein westfalen
+  - rheinland pfalz
+  - saarland
+  - sachsen
+  - sachsen anhalt
+  - schleswig holstein
+  - thuringen
+- iso2: DJ
+  iso3: DJI
+  nombres:
+  - djibouti
+  - djibuti
+  - republic of djibouti
+  - yibuti
+- iso2: DK
+  iso3: DNK
+  nombres:
+  - denmark
+  - dinamarca
+  - kingdom of denmark
+- iso2: DM
+  iso3: DMA
+  nombres:
+  - commonwealth of dominica
+  - dominica
+- iso2: DO
+  iso3: DOM
+  nombres:
+  - dominican republic
+  - republica dominicana
+  subdivisiones:
+  - azua
+  - baoruco
+  - barahona
+  - cibao nordeste
+  - cibao noroeste
+  - cibao norte
+  - cibao sur
+  - dajabon
+  - distrito nacional santo domingo
+  - duarte
+  - el seibo
+  - el valle
+  - elias pina
+  - enriquillo
+  - espaillat
+  - hato mayor
+  - hermanas mirabal
+  - higuamo
+  - independencia
+  - la altagracia
+  - la romana
+  - la vega
+  - maria trinidad sanchez
+  - monsenor nouel
+  - monte cristi
+  - monte plata
+  - ozama
+  - pedernales
+  - peravia
+  - puerto plata
+  - samana
+  - san cristobal
+  - san jose de ocoa
+  - san juan
+  - san pedro de macoris
+  - sanchez ramirez
+  - santiago
+  - santiago rodriguez
+  - santo domingo
+  - valdesia
+  - valverde
+  - yuma
+- iso2: DZ
+  iso3: DZA
+  nombres:
+  - algeria
+  - argelia
+  - people s democratic republic of algeria
+- iso2: EC
+  iso3: ECU
+  nombres:
+  - ecuador
+  - equador
+  - republic of ecuador
+  subdivisiones:
+  - azuay
+  - bolivar
+  - canar
+  - carchi
+  - chimborazo
+  - cotopaxi
+  - el oro
+  - esmeraldas
+  - galapagos
+  - guayas
+  - imbabura
+  - loja
+  - los rios
+  - manabi
+  - morona santiago
+  - napo
+  - orellana
+  - pastaza
+  - pichincha
+  - santa elena
+  - santo domingo de los tsachilas
+  - sucumbios
+  - tungurahua
+  - zamora chinchipe
+- iso2: EE
+  iso3: EST
+  nombres:
+  - estonia
+  - republic of estonia
+- iso2: EG
+  iso3: EGY
+  nombres:
+  - arab republic of egypt
+  - egipto
+  - egito
+  - egypt
+- iso2: EH
+  iso3: ESH
+  nombres:
+  - saara ocidental
+  - sahara occidental
+  - western sahara
+- iso2: ER
+  iso3: ERI
+  nombres:
+  - eritrea
+  - eritreia
+  - the state of eritrea
+- iso2: ES
+  iso3: ESP
+  nombres:
+  - espana
+  - espanha
+  - kingdom of spain
+  - spain
+  subdivisiones:
+  - a coruna la coruna
+  - alava
+  - albacete
+  - alicante
+  - almeria
+  - andalucia
+  - aragon
+  - asturias
+  - asturias principado de
+  - avila
+  - badajoz
+  - barcelona barcelona
+  - bizkaia
+  - burgos
+  - caceres
+  - cadiz
+  - canarias
+  - cantabria
+  - castellon
+  - castilla la mancha
+  - castilla y leon
+  - catalunya cataluna
+  - ceuta
+  - ciudad real
+  - cordoba
+  - cuenca
+  - extremadura
+  - galicia
+  - galicia galicia
+  - gipuzkoa
+  - girona gerona
+  - granada
+  - guadalajara
+  - guipuzcoa
+  - huelva
+  - huesca
+  - illes balears islas baleares
+  - jaen
+  - la rioja
+  - las palmas
+  - leon
+  - lleida lerida
+  - lugo lugo
+  - madrid
+  - madrid comunidad de
+  - malaga
+  - melilla
+  - murcia
+  - murcia region de
+  - navarra
+  - navarra comunidad foral de
+  - ourense orense
+  - pais vasco
+  - palencia
+  - pontevedra pontevedra
+  - salamanca
+  - santa cruz de tenerife
+  - segovia
+  - sevilla
+  - soria
+  - tarragona tarragona
+  - teruel
+  - toledo
+  - valencia
+  - valenciana comunidad
+  - valladolid
+  - vizcaya
+  - zamora
+  - zaragoza
+- iso2: ET
+  iso3: ETH
+  nombres:
+  - ethiopia
+  - etiopia
+  - federal democratic republic of ethiopia
+- iso2: FI
+  iso3: FIN
+  nombres:
+  - finland
+  - finlandia
+  - republic of finland
+- iso2: FJ
+  iso3: FJI
+  nombres:
+  - fiji
+  - fiyi
+  - republic of fiji
+- iso2: FK
+  iso3: FLK
+  nombres:
+  - falkland islands malvinas
+  - ilhas malvinas falkland
+  - islas falkland malvinas
+- iso2: FM
+  iso3: FSM
+  nombres:
+  - federated states of micronesia
+  - micronesia estados federados da
+  - micronesia estados federados de
+  - micronesia federated states of
+- iso2: FO
+  iso3: FRO
+  nombres:
+  - faroe islands
+  - ilhas faroe
+  - islas feroe
+- iso2: FR
+  iso3: FRA
+  nombres:
+  - franca
+  - france
+  - francia
+  - french republic
+  subdivisiones:
+  - ain
+  - aisne
+  - allier
+  - alpes de haute provence
+  - alpes maritimes
+  - alsace
+  - ardeche
+  - ardennes
+  - ariege
+  - aube
+  - aude
+  - auvergne rhone alpes
+  - aveyron
+  - bas rhin
+  - bouches du rhone
+  - bourgogne franche comte
+  - bretagne
+  - calvados
+  - cantal
+  - centre val de loire
+  - charente
+  - charente maritime
+  - cher
+  - clipperton
+  - correze
+  - corse
+  - corse du sud
+  - cote d or
+  - cotes d armor
+  - creuse
+  - deux sevres
+  - dordogne
+  - doubs
+  - drome
+  - essonne
+  - eure
+  - eure et loir
+  - finistere
+  - gard
+  - gers
+  - gironde
+  - grand est
+  - guadalupe
+  - guadeloupe
+  - guyane francaise
+  - haut rhin
+  - haute corse
+  - haute garonne
+  - haute loire
+  - haute marne
+  - haute saone
+  - haute savoie
+  - haute vienne
+  - hautes alpes
+  - hautes pyrenees
+  - hauts de france
+  - hauts de seine
+  - herault
+  - ile de france
+  - ille et vilaine
+  - indre
+  - indre et loire
+  - isere
+  - jura
+  - la reunion
+  - landes
+  - loir et cher
+  - loire
+  - loire atlantique
+  - loiret
+  - lot
+  - lot et garonne
+  - lozere
+  - maine et loire
+  - manche
+  - marne
+  - martinique
+  - mayenne
+  - mayotte
+  - metropole de lyon
+  - meurthe et moselle
+  - meuse
+  - morbihan
+  - moselle
+  - nievre
+  - nord
+  - normandie
+  - nouvelle aquitaine
+  - nouvelle caledonie
+  - occitania
+  - occitanie
+  - oise
+  - orne
+  - paris
+  - pas de calais
+  - pays de la loire
+  - polynesie francaise
+  - provence alpes cote d azur
+  - puy de dome
+  - pyrenees atlantiques
+  - pyrenees orientales
+  - rhone
+  - saint barthelemy
+  - saint martin
+  - saint pierre et miquelon
+  - saone et loire
+  - sarthe
+  - savoie
+  - seine et marne
+  - seine maritime
+  - seine saint denis
+  - somme
+  - tarn
+  - tarn et garonne
+  - terres australes francaises
+  - territoire de belfort
+  - territorio de belfort
+  - val d oise
+  - val de marne
+  - var
+  - vaucluse
+  - vendee
+  - vienne
+  - vosges
+  - wallis et futuna
+  - yonne
+  - yvelines
+- iso2: GA
+  iso3: GAB
+  nombres:
+  - gabao
+  - gabon
+  - gabonese republic
+- iso2: GB
+  iso3: GBR
+  nombres:
+  - britain
+  - england
+  - escocia
+  - gales
+  - great britain
+  - inglaterra
+  - irlanda del norte
+  - northern ireland
+  - reino unido
+  - scotland
+  - u.k
+  - united kingdom
+  - united kingdom of great britain and northern ireland
+  - wales
+  subdivisiones:
+  - aberdeen city
+  - aberdeenshire
+  - angus
+  - antrim and newtownabbey
+  - ards and north down
+  - argyll and bute
+  - armagh city banbridge and craigavon
+  - barking and dagenham
+  - barnet
+  - barnsley
+  - bath and north east somerset
+  - bedford
+  - belfast city
+  - bexley
+  - birmingham
+  - blackburn with darwen
+  - blackpool
+  - blaenau gwent
+  - bolton
+  - bournemouth christchurch and poole
+  - bracknell forest
+  - bradford
+  - brent
+  - bridgend pen y bont ar ogwr gb pog
+  - brighton and hove
+  - bristol city of
+  - bromley
+  - buckinghamshire
+  - bury
+  - caerphilly caerffili gb caf
+  - calderdale
+  - cambridgeshire
+  - camden
+  - cardiff caerdydd gb crd
+  - carmarthenshire sir gaerfyrddin gb gfy
+  - causeway coast and glens
+  - central bedfordshire
+  - ceredigion sir ceredigion
+  - cheshire east
+  - cheshire west and chester
+  - clackmannanshire
+  - conwy
+  - cornwall
+  - coventry
+  - croydon
+  - cumbria
+  - darlington
+  - denbighshire sir ddinbych gb ddb
+  - derby
+  - derbyshire
+  - derry and strabane
+  - devon
+  - doncaster
+  - dorset
+  - dudley
+  - dumfries and galloway
+  - dundee city
+  - durham county
+  - ealing
+  - east ayrshire
+  - east dunbartonshire
+  - east lothian
+  - east renfrewshire
+  - east riding of yorkshire
+  - east sussex
+  - edinburgh city of
+  - eilean siar
+  - enfield
+  - england
+  - essex
+  - falkirk
+  - fermanagh and omagh
+  - fife
+  - flintshire sir y fflint gb ffl
+  - gateshead
+  - glasgow city
+  - gloucestershire
+  - greenwich
+  - gwynedd
+  - hackney
+  - halton
+  - hammersmith and fulham
+  - hampshire
+  - haringey
+  - harrow
+  - hartlepool
+  - havering
+  - herefordshire
+  - hertfordshire
+  - highland
+  - hillingdon
+  - hounslow
+  - inverclyde
+  - isle of anglesey sir ynys mon gb ynm
+  - isle of wight
+  - isles of scilly
+  - islington
+  - kensington and chelsea
+  - kent
+  - kingston upon hull
+  - kingston upon thames
+  - kirklees
+  - knowsley
+  - lambeth
+  - lancashire
+  - leeds
+  - leicester
+  - leicestershire
+  - lewisham
+  - lincolnshire
+  - lisburn and castlereagh
+  - liverpool
+  - london city of
+  - luton
+  - manchester
+  - medway
+  - merthyr tydfil merthyr tudful gb mtu
+  - merton
+  - mid and east antrim
+  - mid ulster
+  - middlesbrough
+  - midlothian
+  - milton keynes
+  - monmouthshire sir fynwy gb fyn
+  - moray
+  - neath port talbot castell nedd port talbot gb ctl
+  - newcastle upon tyne
+  - newham
+  - newport casnewydd gb cnw
+  - newry mourne and down
+  - norfolk
+  - north ayrshire
+  - north east lincolnshire
+  - north lanarkshire
+  - north lincolnshire
+  - north northamptonshire
+  - north somerset
+  - north tyneside
+  - north yorkshire
+  - northern ireland
+  - northumberland
+  - nottingham
+  - nottinghamshire
+  - oldham
+  - orkney islands
+  - oxfordshire
+  - pembrokeshire sir benfro gb bnf
+  - perth and kinross
+  - peterborough
+  - plymouth
+  - portsmouth
+  - powys
+  - reading
+  - redbridge
+  - redcar and cleveland
+  - renfrewshire
+  - rhondda cynon taff rhondda cynontaf
+  - richmond upon thames
+  - rochdale
+  - rotherham
+  - rutland
+  - salford
+  - sandwell
+  - scotland
+  - scottish borders
+  - sefton
+  - sheffield
+  - shetland islands
+  - shropshire
+  - slough
+  - solihull
+  - somerset
+  - south ayrshire
+  - south gloucestershire
+  - south lanarkshire
+  - south tyneside
+  - southampton
+  - southend on sea
+  - southwark
+  - st helens
+  - staffordshire
+  - stirling
+  - stockport
+  - stockton on tees
+  - stoke on trent
+  - suffolk
+  - sunderland
+  - surrey
+  - sutton
+  - swansea abertawe gb ata
+  - swindon
+  - tameside
+  - telford and wrekin
+  - thurrock
+  - torbay
+  - torfaen tor faen
+  - tower hamlets
+  - trafford
+  - vale of glamorgan the bro morgannwg gb bmg
+  - wakefield
+  - wales cymru gb cym
+  - walsall
+  - waltham forest
+  - wandsworth
+  - warrington
+  - warwickshire
+  - west berkshire
+  - west dunbartonshire
+  - west lothian
+  - west northamptonshire
+  - west sussex
+  - westminster
+  - wigan
+  - wiltshire
+  - windsor and maidenhead
+  - wirral
+  - wokingham
+  - wolverhampton
+  - worcestershire
+  - wrexham wrecsam gb wrc
+  - york
+- iso2: GD
+  iso3: GRD
+  nombres:
+  - granada
+  - grenada
+- iso2: GE
+  iso3: GEO
+  nombres:
+  - georgia
+- iso2: GF
+  iso3: GUF
+  nombres:
+  - french guiana
+  - guayana francesa
+  - guiana francesa
+- iso2: GG
+  iso3: GGY
+  nombres:
+  - guernsey
+- iso2: GH
+  iso3: GHA
+  nombres:
+  - gana
+  - ghana
+  - republic of ghana
+- iso2: GI
+  iso3: GIB
+  nombres:
+  - gibraltar
+- iso2: GL
+  iso3: GRL
+  nombres:
+  - greenland
+  - groenlandia
+- iso2: GM
+  iso3: GMB
+  nombres:
+  - gambia
+  - republic of the gambia
+- iso2: GN
+  iso3: GIN
+  nombres:
+  - guine
+  - guinea
+  - republic of guinea
+- iso2: GP
+  iso3: GLP
+  nombres:
+  - guadalupe
+  - guadeloupe
+- iso2: GQ
+  iso3: GNQ
+  nombres:
+  - equatorial guinea
+  - guine equatorial
+  - guinea ecuatorial
+  - republic of equatorial guinea
+- iso2: GR
+  iso3: GRC
+  nombres:
+  - grecia
+  - greece
+  - hellenic republic
+- iso2: GS
+  iso3: SGS
+  nombres:
+  - georgia do sul e ilhas sandwich do sul
+  - islas georgias del sur y sandwich del sur
+  - south georgia and the south sandwich islands
+- iso2: GT
+  iso3: GTM
+  nombres:
+  - guatemala
+  - republic of guatemala
+  subdivisiones:
+  - alta verapaz
+  - baja verapaz
+  - chimaltenango
+  - chiquimula
+  - el progreso
+  - escuintla
+  - guatemala
+  - huehuetenango
+  - izabal
+  - jalapa
+  - jutiapa
+  - peten
+  - quetzaltenango
+  - quiche
+  - retalhuleu
+  - sacatepequez
+  - san marcos
+  - santa rosa
+  - solola
+  - suchitepequez
+  - totonicapan
+  - zacapa
+- iso2: GU
+  iso3: GUM
+  nombres:
+  - guam
+- iso2: GW
+  iso3: GNB
+  nombres:
+  - guine bissau
+  - guinea bisau
+  - guinea bissau
+  - republic of guinea bissau
+- iso2: GY
+  iso3: GUY
+  nombres:
+  - guiana
+  - guyana
+  - republic of guyana
+- iso2: HK
+  iso3: HKG
+  nombres:
+  - hong kong
+  - hong kong special administrative region of china
+- iso2: HM
+  iso3: HMD
+  nombres:
+  - heard island and mcdonald islands
+  - ilha heard e ilhas mcdonald
+  - isla heard e islas mcdonald
+- iso2: HN
+  iso3: HND
+  nombres:
+  - honduras
+  - republic of honduras
+  subdivisiones:
+  - atlantida
+  - choluteca
+  - colon
+  - comayagua
+  - copan
+  - cortes
+  - el paraiso
+  - francisco morazan
+  - gracias a dios
+  - intibuca
+  - islas de la bahia
+  - la paz
+  - lempira
+  - ocotepeque
+  - olancho
+  - santa barbara
+  - valle
+  - yoro
+- iso2: HR
+  iso3: HRV
+  nombres:
+  - croacia
+  - croatia
+  - republic of croatia
+- iso2: HT
+  iso3: HTI
+  nombres:
+  - haiti
+  - republic of haiti
+- iso2: HU
+  iso3: HUN
+  nombres:
+  - hungary
+  - hungria
+- iso2: ID
+  iso3: IDN
+  nombres:
+  - indonesia
+  - republic of indonesia
+- iso2: IE
+  iso3: IRL
+  nombres:
+  - ireland
+  - irlanda
+  subdivisiones:
+  - carlow
+  - cavan
+  - clare
+  - connaught
+  - cork
+  - donegal
+  - dublin
+  - galway
+  - kerry
+  - kildare
+  - kilkenny
+  - laois
+  - leinster
+  - leitrim
+  - limerick
+  - longford
+  - louth
+  - mayo
+  - meath
+  - monaghan
+  - munster
+  - offaly
+  - roscommon
+  - sligo
+  - tipperary
+  - ulster
+  - waterford
+  - westmeath
+  - wexford
+  - wicklow
+- iso2: IL
+  iso3: ISR
+  nombres:
+  - israel
+  - state of israel
+- iso2: IM
+  iso3: IMN
+  nombres:
+  - ilha de man
+  - isla de man
+  - isle of man
+- iso2: IN
+  iso3: IND
+  nombres:
+  - india
+  - republic of india
+  subdivisiones:
+  - andaman and nicobar islands
+  - andhra pradesh
+  - arunachal pradesh
+  - assam
+  - bihar
+  - chandigarh
+  - chhattisgarh
+  - dadra and nagar haveli and daman and diu
+  - delhi
+  - goa
+  - gujarat
+  - haryana
+  - himachal pradesh
+  - jammu and kashmir
+  - jharkhand
+  - karnataka
+  - kerala
+  - ladakh
+  - lakshadweep
+  - madhya pradesh
+  - maharashtra
+  - manipur
+  - meghalaya
+  - mizoram
+  - nagaland
+  - odisha
+  - puducherry
+  - punjab
+  - rajasthan
+  - sikkim
+  - tamil nadu
+  - telangana
+  - tripura
+  - uttar pradesh
+  - uttarakhand
+  - west bengal
+- iso2: IO
+  iso3: IOT
+  nombres:
+  - british indian ocean territory
+  - territorio britanico del oceano indico
+  - territorio britanico do oceano indico
+- iso2: IQ
+  iso3: IRQ
+  nombres:
+  - irak
+  - iraq
+  - iraque
+  - republic of iraq
+- iso2: IR
+  iso3: IRN
+  nombres:
+  - ira republica islamica do
+  - iran
+  - iran islamic republic of
+  - iran republica islamica de
+  - islamic republic of iran
+- iso2: IS
+  iso3: ISL
+  nombres:
+  - iceland
+  - islandia
+  - republic of iceland
+- iso2: IT
+  iso3: ITA
+  nombres:
+  - italia
+  - italian republic
+  - italy
+  subdivisiones:
+  - abruzos
+  - abruzzo
+  - agrigento
+  - alessandria
+  - ancona
+  - apulia
+  - arezzo
+  - ascoli piceno
+  - asti
+  - avellino
+  - bari
+  - barletta andria trani
+  - basilicata
+  - belluno
+  - benevento
+  - bergamo
+  - biella
+  - bologna
+  - bolonia
+  - bolzano
+  - brescia
+  - brindisi
+  - cagliari
+  - calabria
+  - caltanissetta
+  - campania
+  - campobasso
+  - caserta
+  - catania
+  - catanzaro
+  - cerdena
+  - chieti
+  - como
+  - cosenza
+  - cremona
+  - crotone
+  - cuneo
+  - emilia romagna
+  - emilia romana
+  - enna
+  - fermo
+  - ferrara
+  - firenze
+  - florencia
+  - foggia
+  - forli cesena
+  - friuli venezia giulia
+  - frosinone
+  - genova
+  - gorizia
+  - grosseto
+  - imperia
+  - isernia
+  - l aquila
+  - la spezia
+  - lacio
+  - latina
+  - lazio
+  - lecce
+  - lecco
+  - liguria
+  - livorno
+  - lodi
+  - lombardia
+  - lucca
+  - macerata
+  - mantova
+  - marcas
+  - marche
+  - massa carrara
+  - matera
+  - messina
+  - milano
+  - modena
+  - molise
+  - monza e brianza
+  - napoli
+  - novara
+  - nuoro
+  - oristano
+  - padova
+  - palermo
+  - parma
+  - pavia
+  - perugia
+  - pesaro e urbino
+  - pescara
+  - piacenza
+  - piamonte
+  - piemonte
+  - pisa
+  - pistoia
+  - pordenone
+  - potenza
+  - prato
+  - puglia
+  - ragusa
+  - ravenna
+  - reggio calabria
+  - reggio emilia
+  - rieti
+  - rimini
+  - roma
+  - rovigo
+  - salerno
+  - sardegna
+  - sassari
+  - savona
+  - sicilia
+  - siena
+  - siracusa
+  - sondrio
+  - sud sardegna
+  - taranto
+  - teramo
+  - terni
+  - torino
+  - toscana
+  - trapani
+  - trentino alto adige
+  - trentino alto adigio
+  - trento
+  - treviso
+  - trieste
+  - udine
+  - umbria
+  - valle d aosta
+  - varese
+  - veneto
+  - venezia
+  - verbano cusio ossola
+  - vercelli
+  - verona
+  - vibo valentia
+  - vicenza
+  - viterbo
+- iso2: JE
+  iso3: JEY
+  nombres:
+  - jersey
+- iso2: JM
+  iso3: JAM
+  nombres:
+  - jamaica
+- iso2: JO
+  iso3: JOR
+  nombres:
+  - hashemite kingdom of jordan
+  - jordan
+  - jordania
+- iso2: JP
+  iso3: JPN
+  nombres:
+  - japan
+  - japao
+  - japon
+- iso2: KE
+  iso3: KEN
+  nombres:
+  - kenia
+  - kenya
+  - quenia
+  - republic of kenya
+- iso2: KG
+  iso3: KGZ
+  nombres:
+  - kirguistan
+  - kyrgyz republic
+  - kyrgyzstan
+  - quirguistao
+- iso2: KH
+  iso3: KHM
+  nombres:
+  - cambodia
+  - camboja
+  - camboya
+  - kingdom of cambodia
+- iso2: KI
+  iso3: KIR
+  nombres:
+  - kiribati
+  - republic of kiribati
+- iso2: KM
+  iso3: COM
+  nombres:
+  - comores
+  - comores islas
+  - comoros
+  - union of the comoros
+- iso2: KN
+  iso3: KNA
+  nombres:
+  - saint kitts and nevis
+  - san cristobal y nieves
+  - sao cristovao e nevis
+- iso2: KP
+  iso3: PRK
+  nombres:
+  - corea del norte
+  - corea republica democratica popular de
+  - coreia republica popular democratica da
+  - democratic people s republic of korea
+  - korea democratic people s republic of
+  - north korea
+- iso2: KR
+  iso3: KOR
+  nombres:
+  - corea del sur
+  - corea republica de
+  - coreia republica da
+  - korea republic of
+  - south korea
+- iso2: KW
+  iso3: KWT
+  nombres:
+  - kuwait
+  - state of kuwait
+- iso2: KY
+  iso3: CYM
+  nombres:
+  - cayman islands
+  - ilhas cayman
+  - islas caiman
+- iso2: KZ
+  iso3: KAZ
+  nombres:
+  - cazaquistao
+  - kazajistan
+  - kazakhstan
+  - republic of kazakhstan
+- iso2: LA
+  iso3: LAO
+  nombres:
+  - lao people s democratic republic
+  - laos
+  - republica democratica popular de lao
+  - republica popular democratica do laos
+- iso2: LB
+  iso3: LBN
+  nombres:
+  - lebanese republic
+  - lebanon
+  - libano
+- iso2: LC
+  iso3: LCA
+  nombres:
+  - saint lucia
+  - santa lucia
+- iso2: LI
+  iso3: LIE
+  nombres:
+  - liechtenstein
+  - principality of liechtenstein
+- iso2: LK
+  iso3: LKA
+  nombres:
+  - democratic socialist republic of sri lanka
+  - sri lanka
+- iso2: LR
+  iso3: LBR
+  nombres:
+  - liberia
+  - republic of liberia
+- iso2: LS
+  iso3: LSO
+  nombres:
+  - kingdom of lesotho
+  - lesotho
+  - lesoto
+- iso2: LT
+  iso3: LTU
+  nombres:
+  - lithuania
+  - lituania
+  - republic of lithuania
+- iso2: LU
+  iso3: LUX
+  nombres:
+  - grand duchy of luxembourg
+  - luxembourg
+  - luxemburgo
+- iso2: LV
+  iso3: LVA
+  nombres:
+  - latvia
+  - letonia
+  - republic of latvia
+- iso2: LY
+  iso3: LBY
+  nombres:
+  - libia
+  - libya
+- iso2: MA
+  iso3: MAR
+  nombres:
+  - kingdom of morocco
+  - marrocos
+  - marruecos
+  - morocco
+- iso2: MC
+  iso3: MCO
+  nombres:
+  - monaco
+  - principality of monaco
+- iso2: MD
+  iso3: MDA
+  nombres:
+  - moldavia republica da
+  - moldavia republica de
+  - moldova
+  - moldova republic of
+  - republic of moldova
+- iso2: ME
+  iso3: MNE
+  nombres:
+  - montenegro
+- iso2: MF
+  iso3: MAF
+  nombres:
+  - saint martin french part
+  - san martin zona francesa
+  - sao martim parte francesa
+- iso2: MG
+  iso3: MDG
+  nombres:
+  - madagascar
+  - republic of madagascar
+- iso2: MH
+  iso3: MHL
+  nombres:
+  - ilhas marshall
+  - islas marshall
+  - marshall islands
+  - republic of the marshall islands
+- iso2: MK
+  iso3: MKD
+  nombres:
+  - macedonia del norte
+  - macedonia do norte
+  - north macedonia
+  - republic of north macedonia
+- iso2: ML
+  iso3: MLI
+  nombres:
+  - mali
+  - republic of mali
+- iso2: MM
+  iso3: MMR
+  nombres:
+  - birmania
+  - myanmar
+  - republic of myanmar
+- iso2: MN
+  iso3: MNG
+  nombres:
+  - mongolia
+- iso2: MO
+  iso3: MAC
+  nombres:
+  - macao
+  - macao special administrative region of china
+  - macau
+- iso2: MP
+  iso3: MNP
+  nombres:
+  - commonwealth of the northern mariana islands
+  - ilhas marianas do norte
+  - islas marianas del norte
+  - northern mariana islands
+- iso2: MQ
+  iso3: MTQ
+  nombres:
+  - martinica
+  - martinique
+- iso2: MR
+  iso3: MRT
+  nombres:
+  - islamic republic of mauritania
+  - mauritania
+- iso2: MS
+  iso3: MSR
+  nombres:
+  - montserrat
+- iso2: MT
+  iso3: MLT
+  nombres:
+  - malta
+  - republic of malta
+- iso2: MU
+  iso3: MUS
+  nombres:
+  - mauricio
+  - mauritius
+  - republic of mauritius
+- iso2: MV
+  iso3: MDV
+  nombres:
+  - islas maldivas
+  - maldivas
+  - maldives
+  - republic of maldives
+- iso2: MW
+  iso3: MWI
+  nombres:
+  - malaui
+  - malawi
+  - republic of malawi
+- iso2: MX
+  iso3: MEX
+  nombres:
+  - mexico
+  - united mexican states
+  subdivisiones:
+  - aguascalientes
+  - baja california
+  - baja california sur
+  - campeche
+  - chiapas
+  - chihuahua
+  - ciudad de mexico
+  - coahuila de zaragoza
+  - colima
+  - durango
+  - guanajuato
+  - guerrero
+  - hidalgo
+  - jalisco
+  - mexico
+  - michoacan de ocampo
+  - morelos
+  - nayarit
+  - nuevo leon
+  - oaxaca
+  - puebla
+  - queretaro
+  - quintana roo
+  - san luis potosi
+  - sinaloa
+  - sonora
+  - tabasco
+  - tamaulipas
+  - tlaxcala
+  - veracruz de ignacio de la llave
+  - yucatan
+  - zacatecas
+- iso2: MY
+  iso3: MYS
+  nombres:
+  - malasia
+  - malaysia
+- iso2: MZ
+  iso3: MOZ
+  nombres:
+  - mocambique
+  - mozambique
+  - republic of mozambique
+- iso2: NA
+  iso3: NAM
+  nombres:
+  - namibia
+  - republic of namibia
+- iso2: NC
+  iso3: NCL
+  nombres:
+  - new caledonia
+  - nova caledonia
+  - nueva caledonia
+- iso2: NE
+  iso3: NER
+  nombres:
+  - niger
+  - republic of the niger
+- iso2: NF
+  iso3: NFK
+  nombres:
+  - ilha norfolk
+  - isla norfolk
+  - norfolk island
+- iso2: NG
+  iso3: NGA
+  nombres:
+  - federal republic of nigeria
+  - nigeria
+- iso2: NI
+  iso3: NIC
+  nombres:
+  - nicaragua
+  - republic of nicaragua
+  subdivisiones:
+  - boaco
+  - carazo
+  - chinandega
+  - chontales
+  - costa caribe norte
+  - costa caribe sur
+  - esteli
+  - granada
+  - jinotega
+  - leon
+  - madriz
+  - managua
+  - masaya
+  - matagalpa
+  - nueva segovia
+  - rio san juan
+  - rivas
+- iso2: NL
+  iso3: NLD
+  nombres:
+  - holanda
+  - holland
+  - kingdom of the netherlands
+  - netherlands
+  - paises baixos
+  - paises bajos
+  - the netherlands
+  subdivisiones:
+  - aruba
+  - bonaire
+  - curacao
+  - curazao
+  - drenthe
+  - flevoland
+  - fryslan
+  - gelderland
+  - groningen
+  - limburg
+  - noord brabant
+  - noord holland
+  - overijssel
+  - saba
+  - sint eustatius
+  - sint maarten
+  - utrecht
+  - zeeland
+  - zuid holland
+- iso2: 'NO'
+  iso3: NOR
+  nombres:
+  - kingdom of norway
+  - noruega
+  - norway
+- iso2: NP
+  iso3: NPL
+  nombres:
+  - federal democratic republic of nepal
+  - nepal
+- iso2: NR
+  iso3: NRU
+  nombres:
+  - nauru
+  - republic of nauru
+- iso2: NU
+  iso3: NIU
+  nombres:
+  - niue
+- iso2: NZ
+  iso3: NZL
+  nombres:
+  - new zealand
+  - nova zelandia
+  - nueva zelanda
+- iso2: OM
+  iso3: OMN
+  nombres:
+  - oma
+  - oman
+  - sultanate of oman
+- iso2: PA
+  iso3: PAN
+  nombres:
+  - panama
+  - republic of panama
+  subdivisiones:
+  - bocas del toro
+  - chiriqui
+  - cocle
+  - colon
+  - darien
+  - embera
+  - guna yala
+  - herrera
+  - los santos
+  - naso tjer di
+  - ngabe bugle
+  - panama
+  - panama oeste
+  - veraguas
+- iso2: PE
+  iso3: PER
+  nombres:
+  - peru
+  - republic of peru
+  subdivisiones:
+  - amazonas
+  - ancash
+  - apurimac
+  - arequipa
+  - ayacucho
+  - cajamarca
+  - cusco
+  - el callao
+  - huancavelica
+  - huanuco
+  - ica
+  - junin
+  - la libertad
+  - lambayeque
+  - lima
+  - loreto
+  - madre de dios
+  - moquegua
+  - municipalidad metropolitana de lima
+  - pasco
+  - piura
+  - puno
+  - san martin
+  - tacna
+  - tumbes
+  - ucayali
+- iso2: PF
+  iso3: PYF
+  nombres:
+  - french polynesia
+  - polinesia francesa
+- iso2: PG
+  iso3: PNG
+  nombres:
+  - independent state of papua new guinea
+  - papua new guinea
+  - papua nova guine
+  - papua nueva guinea
+- iso2: PH
+  iso3: PHL
+  nombres:
+  - filipinas
+  - philippines
+  - republic of the philippines
+  subdivisiones:
+  - abra
+  - agusan del norte
+  - agusan del sur
+  - aklan
+  - albay
+  - antique
+  - apayao
+  - aurora
+  - autonomous region in muslim mindanao armm
+  - basilan
+  - bataan
+  - batanes
+  - batangas
+  - benguet
+  - bicol region v
+  - biliran
+  - bohol
+  - bukidnon
+  - bulacan
+  - cagayan
+  - cagayan valley region ii
+  - calabarzon region iv a
+  - camarines norte
+  - camarines sur
+  - camiguin
+  - capiz
+  - caraga region xiii
+  - catanduanes
+  - cavite
+  - cebu
+  - central luzon region iii
+  - central visayas region vii
+  - cordillera administrative region car
+  - cotabato
+  - davao de oro
+  - davao del norte
+  - davao del sur
+  - davao occidental
+  - davao oriental
+  - davao region xi
+  - dinagat islands
+  - eastern samar
+  - eastern visayas region viii
+  - guimaras
+  - ifugao
+  - ilocos norte
+  - ilocos region i
+  - ilocos sur
+  - iloilo
+  - isabela
+  - kalinga
+  - la union
+  - laguna
+  - lanao del norte
+  - lanao del sur
+  - leyte
+  - luzon central region iii
+  - maguindanao del norte
+  - maguindanao del sur
+  - marinduque
+  - masbate
+  - mimaropa region iv b
+  - mindanao del norte region x
+  - mindoro occidental
+  - mindoro oriental
+  - misamis occidental
+  - misamis oriental
+  - mountain province
+  - national capital region
+  - negros occidental
+  - negros oriental
+  - northern mindanao region x
+  - northern samar
+  - nueva ecija
+  - nueva vizcaya
+  - palawan
+  - pampanga
+  - pangasinan
+  - peninsula de zamboanga region ix
+  - quezon
+  - quirino
+  - region de la capital nacional
+  - rizal
+  - romblon
+  - samar
+  - sarangani
+  - siquijor
+  - soccsksargen region xii
+  - sorsogon
+  - south cotabato
+  - southern leyte
+  - sultan kudarat
+  - sulu
+  - surigao del norte
+  - surigao del sur
+  - tarlac
+  - tawi tawi
+  - valle del cagayan region ii
+  - visayas centrales region vii
+  - visayas occidentales region vi
+  - visayas orientales region viii
+  - western visayas region vi
+  - zambales
+  - zamboanga del norte
+  - zamboanga del sur
+  - zamboanga peninsula region ix
+  - zamboanga sibugay
+- iso2: PK
+  iso3: PAK
+  nombres:
+  - islamic republic of pakistan
+  - pakistan
+  - paquistao
+- iso2: PL
+  iso3: POL
+  nombres:
+  - poland
+  - polonia
+  - republic of poland
+  subdivisiones:
+  - dolnoslaskie
+  - kujawsko pomorskie
+  - lubelskie
+  - lubuskie
+  - ma opolskie
+  - mazowieckie
+  - odzkie
+  - opolskie
+  - podkarpackie
+  - podlaskie
+  - pomorskie
+  - slaskie
+  - swietokrzyskie
+  - warminsko mazurskie
+  - wielkopolskie
+  - zachodniopomorskie
+- iso2: PM
+  iso3: SPM
+  nombres:
+  - saint pierre and miquelon
+  - san pedro y miquelon
+  - sao pedro e miquelon
+- iso2: PN
+  iso3: PCN
+  nombres:
+  - pitcairn
+- iso2: PR
+  iso3: PRI
+  nombres:
+  - porto rico
+  - puerto rico
+  subdivisiones: []
+- iso2: PS
+  iso3: PSE
+  nombres:
+  - palestina estado da
+  - palestina estado de
+  - palestine state of
+  - the state of palestine
+- iso2: PT
+  iso3: PRT
+  nombres:
+  - portugal
+  - portuguese republic
+  subdivisiones:
+  - aveiro
+  - beja
+  - braga
+  - braganca
+  - castelo branco
+  - coimbra
+  - evora
+  - faro
+  - guarda
+  - leiria
+  - lisboa
+  - portalegre
+  - porto
+  - regiao autonoma da madeira
+  - regiao autonoma dos acores
+  - santarem
+  - setubal
+  - viana do castelo
+  - vila real
+  - viseu
+- iso2: PW
+  iso3: PLW
+  nombres:
+  - palaos
+  - palau
+  - republic of palau
+- iso2: PY
+  iso3: PRY
+  nombres:
+  - paraguai
+  - paraguay
+  - republic of paraguay
+  subdivisiones:
+  - alto paraguay
+  - alto parana
+  - amambay
+  - asuncion
+  - boqueron
+  - caaguazu
+  - caazapa
+  - canindeyu
+  - central
+  - concepcion
+  - cordillera
+  - guaira
+  - itapua
+  - misiones
+  - neembucu
+  - paraguari
+  - presidente hayes
+  - san pedro
+- iso2: QA
+  iso3: QAT
+  nombres:
+  - catar
+  - qatar
+  - state of qatar
+- iso2: RE
+  iso3: REU
+  nombres:
+  - reuniao
+  - reunion
+- iso2: RO
+  iso3: ROU
+  nombres:
+  - romania
+  - romenia
+  - rumania
+  subdivisiones:
+  - alba
+  - arad
+  - arges
+  - bacau
+  - bihor
+  - bistrita nasaud
+  - botosani
+  - braila
+  - brasov
+  - bucuresti
+  - buzau
+  - calarasi
+  - caras severin
+  - cluj
+  - constanta
+  - covasna
+  - dambovita
+  - dolj
+  - galati
+  - giurgiu
+  - gorj
+  - harghita
+  - hunedoara
+  - ialomita
+  - iasi
+  - ilfov
+  - maramures
+  - mehedinti
+  - mures
+  - neamt
+  - olt
+  - prahova
+  - salaj
+  - satu mare
+  - sibiu
+  - suceava
+  - teleorman
+  - timis
+  - tulcea
+  - valcea
+  - vaslui
+  - vrancea
+- iso2: RS
+  iso3: SRB
+  nombres:
+  - republic of serbia
+  - serbia
+  - servia
+- iso2: RU
+  iso3: RUS
+  nombres:
+  - federacao russa
+  - federacion rusa
+  - rusia
+  - russia
+  - russian federation
+- iso2: RW
+  iso3: RWA
+  nombres:
+  - ruanda
+  - rwanda
+  - rwandese republic
+- iso2: SA
+  iso3: SAU
+  nombres:
+  - arabia saudi
+  - arabia saudita
+  - kingdom of saudi arabia
+  - saudi arabia
+- iso2: SB
+  iso3: SLB
+  nombres:
+  - ilhas salomao
+  - islas salomon
+  - solomon islands
+- iso2: SC
+  iso3: SYC
+  nombres:
+  - republic of seychelles
+  - seychelles
+- iso2: SD
+  iso3: SDN
+  nombres:
+  - republic of the sudan
+  - sudan
+  - sudao
+- iso2: SE
+  iso3: SWE
+  nombres:
+  - kingdom of sweden
+  - suecia
+  - sweden
+- iso2: SG
+  iso3: SGP
+  nombres:
+  - cingapura
+  - republic of singapore
+  - singapore
+  - singapur
+- iso2: SH
+  iso3: SHN
+  nombres:
+  - saint helena ascension and tristan da cunha
+  - santa elena ascension y tristan de acuna
+  - santa helena ascensao e tristao da cunha
+- iso2: SI
+  iso3: SVN
+  nombres:
+  - eslovenia
+  - republic of slovenia
+  - slovenia
+- iso2: SJ
+  iso3: SJM
+  nombres:
+  - svalbard and jan mayen
+  - svalbard e a ilha de jan mayen
+  - svalbard y jan mayen
+- iso2: SK
+  iso3: SVK
+  nombres:
+  - eslovaquia
+  - slovak republic
+  - slovakia
+- iso2: SL
+  iso3: SLE
+  nombres:
+  - republic of sierra leone
+  - serra leoa
+  - sierra leona
+  - sierra leone
+- iso2: SM
+  iso3: SMR
+  nombres:
+  - republic of san marino
+  - san marino
+  - sao marino
+- iso2: SN
+  iso3: SEN
+  nombres:
+  - republic of senegal
+  - senegal
+- iso2: SO
+  iso3: SOM
+  nombres:
+  - federal republic of somalia
+  - somalia
+- iso2: SR
+  iso3: SUR
+  nombres:
+  - republic of suriname
+  - surinam
+  - suriname
+- iso2: SS
+  iso3: SSD
+  nombres:
+  - republic of south sudan
+  - south sudan
+  - sudan del sur
+  - sudao do sul
+- iso2: ST
+  iso3: STP
+  nombres:
+  - democratic republic of sao tome and principe
+  - santo tome y principe
+  - sao tome and principe
+  - sao tome e principe
+- iso2: SV
+  iso3: SLV
+  nombres:
+  - el salvador
+  - republic of el salvador
+  subdivisiones:
+  - ahuachapan
+  - cabanas
+  - chalatenango
+  - cuscatlan
+  - la libertad
+  - la paz
+  - la union
+  - morazan
+  - san miguel
+  - san salvador
+  - san vicente
+  - santa ana
+  - sonsonate
+  - usulutan
+- iso2: SX
+  iso3: SXM
+  nombres:
+  - isla de san martin zona holandesa
+  - sao martim parte holandesa
+  - sint maarten dutch part
+- iso2: SY
+  iso3: SYR
+  nombres:
+  - republica arabe da siria
+  - republica arabe de siria
+  - siria
+  - syria
+  - syrian arab republic
+- iso2: SZ
+  iso3: SWZ
+  nombres:
+  - esuatini
+  - eswatini
+  - kingdom of eswatini
+  - suazilandia
+- iso2: TC
+  iso3: TCA
+  nombres:
+  - ilhas turks e caicos
+  - islas turcas y caicos
+  - turks and caicos islands
+- iso2: TD
+  iso3: TCD
+  nombres:
+  - chad
+  - chade
+  - republic of chad
+- iso2: TF
+  iso3: ATF
+  nombres:
+  - french southern territories
+  - territorios franceses del sur
+  - territorios franceses do sul
+- iso2: TG
+  iso3: TGO
+  nombres:
+  - togo
+  - togolese republic
+- iso2: TH
+  iso3: THA
+  nombres:
+  - kingdom of thailand
+  - tailandia
+  - thailand
+- iso2: TJ
+  iso3: TJK
+  nombres:
+  - republic of tajikistan
+  - tadjiquistao
+  - tajikistan
+  - tayikistan
+- iso2: TK
+  iso3: TKL
+  nombres:
+  - tokelau
+  - toquelau
+- iso2: TL
+  iso3: TLS
+  nombres:
+  - democratic republic of timor leste
+  - timor leste
+  - timor oriental
+- iso2: TM
+  iso3: TKM
+  nombres:
+  - turcomenistao
+  - turkmenistan
+- iso2: TN
+  iso3: TUN
+  nombres:
+  - republic of tunisia
+  - tunez
+  - tunisia
+- iso2: TO
+  iso3: TON
+  nombres:
+  - kingdom of tonga
+  - tonga
+- iso2: TR
+  iso3: TUR
+  nombres:
+  - republic of turkiye
+  - turkey
+  - turkiye
+  - turquia
+- iso2: TT
+  iso3: TTO
+  nombres:
+  - republic of trinidad and tobago
+  - trinidad and tobago
+  - trinidad y tobago
+  - trinidade e tobago
+- iso2: TV
+  iso3: TUV
+  nombres:
+  - tuvalu
+- iso2: TW
+  iso3: TWN
+  nombres:
+  - taiwan
+  - taiwan province of china
+  - taiwan provincia da china
+  - taiwan provincia de china
+- iso2: TZ
+  iso3: TZA
+  nombres:
+  - tanzania
+  - tanzania republica unida da
+  - tanzania republica unida de
+  - tanzania united republic of
+  - united republic of tanzania
+- iso2: UA
+  iso3: UKR
+  nombres:
+  - ucrania
+  - ukraine
+- iso2: UG
+  iso3: UGA
+  nombres:
+  - republic of uganda
+  - uganda
+- iso2: UM
+  iso3: UMI
+  nombres:
+  - ilhas menores distantes dos estados unidos
+  - islas ultramarinas menores de estados unidos
+  - united states minor outlying islands
+- iso2: US
+  iso3: USA
+  nombres:
+  - ee uu
+  - ee.uu
+  - eeuu
+  - estados unidos
+  - u.s.a
+  - united states
+  - united states of america
+  - usa
+  subdivisiones:
+  - alabama
+  - alaska
+  - american samoa
+  - arizona
+  - arkansas
+  - california
+  - carolina del norte
+  - carolina del sur
+  - colorado
+  - connecticut
+  - dakota del norte
+  - dakota del sur
+  - delaware
+  - district of columbia
+  - distrito de columbia
+  - florida
+  - georgia
+  - guam
+  - hawai
+  - hawaii
+  - idaho
+  - illinois
+  - indiana
+  - iowa
+  - islas marianas del norte
+  - islas ultramarinas menores de estados unidos
+  - kansas
+  - kentucky
+  - louisiana
+  - luisiana
+  - maine
+  - maryland
+  - massachusetts
+  - michigan
+  - minnesota
+  - misisipi
+  - mississippi
+  - missouri
+  - montana
+  - nebraska
+  - nevada
+  - new hampshire
+  - new jersey
+  - new mexico
+  - new york
+  - north carolina
+  - north dakota
+  - northern mariana islands
+  - nueva jersey
+  - nueva york
+  - nuevo hampshire
+  - nuevo mexico
+  - ohio
+  - oklahoma
+  - oregon
+  - pennsylvania
+  - pensilvania
+  - puerto rico
+  - rhode island
+  - samoa estadounidense
+  - south carolina
+  - south dakota
+  - tennessee
+  - texas
+  - united states minor outlying islands
+  - utah
+  - vermont
+  - virgin islands u.s
+  - virginia
+  - virginia occidental
+  - washington
+  - west virginia
+  - wisconsin
+  - wyoming
+- iso2: UY
+  iso3: URY
+  nombres:
+  - eastern republic of uruguay
+  - uruguai
+  - uruguay
+  subdivisiones:
+  - artigas
+  - canelones
+  - cerro largo
+  - colonia
+  - durazno
+  - flores
+  - florida
+  - lavalleja
+  - maldonado
+  - montevideo
+  - paysandu
+  - rio negro
+  - rivera
+  - rocha
+  - salto
+  - san jose
+  - soriano
+  - tacuarembo
+  - treinta y tres
+- iso2: UZ
+  iso3: UZB
+  nombres:
+  - republic of uzbekistan
+  - uzbekistan
+  - uzbequistao
+- iso2: VA
+  iso3: VAT
+  nombres:
+  - holy see vatican city state
+  - santa se cidade estado do vaticano
+  - santa sede ciudad estado del vaticano
+- iso2: VC
+  iso3: VCT
+  nombres:
+  - saint vincent and the grenadines
+  - san vicente y las granadinas
+  - sao vicente e granadinas
+- iso2: VE
+  iso3: VEN
+  nombres:
+  - bolivarian republic of venezuela
+  - venezuela
+  - venezuela bolivarian republic of
+  - venezuela republica bolivariana da
+  - venezuela republica bolivariana de
+  subdivisiones:
+  - amazonas
+  - anzoategui
+  - apure
+  - aragua
+  - barinas
+  - bolivar
+  - carabobo
+  - cojedes
+  - delta amacuro
+  - dependencias federales
+  - distrito capital
+  - falcon
+  - guarico
+  - la guaira
+  - lara
+  - merida
+  - miranda
+  - monagas
+  - nueva esparta
+  - portuguesa
+  - sucre
+  - tachira
+  - trujillo
+  - yaracuy
+  - zulia
+- iso2: VG
+  iso3: VGB
+  nombres:
+  - british virgin islands
+  - ilhas virgens britanicas
+  - islas virgenes britanicas
+  - virgin islands british
+- iso2: VI
+  iso3: VIR
+  nombres:
+  - ilhas virgens dos estados unidos
+  - islas virgenes de eeuu
+  - virgin islands of the united states
+  - virgin islands u.s
+- iso2: VN
+  iso3: VNM
+  nombres:
+  - socialist republic of viet nam
+  - viet nam
+  - vietna
+  - vietnam
+- iso2: VU
+  iso3: VUT
+  nombres:
+  - republic of vanuatu
+  - vanuatu
+- iso2: WF
+  iso3: WLF
+  nombres:
+  - wallis and futuna
+  - wallis e futuna
+  - wallis y futuna
+- iso2: WS
+  iso3: WSM
+  nombres:
+  - independent state of samoa
+  - samoa
+- iso2: YE
+  iso3: YEM
+  nombres:
+  - iemen
+  - republic of yemen
+  - yemen
+- iso2: YT
+  iso3: MYT
+  nombres:
+  - maiote
+  - mayotte
+- iso2: ZA
+  iso3: ZAF
+  nombres:
+  - africa do sul
+  - republic of south africa
+  - south africa
+  - sudafrica
+- iso2: ZM
+  iso3: ZMB
+  nombres:
+  - republic of zambia
+  - zambia
+- iso2: ZW
+  iso3: ZWE
+  nombres:
+  - republic of zimbabwe
+  - zimbabue
+  - zimbabwe

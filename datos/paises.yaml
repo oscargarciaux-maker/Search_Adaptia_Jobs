@@ -149,6 +149,19 @@ paises:
                molina de segura, elche, cartagena murcia, palma de mallorca, ibiza, tenerife, santa cruz de tenerife]  # sin Valencia ni Granada: también son de VE y NI
     utc: 1
 
+# Contrato v15: nombres que existen en varios lugares y que la tabla oficial no detecta sola (ciudades que no son
+# provincias). Nunca deciden solos; con el país al lado sí cuentan. La tabla añade por su cuenta los que se repiten
+# entre provincias o países (Córdoba, Bolívar, La Paz, Santiago, Florida…).
+ambiguas: [valencia, cordoba, santa lucia, victoria, san miguel, san isidro, providencia, palma]
+
+# Contrato v15: provincias o regiones extranjeras de la tabla oficial que son también palabras corrientes en español o
+# inglés. No se usan como lugar (evita leer «como» como la provincia italiana de Como).
+palabras_comunes: [como, mayo, alba, laguna, negros, aurora, guarda, antique, abra, lot, down, bath, reading, var, ain,
+                   nord, cher, manche, sur, norte, centro, central, capital, oeste, este, west, east, north, south,
+                   distrito, region, ciudad, nueva, san, santa, isabela, quirino, rizal, samar, apayao, sulu, aube,
+                   gard, orne, tarn, indre, landes, vienne, savoie, lazio, como, prato, pisa, lucca, siena, roma, bari,
+                   terni, rieti, imperia, latina, pistoia, matera, verona, varese, parma, monza, teramo, viterbo]
+
 # Palabras que abren una vacante remota a toda LATAM
 toda_latam: [latam, latin america, latinoamerica, america latina, americas, the americas]
 
