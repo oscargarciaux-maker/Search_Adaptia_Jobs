@@ -550,3 +550,56 @@ test("arreglos de la auditoría: error de carga, textos, título y botones táct
     expect(caja!.height).toBeGreaterThanOrEqual(40);
   }
 });
+
+test("reunión 14 nov: comas separan términos y el cliente se recupera tras cerrar", async ({
+  page,
+}) => {
+  const errores: string[] = [];
+  page.on("pageerror", (e) => errores.push(e.message));
+  await page.goto("/");
+  // Términos del cargo: escribir o pegar con comas crea una etiqueta por término.
+  await ir(page, "Cargos y cupos");
+  await page.getByRole("button", { name: "Añadir cargo" }).first().click();
+  const cargo = page.locator("dialog", { hasText: "Añadir un cargo" });
+  const afines = cargo.getByLabel("Cargos afines");
+  await afines.fill("UX Writer, Content Designer; Redactor UX");
+  await afines.press("Enter");
+  for (const t of ["UX Writer", "Content Designer", "Redactor UX"])
+    await expect(
+      cargo.getByRole("button", { name: "Quitar " + t }),
+    ).toBeVisible();
+  await expect(
+    cargo.getByRole("button", { name: /Quitar UX Writer, Content/ }),
+  ).toHaveCount(0);
+  await cargo.getByRole("button", { name: "Cancelar" }).click();
+  // Borrador del cliente: lo escrito vuelve al reabrir aunque el formulario se haya cerrado sin guardar.
+  await ir(page, "Clientes");
+  await page
+    .getByRole("button", { name: "Nuevo cliente", exact: true })
+    .click();
+  let dialog = page.getByRole("dialog");
+  await dialog
+    .getByLabel("Nombre o referencia del cliente")
+    .fill("Cliente a recuperar");
+  await dialog.getByRole("button", { name: "Cerrar" }).click();
+  await page
+    .getByRole("button", { name: "Nuevo cliente", exact: true })
+    .click();
+  dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("Tienes cambios sin guardar")).toBeVisible();
+  await dialog
+    .getByRole("button", { name: "Recuperar lo que escribías" })
+    .click();
+  await expect(
+    dialog.getByLabel("Nombre o referencia del cliente"),
+  ).toHaveValue("Cliente a recuperar");
+  // «Cancelar» descarta a propósito: la próxima vez no se ofrece nada.
+  await dialog.getByRole("button", { name: "Cancelar" }).click();
+  await page
+    .getByRole("button", { name: "Nuevo cliente", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog").getByText("Tienes cambios sin guardar"),
+  ).toHaveCount(0);
+  expect(errores).toEqual([]);
+});

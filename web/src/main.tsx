@@ -266,6 +266,7 @@ function Dialog({
     </dialog>
   );
 }
+const SEPARADORES = /[,;\n]/;
 function TagInput({
   label,
   values,
@@ -276,10 +277,18 @@ function TagInput({
   onChange: (v: string[]) => void;
 }) {
   const [text, setText] = useState("");
+  // Reunión del 14 nov: escribir o pegar «A, B; C» guardaba una sola cadena. Ahora cada parte es un término.
+  function sumar(partes: string[]) {
+    const salida = [...values];
+    for (const bruto of partes) {
+      const t = bruto.trim();
+      if (t && !salida.some((x) => x.toLowerCase() === t.toLowerCase()))
+        salida.push(t);
+    }
+    if (salida.length !== values.length) onChange(salida);
+  }
   function add() {
-    const t = text.trim();
-    if (t && !values.some((x) => x.toLowerCase() === t.toLowerCase()))
-      onChange([...values, t]);
+    sumar(text.split(SEPARADORES));
     setText("");
   }
   return (
@@ -302,7 +311,14 @@ function TagInput({
           aria-label={label}
           placeholder="Añade un término y pulsa Enter"
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            const partes = e.target.value.split(SEPARADORES);
+            if (partes.length > 1) {
+              // Lo que va antes de la última coma ya es un término; lo último sigue escribiéndose.
+              sumar(partes.slice(0, -1));
+              setText(partes[partes.length - 1].trimStart());
+            } else setText(e.target.value);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -1653,6 +1669,35 @@ function EmbudoCargos({
   );
 }
 
+type BorradorCliente = {
+  c: Cliente;
+  ps: Perfil[];
+  ct: Contacto;
+  guardado: number;
+};
+// localStorage puede no existir o fallar (ventana privada, sitio bloqueado): nunca rompe el panel.
+function leerLocal<T>(clave: string): T | null {
+  try {
+    const v = window.localStorage.getItem(clave);
+    return v ? (JSON.parse(v) as T) : null;
+  } catch {
+    return null;
+  }
+}
+function guardarLocal(clave: string, valor: unknown) {
+  try {
+    window.localStorage.setItem(clave, JSON.stringify(valor));
+  } catch {
+    /* sin almacenamiento: se sigue sin borrador */
+  }
+}
+function borrarLocal(clave: string) {
+  try {
+    window.localStorage.removeItem(clave);
+  } catch {
+    /* nada que borrar */
+  }
+}
 function ClienteDialog({
   cliente,
   config,
@@ -1706,6 +1751,37 @@ function ClienteDialog({
   });
   const [error, setError] = useState("");
   const cargos = config.cargos.filter((c) => c.activo);
+  // Reunión del 14 nov: lo escrito se guarda solo en este navegador mientras se edita. Si algo falla (pantalla en
+  // blanco, conexión), al volver a abrir el formulario se ofrece recuperarlo. Nada sale del navegador hasta guardar.
+  const claveBorrador = "adaptia:borrador-cliente:" + (cliente?.id ?? "nuevo");
+  const inicial = useRef(JSON.stringify({ c, ps, ct: vacioContacto }));
+  const [recuperable, setRecuperable] = useState<BorradorCliente | null>(() => {
+    const guardado = leerLocal<BorradorCliente>(claveBorrador);
+    return guardado &&
+      JSON.stringify({ c: guardado.c, ps: guardado.ps, ct: guardado.ct }) !==
+        inicial.current
+      ? guardado
+      : null;
+  });
+  useEffect(() => {
+    const actual = JSON.stringify({ c, ps, ct });
+    if (actual !== inicial.current)
+      guardarLocal(claveBorrador, { c, ps, ct, guardado: Date.now() });
+  }, [c, ps, ct, claveBorrador]);
+  function recuperar(b: BorradorCliente) {
+    const activos = new Set(config.cargos.map((x) => x.id));
+    setC(b.c);
+    // Un cargo que ya no existe se cambia por el primero activo para que el perfil siga siendo válido.
+    setPs(
+      b.ps.map((p) =>
+        activos.has(p.cargo_id) || !cargos.length
+          ? p
+          : { ...p, cargo_id: cargos[0].id },
+      ),
+    );
+    setCt(b.ct);
+    setRecuperable(null);
+  }
   function patch(id: string, v: Partial<Perfil>) {
     setPs(ps.map((p) => (p.id === id ? { ...p, ...v } : p)));
   }
@@ -1752,9 +1828,41 @@ function ClienteDialog({
               setError((err as Error).message);
               return;
             }
+            borrarLocal(claveBorrador);
             onSave(c, ps);
           }}
         >
+          {recuperable && (
+            <div className="recuperar" role="status">
+              <span>
+                Tienes cambios sin guardar de las{" "}
+                {new Date(recuperable.guardado).toLocaleTimeString("es-CO", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+                .
+              </span>
+              <div>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => recuperar(recuperable)}
+                >
+                  Recuperar lo que escribías
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => {
+                    borrarLocal(claveBorrador);
+                    setRecuperable(null);
+                  }}
+                >
+                  Descartar
+                </button>
+              </div>
+            </div>
+          )}
           <div className="field">
             <label htmlFor="cliente-nombre">
               Nombre o referencia del cliente
@@ -2175,7 +2283,10 @@ function ClienteDialog({
             <button
               className="button secondary"
               type="button"
-              onClick={onClose}
+              onClick={() => {
+                borrarLocal(claveBorrador);
+                onClose();
+              }}
             >
               Cancelar
             </button>
@@ -4025,8 +4136,45 @@ function VacancyCard({ v }: { v: Vacante }) {
   );
 }
 
+// Reunión del 14 nov: un fallo al pintar dejaba la pantalla en blanco y se perdía lo escrito. Ahora se muestra qué
+// pasó; el borrador del cliente sigue en este navegador y se ofrece al volver a abrir el formulario.
+class Protector extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error("Fallo del panel:", error, info.componentStack);
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <main className="fallo" role="alert">
+        <h1>Algo falló al mostrar esta pantalla</h1>
+        <p>
+          Lo que estabas escribiendo de un cliente quedó guardado en este
+          navegador: al abrir otra vez su formulario podrás recuperarlo.
+        </p>
+        <p className="fallo-detalle">Detalle: {this.state.error.message}</p>
+        <button
+          type="button"
+          className="button primary"
+          onClick={() => window.location.reload()}
+        >
+          Volver a cargar el panel
+        </button>
+      </main>
+    );
+  }
+}
+
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <Protector>
+      <App />
+    </Protector>
   </React.StrictMode>,
 );
