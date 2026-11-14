@@ -267,13 +267,23 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
                         headers={"Content-Disposition": f'attachment; filename="por-confirmar-{hoy()}.csv"'})
 
     @app.get("/api/base.csv")
-    def descargar_base():
+    def descargar_base(fecha: str | None = None, cliente: str | None = None, todo: bool = False):
+        """CSV con el formato del contrato (reunión del 14 nov): general o de un cliente, de un día (hoy en Bogotá por
+        defecto) o de toda la base."""
+        import re
         from fastapi.responses import Response
         from panel import revision
-        texto, incluidas, omitidas = revision.exportar_base(repo)
+        if fecha and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", fecha):
+            raise HTTPException(422, "La fecha debe tener el formato AAAA-MM-DD.")
+        if cliente:
+            UUID(cliente)  # un id que no es UUID responde 422 por el manejador de errores de validación
+        dia = fecha or hoy()
+        texto, incluidas, omitidas, sin_fila = revision.exportar_base(repo, fecha=dia, cliente_id=cliente, todo=todo)
+        nombre = "vacantes-" + ("base" if todo else dia) + ("-cliente" if cliente else "-todas") + ".csv"
         return Response(texto, media_type="text/csv; charset=utf-8",
-                        headers={"Content-Disposition": f'attachment; filename="base-vacantes-{hoy()}.csv"',
-                                 "X-Incluidas": str(incluidas), "X-Omitidas-Sin-Confirmar": str(omitidas)})
+                        headers={"Content-Disposition": f'attachment; filename="{nombre}"',
+                                 "X-Incluidas": str(incluidas), "X-Omitidas-Sin-Confirmar": str(omitidas),
+                                 "X-Sin-Fila": str(sin_fila)})
 
     @app.post("/api/revisiones/csv")
     def subir_revisiones(body: SubirRevision):

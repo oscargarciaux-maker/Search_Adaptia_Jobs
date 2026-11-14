@@ -340,7 +340,7 @@ def test_base_ofertas_lee_mas_de_una_pagina_con_ids_numericos(monkeypatch):
         return SimpleNamespace(status_code=200, content=b"[]", json=lambda: lote)
     repo = RepositorioSupabase(SimpleNamespace(request=request))
     assert len(repo.base_ofertas()) == 592
-    texto, incluidas, omitidas = revision.exportar_base(repo)
+    texto, incluidas, omitidas, _ = revision.exportar_base(repo)
     assert incluidas == 592 and omitidas == 0 and texto.count("\n") == 593
 
 
@@ -358,7 +358,7 @@ def test_base_sigue_el_contrato_v1():
                      "scraped_at": "2026-11-10T07:12:34.123456+00:00", "published_date": "2026-11-09",
                      "years_experience_min": 3, "enlaces_alternativos": ["https://a.example/1", "https://b.example/2"],
                      "catalogo_vacantes": {"reason": None, "confianza": "alta"}}]
-    texto, incluidas, _ = revision.exportar_base(R())
+    texto, incluidas, _, _ = revision.exportar_base(R())
     lector = csv.reader(io.StringIO(texto.lstrip("\ufeff")))
     cabecera = next(lector)
     assert cabecera == contrato.COLUMNAS + contrato.EXTRAS  # orden del contrato, sin id/created_at/estado
@@ -370,3 +370,56 @@ def test_base_sigue_el_contrato_v1():
     assert f["scraped_at"] == "2026-11-10T07:12:34Z" and f["published_date"] == "2026-11-09"
     assert f["years_experience_min"] == "3" and f["enlaces_alternativos"] == "https://a.example/1|https://b.example/2"
     assert f["salary_min"] == "" and f["external_id"] == "a"
+
+
+def test_csv_general_y_por_cliente_del_dia_o_de_toda_la_base():
+    """Reunión del 14 nov: el general de un día trae lo entregado y lo asignado ese día; el de un cliente, lo que el
+    panel le asignó; la misma vacante sale en el archivo de cada cliente y una sola vez en el general."""
+    import csv
+    import io
+    from datetime import datetime, timedelta
+    api = TestClient(crear_app(demo=True, repositorio=RepositorioDemo()))
+    uno, dos = [c["id"] for c in configuracion_demo()["clientes"]][:2]
+    ayer = (datetime.fromisoformat(hoy()) - timedelta(days=1)).date().isoformat()
+
+    def ids(r):
+        return [f["external_id"] for f in csv.DictReader(io.StringIO(r.text.lstrip("\ufeff")))]
+    general = api.get("/api/base.csv", params={"fecha": hoy()})
+    assert ids(general) == ["demo-1"] and general.headers["x-omitidas-sin-confirmar"] == "1"
+    assert 'filename="vacantes-' + hoy() + '-todas.csv"' in general.headers["content-disposition"]
+    assert ids(api.get("/api/base.csv", params={"fecha": ayer})) == ["demo-3"]
+    assert ids(api.get("/api/base.csv", params={"todo": "true"})) == ["demo-1", "demo-3"]
+    # Por cliente: la de hoy y, con «toda la base», también la que recibió ayer.
+    assert ids(api.get("/api/base.csv", params={"fecha": hoy(), "cliente": uno})) == ["demo-1"]
+    assert ids(api.get("/api/base.csv", params={"todo": "true", "cliente": uno})) == ["demo-1", "demo-3"]
+    r = api.get("/api/base.csv", params={"fecha": hoy(), "cliente": dos})
+    assert ids(r) == ["demo-1"] and r.headers["x-omitidas-sin-confirmar"] == "1"
+    assert "-cliente.csv" in r.headers["content-disposition"]
+    assert api.get("/api/base.csv", params={"fecha": "14/11/2026"}).status_code == 422
+    assert api.get("/api/base.csv", params={"cliente": "no-es-un-id"}).status_code == 422
+
+
+def test_csv_por_cliente_cuenta_las_asignadas_sin_fila_en_ofertas():
+    class R(RepositorioDemo):
+        def vacantes_asignadas(self, fecha=None, cliente_id=None):
+            return {"demo-v1", "post-sin-ficha"}
+    texto, incluidas, omitidas, sin_fila = revision.exportar_base(R(), fecha=hoy(), cliente_id="c")
+    assert incluidas == 1 and omitidas == 0 and sin_fila == 1 and "post-sin-ficha" not in texto
+
+
+def test_ofertas_de_consulta_por_fecha_y_por_grupos_de_vacantes(monkeypatch):
+    from types import SimpleNamespace
+    from panel.repositorio import RepositorioSupabase
+    monkeypatch.setattr("buscador.supabase.credenciales", lambda: ("https://prueba.supabase.co", "clave-ficticia"))
+    pedidas = []
+
+    def request(metodo, url, **op):
+        pedidas.append((url.rsplit("/", 1)[-1], dict(op["params"])))
+        return SimpleNamespace(status_code=200, content=b"[]", json=lambda: [])
+    repo = RepositorioSupabase(SimpleNamespace(request=request))
+    repo.ofertas_de(fecha="2026-11-14")
+    assert pedidas[-1][1]["delivery_date"] == "eq.2026-11-14"
+    pedidas.clear()
+    repo.ofertas_de(vacante_ids=[f"v{n}" for n in range(250)])
+    grupos = [p for t, p in pedidas if t == "ofertas"]
+    assert len(grupos) == 3 and grupos[0]["vacante_id"].startswith('in.("v0","v1"')
