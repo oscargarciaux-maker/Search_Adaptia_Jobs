@@ -38,10 +38,13 @@ def preparar(version, fecha):
     cfg = validar_version(version)
     mapa, roles = [], []
     nombres = {p["codigo"]: p["nombre"] for p in paises.datos()["paises"]}
+    comunidades = {c.id for c in cfg.clientes if c.comunidad}
     for c in cfg.cargos:
-        if not c.activo or not c.cupo:
+        perfiles = cfg.perfiles_activos(c.id) if c.activo else []
+        comunidad = [p for p in perfiles if p.cliente_id in comunidades]
+        # Contrato v21: un cargo sin cupo propio se busca igual si Comunidad tiene perfiles en él (recibe lo que sobra).
+        if not perfiles or (not c.cupo and not comunidad):
             continue
-        perfiles = cfg.perfiles_activos(c.id)
         raw = c.model_dump(mode="json")
         if not raw["terminos_exactos"]:
             raw["terminos_exactos"] = sugerir(c.nombre, consultar_esco=False)["terminos_exactos"]
@@ -56,9 +59,10 @@ def preparar(version, fecha):
             "paises_objetivo": sorted({x for p in perfiles for x in p.paises_oficina}),
             "solo_remoto": all(p.modalidades == ["remoto"] for p in perfiles)})
         roles.append({"id": rid, "nombre": c.nombre, "familias": [rid], "cupo": c.cupo,
-                      "_perfiles": [p.model_dump(mode="json") for p in perfiles], "_hoy": fecha})
+                      "_perfiles": [p.model_dump(mode="json") for p in perfiles], "_hoy": fecha,
+                      "_comunidad": [p.model_dump(mode="json") for p in comunidad]})
     configuracion = {"por_rol": 20, "roles": roles, "preferir_remotas": True, "max_por_empresa": 2,
-                     "dias_frescura": 30, "idiomas": ["es", "en"]}
+                     "dias_frescura": 30, "idiomas": ["es", "en"], "techo": cfg.techo_diario}
     motor = bodega.config()
     motor["paises_activos"] = sorted({p for x in mapa for p in x["paises_objetivo"]})
     motor["dias_maximos"] = max(p.antiguedad_dias for p in cfg.perfiles_activos())
@@ -274,7 +278,8 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None):
     confirmado = reporte is None or not (errores_catalogo(reporte) if reporte.get("modo") == "incremental" else errores(reporte))
     repo.pedir("PATCH", "panel_ejecuciones", params={"id": "eq." + ejecucion["id"]},
         json={"estado": "parcial" if any(faltantes.values()) or not confirmado else "completa",
-              "resumen": {"vacantes": sum(conteos.values()), "meta": 120, "faltantes": faltantes,
+              "resumen": {"vacantes": sum(conteos.values()), "meta": cfg.total, "techo": cfg.techo_diario,
+                          "metas": cfg.metas(), "faltantes": faltantes,
                           "asignaciones": len(filas),
                           "ampliadas": sum(any(isinstance(e, dict) and e.get("ampliacion") for e in f["explicacion"]) for f in filas),
                           "reutilizadas": reutilizadas, "posts": posts, **por_confirmar,

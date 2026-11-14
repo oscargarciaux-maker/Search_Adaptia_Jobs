@@ -1,4 +1,9 @@
-export type Cliente = { id: string; nombre: string; activo: boolean };
+export type Cliente = {
+  id: string;
+  nombre: string;
+  activo: boolean;
+  comunidad?: boolean;
+};
 export type Cargo = {
   id: string;
   nombre: string;
@@ -25,11 +30,13 @@ export type Perfil = {
   experiencia_anos?: number | null;
   aceptar_experiencia_sin_dato: boolean;
   aceptar_ingles_sin_dato: boolean;
+  meta_diaria?: number | null;
 };
 export type Configuracion = {
   clientes: Cliente[];
   cargos: Cargo[];
   perfiles: Perfil[];
+  techo_diario?: number;
 };
 export type EstadoConfig = {
   revision: number;

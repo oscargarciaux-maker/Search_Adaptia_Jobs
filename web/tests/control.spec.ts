@@ -3,7 +3,7 @@ import { test, expect, type Page } from "@playwright/test";
 // Sección 5 (13 nov): sin menú lateral; cada sección se abre desde su tarjeta del resumen.
 const accion: Record<string, string> = {
   Clientes: "Ver clientes",
-  "Cargos y cupos": "Editar cupos",
+  "Cargos y metas": "Editar cargos y metas",
   Vacantes: "Ver vacantes",
   "Por confirmar": "Revisar",
   Mensajes: "Ver mensajes",
@@ -80,7 +80,8 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await expect(
     dialog.getByLabel("Cargo del perfil 1").locator("option:checked"),
   ).toHaveText("UX Writer");
-  await expect(dialog.getByText("Este cargo aún no tiene cupo")).toBeVisible();
+  // Contrato v21: cada perfil tiene su meta diaria (10 por defecto).
+  await expect(dialog.getByLabel("Meta diaria del perfil 1")).toHaveValue("10");
   await expect(
     dialog.getByLabel("Nombre o referencia del cliente"),
   ).toHaveValue("Prueba operadora");
@@ -178,12 +179,15 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   ).toHaveCount(0);
   await page.getByRole("button", { name: "Ver archivados (1)" }).click();
   await page.getByRole("button", { name: "Reactivar", exact: true }).click();
-  await ir(page, "Cargos y cupos");
-  await page.getByLabel("Vacantes de QA", { exact: true }).fill("29");
+  await ir(page, "Cargos y metas");
+  // La operadora suma 10 a los 120 de los demás: con techo 120 no se puede programar; con 130, sí.
+  await expect(page.getByText(/pasan el techo/)).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Programar para mañana", exact: true }),
   ).toBeDisabled();
-  await page.getByLabel("Vacantes de QA", { exact: true }).fill("30");
+  await page.getByLabel("Techo del día", { exact: true }).fill("130");
+  await expect(page.getByText(/pasan el techo/)).toHaveCount(0);
+  await expect(page.getByText("Meta del día:").first()).toBeVisible();
   await expect(page.getByText(/guardadas sin entregar/).first()).toBeVisible();
   // Accesibilidad: al cerrar con Escape el foco vuelve al botón que abrió la ventana; ningún texto bajo 12 px.
   await page.getByRole("button", { name: "Añadir cargo", exact: true }).click();
@@ -240,7 +244,8 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
       (s: number, c: { cupo: number }) => s + c.cupo,
       0,
     ),
-  ).toBe(120);
+  ).toBe(130);
+  expect(cfg.publicada.configuracion.techo_diario).toBe(130);
   await ir(page, "Vacantes");
   await expect(page.locator(".vacancy")).toHaveCount(50);
   // Sección 9: al menos 3 vacantes por fila a 1366 px; «Recargar lista» y las ayudas explican qué hace cada cosa.
@@ -564,7 +569,7 @@ test("reunión 14 nov: comas separan términos y el cliente se recupera tras cer
   page.on("pageerror", (e) => errores.push(e.message));
   await page.goto("/");
   // Términos del cargo: escribir o pegar con comas crea una etiqueta por término.
-  await ir(page, "Cargos y cupos");
+  await ir(page, "Cargos y metas");
   await page.getByRole("button", { name: "Añadir cargo" }).first().click();
   const cargo = page.locator("dialog", { hasText: "Añadir un cargo" });
   const afines = cargo.getByLabel("Cargos afines");

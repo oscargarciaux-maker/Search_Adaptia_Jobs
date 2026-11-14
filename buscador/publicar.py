@@ -16,6 +16,10 @@ def publicar(salida, vacantes, reporte, sin_familia):
     for nombre in INTERFAZ_RETIRADA:
         (salida / nombre).unlink(missing_ok=True)
     (datos / "salud.json").write_text(json.dumps(reporte, ensure_ascii=False, indent=1), encoding="utf-8")
+    if (reporte or {}).get("modo") != "incremental":
+        # 14 nov: la captura de cada hora pisaba el informe de la búsqueda completa (rescate, posts, embudo). Se guarda
+        # aparte para poder revisarlo durante el día; solo conteos, como salud.json.
+        (datos / "salud_bodega.json").write_text(json.dumps(reporte, ensure_ascii=False, indent=1), encoding="utf-8")
     with open(datos / "titulos_sin_familia.csv", "w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
         w.writerow(["titulo", "veces"])

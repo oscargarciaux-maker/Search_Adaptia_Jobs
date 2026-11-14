@@ -29,6 +29,18 @@ class ErrorRepositorio(Exception):
         super().__init__(mensaje)
 
 
+# Mensajes de las funciones SQL del panel. Los de SQL 009 (exigen 120 exactos) indican que la base aún no tiene
+# SQL 015 (contrato v21, metas por perfil): se explica cómo instalarla en lugar de un error genérico.
+_SIN_015 = ("Reparte exactamente 120 vacantes", "Los cupos superan 120")
+
+
+def _mensaje_sql(mensaje):
+    if any(m in mensaje for m in _SIN_015):
+        return ("La base todavía no tiene la actualización de metas por perfil (SQL 015). En GitHub → Actions, corre "
+                "«Preparar Supabase» y vuelve a intentarlo.")
+    return mensaje[:240] or "No se pudo confirmar la operación. Vuelve a intentarlo."
+
+
 class RepositorioSupabase:
     def __init__(self, sesion=None):
         self.url, clave = supabase.credenciales()
@@ -46,6 +58,9 @@ class RepositorioSupabase:
             if r.status_code == 409 or r.status_code == 500 and r.json().get("code") == "40001":
                 raise ErrorRepositorio("La configuración cambió en otra ventana. Recarga antes de guardar.", 409)
             if not 200 <= r.status_code < 300:
+                cuerpo = r.json() if r.content else {}
+                if isinstance(cuerpo, dict) and cuerpo.get("code") == "P0001":  # `raise exception` de las funciones SQL
+                    raise ErrorRepositorio(_mensaje_sql(cuerpo.get("message") or ""), 422)
                 raise ErrorRepositorio()
             return r.json() if r.content else None
         except (requests.RequestException, ValueError, AttributeError):

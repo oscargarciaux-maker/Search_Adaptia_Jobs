@@ -3335,3 +3335,28 @@ legend .ayuda-texto,
   min-height: 40px;
   color: var(--ink);
 }
+/* Contrato v21: Comunidad, meta diaria y techo del día. */
+.casilla-comunidad {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 40px;
+  margin: 4px 0 14px;
+  color: var(--ink);
+  font-size: 13px;
+}
+.casilla-comunidad input {
+  margin-top: 3px;
+}
+.techo-campo {
+  margin: 0;
+  max-width: 140px;
+}
+.role-quota strong {
+  color: var(--ink);
+}
+p.role-quota {
+  display: block;
+  margin: 0;
+  color: var(--muted);
+}

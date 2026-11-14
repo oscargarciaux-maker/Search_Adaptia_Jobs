@@ -230,6 +230,30 @@ def deficit_por_perfil(elegidas, roles, hoy):
     return salida
 
 
+def sobrante_para_comunidad(salida, por_rol, roles, cfg, hoy):
+    """Contrato v21: si los clientes reales no llenan el techo del día, lo que sobra no se pierde. Se completa con
+    vacantes que sirven a los perfiles del cliente «Comunidad» y que nadie tomó, dentro del techo y con la misma
+    variedad (empresa, país, idioma). Sin techo o sin Comunidad, no cambia nada."""
+    techo = cfg.get("techo")
+    sobrante = (techo or 0) - sum(len(lista) for lista in salida.values())
+    if not techo or sobrante <= 0 or not any(r.get("_comunidad") for r in roles):
+        return salida
+    from panel.afinidad import evaluar
+    tomadas = {v["id"] for lista in salida.values() for v, _ in lista}
+    for rol in roles:
+        comunidad = rol.get("_comunidad") or []
+        if sobrante <= 0 or not comunidad:
+            continue
+        libres = [(v, g) for v, g in por_rol[rol["id"]] if v["id"] not in tomadas and
+                  any(evaluar(v, p, hoy)["compatible"] for p in comunidad)]
+        nuevas = variadas(libres, sobrante, cfg.get("max_por_empresa", 2), hoy, cfg.get("preferir_remotas", False),
+                          perfiles=comunidad)
+        salida[rol["id"]] = list(salida[rol["id"]]) + list(nuevas)
+        tomadas |= {v["id"] for v, _ in nuevas}
+        sobrante -= len(nuevas)
+    return salida
+
+
 def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificacion=False):
     """{rol_id: [(vacante, grado)]} con las vacantes nuevas de cada rol, y un resumen por rol."""
     cfg = cfg or config()
@@ -287,6 +311,7 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificac
             salida[rol["id"]] = ampliar(rol, salida[rol["id"]], libres, meta_de(rol, cfg),
                                         cfg.get("max_por_empresa", 2), hoy)
             salida[rol["id"]] = completar_cupo_por_empresa(salida[rol["id"]], por_rol[rol["id"]], meta_de(rol, cfg))
+        salida = sobrante_para_comunidad(salida, por_rol, roles, cfg, hoy)
         deficit = deficit_por_perfil(salida, roles, hoy)
     for rol in roles:
         candidatas = por_rol[rol["id"]]
