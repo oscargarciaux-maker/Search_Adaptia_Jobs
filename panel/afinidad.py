@@ -1,12 +1,12 @@
 """Filtros verificables por perfil. No infiere compatibilidad con un CV ni llama a una IA."""
 from datetime import date
 
-from buscador import contrato, enlaces, tiempos
+from buscador import contrato, enlaces, normalizar, tiempos
 from panel.modelos import Perfil
 
 NIVELES = ["A1", "A2", "B1", "B2", "C1", "C2", "native"]
 CAMPOS_FILTRO = ("id", "titulo", "paises", "confianza_pais", "modalidad", "idioma", "publicada_en",
-                 "fecha_publicacion", "fecha_estimada", "ids_agrupados")
+                 "fecha_publicacion", "fecha_estimada", "ids_agrupados", "salario")
 
 
 def ligera(datos, descripcion=None):
@@ -89,7 +89,9 @@ def evaluar(v, perfil, hoy=None):
         motivos.append("fecha de publicación sin confirmar")
     # La vista previa precalcula estos dos datos con las mismas funciones para no conservar descripciones.
     minimo = v["_anos_minimos"] if "_anos_minimos" in v else contrato.anos(v.get("_descripcion", ""), v.get("anos_min"))[0]
-    if p.experiencia_min is not None or p.experiencia_max is not None:
+    # Contrato v22: con 2 años o menos, junior abierto (sin filtro de experiencia).
+    junior_abierto = p.experiencia_anos is not None and p.experiencia_anos <= 2
+    if (p.experiencia_min is not None or p.experiencia_max is not None) and not junior_abierto:
         if minimo in ("", None):
             if not p.aceptar_experiencia_sin_dato:
                 motivos.append("experiencia no informada")
@@ -114,7 +116,62 @@ def evaluar(v, perfil, hoy=None):
             motivos.append("inglés requerido superior al indicado")
         else:
             pruebas.append(f"Inglés {nivel}" + (" deseable" if not obligatorio else " requerido"))
+    titulo, descripcion = v.get("titulo") or "", v.get("_descripcion") or ""
+    if p.experiencia_anos is not None and p.experiencia_anos >= 5 and (
+            contrato.seniority(titulo) in ("intern", "junior") or contrato.tipo_contrato(titulo, descripcion) == "internship"):
+        motivos.append("nivel inferior al del perfil")
+    for r in p.restricciones:
+        motivo = restriccion(v, r, titulo, descripcion)
+        if motivo:
+            motivos.append(motivo)
     return {"compatible": not motivos, "motivos": motivos, "pruebas": pruebas}
+
+
+_POR_MES = {"month": 1, "year": 1 / 12}
+
+
+def restriccion(v, r, titulo, descripcion):
+    """Contrato v22: motivo de descarte de una restricción del perfil, o None. Solo con evidencia clara en el aviso:
+    sin salario, sin moneda igual o sin periodo comparable, nunca descarta."""
+    if r.tipo == "salario_minimo":
+        _, minimo, maximo, moneda, periodo = contrato.salario(v.get("salario"), descripcion)
+        valor = maximo if maximo != "" else minimo
+        if valor == "" or moneda != r.moneda or not periodo:
+            return None
+        if "hour" in (periodo, r.periodo):
+            if periodo != r.periodo:
+                return None
+            return "salario menor al aceptado" if valor < r.monto else None
+        return "salario menor al aceptado" if valor * _POR_MES[periodo] < r.monto * _POR_MES[r.periodo] else None
+    if r.tipo == "palabras":
+        texto = normalizar.texto(titulo + " " + descripcion[:12000])
+        if any(normalizar.contiene_frase(texto, normalizar.texto(w)) for w in r.palabras):
+            return "menciona algo que el perfil no acepta"
+        return None
+    if r.tipo == "contrato":
+        tipo = contrato.tipo_contrato(titulo, descripcion)
+        if tipo in r.tipos or ("internship" in r.tipos and contrato.seniority(titulo) == "intern"):
+            return "tipo de contrato no aceptado"
+    return None
+
+
+def preferidos(perfiles):
+    """Contrato v22: términos preferidos (sectores y palabras) de los perfiles, ya normalizados."""
+    salida = set()
+    for p in perfiles or ():
+        datos = p if isinstance(p, dict) else p.model_dump()
+        for t in (datos.get("sectores_preferidos") or []) + (datos.get("palabras_preferidas") or []):
+            salida.add(normalizar.texto(t))
+    return {t for t in salida if t}
+
+
+def coincidencias_preferidas(v, terminos):
+    """Cuántos términos preferidos distintos menciona la vacante en el título, la descripción o la empresa."""
+    if not terminos:
+        return 0
+    texto = normalizar.texto(" ".join([v.get("titulo") or "", v.get("empresa") or "",
+                                       (v.get("_descripcion") or "")[:12000]]))
+    return sum(1 for t in terminos if normalizar.contiene_frase(texto, t))
 
 
 def enlace_utilizable(row, ahora=None):

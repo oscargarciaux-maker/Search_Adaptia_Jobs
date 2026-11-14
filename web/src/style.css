@@ -3360,3 +3360,64 @@ p.role-quota {
   margin: 0;
   color: var(--muted);
 }
+/* Contrato v22: margen, prioridades y restricciones del perfil. */
+select.margen {
+  margin-top: 8px;
+}
+.filtros-perfil {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 14px 0;
+}
+.restricciones {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.restricciones legend {
+  font-weight: 600;
+  color: var(--ink);
+  padding: 0 4px;
+}
+.restriccion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--line);
+}
+.restriccion > .field {
+  flex: 1 1 260px;
+  margin: 0;
+}
+.restriccion-campos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 260px;
+  color: var(--ink);
+}
+.restriccion-campos input[type="number"] {
+  width: 120px;
+}
+.chip-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+}
+.nueva-restriccion {
+  align-self: flex-start;
+  min-height: 40px;
+}

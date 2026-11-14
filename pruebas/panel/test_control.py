@@ -984,3 +984,70 @@ def test_sin_sql_015_se_explica_como_instalarla(monkeypatch):
     cuerpo["message"] = "Las metas superan el techo diario"
     with pytest.raises(ErrorRepositorio, match="superan el techo"):
         repo.pedir("POST", "rpc/panel_publicar", json={})
+
+
+# ── Contrato v22: restricciones, prioridades, margen y nivel según los años ──────────────────────────────────────
+
+def _perfil_v22(cfg, **cambios):
+    return Perfil.model_validate({**cfg["perfiles"][0], "experiencia_min": None, "experiencia_max": None,
+                                  "ingles_maximo": "sin_filtro", **cambios})
+
+
+def test_margen_de_cuatro_anos(cfg):
+    p = _perfil_v22(cfg, experiencia_anos=6, margen_experiencia=4)
+    assert (p.experiencia_min, p.experiencia_max) == (2, 10)
+    with pytest.raises(ValidationError):
+        _perfil_v22(cfg, experiencia_anos=6, margen_experiencia=5)
+
+
+def test_nivel_segun_los_anos(cfg):
+    junior = trabajo(titulo="Junior Product Designer")
+    senior = _perfil_v22(cfg, experiencia_anos=7)
+    assert "nivel inferior al del perfil" in afinidad.evaluar(junior, senior, hoy())["motivos"]
+    assert "nivel inferior al del perfil" in afinidad.evaluar(trabajo(titulo="Product Design Intern"), senior, hoy())["motivos"]
+    assert afinidad.evaluar(trabajo(titulo="Senior Product Designer", anos_min=6), senior, hoy())["compatible"]
+    # Con 2 años o menos no hay filtro de experiencia: entra aunque pida 8 años.
+    nuevo = _perfil_v22(cfg, experiencia_anos=1)
+    pide_seis = trabajo(anos_min=8)
+    assert afinidad.evaluar(pide_seis, nuevo, hoy())["compatible"]
+    assert not afinidad.evaluar(pide_seis, _perfil_v22(cfg, experiencia_anos=3), hoy())["compatible"]
+
+
+def test_salario_minimo_solo_con_la_misma_moneda(cfg):
+    p = _perfil_v22(cfg, restricciones=[{"tipo": "salario_minimo", "monto": 3000, "moneda": "USD", "periodo": "month"}])
+    bajo = trabajo(salario="USD 1.500 - 2.000 per month")
+    alto = trabajo(salario="USD 40,000 - 50,000 per year")  # 4.166 al mes: pasa
+    otra_moneda = trabajo(salario="EUR 1.000 per month")
+    sin_dato = trabajo(salario="")
+    assert "salario menor al aceptado" in afinidad.evaluar(bajo, p, hoy())["motivos"]
+    for v in (alto, otra_moneda, sin_dato):
+        assert "salario menor al aceptado" not in afinidad.evaluar(v, p, hoy())["motivos"]
+
+
+def test_palabras_y_tipo_de_contrato_descartan(cfg):
+    p = _perfil_v22(cfg, restricciones=[{"tipo": "palabras", "palabras": ["call center", "Java"]},
+                                        {"tipo": "contrato", "tipos": ["freelance"]}])
+    con_java = trabajo(_descripcion=trabajo()["_descripcion"] + " Experience with Java is a plus.")
+    javascript = trabajo(_descripcion=trabajo()["_descripcion"] + " JavaScript and Figma.")
+    freelance = trabajo(titulo="Product Designer (Freelance)")
+    assert "menciona algo que el perfil no acepta" in afinidad.evaluar(con_java, p, hoy())["motivos"]
+    assert afinidad.evaluar(javascript, p, hoy())["compatible"]  # palabra completa: JavaScript no es Java
+    assert "tipo de contrato no aceptado" in afinidad.evaluar(freelance, p, hoy())["motivos"]
+    # La ampliación nunca relaja una restricción.
+    assert not afinidad.evaluar_ampliada(con_java, p, hoy(), "experiencia_cercana")["compatible"]
+    with pytest.raises(ValidationError):
+        _perfil_v22(cfg, restricciones=[{"tipo": "palabras", "palabras": []}])
+
+
+def test_preferidas_solo_ordenan_cuando_sobran_candidatas(cfg):
+    perfil = {**cfg["perfiles"][0], "sectores_preferidos": ["Fintech"], "palabras_preferidas": ["AI prototyping"]}
+    texto = trabajo()["_descripcion"]
+    comunes = [_oferta("Product Designer", n, texto) for n in range(4)]
+    fintech = _oferta("Product Designer", 9, texto + " We are a fintech doing AI prototyping.")
+    fintech["visto_primera_vez"] = fintech["fecha_publicacion"] = (date.fromisoformat(hoy()) - timedelta(days=9)).isoformat()
+    candidatas = [(v, "exacto") for v in comunes + [fintech]]
+    una = entrega.variadas(candidatas, 1, 2, hoy(), perfiles=[perfil])
+    assert una[0][0]["empresa"] == "Empresa 9"  # más vieja, pero menciona dos preferidas
+    sin_preferencias = entrega.variadas(candidatas, 1, 2, hoy(), perfiles=[cfg["perfiles"][0]])
+    assert sin_preferencias[0][0]["empresa"] != "Empresa 9"
+    assert len(entrega.variadas(candidatas, 10, 2, hoy(), perfiles=[perfil])) == 5  # con pocas, entran todas

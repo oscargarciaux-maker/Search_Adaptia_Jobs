@@ -643,3 +643,53 @@ test("CSV por cliente o de todos, del día o de toda la base", async ({
   );
   await expect(page.getByText(/CSV descargado: \d+ vacantes/)).toBeVisible();
 });
+
+test("contrato v22: restricciones, prioridades y margen de años en el perfil", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/");
+  await ir(page, "Clientes");
+  await page
+    .getByRole("button", { name: "Editar Cliente de ejemplo 01", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Años de experiencia del perfil 1").fill("6");
+  await dialog.getByLabel("Margen de años del perfil 1").selectOption("4");
+  await expect(
+    dialog.getByText(/de 2 a 10 años\. No recibe vacantes junior/),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Prioridades (opcional)" }).click();
+  const sectores = dialog.getByLabel("Sectores preferidos del perfil 1");
+  await sectores.fill("Fintech, B2B SaaS");
+  await sectores.press("Enter");
+  await expect(
+    dialog.getByRole("button", { name: "Quitar B2B SaaS" }),
+  ).toBeVisible();
+  await dialog
+    .getByLabel("Añadir restricción al perfil 1")
+    .selectOption("palabras");
+  const palabras = dialog.getByLabel("Vacantes que mencionan (perfil 1)");
+  await palabras.fill("call center");
+  await palabras.press("Enter");
+  await dialog
+    .getByLabel("Añadir restricción al perfil 1")
+    .selectOption("salario_minimo"); // a medio llenar: no se guarda
+  await dialog.getByRole("button", { name: "Aplicar cambios" }).click();
+  await page
+    .getByRole("button", { name: "Guardar borrador", exact: true })
+    .click();
+  await expect(
+    page.getByText("Borrador guardado.", { exact: false }),
+  ).toBeVisible();
+  const cfg = await (await request.get("/api/config")).json();
+  const perfil = cfg.borrador.perfiles.find(
+    (p: { cliente_id: string }) => p.cliente_id === cfg.borrador.clientes[0].id,
+  );
+  expect(perfil.margen_experiencia).toBe(4);
+  expect(perfil.experiencia_min).toBe(2);
+  expect(perfil.sectores_preferidos).toEqual(["Fintech", "B2B SaaS"]);
+  expect(perfil.restricciones).toEqual([
+    { tipo: "palabras", palabras: ["call center"] },
+  ]);
+});
