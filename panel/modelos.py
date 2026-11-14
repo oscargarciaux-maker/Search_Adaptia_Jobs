@@ -7,6 +7,9 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from buscador import paises
 
 
+TECHO_MAXIMO = 600  # contrato v21: techo diario editable; protege los consumos (Apify, tiempo de búsqueda)
+
+
 class Modelo(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -15,6 +18,9 @@ class Cliente(Modelo):
     id: UUID
     nombre: str = Field(min_length=1, max_length=100)
     activo: bool = True
+    # Contrato v21: el cliente «Comunidad» (grupo de WhatsApp) recibe después de los clientes reales, con lo que sobra
+    # del techo diario.
+    comunidad: bool = False
 
     @field_validator("nombre")
     @classmethod
@@ -27,7 +33,9 @@ class Cliente(Modelo):
 class Cargo(Modelo):
     id: UUID
     nombre: str = Field(min_length=2, max_length=120)
-    cupo: int = Field(default=20, ge=0, le=120, strict=True)
+    # Contrato v21: el cupo del cargo ya no se edita; se calcula con las metas de sus perfiles (`Configuracion`). Se
+    # conserva el campo para leer configuraciones anteriores y para el motor, que sigue eligiendo por cargo.
+    cupo: int = Field(default=20, ge=0, le=TECHO_MAXIMO, strict=True)
     activo: bool = True
     terminos_exactos: list[str] = Field(default_factory=list, max_length=30)
     terminos_similares: list[str] = Field(default_factory=list, max_length=30)
@@ -56,6 +64,7 @@ class Cargo(Modelo):
 
 
 RANGO_EXPERIENCIA = 3  # contrato v20: de 3 años menos a 3 años más
+META_POR_DEFECTO = 10  # contrato v21: meta diaria de un perfil nuevo
 
 
 class Perfil(Modelo):
@@ -78,6 +87,9 @@ class Perfil(Modelo):
     experiencia_anos: int | None = Field(default=None, ge=0, le=40)
     aceptar_experiencia_sin_dato: bool = False
     aceptar_ingles_sin_dato: bool = False
+    # Contrato v21: cuántas vacantes al día busca este perfil. Vacío solo en configuraciones anteriores: se calcula
+    # repartiendo el cupo antiguo del cargo entre sus perfiles activos.
+    meta_diaria: int | None = Field(default=None, ge=0, le=120)
 
     @model_validator(mode="before")
     @classmethod
@@ -134,6 +146,8 @@ class Configuracion(Modelo):
     clientes: list[Cliente] = Field(default_factory=list, max_length=250)
     cargos: list[Cargo] = Field(default_factory=list, max_length=100)
     perfiles: list[Perfil] = Field(default_factory=list, max_length=1000)
+    # Contrato v21: máximo de vacantes del día. Los clientes reales se llenan primero; lo que sobra va a Comunidad.
+    techo_diario: int = Field(default=120, ge=1, le=TECHO_MAXIMO)
 
     @model_validator(mode="after")
     def coherencia(self):
@@ -146,9 +160,47 @@ class Configuracion(Modelo):
         nombres = [" ".join(c.nombre.casefold().replace("-", " ").split()) for c in self.cargos if c.activo]
         if len(nombres) != len(set(nombres)):
             raise ValueError("Usa un solo cargo compartido para los clientes del mismo oficio.")
-        if self.total > 120:
-            raise ValueError("Los cupos activos no pueden superar las 120 vacantes.")
+        # Un borrador puede pasar el techo mientras se edita; programar no (`validar_publicacion`).
+        return self.aplicar_metas()
+
+    def _activos(self):
+        clientes = {c.id: c for c in self.clientes if c.activo}
+        cargos = {c.id for c in self.cargos if c.activo}
+        return [p for p in self.perfiles if p.activo and p.cliente_id in clientes and p.cargo_id in cargos], clientes
+
+    def aplicar_metas(self):
+        """Contrato v21. 1) Perfil sin meta (configuración anterior): reparte el cupo antiguo de su cargo entre los
+        perfiles activos de ese cargo que no tienen meta. 2) El cupo de cada cargo pasa a ser la suma de las metas de
+        sus perfiles reales más la parte de Comunidad que cabe bajo el techo. El motor sigue eligiendo por cargo."""
+        activos, clientes = self._activos()
+        ids_activos = {p.id for p in activos}
+        for c in self.cargos:
+            sin_meta = [p for p in activos if p.cargo_id == c.id and p.meta_diaria is None]
+            if sin_meta:
+                base, resto = divmod(c.cupo, len(sin_meta))
+                for i, p in enumerate(sin_meta):
+                    p.meta_diaria = base + (1 if i < resto else 0)
+        for p in self.perfiles:
+            if p.meta_diaria is None:
+                p.meta_diaria = 0 if p.id not in ids_activos else META_POR_DEFECTO
+        reales = sum(p.meta_diaria for p in activos if not clientes[p.cliente_id].comunidad)
+        comunidad = sum(p.meta_diaria for p in activos if clientes[p.cliente_id].comunidad)
+        factor = min(1.0, max(0, self.techo_diario - reales) / comunidad) if comunidad else 0
+        for c in self.cargos:
+            de_cargo = [p for p in activos if p.cargo_id == c.id]
+            c.cupo = min(TECHO_MAXIMO, sum(p.meta_diaria for p in de_cargo if not clientes[p.cliente_id].comunidad) +
+                         int(sum(p.meta_diaria for p in de_cargo if clientes[p.cliente_id].comunidad) * factor)) \
+                if c.activo else 0
         return self
+
+    def metas(self):
+        """Sumas de metas activas: clientes reales, Comunidad, lo que Comunidad recibe bajo el techo y lo libre."""
+        activos, clientes = self._activos()
+        reales = sum(p.meta_diaria or 0 for p in activos if not clientes[p.cliente_id].comunidad)
+        comunidad = sum(p.meta_diaria or 0 for p in activos if clientes[p.cliente_id].comunidad)
+        cabe = min(comunidad, max(0, self.techo_diario - reales))
+        return {"techo": self.techo_diario, "reales": reales, "comunidad": comunidad, "comunidad_cabe": cabe,
+                "libre": max(0, self.techo_diario - reales - cabe)}
 
     @property
     def total(self):
@@ -156,22 +208,30 @@ class Configuracion(Modelo):
 
     def perfiles_activos(self, cargo_id=None):
         clientes = {c.id for c in self.clientes if c.activo}
-        cargos = {c.id for c in self.cargos if c.activo and c.cupo > 0}
+        cargos = {c.id for c in self.cargos if c.activo}
+        # Contrato v21: cuenta el perfil activo con meta; un cargo sin meta en ningún perfil no busca.
         return [p for p in self.perfiles if p.activo and p.cliente_id in clientes and p.cargo_id in cargos
+                and (p.meta_diaria or 0) > 0
                 and (cargo_id is None or str(p.cargo_id) == str(cargo_id))]
 
     def validar_publicacion(self):
-        if self.total != 120:
-            raise ValueError("Reparte exactamente 120 vacantes antes de programar la búsqueda.")
-        if any(not self.perfiles_activos(c.id) for c in self.cargos if c.activo and c.cupo):
-            raise ValueError("Cada cargo con cupo necesita al menos un perfil de cliente activo.")
+        reales = self.metas()["reales"]
+        if reales > self.techo_diario:
+            raise ValueError(f"Las metas de los clientes suman {reales} y el techo diario es {self.techo_diario}: "
+                             "baja algunas metas o sube el techo antes de programar.")
+        if self.total <= 0:
+            raise ValueError("Ningún perfil activo tiene meta diaria: da una meta a algún perfil antes de programar.")
+        if self.total > self.techo_diario:
+            raise ValueError(f"Las metas suman {self.total} y el techo diario es {self.techo_diario}.")
         return self
 
 
 _MOTIVOS_CAMPO = {
     ("clientes", "nombre"): "Escribe el nombre del cliente.",
     ("cargos", "nombre"): "Escribe el nombre del cargo (al menos 2 letras).",
-    ("cargos", "cupo"): "El cupo de cada cargo va de 0 a 120.",
+    ("cargos", "cupo"): "El cupo de cada cargo va de 0 a 600.",
+    ("perfiles", "meta_diaria"): "La meta diaria de cada perfil va de 0 a 120 vacantes.",
+    ("techo_diario",): "El techo diario va de 1 a 600 vacantes.",
     ("perfiles", "modalidades"): "Elige al menos una modalidad: remoto, híbrido o presencial.",
     ("perfiles", "idiomas"): "Elige al menos un idioma de los avisos: español o inglés.",
     ("perfiles", "experiencia_min"): "Los años de experiencia van de 0 a 40.",
@@ -241,8 +301,11 @@ def parcial(datos):
         perfiles[pid] = p
     if not perfiles:
         return None, incompletos
-    return Configuracion.model_construct(clientes=list(clientes.values()), cargos=list(cargos.values()),
-                                         perfiles=list(perfiles.values())), incompletos
+    techo = datos.get("techo_diario")
+    cfg = Configuracion.model_construct(clientes=list(clientes.values()), cargos=list(cargos.values()),
+                                        perfiles=list(perfiles.values()),
+                                        techo_diario=techo if isinstance(techo, int) and 1 <= techo <= TECHO_MAXIMO else 120)
+    return cfg.aplicar_metas(), incompletos
 
 
 class Guardar(Modelo):

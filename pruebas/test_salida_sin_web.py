@@ -21,3 +21,11 @@ def test_reanudar_salida_antigua_retira_web_y_preserva_estado(tmp_path):
     assert not any((tmp_path / nombre).exists() for nombre in publicar.INTERFAZ_RETIRADA)
     assert json.loads((tmp_path / "datos/salud.json").read_text())["catalogo"]["pendientes"] == 0
     assert all((trabajo / nombre).read_bytes() == contenido for nombre, contenido in archivos.items())
+
+
+def test_la_captura_horaria_no_pisa_el_informe_de_la_busqueda_completa(tmp_path):
+    import json
+    publicar.publicar(tmp_path, [], {"modo": "diario", "nuevas_hoy": 50}, Counter())
+    publicar.publicar(tmp_path, [], {"modo": "incremental", "nuevas_hoy": 3}, Counter())
+    assert json.loads((tmp_path / "datos" / "salud.json").read_text())["nuevas_hoy"] == 3
+    assert json.loads((tmp_path / "datos" / "salud_bodega.json").read_text())["nuevas_hoy"] == 50

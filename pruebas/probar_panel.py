@@ -40,10 +40,10 @@ def main():
             assert c.execute("select vigente_desde > (now() at time zone 'America/Bogota')::date from public.panel_versiones").fetchone()[0]
             assert c.execute("select public.panel_publicar(1)").fetchone()[0] == publicada
             mala = json.loads(json.dumps(cfg))
-            mala["cargos"][0]["cupo"] += 1
+            mala["techo_diario"] = 0
             try:
                 c.execute("select public.panel_guardar(1,%s::jsonb)", (json.dumps(mala),))
-                raise AssertionError("Se guardó un presupuesto superior a 120")
+                raise AssertionError("Se guardó un techo diario de 0")
             except psycopg.errors.RaiseException:
                 pass
             assert c.execute("select revision from public.panel_configuracion").fetchone()[0] == 1
@@ -75,7 +75,30 @@ def main():
             except psycopg.errors.ForeignKeyViolation:
                 pass
             assert c.execute("select count(*) from public.panel_asignaciones").fetchone()[0] == 1
-        print("Panel SQL: RLS, acceso exclusivo de servicio, 120 cupos, revisión concurrente, vigencia siguiente e historial protegido: aprobados.")
+            # SQL 015 (contrato v21): con techo 130 se guarda y programa una suma de 125; ya no exige 120 exactos.
+            c.execute("set role service_role")
+            r = c.execute("select revision from public.panel_configuracion").fetchone()[0]
+            amplia = json.loads(json.dumps(cfg))
+            amplia["techo_diario"], amplia["cargos"][0]["cupo"] = 130, amplia["cargos"][0]["cupo"] + 5
+            assert c.execute("select public.panel_guardar(%s,%s::jsonb)", (r, json.dumps(amplia))).fetchone()[0]["revision"] == r + 1
+            assert c.execute("select public.panel_publicar(%s)", (r + 1,)).fetchone()[0]["revision"] == r + 1
+            excesiva = json.loads(json.dumps(amplia))
+            excesiva["techo_diario"] = 601
+            try:
+                c.execute("select public.panel_guardar(%s,%s::jsonb)", (r + 1, json.dumps(excesiva)))
+                raise AssertionError("Se guardó un techo diario mayor que 600")
+            except psycopg.errors.RaiseException:
+                pass
+            # Un borrador por encima del techo se guarda, pero no se programa.
+            pasada = json.loads(json.dumps(amplia))
+            pasada["cargos"][0]["cupo"] += 10
+            c.execute("select public.panel_guardar(%s,%s::jsonb)", (r + 1, json.dumps(pasada)))
+            try:
+                c.execute("select public.panel_publicar(%s)", (r + 2,))
+                raise AssertionError("Se programó una suma mayor que el techo")
+            except psycopg.errors.RaiseException:
+                pass
+        print("Panel SQL: RLS, acceso exclusivo de servicio, techo diario, revisión concurrente, vigencia siguiente e historial protegido: aprobados.")
     finally:
         with conectar() as c:
             c.execute(sql.SQL("drop database {}").format(sql.Identifier(nombre)))

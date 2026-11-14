@@ -121,7 +121,7 @@ function vacioVacantes(estado: EstadoConfig | null, r: Resultados | null) {
     return {
       title: "Programa la configuración para empezar",
       texto:
-        "Las vacantes de cada cliente aparecen después de la primera búsqueda (6:30 a. m.) con su configuración. Ve a «Cargos y cupos» y pulsa «Programar para mañana».",
+        "Las vacantes de cada cliente aparecen después de la primera búsqueda (6:30 a. m.) con su configuración. Ve a «Cargos y metas» y pulsa «Programar para mañana».",
     };
   const desde = estado.publicada.vigente_desde;
   if (!r?.ejecucion || r.ejecucion.fecha < desde)
@@ -158,6 +158,67 @@ function perfilNuevo(cliente: string, cargo: string): Perfil {
     experiencia_anos: null,
     aceptar_experiencia_sin_dato: false,
     aceptar_ingles_sin_dato: false,
+    meta_diaria: META_POR_DEFECTO,
+  };
+}
+
+// Contrato v21: cada perfil tiene su meta diaria y el día tiene un techo. Mismo cálculo que el servidor
+// (panel/modelos.py, aplicar_metas): un perfil antiguo sin meta recibe su parte del cupo anterior del cargo; el cupo
+// de cada cargo es la suma de las metas reales más la parte de Comunidad que cabe bajo el techo.
+const META_POR_DEFECTO = 10;
+function conMetas(cfg: Configuracion) {
+  const techo = cfg.techo_diario ?? 120;
+  const clientes = new Map(
+    cfg.clientes.filter((c) => c.activo).map((c) => [c.id, c]),
+  );
+  const cargosActivos = new Set(
+    cfg.cargos.filter((c) => c.activo).map((c) => c.id),
+  );
+  const activos = cfg.perfiles.filter(
+    (p) =>
+      p.activo && clientes.has(p.cliente_id) && cargosActivos.has(p.cargo_id),
+  );
+  const repartida = new Map<string, number>();
+  for (const c of cfg.cargos) {
+    const sinMeta = activos.filter(
+      (p) => p.cargo_id === c.id && p.meta_diaria == null,
+    );
+    sinMeta.forEach((p, i) =>
+      repartida.set(
+        p.id,
+        Math.floor(c.cupo / sinMeta.length) +
+          (i < c.cupo % sinMeta.length ? 1 : 0),
+      ),
+    );
+  }
+  const metaDe = (p: Perfil) => p.meta_diaria ?? repartida.get(p.id) ?? 0;
+  const esComunidad = (p: Perfil) => !!clientes.get(p.cliente_id)?.comunidad;
+  const suma = (ps: Perfil[]) => ps.reduce((s, p) => s + metaDe(p), 0);
+  const reales = suma(activos.filter((p) => !esComunidad(p)));
+  const comunidad = suma(activos.filter(esComunidad));
+  const factor = comunidad
+    ? Math.min(1, Math.max(0, techo - reales) / comunidad)
+    : 0;
+  const cargos = cfg.cargos.map((c) => {
+    const delCargo = activos.filter((p) => p.cargo_id === c.id);
+    return {
+      ...c,
+      cupo: c.activo
+        ? suma(delCargo.filter((p) => !esComunidad(p))) +
+          Math.floor(suma(delCargo.filter(esComunidad)) * factor)
+        : 0,
+    };
+  });
+  const cabe = Math.min(comunidad, Math.max(0, techo - reales));
+  return {
+    cargos,
+    techo,
+    reales,
+    comunidad,
+    cabe,
+    libre: Math.max(0, techo - reales - cabe),
+    metaDe,
+    total: cargos.filter((c) => c.activo).reduce((s, c) => s + c.cupo, 0),
   };
 }
 
@@ -404,8 +465,8 @@ function CargoDialog({
   }
   return (
     <Dialog
-      titulo={cargo ? "Editar cargo y cupo" : "Añadir un cargo"}
-      subtitulo="Un mismo cupo puede servir a varios clientes compatibles."
+      titulo={cargo ? "Editar cargo" : "Añadir un cargo"}
+      subtitulo="Un mismo cargo sirve a varios clientes; cuántas vacantes recibe lo dicen las metas de sus perfiles."
       onClose={onClose}
     >
       <form
@@ -442,18 +503,6 @@ function CargoDialog({
                 value={c.nombre}
                 placeholder="Por ejemplo, Frontend"
                 onChange={(e) => setC({ ...c, nombre: e.target.value })}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="cargo-cupo">Vacantes diarias</label>
-              <input
-                id="cargo-cupo"
-                type="number"
-                min={0}
-                max={120}
-                required
-                value={c.cupo}
-                onChange={(e) => setC({ ...c, cupo: Number(e.target.value) })}
               />
             </div>
           </div>
@@ -1805,6 +1854,7 @@ function ClienteDialog({
     perfiles: [...config.perfiles.filter((p) => p.cliente_id !== c.id), ...ps],
   };
   const previa = useVistaPrevia(borrador);
+  const metasBorrador = conMetas(borrador);
   return (
     <>
       <Dialog
@@ -1888,6 +1938,15 @@ function ClienteDialog({
               onChange={(e) => setC({ ...c, nombre: e.target.value })}
             />
           </div>
+          <label className="casilla-comunidad">
+            <input
+              type="checkbox"
+              checked={!!c.comunidad}
+              onChange={(e) => setC({ ...c, comunidad: e.target.checked })}
+            />
+            Es «Comunidad» (grupo de WhatsApp): recibe después de los clientes
+            reales, con lo que sobra del techo del día
+          </label>
           <fieldset className="whatsapp-contacto">
             <legend>WhatsApp (opcional)</legend>
             <label className="check-line">
@@ -1976,12 +2035,28 @@ function ClienteDialog({
                     ))}
                     <option value="__nuevo">＋ Añadir cargo nuevo…</option>
                   </select>
-                  {cargos.find((x) => x.id === p.cargo_id)?.cupo === 0 && (
-                    <p className="field-help">
-                      Este cargo aún no tiene cupo: dale vacantes en «Cargos y
-                      cupos» para que reciba.
-                    </p>
-                  )}
+                </div>
+                <div className="field">
+                  <label htmlFor={"meta-" + p.id}>Meta diaria</label>
+                  <input
+                    id={"meta-" + p.id}
+                    aria-label={"Meta diaria del perfil " + (i + 1)}
+                    type="number"
+                    min={0}
+                    max={120}
+                    value={p.meta_diaria ?? metasBorrador.metaDe(p)}
+                    onChange={(e) =>
+                      patch(p.id, {
+                        meta_diaria: Math.max(
+                          0,
+                          Math.min(120, Number(e.target.value) || 0),
+                        ),
+                      })
+                    }
+                  />
+                  <p className="field-help">
+                    Vacantes al día para este perfil.
+                  </p>
                 </div>
                 <div className="field">
                   <label htmlFor={"vive-" + p.id}>¿En qué país vive?</label>
@@ -2335,7 +2410,7 @@ function ClienteDialog({
 const secciones: Record<string, string> = {
   Resumen: "",
   Clientes: "clientes",
-  "Cargos y cupos": "cargos",
+  "Cargos y metas": "cargos",
   Vacantes: "vacantes",
   "Por confirmar": "por-confirmar",
   Mensajes: "mensajes",
@@ -2375,6 +2450,8 @@ function TarjetasResumen({
   perfiles,
   cargos,
   total,
+  techo,
+  comunidad,
   ultima,
   porConfirmar,
   borradores,
@@ -2384,6 +2461,8 @@ function TarjetasResumen({
   perfiles: number;
   cargos: Cargo[];
   total: number;
+  techo: number;
+  comunidad: number;
   ultima?: Ejecucion;
   porConfirmar: number;
   borradores: Borrador[] | null;
@@ -2447,25 +2526,22 @@ function TarjetasResumen({
       <button
         type="button"
         className={
-          "tarjeta-resumen tarjeta-cupos " + (total === 120 ? "green" : "amber")
+          "tarjeta-resumen tarjeta-cupos " +
+          (total > 0 && total <= techo ? "green" : "amber")
         }
-        onClick={() => go("Cargos y cupos")}
+        onClick={() => go("Cargos y metas")}
       >
         <span className="tarjeta-cabeza">
           <SlidersHorizontal size={17} />
-          Cargos y cupos
+          Techo del día
         </span>
         <div className="cupos-fila">
           <strong className="tarjeta-numero">
             {total}
-            <small> / 120</small>
+            <small> / {techo}</small>
           </strong>
           <span className="tarjeta-detalle">
-            {total === 120
-              ? "Distribución completa"
-              : total > 120
-                ? `Sobran ${total - 120}: quita cupos`
-                : `Faltan ${120 - total} por repartir`}
+            {total - comunidad} a clientes · {comunidad} a Comunidad
           </span>
         </div>
         <span className="cupos-barra" aria-hidden="true">
@@ -2473,7 +2549,7 @@ function TarjetasResumen({
             <span
               key={c.id}
               style={{
-                width: (c.cupo / Math.max(total, 120)) * 100 + "%",
+                width: (c.cupo / Math.max(total, techo)) * 100 + "%",
                 background: colores[i % 5],
                 animationDelay: 120 + i * 70 + "ms",
               }}
@@ -2489,7 +2565,7 @@ function TarjetasResumen({
           ))}
         </span>
         <span className="tarjeta-accion">
-          Editar cupos
+          Editar cargos y metas
           <ArrowRight size={15} />
         </span>
       </button>
@@ -2644,13 +2720,13 @@ function App() {
   const [porConfirmar, setPorConfirmar] = useState(0);
   const [borradoresHoy, setBorradoresHoy] = useState<Borrador[] | null>(null);
   const previaCargos = useVistaPrevia(
-    tab === "Cargos y cupos" && sesion?.sesion ? draft : null,
+    tab === "Cargos y metas" && sesion?.sesion ? draft : null,
   );
-  const total = draft.cargos
-      .filter((c) => c.activo)
-      .reduce((s, c) => s + c.cupo, 0),
+  const metas = conMetas(draft),
+    total = metas.total,
+    excede = metas.reales > metas.techo,
     clientes = draft.clientes.filter((c) => c.activo),
-    cargos = draft.cargos.filter((c) => c.activo);
+    cargos = metas.cargos.filter((c) => c.activo);
   function notify(texto: string, error = false) {
     setToast({ texto, error });
   }
@@ -3060,8 +3136,8 @@ function App() {
                   ? "Organiza tus clientes y prepara las oportunidades de mañana."
                   : tab === "Clientes"
                     ? "Configura los criterios que hacen útil una vacante para cada cliente."
-                    : tab === "Cargos y cupos"
-                      ? "Reparte las 120 vacantes diarias entre los cargos que necesitas."
+                    : tab === "Cargos y metas"
+                      ? "Cada perfil tiene su meta diaria; aquí defines el techo del día y los cargos."
                       : tab === "Vacantes"
                         ? "Revisa las coincidencias de cada cliente y prepara su mensaje."
                         : tab === "Por confirmar"
@@ -3073,7 +3149,7 @@ function App() {
                               : "Información sobre la conexión y el funcionamiento del espacio."}
               </p>
             </div>
-            {["Resumen", "Clientes", "Cargos y cupos"].includes(tab) && (
+            {["Resumen", "Clientes", "Cargos y metas"].includes(tab) && (
               <div className="heading-actions">
                 <span className={"flow-pill" + (dirty ? " pending" : "")}>
                   {dirty
@@ -3089,7 +3165,7 @@ function App() {
                 <button
                   className="button secondary"
                   onClick={guardarClick}
-                  disabled={!dirty || busy || total > 120}
+                  disabled={!dirty || busy}
                 >
                   <Save size={16} />
                   {busy ? "Guardando…" : "Guardar borrador"}
@@ -3106,7 +3182,7 @@ function App() {
                 <button
                   className="button primary"
                   onClick={() => setModal("publicar")}
-                  disabled={busy || total !== 120}
+                  disabled={busy || total < 1 || excede}
                 >
                   <CalendarClock size={16} />
                   Programar para mañana
@@ -3137,6 +3213,8 @@ function App() {
                 }
                 cargos={cargos}
                 total={total}
+                techo={metas.techo}
+                comunidad={metas.cabe}
                 ultima={runs?.[0]}
                 porConfirmar={porConfirmar}
                 borradores={borradoresHoy}
@@ -3245,23 +3323,44 @@ function App() {
               )}
             </>
           )}
-          {tab === "Cargos y cupos" && (
+          {tab === "Cargos y metas" && (
             <>
-              <div
-                className={"allocation card " + (total > 120 ? "invalid" : "")}
-              >
+              <div className={"allocation card " + (excede ? "invalid" : "")}>
+                <div className="field techo-campo">
+                  <label htmlFor="techo-diario">Techo del día</label>
+                  <input
+                    id="techo-diario"
+                    type="number"
+                    min={1}
+                    max={600}
+                    value={metas.techo}
+                    onChange={(e) =>
+                      cambiar({
+                        ...draft,
+                        techo_diario: Math.max(
+                          1,
+                          Math.min(600, Number(e.target.value) || 1),
+                        ),
+                      })
+                    }
+                  />
+                </div>
                 <p className="allocation-texto">
-                  <strong>{total}</strong> / 120 vacantes ·{" "}
-                  {total === 120
-                    ? "Distribución completa"
-                    : total < 120
-                      ? "Faltan " + (120 - total) + " por repartir"
-                      : "Sobran " + (total - 120) + ": quita cupos"}
+                  <strong>{metas.reales}</strong> a clientes · {metas.cabe} a
+                  Comunidad · {metas.libre} libres
+                  {excede &&
+                    " · Las metas de los clientes pasan el techo: baja metas o sube el techo"}
                 </p>
+                <Ayuda etiqueta="Techo del día">
+                  Máximo de vacantes al día, para cuidar los consumos. Primero
+                  se llenan las metas de los clientes reales; lo que sobre va al
+                  cliente «Comunidad».
+                </Ayuda>
                 <div className="allocation-track">
                   <span
                     style={{
-                      width: Math.min((total / 120) * 100, 100) + "%",
+                      width:
+                        Math.min((metas.reales / metas.techo) * 100, 100) + "%",
                     }}
                   />
                 </div>
@@ -3345,56 +3444,18 @@ function App() {
                         </span>
                       )}
                     </div>
-                    <div className="role-quota">
-                      <label htmlFor={"cupo-" + c.id}>Cupo diario</label>
-                      <input
-                        id={"cupo-" + c.id}
-                        type="range"
-                        min={0}
-                        max={120}
-                        value={c.cupo}
-                        onChange={(e) =>
-                          cambiar({
-                            ...draft,
-                            cargos: draft.cargos.map((x) =>
-                              x.id === c.id
-                                ? { ...x, cupo: Number(e.target.value) }
-                                : x,
-                            ),
-                          })
-                        }
-                      />
-                      <div className="number-wrap">
-                        <input
-                          aria-label={"Vacantes de " + c.nombre}
-                          type="number"
-                          min={0}
-                          max={120}
-                          value={c.cupo}
-                          onChange={(e) =>
-                            cambiar({
-                              ...draft,
-                              cargos: draft.cargos.map((x) =>
-                                x.id === c.id
-                                  ? {
-                                      ...x,
-                                      cupo: Math.max(
-                                        0,
-                                        Math.min(120, Number(e.target.value)),
-                                      ),
-                                    }
-                                  : x,
-                              ),
-                            })
-                          }
-                        />
-                        <span>vacantes</span>
-                      </div>
-                    </div>
-                    {c.cupo > 0 && clientCount(c.id) === 0 && (
+                    <p className="role-quota">
+                      Meta del día: <strong>{c.cupo}</strong>{" "}
+                      {c.cupo === 1 ? "vacante" : "vacantes"}
+                      <span className="helper">
+                        {" "}
+                        · suma de las metas de sus perfiles
+                      </span>
+                    </p>
+                    {clientCount(c.id) === 0 && (
                       <p className="role-warning">
-                        Añade un perfil de cliente para poder programar este
-                        cargo.
+                        Sin perfiles: este cargo no busca hasta que un cliente
+                        lo tenga.
                       </p>
                     )}
                   </section>
@@ -3781,8 +3842,10 @@ function App() {
               ))}
           </div>
           <div className="publish-total">
-            <span>Objetivo total</span>
-            <strong>{total} / 120</strong>
+            <span>Total del día</span>
+            <strong>
+              {total} / {metas.techo}
+            </strong>
           </div>
           <p className="helper note">
             Al confirmar se guardan tus cambios y esta configuración se usa
@@ -4065,8 +4128,8 @@ function ClientCard({
             <Archive size={15} />
           </button>
         )}
-        {!(cargo?.activo && cargo.cupo > 0) && (
-          <span className="pill amber sin-cupo">Sin cupo</span>
+        {!(cargo?.activo && perfiles.some((p) => (p.meta_diaria ?? 1) > 0)) && (
+          <span className="pill amber sin-cupo">Sin meta</span>
         )}
         <button className="button secondary small vacantes" onClick={onResults}>
           Vacantes

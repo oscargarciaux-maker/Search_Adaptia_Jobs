@@ -30,20 +30,54 @@ def trabajo(**op):
     return v
 
 
+def sin_metas(cfg):
+    """Configuración anterior a v21: los perfiles no traen meta y manda el cupo de cada cargo."""
+    for p in cfg["perfiles"]:
+        p.pop("meta_diaria", None)
+    cfg.pop("techo_diario", None)
+    return cfg
+
+
 def test_cupos_se_validan_por_cargo_y_no_por_numero_de_clientes(cfg):
     c = Configuracion.model_validate(cfg)
     assert c.total == 120 and len(c.perfiles_activos(c.cargos[0].id)) == 3
     assert c.validar_publicacion()
-    cfg["cargos"][0]["cupo"] += 1
-    with pytest.raises(ValidationError, match="120"):
-        Configuracion.model_validate(cfg)
+    cfg["perfiles"][0]["meta_diaria"] += 1  # contrato v21: el borrador puede pasar el techo; programar, no
+    with pytest.raises(ValueError, match="suman 121 y el techo diario es 120"):
+        Configuracion.model_validate(cfg).validar_publicacion()
+    cfg["techo_diario"] = 121
+    assert Configuracion.model_validate(cfg).validar_publicacion().total == 121
+
+
+def test_configuracion_anterior_reparte_el_cupo_del_cargo_entre_sus_perfiles(cfg):
+    sin_metas(cfg)
+    cfg["cargos"][0]["cupo"] = 50  # tres perfiles: 17, 17 y 16
+    c = Configuracion.model_validate(cfg)
+    metas = [p.meta_diaria for p in c.perfiles_activos(c.cargos[0].id)]
+    assert sorted(metas) == [16, 17, 17] and c.cargos[0].cupo == 50 and c.techo_diario == 120
 
 
 def test_borrador_incompleto_no_se_publica(cfg):
-    cfg["cargos"][0]["cupo"] -= 1
+    for p in cfg["perfiles"]:
+        p["meta_diaria"] = 0
     c = Configuracion.model_validate(cfg)
-    with pytest.raises(ValueError, match="exactamente 120"):
+    with pytest.raises(ValueError, match="meta diaria"):
         c.validar_publicacion()
+    cfg["perfiles"][0]["meta_diaria"] = 5  # ya no hace falta repartir exactamente 120
+    assert Configuracion.model_validate(cfg).validar_publicacion().total == 5
+
+
+def test_comunidad_recibe_solo_lo_que_cabe_bajo_el_techo(cfg):
+    cfg["clientes"][4]["comunidad"] = True  # su perfil es el de QA
+    for p in cfg["perfiles"]:
+        p["meta_diaria"] = 30
+    c = Configuracion.model_validate(cfg)  # reales: 4 × 30 = 120; a Comunidad no le cabe nada
+    assert c.metas() == {"techo": 120, "reales": 120, "comunidad": 30, "comunidad_cabe": 0, "libre": 0}
+    assert c.cargos[2].cupo == 0  # sin cupo propio, pero su perfil sigue activo para recibir lo que sobre
+    assert len(c.perfiles_activos(c.cargos[2].id)) == 1
+    cfg["techo_diario"] = 140
+    c = Configuracion.model_validate(cfg)
+    assert c.metas()["comunidad_cabe"] == 20 and c.cargos[2].cupo == 20
 
 
 def test_no_programar_un_cargo_sin_cliente_activo(cfg):
@@ -715,7 +749,7 @@ def test_con_cinco_que_cumplen_no_se_amplia_y_el_cupo_manda(cfg_un_perfil):
     elegidas, _ = _elegir(cfg_un_perfil, ofertas)
     assert not any(v.get("_ampliacion") for v, _ in elegidas)
     pocas = [_oferta("Product Designer", 0, con_dato)] + [_oferta("Product Designer", 10 + n, SIN_DATO) for n in range(6)]
-    cfg_un_perfil["cargos"][0]["cupo"], cfg_un_perfil["cargos"][1]["cupo"] = 3, 87
+    cfg_un_perfil["perfiles"][0]["meta_diaria"] = 3  # contrato v21: la meta del perfil fija el cupo del cargo
     elegidas, _ = _elegir(cfg_un_perfil, pocas)
     assert len(elegidas) == 3  # las ampliadas cuentan dentro del cupo
 
@@ -849,6 +883,7 @@ def test_estimacion_avisa_cargos_que_comparten_vacantes(cfg):
 
 def test_cargos_parecidos_se_reparten_las_compartidas_por_turnos(cfg):
     """12 nov: «Diseñador UX/UI» recibía solo 2 porque «Product Designer», primero en la lista, se llevaba las compartidas."""
+    sin_metas(cfg)
     cfg["cargos"][1].update(nombre="Diseñador UX/UI", terminos_exactos=["Product Designer"], terminos_similares=[],
                             cupo=10)
     cfg["cargos"][0]["cupo"], cfg["cargos"][2]["cupo"] = 20, 90
@@ -873,6 +908,7 @@ def test_cargos_parecidos_se_reparten_las_compartidas_por_turnos(cfg):
 def test_lo_exclusivo_va_siempre_a_su_cargo(cfg):
     cfg["cargos"][1].update(nombre="Diseñador UX/UI", terminos_exactos=["Product Designer"],
                             terminos_similares=["Diseñador Gráfico Digital"], cupo=10)
+    sin_metas(cfg)
     cfg["cargos"][0]["cupo"], cfg["cargos"][2]["cupo"] = 20, 90
     for p in cfg["perfiles"]:
         p.update(experiencia_min=None, experiencia_max=None, ingles_maximo="sin_filtro")
@@ -913,3 +949,38 @@ def test_con_cinco_anos_entra_un_aviso_de_ocho_y_no_uno_de_nueve(cfg):
     assert "experiencia fuera del rango" in nueve["motivos"]
     # El rescate por persona (v11) sigue sumando ±2 sobre el rango de ±3.
     assert afinidad.relajado(p, "experiencia_cercana").experiencia_max == 10
+
+
+def test_lo_que_sobra_del_techo_va_a_comunidad(cfg):
+    """Contrato v21: los clientes reales piden 10; el techo es 30. Las 9 vacantes que nadie tomó y sirven a Comunidad
+    no se pierden: completan el día hasta el techo."""
+    cfg["clientes"][1]["comunidad"] = True
+    for i, p in enumerate(cfg["perfiles"]):
+        p.update(meta_diaria=[10, 1, 0, 0, 0][i], vive_en="CO", experiencia_min=None, experiencia_max=None,
+                 ingles_maximo="sin_filtro")
+    cfg["techo_diario"] = 30
+    con_dato = trabajo()["_descripcion"]
+    ofertas = [_oferta("Product Designer", n, con_dato) for n in range(20)]
+    with ejecutor.activar({"configuracion": cfg}, hoy()):
+        for v in ofertas:
+            v["familias"] = familias.clasificar(v["titulo"], v["_descripcion"])
+        elegidas, _ = entrega.elegir(ofertas, {}, hoy())
+        sin_comunidad = dict(entrega.config(), roles=[{**r, "_comunidad": []} for r in entrega.config()["roles"]])
+        solo_cupo, _ = entrega.elegir(ofertas, {}, hoy(), sin_comunidad)
+    rid = "cargo:" + cfg["cargos"][0]["id"]
+    assert len(solo_cupo[rid]) == 11  # meta real (10) + lo que cabe de Comunidad (1)
+    assert len(elegidas[rid]) == 20  # y el sobrante del techo completa con lo que sirve a Comunidad
+    assert len({v["id"] for v, _ in elegidas[rid]}) == 20
+
+
+def test_sin_sql_015_se_explica_como_instalarla(monkeypatch):
+    monkeypatch.setattr("buscador.supabase.credenciales", lambda: ("https://prueba.supabase.co", "clave-ficticia"))
+    cuerpo = {"code": "P0001", "message": "Reparte exactamente 120 vacantes"}
+    sesion = SimpleNamespace(request=lambda *a, **k: SimpleNamespace(status_code=400, content=b"x", json=lambda: cuerpo))
+    repo = RepositorioSupabase(sesion)
+    with pytest.raises(ErrorRepositorio, match="Preparar Supabase") as e:
+        repo.pedir("POST", "rpc/panel_publicar", json={})
+    assert e.value.estado == 422
+    cuerpo["message"] = "Las metas superan el techo diario"
+    with pytest.raises(ErrorRepositorio, match="superan el techo"):
+        repo.pedir("POST", "rpc/panel_publicar", json={})
