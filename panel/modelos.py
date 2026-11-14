@@ -63,7 +63,45 @@ class Cargo(Modelo):
         return salida
 
 
-RANGO_EXPERIENCIA = 3  # contrato v20: de 3 años menos a 3 años más
+RANGO_EXPERIENCIA = 3  # contrato v20: de 3 años menos a 3 años más (v22: margen editable, 3 o 4)
+MONEDAS = Literal["USD", "EUR", "COP", "MXN", "ARS", "CLP", "PEN", "BRL", "UYU", "DOP", "GTQ", "CRC", "VES"]
+
+
+class RestriccionSalario(BaseModel):
+    """Contrato v22: no acepta vacantes con salario menor, si el aviso lo dice en la misma moneda."""
+    model_config = ConfigDict(extra="forbid")
+    tipo: Literal["salario_minimo"]
+    monto: float = Field(gt=0, le=100_000_000)
+    moneda: MONEDAS
+    periodo: Literal["month", "year", "hour"] = "month"
+
+
+class RestriccionPalabras(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tipo: Literal["palabras"]
+    palabras: list[str] = Field(min_length=1, max_length=30)
+
+    @field_validator("palabras")
+    @classmethod
+    def limpias(cls, vs):
+        return _terminos(vs)
+
+
+class RestriccionContrato(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tipo: Literal["contrato"]
+    tipos: list[Literal["freelance", "part_time", "contract", "internship"]] = Field(min_length=1, max_length=4)
+
+
+def _terminos(vs):
+    salida = []
+    for v in vs:
+        v = " ".join(str(v).split())
+        if not 2 <= len(v) <= 60 or "@" in v or "://" in v:
+            raise ValueError("Cada término debe tener entre 2 y 60 caracteres, sin enlaces.")
+        if v.casefold() not in {x.casefold() for x in salida}:
+            salida.append(v)
+    return salida
 META_POR_DEFECTO = 10  # contrato v21: meta diaria de un perfil nuevo
 
 
@@ -90,6 +128,12 @@ class Perfil(Modelo):
     # Contrato v21: cuántas vacantes al día busca este perfil. Vacío solo en configuraciones anteriores: se calcula
     # repartiendo el cupo antiguo del cargo entre sus perfiles activos.
     meta_diaria: int | None = Field(default=None, ge=0, le=120)
+    # Contrato v22: margen de años, restricciones que descartan con evidencia y prioridades que solo ordenan.
+    margen_experiencia: Literal[3, 4] = RANGO_EXPERIENCIA
+    restricciones: list[RestriccionSalario | RestriccionPalabras | RestriccionContrato] = Field(
+        default_factory=list, max_length=10)
+    sectores_preferidos: list[str] = Field(default_factory=list, max_length=30)
+    palabras_preferidas: list[str] = Field(default_factory=list, max_length=30)
 
     @model_validator(mode="before")
     @classmethod
@@ -126,6 +170,11 @@ class Perfil(Modelo):
     def sin_repetir(cls, vs):
         return list(dict.fromkeys(vs))
 
+    @field_validator("sectores_preferidos", "palabras_preferidas")
+    @classmethod
+    def preferidos(cls, vs):
+        return _terminos(vs)
+
     @property
     def paises_oficina(self):
         """Países donde aceptaría trabajo híbrido o presencial."""
@@ -134,8 +183,8 @@ class Perfil(Modelo):
     @model_validator(mode="after")
     def rango(self):
         if self.experiencia_anos is not None:
-            self.experiencia_min = max(0, self.experiencia_anos - RANGO_EXPERIENCIA)
-            self.experiencia_max = min(40, self.experiencia_anos + RANGO_EXPERIENCIA)
+            self.experiencia_min = max(0, self.experiencia_anos - self.margen_experiencia)
+            self.experiencia_max = min(40, self.experiencia_anos + self.margen_experiencia)
         if self.experiencia_min is not None and self.experiencia_max is not None and self.experiencia_min > self.experiencia_max:
             raise ValueError("El mínimo de experiencia no puede superar al máximo.")
         self.paises_presenciales_extra = [c for c in self.paises_presenciales_extra if c != self.vive_en]
@@ -231,6 +280,9 @@ _MOTIVOS_CAMPO = {
     ("cargos", "nombre"): "Escribe el nombre del cargo (al menos 2 letras).",
     ("cargos", "cupo"): "El cupo de cada cargo va de 0 a 600.",
     ("perfiles", "meta_diaria"): "La meta diaria de cada perfil va de 0 a 120 vacantes.",
+    ("perfiles", "restricciones"): "Revisa las restricciones del perfil: monto mayor que 0, moneda y al menos una palabra o tipo.",
+    ("perfiles", "sectores_preferidos"): "Cada sector preferido debe tener entre 2 y 60 caracteres.",
+    ("perfiles", "palabras_preferidas"): "Cada palabra preferida debe tener entre 2 y 60 caracteres.",
     ("techo_diario",): "El techo diario va de 1 a 600 vacantes.",
     ("perfiles", "modalidades"): "Elige al menos una modalidad: remoto, híbrido o presencial.",
     ("perfiles", "idiomas"): "Elige al menos un idioma de los avisos: español o inglés.",

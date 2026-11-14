@@ -102,7 +102,13 @@ def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False, 
         from panel.afinidad import evaluar
         return {p["cliente_id"] for p in perfiles if evaluar(v,p,hoy)["compatible"]}
     atendidos = Counter(k for v,_ in iniciales for k in destinatarios(v))
-    resto = [(v, g, dict(_rasgos(v),_destinatarios=destinatarios(v))) for v, g in candidatas]
+    # Contrato v22: sectores y palabras preferidas de los perfiles solo ordenan (pesan cuando sobran candidatas).
+    terminos = set()
+    if perfiles:
+        from panel.afinidad import coincidencias_preferidas, preferidos
+        terminos = preferidos(perfiles)
+    resto = [(v, g, dict(_rasgos(v), _destinatarios=destinatarios(v),
+                         _preferidas=coincidencias_preferidas(v, terminos) if terminos else 0)) for v, g in candidatas]
     hoy_d = date.fromisoformat(hoy)
     while resto and len(elegidas) < cuantas:
         def costo(item):
@@ -111,7 +117,7 @@ def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False, 
             return (3.0 * conteo["idioma"][r["idioma"]] + 2.0 * conteo["nivel"][r["nivel"]] +
                     1.5 * conteo["pais"][r["pais"]] + 1.0 * conteo["modo"][r["modo"]] +
                     1.0 * conteo["fuente"][r["fuente"]] + 4.0 * GRADOS.index(g) +
-                    (0 if r["con_texto"] else 4.0) + 0.3 * max(0, dias))
+                    (0 if r["con_texto"] else 4.0) + 0.3 * max(0, dias) - 3.0 * r["_preferidas"])
         resto = [x for x in resto if conteo["empresa"][x[2]["empresa"]] < max_por_empresa]
         if not resto:
             break
@@ -357,7 +363,10 @@ FILTRO_DE_MOTIVO = {"modalidad diferente": "modalidad", "país sin elegibilidad 
                     "fecha de publicación sin confirmar": "antigüedad", "experiencia no informada": "años de experiencia",
                     "experiencia fuera del rango": "años de experiencia",
                     "inglés requerido sin confirmar": "nivel de inglés",
-                    "inglés requerido superior al indicado": "nivel de inglés"}
+                    "inglés requerido superior al indicado": "nivel de inglés",
+                    "nivel inferior al del perfil": "nivel", "salario menor al aceptado": "restricciones",
+                    "menciona algo que el perfil no acepta": "restricciones",
+                    "tipo de contrato no aceptado": "restricciones"}
 
 
 def embudo(vacantes, entregadas, hoy, cfg=None, resumen=None):

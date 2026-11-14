@@ -301,7 +301,7 @@ class RepositorioSupabase:
         "fecha_publicacion:datos->>fecha_publicacion,fecha_estimada:datos->fecha_estimada,"
         "ids_agrupados:datos->ids_agrupados,anos_min:datos->anos_min,ingles:datos->>ingles,"
         "requisito_ingles:datos->requisito_ingles,duplicada_de:datos->>duplicada_de,"
-        "verificacion:datos->verificacion->>estado,tipo:datos->>tipo")
+        "verificacion:datos->verificacion->>estado,tipo:datos->>tipo,salario:datos->>salario")
 
     def _leer_catalogo(self):
         from panel.afinidad import ligera

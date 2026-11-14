@@ -21,6 +21,10 @@ SUGERENCIAS = {
     "idioma del aviso diferente": "Aceptar avisos en español e inglés",
     "experiencia fuera del rango": "Revisar los años de experiencia",
     "inglés requerido superior al indicado": "Subir el nivel de inglés admitido",
+    "nivel inferior al del perfil": "Revisar los años de experiencia",
+    "salario menor al aceptado": "Revisar las restricciones del perfil",
+    "menciona algo que el perfil no acepta": "Revisar las restricciones del perfil",
+    "tipo de contrato no aceptado": "Revisar las restricciones del perfil",
 }
 SIN_DATO = {"experiencia no informada", "inglés requerido sin confirmar"}
 _POR_CARGO = {}

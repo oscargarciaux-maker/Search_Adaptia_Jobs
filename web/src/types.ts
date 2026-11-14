@@ -31,7 +31,16 @@ export type Perfil = {
   aceptar_experiencia_sin_dato: boolean;
   aceptar_ingles_sin_dato: boolean;
   meta_diaria?: number | null;
+  margen_experiencia?: 3 | 4;
+  restricciones?: Restriccion[];
+  sectores_preferidos?: string[];
+  palabras_preferidas?: string[];
 };
+// Contrato v22: «Este perfil NO acepta…». Cada regla descarta solo con evidencia clara en el aviso.
+export type Restriccion =
+  | { tipo: "salario_minimo"; monto: number; moneda: string; periodo: string }
+  | { tipo: "palabras"; palabras: string[] }
+  | { tipo: "contrato"; tipos: string[] };
 export type Configuracion = {
   clientes: Cliente[];
   cargos: Cargo[];

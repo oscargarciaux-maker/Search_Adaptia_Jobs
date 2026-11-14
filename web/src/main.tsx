@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import { api, ErrorAPI } from "./api";
 import type {
+  Restriccion,
   Cargo,
   Cliente,
   Configuracion,
@@ -159,6 +160,10 @@ function perfilNuevo(cliente: string, cargo: string): Perfil {
     aceptar_experiencia_sin_dato: false,
     aceptar_ingles_sin_dato: false,
     meta_diaria: META_POR_DEFECTO,
+    margen_experiencia: 3,
+    restricciones: [],
+    sectores_preferidos: [],
+    palabras_preferidas: [],
   };
 }
 
@@ -1729,6 +1734,180 @@ function EmbudoCargos({
   );
 }
 
+// Contrato v22: prioridades que solo ordenan y restricciones que descartan con evidencia clara.
+const MONEDAS = [
+  "USD",
+  "EUR",
+  "COP",
+  "MXN",
+  "ARS",
+  "CLP",
+  "PEN",
+  "BRL",
+  "UYU",
+  "DOP",
+  "GTQ",
+  "CRC",
+];
+const TIPOS_CONTRATO: [string, string][] = [
+  ["freelance", "Freelance o por proyecto"],
+  ["part_time", "Medio tiempo"],
+  ["contract", "Temporal o por prestación"],
+  ["internship", "Prácticas o pasantía"],
+];
+function FiltrosPerfil({
+  p,
+  i,
+  patch,
+}: {
+  p: Perfil;
+  i: number;
+  patch: (id: string, v: Partial<Perfil>) => void;
+}) {
+  const restricciones = p.restricciones || [];
+  const cambiar = (n: number, r: Restriccion) =>
+    patch(p.id, {
+      restricciones: restricciones.map((x, k) => (k === n ? r : x)),
+    });
+  const quitar = (n: number) =>
+    patch(p.id, { restricciones: restricciones.filter((_, k) => k !== n) });
+  const nueva = (tipo: string): Restriccion =>
+    tipo === "salario_minimo"
+      ? { tipo, monto: 0, moneda: "USD", periodo: "month" }
+      : tipo === "palabras"
+        ? { tipo, palabras: [] }
+        : { tipo: "contrato", tipos: [] };
+  return (
+    <div className="filtros-perfil">
+      <Plegable
+        mostrar={
+          "Prioridades (opcional)" +
+          ((p.sectores_preferidos?.length || 0) +
+          (p.palabras_preferidas?.length || 0)
+            ? ` · ${(p.sectores_preferidos?.length || 0) + (p.palabras_preferidas?.length || 0)}`
+            : "")
+        }
+        ocultar="Ocultar prioridades"
+      >
+        <p className="field-help">
+          Solo ordenan: cuando hay más vacantes que la meta, primero las que
+          mencionan estos sectores o palabras. Nunca descartan. Déjalas vacías
+          si no ayudan (por ejemplo en QA).
+        </p>
+        <TagInput
+          label={"Sectores preferidos del perfil " + (i + 1)}
+          values={p.sectores_preferidos || []}
+          onChange={(v) => patch(p.id, { sectores_preferidos: v })}
+        />
+        <TagInput
+          label={"Palabras clave preferidas del perfil " + (i + 1)}
+          values={p.palabras_preferidas || []}
+          onChange={(v) => patch(p.id, { palabras_preferidas: v })}
+        />
+      </Plegable>
+      <fieldset className="restricciones">
+        <legend>Este perfil NO acepta…</legend>
+        {restricciones.map((r, n) => (
+          <div className="restriccion" key={n}>
+            {r.tipo === "salario_minimo" && (
+              <div className="restriccion-campos">
+                <span>Salario menor a</span>
+                <input
+                  type="number"
+                  min={1}
+                  aria-label={`Salario mínimo del perfil ${i + 1}`}
+                  value={r.monto || ""}
+                  onChange={(e) =>
+                    cambiar(n, { ...r, monto: Number(e.target.value) || 0 })
+                  }
+                />
+                <select
+                  aria-label={`Moneda del salario del perfil ${i + 1}`}
+                  value={r.moneda}
+                  onChange={(e) => cambiar(n, { ...r, moneda: e.target.value })}
+                >
+                  {MONEDAS.map((m) => (
+                    <option key={m}>{m}</option>
+                  ))}
+                </select>
+                <select
+                  aria-label={`Periodo del salario del perfil ${i + 1}`}
+                  value={r.periodo}
+                  onChange={(e) =>
+                    cambiar(n, { ...r, periodo: e.target.value })
+                  }
+                >
+                  <option value="month">al mes</option>
+                  <option value="year">al año</option>
+                  <option value="hour">por hora</option>
+                </select>
+              </div>
+            )}
+            {r.tipo === "palabras" && (
+              <TagInput
+                label={`Vacantes que mencionan (perfil ${i + 1})`}
+                values={r.palabras}
+                onChange={(v) => cambiar(n, { ...r, palabras: v })}
+              />
+            )}
+            {r.tipo === "contrato" && (
+              <div className="restriccion-campos">
+                <span>Contratos de tipo</span>
+                {TIPOS_CONTRATO.map(([valor, texto]) => (
+                  <label key={valor} className="chip-check">
+                    <input
+                      type="checkbox"
+                      checked={r.tipos.includes(valor)}
+                      onChange={(e) =>
+                        cambiar(n, {
+                          ...r,
+                          tipos: e.target.checked
+                            ? [...r.tipos, valor]
+                            : r.tipos.filter((x) => x !== valor),
+                        })
+                      }
+                    />
+                    {texto}
+                  </label>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              className="text-button"
+              aria-label={`Quitar restricción ${n + 1} del perfil ${i + 1}`}
+              onClick={() => quitar(n)}
+            >
+              Quitar
+            </button>
+          </div>
+        ))}
+        {restricciones.length < 10 && (
+          <select
+            className="nueva-restriccion"
+            aria-label={`Añadir restricción al perfil ${i + 1}`}
+            value=""
+            onChange={(e) =>
+              e.target.value &&
+              patch(p.id, {
+                restricciones: [...restricciones, nueva(e.target.value)],
+              })
+            }
+          >
+            <option value="">＋ Añadir restricción…</option>
+            <option value="salario_minimo">Salario menor a…</option>
+            <option value="palabras">Vacantes que mencionan…</option>
+            <option value="contrato">Tipo de contrato…</option>
+          </select>
+        )}
+        <p className="field-help">
+          Cada regla descarta solo si el aviso lo dice claramente. El salario se
+          compara solo en la misma moneda.
+        </p>
+      </fieldset>
+    </div>
+  );
+}
 type BorradorCliente = {
   c: Cliente;
   ps: Perfil[];
@@ -1890,7 +2069,20 @@ function ClienteDialog({
               return;
             }
             borrarLocal(claveBorrador);
-            onSave(c, ps);
+            // Una restricción a medio llenar (sin monto, sin palabras ni tipos) no se guarda.
+            onSave(
+              c,
+              ps.map((p) => ({
+                ...p,
+                restricciones: (p.restricciones || []).filter((r) =>
+                  r.tipo === "salario_minimo"
+                    ? r.monto > 0
+                    : r.tipo === "palabras"
+                      ? r.palabras.length > 0
+                      : r.tipos.length > 0,
+                ),
+              })),
+            );
           }}
         >
           {recuperable && (
@@ -2248,22 +2440,49 @@ function ClienteDialog({
                     }
                     value={p.experiencia_anos ?? ""}
                     onChange={(e) => {
-                      // Contrato v20: de 3 años menos a 3 años más (el servidor hace la misma cuenta).
+                      // Contratos v20 y v22: de N años menos a N más (el servidor hace la misma cuenta).
                       const n =
                         e.target.value === ""
                           ? null
                           : Math.max(0, Math.min(40, Number(e.target.value)));
+                      const m = p.margen_experiencia ?? 3;
                       patch(p.id, {
                         experiencia_anos: n,
-                        experiencia_min: n === null ? null : Math.max(0, n - 3),
+                        experiencia_min: n === null ? null : Math.max(0, n - m),
                         experiencia_max:
-                          n === null ? null : Math.min(40, n + 3),
+                          n === null ? null : Math.min(40, n + m),
                       });
                     }}
                   />
+                  <select
+                    className="margen"
+                    aria-label={"Margen de años del perfil " + (i + 1)}
+                    value={p.margen_experiencia ?? 3}
+                    onChange={(e) => {
+                      const m = Number(e.target.value) as 3 | 4;
+                      const n = p.experiencia_anos;
+                      patch(p.id, {
+                        margen_experiencia: m,
+                        ...(n != null
+                          ? {
+                              experiencia_min: Math.max(0, n - m),
+                              experiencia_max: Math.min(40, n + m),
+                            }
+                          : {}),
+                      });
+                    }}
+                  >
+                    <option value={3}>Margen ±3 años</option>
+                    <option value={4}>Margen ±4 años</option>
+                  </select>
                   <p className="field-help">
                     {p.experiencia_anos != null
-                      ? `Busca vacantes que pidan de ${p.experiencia_min} a ${p.experiencia_max} años.`
+                      ? p.experiencia_anos <= 2
+                        ? "Con 2 años o menos no se filtra por experiencia: entra cualquier vacante de entrada."
+                        : `Busca vacantes que pidan de ${p.experiencia_min} a ${p.experiencia_max} años.` +
+                          (p.experiencia_anos >= 5
+                            ? " No recibe vacantes junior ni de prácticas."
+                            : "")
                       : p.experiencia_min !== null || p.experiencia_max !== null
                         ? `Hoy filtra de ${p.experiencia_min ?? 0} a ${p.experiencia_max ?? 40} años. Si escribes sus años, buscará de 3 menos a 3 más.`
                         : "Vacío: sin filtro de experiencia. Con un valor, busca de 3 años menos a 3 más."}
@@ -2315,6 +2534,7 @@ function ClienteDialog({
                   Admitir inglés no informado
                 </label>
               </div>
+              <FiltrosPerfil p={p} i={i} patch={patch} />
               <PreviewPerfil
                 info={previa.datos?.perfiles?.[p.id]}
                 estado={previa.estado}
