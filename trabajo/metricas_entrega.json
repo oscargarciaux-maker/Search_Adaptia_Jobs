@@ -1,0 +1,451 @@
+{
+ "2026-11-05": {
+  "fecha": "2026-11-05",
+  "meta_cumplida": true,
+  "pendientes_supabase": 0,
+  "registro_confirmado": true,
+  "roles": {
+   "product-designer": {
+    "candidatas": 79,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 59
+   },
+   "ux-ui-designer": {
+    "candidatas": 187,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 167
+   },
+   "product-owner": {
+    "candidatas": 403,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 383
+   },
+   "product-manager": {
+    "candidatas": 239,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 219
+   },
+   "ai-engineer": {
+    "candidatas": 492,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 472
+   },
+   "qa": {
+    "candidatas": 449,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 429
+   }
+  }
+ },
+ "2026-11-06": {
+  "fecha": "2026-11-06",
+  "meta_cumplida": true,
+  "pendientes_supabase": 0,
+  "registro_confirmado": true,
+  "enlaces_comprobados": true,
+  "roles": {
+   "product-designer": {
+    "candidatas": 20,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 0
+   },
+   "ux-ui-designer": {
+    "candidatas": 34,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 14
+   },
+   "product-owner": {
+    "candidatas": 24,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 4
+   },
+   "product-manager": {
+    "candidatas": 31,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 11
+   },
+   "ai-engineer": {
+    "candidatas": 29,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 9
+   },
+   "qa": {
+    "candidatas": 21,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 1
+   }
+  }
+ },
+ "2026-11-07": {
+  "fecha": "2026-11-07",
+  "meta_cumplida": true,
+  "pendientes_supabase": 0,
+  "registro_confirmado": true,
+  "enlaces_comprobados": true,
+  "roles": {
+   "product-designer": {
+    "candidatas": 28,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 8
+   },
+   "ux-ui-designer": {
+    "candidatas": 25,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 5
+   },
+   "product-owner": {
+    "candidatas": 21,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 1
+   },
+   "product-manager": {
+    "candidatas": 24,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 4
+   },
+   "ai-engineer": {
+    "candidatas": 34,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 14
+   },
+   "qa": {
+    "candidatas": 23,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 3
+   }
+  }
+ },
+ "2026-11-08": {
+  "fecha": "2026-11-08",
+  "meta_cumplida": true,
+  "pendientes_supabase": 0,
+  "registro_confirmado": true,
+  "enlaces_comprobados": true,
+  "roles": {
+   "product-designer": {
+    "candidatas": 20,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 0
+   },
+   "ux-ui-designer": {
+    "candidatas": 21,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 1
+   },
+   "product-owner": {
+    "candidatas": 21,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 1
+   },
+   "product-manager": {
+    "candidatas": 21,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 1
+   },
+   "ai-engineer": {
+    "candidatas": 21,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 1
+   },
+   "qa": {
+    "candidatas": 22,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 2
+   }
+  }
+ },
+ "2026-11-09": {
+  "fecha": "2026-11-09",
+  "meta_cumplida": true,
+  "pendientes_supabase": 0,
+  "registro_confirmado": true,
+  "enlaces_comprobados": true,
+  "roles": {
+   "product-designer": {
+    "candidatas": 22,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 2
+   },
+   "ux-ui-designer": {
+    "candidatas": 23,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 3
+   },
+   "product-owner": {
+    "candidatas": 21,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 1
+   },
+   "product-manager": {
+    "candidatas": 23,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 3
+   },
+   "ai-engineer": {
+    "candidatas": 27,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 7
+   },
+   "qa": {
+    "candidatas": 22,
+    "entregadas": 20,
+    "faltan": 0,
+    "reserva_sin_entregar": 2
+   }
+  }
+ },
+ "2026-11-10": {
+  "fecha": "2026-11-10",
+  "meta_cumplida": false,
+  "pendientes_supabase": 0,
+  "registro_confirmado": true,
+  "enlaces_comprobados": true,
+  "roles": {
+   "product-designer": {
+    "candidatas": 22,
+    "entregadas": 19,
+    "faltan": 1,
+    "reserva_sin_entregar": 3
+   },
+   "ux-ui-designer": {
+    "candidatas": 15,
+    "entregadas": 15,
+    "faltan": 5,
+    "reserva_sin_entregar": 0
+   },
+   "product-owner": {
+    "candidatas": 19,
+    "entregadas": 19,
+    "faltan": 1,
+    "reserva_sin_entregar": 0
+   },
+   "product-manager": {
+    "candidatas": 29,
+    "entregadas": 18,
+    "faltan": 2,
+    "reserva_sin_entregar": 11
+   },
+   "ai-engineer": {
+    "candidatas": 11,
+    "entregadas": 11,
+    "faltan": 9,
+    "reserva_sin_entregar": 0
+   },
+   "qa": {
+    "candidatas": 5,
+    "entregadas": 5,
+    "faltan": 15,
+    "reserva_sin_entregar": 0
+   }
+  }
+ },
+ "2026-11-11": {
+  "fecha": "2026-11-11",
+  "meta_cumplida": false,
+  "pendientes_supabase": 0,
+  "registro_confirmado": true,
+  "enlaces_comprobados": true,
+  "roles": {
+   "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": {
+    "candidatas": 10,
+    "entregadas": 10,
+    "faltan": 20,
+    "reserva_sin_entregar": 0
+   },
+   "cargo:47719430-6f43-4eba-b845-1f46e572567d": {
+    "candidatas": 6,
+    "entregadas": 6,
+    "faltan": 17,
+    "reserva_sin_entregar": 0
+   },
+   "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": {
+    "candidatas": 2,
+    "entregadas": 2,
+    "faltan": 15,
+    "reserva_sin_entregar": 0
+   },
+   "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": {
+    "candidatas": 16,
+    "entregadas": 16,
+    "faltan": 0,
+    "reserva_sin_entregar": 0
+   },
+   "cargo:97987e16-5bba-4569-9fb3-e6681926cd63": {
+    "candidatas": 0,
+    "entregadas": 0,
+    "faltan": 20,
+    "reserva_sin_entregar": 0
+   },
+   "cargo:d051de26-fd6b-40f7-828e-2469aacf38ee": {
+    "candidatas": 1,
+    "entregadas": 1,
+    "faltan": 13,
+    "reserva_sin_entregar": 0
+   }
+  }
+ },
+ "2026-11-12": {
+  "fecha": "2026-11-12",
+  "meta_cumplida": false,
+  "pendientes_supabase": 0,
+  "registro_confirmado": true,
+  "enlaces_comprobados": true,
+  "roles": {
+   "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": {
+    "candidatas": 16,
+    "entregadas": 8,
+    "faltan": 22,
+    "reserva_sin_entregar": 8
+   },
+   "cargo:47719430-6f43-4eba-b845-1f46e572567d": {
+    "candidatas": 2,
+    "entregadas": 4,
+    "faltan": 19,
+    "reserva_sin_entregar": 0
+   },
+   "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": {
+    "candidatas": 0,
+    "entregadas": 1,
+    "faltan": 16,
+    "reserva_sin_entregar": 0
+   },
+   "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": {
+    "candidatas": 28,
+    "entregadas": 16,
+    "faltan": 0,
+    "reserva_sin_entregar": 12
+   },
+   "cargo:97987e16-5bba-4569-9fb3-e6681926cd63": {
+    "candidatas": 0,
+    "entregadas": 2,
+    "faltan": 18,
+    "reserva_sin_entregar": 0
+   },
+   "cargo:d051de26-fd6b-40f7-828e-2469aacf38ee": {
+    "candidatas": 2,
+    "entregadas": 4,
+    "faltan": 10,
+    "reserva_sin_entregar": 0
+   }
+  }
+ },
+ "2026-11-13": {
+  "fecha": "2026-11-13",
+  "meta_cumplida": false,
+  "pendientes_supabase": 0,
+  "registro_confirmado": true,
+  "enlaces_comprobados": true,
+  "roles": {
+   "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": {
+    "candidatas": 18,
+    "entregadas": 14,
+    "faltan": 16,
+    "reserva_sin_entregar": 4
+   },
+   "cargo:47719430-6f43-4eba-b845-1f46e572567d": {
+    "candidatas": 17,
+    "entregadas": 17,
+    "faltan": 6,
+    "reserva_sin_entregar": 0
+   },
+   "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": {
+    "candidatas": 1,
+    "entregadas": 1,
+    "faltan": 16,
+    "reserva_sin_entregar": 0
+   },
+   "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": {
+    "candidatas": 37,
+    "entregadas": 16,
+    "faltan": 0,
+    "reserva_sin_entregar": 21
+   },
+   "cargo:97987e16-5bba-4569-9fb3-e6681926cd63": {
+    "candidatas": 0,
+    "entregadas": 0,
+    "faltan": 20,
+    "reserva_sin_entregar": 0
+   },
+   "cargo:d051de26-fd6b-40f7-828e-2469aacf38ee": {
+    "candidatas": 3,
+    "entregadas": 3,
+    "faltan": 11,
+    "reserva_sin_entregar": 0
+   }
+  }
+ },
+ "2026-11-14": {
+  "fecha": "2026-11-14",
+  "meta_cumplida": false,
+  "pendientes_supabase": 0,
+  "registro_confirmado": true,
+  "enlaces_comprobados": true,
+  "roles": {
+   "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": {
+    "candidatas": 20,
+    "entregadas": 12,
+    "faltan": 18,
+    "reserva_sin_entregar": 8
+   },
+   "cargo:47719430-6f43-4eba-b845-1f46e572567d": {
+    "candidatas": 16,
+    "entregadas": 16,
+    "faltan": 7,
+    "reserva_sin_entregar": 0
+   },
+   "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": {
+    "candidatas": 0,
+    "entregadas": 1,
+    "faltan": 16,
+    "reserva_sin_entregar": 0
+   },
+   "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": {
+    "candidatas": 41,
+    "entregadas": 16,
+    "faltan": 0,
+    "reserva_sin_entregar": 25
+   },
+   "cargo:97987e16-5bba-4569-9fb3-e6681926cd63": {
+    "candidatas": 1,
+    "entregadas": 2,
+    "faltan": 18,
+    "reserva_sin_entregar": 0
+   },
+   "cargo:d051de26-fd6b-40f7-828e-2469aacf38ee": {
+    "candidatas": 5,
+    "entregadas": 5,
+    "faltan": 9,
+    "reserva_sin_entregar": 0
+   }
+  }
+ }
+}
