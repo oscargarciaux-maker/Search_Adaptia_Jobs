@@ -1,4 +1,5 @@
 """Filtros verificables por perfil. No infiere compatibilidad con un CV ni llama a una IA."""
+import re
 from datetime import date
 
 from buscador import contrato, enlaces, normalizar, tiempos
@@ -129,6 +130,59 @@ def evaluar(v, perfil, hoy=None):
 
 _POR_MES = {"month": 1, "year": 1 / 12}
 
+# Contrato v22 (14 nov, pedido de Oscar): lo que el aviso pide solo como deseable no descarta. Marcas editables; se
+# buscan como palabras completas en la línea u oración, o en el encabezado de la sección.
+MARCAS_DESEABLE = ("deseable", "deseables", "valorable", "se valora", "se valorara", "valoraremos", "plus", "a plus",
+                   "nice to have", "nice-to-have", "bonus", "bonus points", "preferred", "preferible", "preferiblemente",
+                   "preferentemente", "ideally", "idealmente", "opcional", "optional", "would be great", "extra",
+                   "not required", "no excluyente", "no es requisito")
+_CORTE_ORACION = re.compile(r"(?<=[.;!?])\s+|\s+[•·▪◦\-–*]\s+")
+
+
+def _deseable(texto_normalizado):
+    return any(normalizar.contiene_frase(texto_normalizado, normalizar.texto(m)) for m in MARCAS_DESEABLE)
+
+
+_VINETA = re.compile(r"^\s*([-–•·▪◦*]|\d+[.)])\s+")
+SECCIONES = ("requirements", "requisitos", "responsabilidades", "responsibilities", "qualifications", "cualificaciones",
+             "what you will do", "what you'll do", "que haras", "about you", "sobre ti", "perfil", "beneficios",
+             "benefits", "funciones", "tareas", "must have", "must-have", "conocimientos", "skills", "habilidades",
+             "experiencia", "experience", "we offer", "ofrecemos")
+
+
+def menciones_obligatorias(descripcion, palabras):
+    """True si la descripción menciona alguna palabra fuera de lo marcado como deseable.
+    - Encabezado: «Algo:» al inicio de una línea (hasta 5 palabras antes de los dos puntos) o una línea corta con el
+      nombre de una sección conocida. Si es de deseables («Nice to have», «Deseable», «Bonus»…), su sección no cuenta
+      hasta el siguiente encabezado.
+    - Dentro de cada línea, una oración con marca de deseable («Java is a plus», «idealmente…») no cuenta."""
+    if not palabras or not descripcion:
+        return False
+    en_deseables = False
+    for linea in str(descripcion)[:12000].splitlines():
+        crudo = linea.strip()
+        if not crudo:
+            continue
+        vineta = bool(_VINETA.match(crudo))
+        prefijo, dos_puntos, resto = crudo.partition(":")
+        normal = normalizar.texto(crudo)
+        if not vineta and dos_puntos and 0 < len(normalizar.texto(prefijo).split()) <= 5:
+            en_deseables = _deseable(normalizar.texto(prefijo))
+            contenido = resto
+        elif not vineta and len(normal.split()) <= 4 and not re.search(r"[.!?)]$", crudo) and (
+                _deseable(normal) or any(normalizar.contiene_frase(normal, normalizar.texto(x)) for x in SECCIONES)):
+            en_deseables = _deseable(normal)
+            contenido = ""
+        else:
+            contenido = crudo
+        if en_deseables or not contenido.strip():
+            continue
+        for oracion in _CORTE_ORACION.split(contenido):
+            o = normalizar.texto(oracion)
+            if not _deseable(o) and any(normalizar.contiene_frase(o, w) for w in palabras):
+                return True
+    return False
+
 
 def restriccion(v, r, titulo, descripcion):
     """Contrato v22: motivo de descarte de una restricción del perfil, o None. Solo con evidencia clara en el aviso:
@@ -144,8 +198,9 @@ def restriccion(v, r, titulo, descripcion):
             return "salario menor al aceptado" if valor < r.monto else None
         return "salario menor al aceptado" if valor * _POR_MES[periodo] < r.monto * _POR_MES[r.periodo] else None
     if r.tipo == "palabras":
-        texto = normalizar.texto(titulo + " " + descripcion[:12000])
-        if any(normalizar.contiene_frase(texto, normalizar.texto(w)) for w in r.palabras):
+        palabras = [normalizar.texto(w) for w in r.palabras]
+        if any(normalizar.contiene_frase(normalizar.texto(titulo), w) for w in palabras) or \
+                menciones_obligatorias(descripcion, palabras):
             return "menciona algo que el perfil no acepta"
         return None
     if r.tipo == "contrato":

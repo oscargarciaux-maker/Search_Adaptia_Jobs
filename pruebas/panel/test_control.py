@@ -1027,7 +1027,7 @@ def test_salario_minimo_solo_con_la_misma_moneda(cfg):
 def test_palabras_y_tipo_de_contrato_descartan(cfg):
     p = _perfil_v22(cfg, restricciones=[{"tipo": "palabras", "palabras": ["call center", "Java"]},
                                         {"tipo": "contrato", "tipos": ["freelance"]}])
-    con_java = trabajo(_descripcion=trabajo()["_descripcion"] + " Experience with Java is a plus.")
+    con_java = trabajo(_descripcion=trabajo()["_descripcion"] + " Strong Java experience required.")
     javascript = trabajo(_descripcion=trabajo()["_descripcion"] + " JavaScript and Figma.")
     freelance = trabajo(titulo="Product Designer (Freelance)")
     assert "menciona algo que el perfil no acepta" in afinidad.evaluar(con_java, p, hoy())["motivos"]
@@ -1051,3 +1051,27 @@ def test_preferidas_solo_ordenan_cuando_sobran_candidatas(cfg):
     sin_preferencias = entrega.variadas(candidatas, 1, 2, hoy(), perfiles=[cfg["perfiles"][0]])
     assert sin_preferencias[0][0]["empresa"] != "Empresa 9"
     assert len(entrega.variadas(candidatas, 10, 2, hoy(), perfiles=[perfil])) == 5  # con pocas, entran todas
+
+
+@pytest.mark.parametrize("texto, descarta", [
+    ("Requirements:\n- Java and Python", True),
+    ("Requirements:\n- Python\nNice to have:\n- Java", False),
+    ("We need Figma. Java is a plus.", False),
+    ("Deseable: experiencia en call center.", False),
+    ("Experiencia en call center (excluyente).", True),
+    ("Responsabilidades\nAtender llamadas en call center", True),
+    ("Nice to have\n- Java\nRequirements\n- Java", True),
+    ("Bonus points: Java, Go\nWe build apps.", False),
+    ("Idealmente conocimientos de call center.", False),
+    ("Preferred qualifications\n* Java\n* Kotlin", False),
+])
+def test_lo_deseable_no_descarta(cfg, texto, descarta):
+    """14 nov, pedido de Oscar: si el aviso menciona algo solo como deseable, no se descarta la vacante."""
+    p = _perfil_v22(cfg, restricciones=[{"tipo": "palabras", "palabras": ["Java", "call center"]}])
+    v = trabajo(_descripcion=trabajo()["_descripcion"] + "\n" + texto)
+    assert ("menciona algo que el perfil no acepta" in afinidad.evaluar(v, p, hoy())["motivos"]) is descarta
+
+
+def test_en_el_titulo_siempre_descarta(cfg):
+    p = _perfil_v22(cfg, restricciones=[{"tipo": "palabras", "palabras": ["Java"]}])
+    assert not afinidad.evaluar(trabajo(titulo="Java Product Designer"), p, hoy())["compatible"]
