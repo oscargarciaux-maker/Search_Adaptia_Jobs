@@ -1,4 +1,5 @@
 """Filtros verificables por perfil. No infiere compatibilidad con un CV ni llama a una IA."""
+import re
 from datetime import date
 
 from buscador import contrato, enlaces, normalizar, tiempos
@@ -129,49 +130,58 @@ def evaluar(v, perfil, hoy=None):
 
 _POR_MES = {"month": 1, "year": 1 / 12}
 
-
-def restriccion(v, r, titulo, descripcion):
-    """Contrato v22: motivo de descarte de una restricción del perfil, o None. Solo con evidencia clara en el aviso:
-    sin salario, sin moneda igual o sin periodo comparable, nunca descarta."""
-    if r.tipo == "salario_minimo":
-        _, minimo, maximo, moneda, periodo = contrato.salario(v.get("salario"), descripcion)
-        valor = maximo if maximo != "" else minimo
-        if valor == "" or moneda != r.moneda or not periodo:
-            return None
-        if "hour" in (periodo, r.periodo):
-            if periodo != r.periodo:
-                return None
-            return "salario menor al aceptado" if valor < r.monto else None
-        return "salario menor al aceptado" if valor * _POR_MES[periodo] < r.monto * _POR_MES[r.periodo] else None
-    if r.tipo == "palabras":
-        texto = normalizar.texto(titulo + " " + descripcion[:12000])
-        if any(normalizar.contiene_frase(texto, normalizar.texto(w)) for w in r.palabras):
-            return "menciona algo que el perfil no acepta"
-        return None
-    if r.tipo == "contrato":
-        tipo = contrato.tipo_contrato(titulo, descripcion)
-        if tipo in r.tipos or ("internship" in r.tipos and contrato.seniority(titulo) == "intern"):
-            return "tipo de contrato no aceptado"
-    return None
+# Contrato v22 (14 nov, pedido de Oscar): lo que el aviso pide solo como deseable no descarta. Marcas editables; se
+# buscan como palabras completas en la línea u oración, o en el encabezado de la sección.
+MARCAS_DESEABLE = ("deseable", "deseables", "valorable", "se valora", "se valorara", "valoraremos", "plus", "a plus",
+                   "nice to have", "nice-to-have", "bonus", "bonus points", "preferred", "preferible", "preferiblemente",
+                   "preferentemente", "ideally", "idealmente", "opcional", "optional", "would be great", "extra",
+                   "not required", "no excluyente", "no es requisito")
+_CORTE_ORACION = re.compile(r"(?<=[.;!?])\s+|\s+[•·▪◦\-–*]\s+")
 
 
-def preferidos(perfiles):
-    """Contrato v22: términos preferidos (sectores y palabras) de los perfiles, ya normalizados."""
-    salida = set()
-    for p in perfiles or ():
-        datos = p if isinstance(p, dict) else p.model_dump()
-        for t in (datos.get("sectores_preferidos") or []) + (datos.get("palabras_preferidas") or []):
-            salida.add(normalizar.texto(t))
-    return {t for t in salida if t}
+def _deseable(texto_normalizado):
+    return any(normalizar.contiene_frase(texto_normalizado, normalizar.texto(m)) for m in MARCAS_DESEABLE)
 
 
-def coincidencias_preferidas(v, terminos):
-    """Cuántos términos preferidos distintos menciona la vacante en el título, la descripción o la empresa."""
-    if not terminos:
-        return 0
-    texto = normalizar.texto(" ".join([v.get("titulo") or "", v.get("empresa") or "",
-                                       (v.get("_descripcion") or "")[:12000]]))
-    return sum(1 for t in terminos if normalizar.contiene_frase(texto, t))
+_VINETA = re.compile(r"^\s*([-–•·▪◦*]|\d+[.)])\s+")
+SECCIONES = ("requirements", "requisitos", "responsabilidades", "responsibilities", "qualifications", "cualificaciones",
+             "what you will do", "what you'll do", "que haras", "about you", "sobre ti", "perfil", "beneficios",
+             "benefits", "funciones", "tareas", "must have", "must-have", "conocimientos", "skills", "habilidades",
+             "experiencia", "experience", "we offer", "ofrecemos")
+
+
+def menciones_obligatorias(descripcion, palabras):
+    """True si la descripción menciona alguna palabra fuera de lo marcado como deseable.
+    - Encabezado: «Algo:» al inicio de una línea (hasta 5 palabras antes de los dos puntos) o una línea corta con el
+      nombre de una sección conocida. Si es de deseables («Nice to have», «Deseable», «Bonus»…), su sección no cuenta
+      hasta el siguiente encabezado.
+    - Dentro de cada línea, una oración con marca de deseable («Java is a plus», «idealmente…») no cuenta."""
+    if not palabras or not descripcion:
+        return False
+    en_deseables = False
+    for linea in str(descripcion)[:12000].splitlines():
+        crudo = linea.strip()
+        if not crudo:
+            continue
+        vineta = bool(_VINETA.match(crudo))
+        prefijo, dos_puntos, resto = crudo.partition(":")
+        normal = normalizar.texto(crudo)
+        if not vineta and dos_puntos and 0 < len(normalizar.texto(prefijo).split()) <= 5:
+            en_deseables = _deseable(normalizar.texto(prefijo))
+            contenido = resto
+        elif not vineta and len(normal.split()) <= 4 and not re.search(r"[.!?)]$", crudo) and (
+                _deseable(normal) or any(normalizar.contiene_frase(normal, normalizar.texto(x)) for x in SECCIONES)):
+            en_deseables = _deseable(normal)
+            contenido = ""
+        else:
+            contenido = crudo
+        if en_deseables or not contenido.strip():
+            continue
+        for oracion in _CORTE_ORACION.split(contenido):
+            o = normalizar.texto(oracion)
+            if not _deseable(o) and any(normalizar.contiene_frase(o, w) for w in palabras):
+                return True
+    return False
 
 
 def enlace_utilizable(row, ahora=None):

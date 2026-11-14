@@ -14,7 +14,11 @@ pruebas; **sin IA**.
     **la misma moneda**. El periodo se convierte (un año = 12 meses); por hora solo se compara con hora. Descarta si el
     máximo del aviso (o su único valor) es menor que el monto.
   - `{"tipo": "palabras", "palabras": [...]}` (hasta 30): descarta si el título o la descripción las mencionan como
-    palabras completas.
+    palabras completas. **Lo que el aviso pide solo como deseable no descarta** (pedido de Oscar, 14 nov): no cuentan
+    las oraciones con marcas como «deseable», «se valora», «plus», «nice to have», «bonus», «preferred»,
+    «idealmente» u «opcional», ni las secciones cuyo encabezado es de ese tipo («Nice to have:», «Deseable»,
+    «Preferred qualifications»), hasta el siguiente encabezado. En el título siempre descarta. Las marcas están en
+    `panel/afinidad.MARCAS_DESEABLE` y se pueden ampliar.
   - `{"tipo": "contrato", "tipos": [...]}` entre `freelance`, `part_time`, `contract` e `internship`: descarta si el
     aviso es de ese tipo (`contrato.tipo_contrato`).
 - **`sectores_preferidos`** y **`palabras_preferidas`** (hasta 30 cada uno, de 2 a 60 caracteres): **solo ordenan,
