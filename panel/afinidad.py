@@ -184,6 +184,51 @@ def menciones_obligatorias(descripcion, palabras):
     return False
 
 
+def restriccion(v, r, titulo, descripcion):
+    """Contrato v22: motivo de descarte de una restricción del perfil, o None. Solo con evidencia clara en el aviso:
+    sin salario, sin moneda igual o sin periodo comparable, nunca descarta."""
+    if r.tipo == "salario_minimo":
+        _, minimo, maximo, moneda, periodo = contrato.salario(v.get("salario"), descripcion)
+        valor = maximo if maximo != "" else minimo
+        if valor == "" or moneda != r.moneda or not periodo:
+            return None
+        if "hour" in (periodo, r.periodo):
+            if periodo != r.periodo:
+                return None
+            return "salario menor al aceptado" if valor < r.monto else None
+        return "salario menor al aceptado" if valor * _POR_MES[periodo] < r.monto * _POR_MES[r.periodo] else None
+    if r.tipo == "palabras":
+        palabras = [normalizar.texto(w) for w in r.palabras]
+        if any(normalizar.contiene_frase(normalizar.texto(titulo), w) for w in palabras) or \
+                menciones_obligatorias(descripcion, palabras):
+            return "menciona algo que el perfil no acepta"
+        return None
+    if r.tipo == "contrato":
+        tipo = contrato.tipo_contrato(titulo, descripcion)
+        if tipo in r.tipos or ("internship" in r.tipos and contrato.seniority(titulo) == "intern"):
+            return "tipo de contrato no aceptado"
+    return None
+
+
+def preferidos(perfiles):
+    """Contrato v22: términos preferidos (sectores y palabras) de los perfiles, ya normalizados."""
+    salida = set()
+    for p in perfiles or ():
+        datos = p if isinstance(p, dict) else p.model_dump()
+        for t in (datos.get("sectores_preferidos") or []) + (datos.get("palabras_preferidas") or []):
+            salida.add(normalizar.texto(t))
+    return {t for t in salida if t}
+
+
+def coincidencias_preferidas(v, terminos):
+    """Cuántos términos preferidos distintos menciona la vacante en el título, la descripción o la empresa."""
+    if not terminos:
+        return 0
+    texto = normalizar.texto(" ".join([v.get("titulo") or "", v.get("empresa") or "",
+                                       (v.get("_descripcion") or "")[:12000]]))
+    return sum(1 for t in terminos if normalizar.contiene_frase(texto, t))
+
+
 def enlace_utilizable(row, ahora=None):
     """Lee evidencia vigente, no convierte un HTTP 200 ni un estado histórico en disponibilidad."""
     from datetime import datetime, timezone

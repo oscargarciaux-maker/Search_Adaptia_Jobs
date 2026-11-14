@@ -1027,7 +1027,7 @@ def test_salario_minimo_solo_con_la_misma_moneda(cfg):
 def test_palabras_y_tipo_de_contrato_descartan(cfg):
     p = _perfil_v22(cfg, restricciones=[{"tipo": "palabras", "palabras": ["call center", "Java"]},
                                         {"tipo": "contrato", "tipos": ["freelance"]}])
-    con_java = trabajo(_descripcion=trabajo()["_descripcion"] + " Experience with Java is a plus.")
+    con_java = trabajo(_descripcion=trabajo()["_descripcion"] + " Strong Java experience required.")
     javascript = trabajo(_descripcion=trabajo()["_descripcion"] + " JavaScript and Figma.")
     freelance = trabajo(titulo="Product Designer (Freelance)")
     assert "menciona algo que el perfil no acepta" in afinidad.evaluar(con_java, p, hoy())["motivos"]
