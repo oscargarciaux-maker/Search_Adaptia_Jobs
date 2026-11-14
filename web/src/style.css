@@ -3307,3 +3307,31 @@ legend .ayuda-texto,
   color: var(--muted);
   overflow-wrap: anywhere;
 }
+/* Reunión del 14 nov: CSV general o por cliente, de un día o de toda la base. */
+.csv-descarga {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 16px;
+  margin-top: 12px;
+  padding: 14px 18px;
+}
+.csv-descarga .field {
+  margin: 0;
+  min-width: 170px;
+}
+.csv-titulo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  flex-basis: 100%;
+  color: var(--ink);
+}
+.csv-todo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  color: var(--ink);
+}

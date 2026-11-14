@@ -622,13 +622,38 @@ def _celda(columna, valor):
     return str(valor)
 
 
-def exportar_base(repo):
+def _clave_oferta(fila):
+    return fila.get("vacante_id") or fila.get("external_id") or fila.get("id")
+
+
+def exportar_base(repo, fecha=None, cliente_id=None, todo=False):
     """CSV de `ofertas` con las columnas y el formato del contrato (v1 y sus extras, `buscador/contrato.py`), sin las
-    vacantes con país sin confirmar ni las descartadas. Devuelve (texto, incluidas, omitidas)."""
+    vacantes con país sin confirmar ni las descartadas (reunión del 14 nov: general o por cliente, de un día o de toda la
+    base). Una fila por vacante; la misma vacante asignada a dos clientes sale en el archivo de cada uno.
+    - General de un día: las filas entregadas ese día más las vacantes asignadas ese día por el panel.
+    - Por cliente: las vacantes que el panel le asignó (ese día, o siempre con `todo`), unidas a `ofertas`.
+    Devuelve (texto, incluidas, omitidas_sin_confirmar, sin_fila): `sin_fila` cuenta las asignadas que no están en
+    `ofertas` (por ejemplo un post sin ficha formal); nunca se inventa su fila."""
     import csv
     import io
     from buscador import contrato
-    filas = repo.base_ofertas()
+    sin_fila = 0
+    if cliente_id:
+        ids = set(repo.vacantes_asignadas(fecha=None if todo else fecha, cliente_id=cliente_id))
+        filas = repo.ofertas_de(vacante_ids=sorted(ids))
+        sin_fila = len(ids - {f.get("vacante_id") for f in filas})
+    elif todo or not fecha:
+        filas = repo.base_ofertas()
+    else:
+        filas = repo.ofertas_de(fecha=fecha)
+        vistas = {f.get("vacante_id") for f in filas}
+        extra = set(repo.vacantes_asignadas(fecha=fecha)) - vistas
+        if extra:
+            filas += repo.ofertas_de(vacante_ids=sorted(extra))
+    unicas = {}
+    for f in filas:
+        unicas.setdefault(_clave_oferta(f), f)
+    filas = list(unicas.values())
     incluidas = [f for f in filas if not sin_confirmar(f)]
     columnas = contrato.COLUMNAS + contrato.EXTRAS
     salida = io.StringIO()
@@ -636,4 +661,4 @@ def exportar_base(repo):
     escritor.writerow(columnas)
     for f in incluidas:
         escritor.writerow([_celda(c, f.get(c)) for c in columnas])
-    return "\ufeff" + salida.getvalue(), len(incluidas), len(filas) - len(incluidas)
+    return "\ufeff" + salida.getvalue(), len(incluidas), len(filas) - len(incluidas), sin_fila

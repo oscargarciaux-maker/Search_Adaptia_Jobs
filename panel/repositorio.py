@@ -126,6 +126,36 @@ class RepositorioSupabase:
             # Respaldo: sin el campo calculado de `datos`; la razón del catálogo basta para omitir las sin confirmar.
             return list(self._paginas("ofertas", "id", {"select": "*,catalogo_vacantes(reason,status)"}, 500))
 
+    SELECCION_OFERTAS = "*,catalogo_vacantes(reason,status,confianza:datos->>confianza_pais)"
+
+    def ofertas_de(self, fecha=None, vacante_ids=None):
+        """Filas de `ofertas` entregadas un día (`delivery_date`) o de unas vacantes concretas, con lo que hace falta
+        para omitir las sin confirmar. Por páginas y en grupos de 100 ids para no pasar el largo de la dirección."""
+        if fecha:
+            return list(self._paginas("ofertas", "id", {"select": self.SELECCION_OFERTAS,
+                                                        "delivery_date": "eq." + fecha}, 500))
+        salida = []
+        ids = list(vacante_ids or [])
+        for inicio in range(0, len(ids), 100):
+            grupo = ",".join('"%s"' % i.replace('"', "") for i in ids[inicio:inicio + 100])
+            salida += list(self._paginas("ofertas", "id", {"select": self.SELECCION_OFERTAS,
+                                                           "vacante_id": "in.(" + grupo + ")"}, 500))
+        return salida
+
+    def vacantes_asignadas(self, fecha=None, cliente_id=None):
+        """Ids de las vacantes que el panel asignó: las de la ejecución de `fecha` (si se da) y de `cliente_id` (si se
+        da). Sin ejecución ese día, nada."""
+        params = {"select": "id,vacante_id"}
+        if fecha:
+            ejecucion = self.pedir("GET", "panel_ejecuciones", params={"fecha": "eq." + fecha, "select": "id",
+                                                                       "limit": 1})
+            if not ejecucion:
+                return set()
+            params["ejecucion_id"] = "eq." + ejecucion[0]["id"]
+        if cliente_id:
+            params["cliente_id"] = "eq." + cliente_id
+        return {r["vacante_id"] for r in self._paginas("panel_asignaciones", "id", params, 1000)}
+
     def contar(self, tabla, params):
         """Cuántas filas cumplen el filtro (cabecera Content-Range con count=exact); None si no se pudo contar."""
         try:
@@ -529,14 +559,36 @@ class RepositorioDemo:
         return []  # la demostración trae su bandeja ya preparada
 
     def base_ofertas(self):
-        """Dos filas ficticias de `ofertas` (una confirmada y una por confirmar) para probar la descarga."""
-        return [{"id": 1, "external_id": "demo-1", "job_title": "Product Designer", "company_name": "Orbita",
+        """Filas ficticias de `ofertas` para probar la descarga: dos de hoy (una confirmada y una por confirmar) y una de
+        ayer que el panel asignó a un cliente."""
+        ayer = (datetime.fromisoformat(hoy()) - timedelta(days=1)).date().isoformat()
+        return [{"id": 1, "external_id": "demo-1", "vacante_id": "demo-v1", "delivery_date": hoy(),
+                 "job_title": "Product Designer", "company_name": "Orbita",
                  "offer_url": "https://example.org/empleos/demo-1", "location": "Bogotá, Colombia",
                  "hire_countries": ["CO"], "catalogo_vacantes": {"reason": None, "status": "active", "confianza": "alta"}},
-                {"id": 2, "external_id": "demo-2", "job_title": "QA Engineer", "company_name": "Lumen",
+                {"id": 2, "external_id": "demo-2", "vacante_id": "demo-v2", "delivery_date": hoy(),
+                 "job_title": "QA Engineer", "company_name": "Lumen",
                  "offer_url": "https://example.org/empleos/demo-2", "location": "Remote", "hire_countries": [],
                  "catalogo_vacantes": {"reason": "elegibilidad regional por confirmar", "status": "archived",
-                                       "confianza": "baja"}}]
+                                       "confianza": "baja"}},
+                {"id": 3, "external_id": "demo-3", "vacante_id": "demo-v3", "delivery_date": ayer,
+                 "job_title": "UX Designer", "company_name": "Forma",
+                 "offer_url": "https://example.org/empleos/demo-3", "location": "Madrid, España",
+                 "hire_countries": ["ES"], "catalogo_vacantes": {"reason": None, "status": "active", "confianza": "alta"}}]
+
+    def ofertas_de(self, fecha=None, vacante_ids=None):
+        if fecha:
+            return [f for f in self.base_ofertas() if f["delivery_date"] == fecha]
+        ids = set(vacante_ids or [])
+        return [f for f in self.base_ofertas() if f["vacante_id"] in ids]
+
+    def vacantes_asignadas(self, fecha=None, cliente_id=None):
+        """Demostración: el primer cliente recibió hoy demo-v1 y ayer demo-v3; el segundo, hoy demo-v1 y demo-v2."""
+        clientes = [c["id"] for c in configuracion_demo()["clientes"]]
+        ayer = (datetime.fromisoformat(hoy()) - timedelta(days=1)).date().isoformat()
+        asignaciones = [(clientes[0], hoy(), "demo-v1"), (clientes[0], ayer, "demo-v3"),
+                        (clientes[1], hoy(), "demo-v1"), (clientes[1], hoy(), "demo-v2")]
+        return {v for c, f, v in asignaciones if (not fecha or f == fecha) and (not cliente_id or c == cliente_id)}
 
     def _guardar(self):
         if self.archivo:

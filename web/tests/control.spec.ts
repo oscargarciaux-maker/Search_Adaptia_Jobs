@@ -455,8 +455,14 @@ test("revisión masiva por CSV y reglas aprendidas sin IA", async ({
   await expect(regla.getByRole("button", { name: "Activar" })).toBeVisible();
   // Descarga de la base desde Vacantes, con el conteo a la vista.
   await ir(page, "Vacantes");
-  await page.getByRole("button", { name: "Descargar base (CSV)" }).click();
-  await expect(page.getByText(/Base descargada: 1 vacantes/)).toBeVisible();
+  await page
+    .getByRole("button", { name: "Descargar CSV", exact: true })
+    .click();
+  await expect(
+    page.getByText(
+      /CSV descargado: 1 vacantes \(1 sin confirmar quedaron fuera\)/,
+    ),
+  ).toBeVisible();
 });
 
 test("resumen: tablero de una pantalla, sin menú propio, con dirección por sección", async ({
@@ -602,4 +608,33 @@ test("reunión 14 nov: comas separan términos y el cliente se recupera tras cer
     page.getByRole("dialog").getByText("Tienes cambios sin guardar"),
   ).toHaveCount(0);
   expect(errores).toEqual([]);
+});
+
+test("CSV por cliente o de todos, del día o de toda la base", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await ir(page, "Vacantes");
+  await expect(page.getByLabel("Fecha", { exact: true })).toBeEnabled();
+  await page.getByLabel("Toda la base").check();
+  await expect(page.getByLabel("Fecha", { exact: true })).toBeDisabled();
+  const cliente = page.getByLabel("Clientes", { exact: true });
+  await cliente.selectOption({ index: 1 });
+  const nombre = (await cliente.locator("option:checked").textContent()) || "";
+  const [descarga] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Descargar CSV", exact: true }).click(),
+  ]);
+  expect(descarga.suggestedFilename()).toMatch(
+    /^vacantes-base-[a-z0-9-]+\.csv$/,
+  );
+  expect(descarga.suggestedFilename()).toContain(
+    nombre
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, ""),
+  );
+  await expect(page.getByText(/CSV descargado: \d+ vacantes/)).toBeVisible();
 });

@@ -94,6 +94,17 @@ function iniciales(nombre: string) {
     .join("")
     .toUpperCase();
 }
+// Nombre de archivo sin tildes ni espacios: el CSV solo queda en el equipo del operador.
+function slug(texto: string) {
+  return (
+    texto
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "cliente"
+  );
+}
 function hoyBogota() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Bogota",
@@ -2800,23 +2811,43 @@ function App() {
     }
   }
   const [descargandoBase, setDescargandoBase] = useState(false);
-  // Descarga la base y dice cuántas vacantes trae (contarlas en Excel confundía: 13 nov).
+  // Reunión del 14 nov: CSV general o de un cliente, del día elegido o de toda la base, con el formato del contrato.
+  const [csvFecha, setCsvFecha] = useState(hoyBogota());
+  const [csvTodo, setCsvTodo] = useState(false);
+  const [csvCliente, setCsvCliente] = useState("");
   async function descargarBase() {
     setDescargandoBase(true);
     try {
-      const r = await fetch("/api/base.csv", { credentials: "same-origin" });
+      const q = new URLSearchParams();
+      if (csvTodo) q.set("todo", "true");
+      else q.set("fecha", csvFecha);
+      if (csvCliente) q.set("cliente", csvCliente);
+      const r = await fetch("/api/base.csv?" + q.toString(), {
+        credentials: "same-origin",
+      });
       if (!r.ok)
-        throw new Error("No se pudo descargar la base. Inténtalo de nuevo.");
+        throw new Error("No se pudo descargar el CSV. Inténtalo de nuevo.");
       const incluidas = r.headers.get("X-Incluidas") || "?";
-      const omitidas = r.headers.get("X-Omitidas-Sin-Confirmar") || "0";
+      const omitidas = Number(r.headers.get("X-Omitidas-Sin-Confirmar") || 0);
+      const sinFila = Number(r.headers.get("X-Sin-Fila") || 0);
+      const nombreCliente = clientes.find((c) => c.id === csvCliente)?.nombre;
       const url = URL.createObjectURL(await r.blob());
       const enlace = document.createElement("a");
       enlace.href = url;
-      enlace.download = `base-vacantes-${new Date().toISOString().slice(0, 10)}.csv`;
+      enlace.download =
+        "vacantes-" +
+        (csvTodo ? "base" : csvFecha) +
+        "-" +
+        (nombreCliente ? slug(nombreCliente) : "todas") +
+        ".csv";
       enlace.click();
       URL.revokeObjectURL(url);
+      const notas = [
+        omitidas ? `${omitidas} sin confirmar quedaron fuera` : "",
+        sinFila ? `${sinFila} sin ficha en la base (posts)` : "",
+      ].filter(Boolean);
       notify(
-        `Base descargada: ${incluidas} vacantes (se dejaron fuera ${omitidas} sin confirmar).`,
+        `CSV descargado: ${incluidas} vacantes${notas.length ? " (" + notas.join("; ") + ")" : ""}.`,
       );
     } catch (e) {
       notify((e as Error).message, true);
@@ -3455,14 +3486,57 @@ function App() {
                   <MessageCircle size={18} />
                   Copiar WhatsApp
                 </button>
+              </div>
+              <div className="csv-descarga card">
+                <div className="csv-titulo">
+                  <strong>Descargar CSV</strong>
+                  <Ayuda etiqueta="Descargar CSV">
+                    Usa las columnas del contrato, listas para subir a la
+                    plataforma de los candidatos. Una fila por vacante; no
+                    incluye las que tienen el país sin confirmar.
+                  </Ayuda>
+                </div>
+                <div className="field">
+                  <label htmlFor="csv-fecha">Fecha</label>
+                  <input
+                    id="csv-fecha"
+                    type="date"
+                    value={csvFecha}
+                    max={hoyBogota()}
+                    disabled={csvTodo}
+                    onChange={(e) => setCsvFecha(e.target.value || hoyBogota())}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="csv-cliente">Clientes</label>
+                  <select
+                    id="csv-cliente"
+                    value={csvCliente}
+                    onChange={(e) => setCsvCliente(e.target.value)}
+                  >
+                    <option value="">Todos los clientes</option>
+                    {clientes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <label className="csv-todo">
+                  <input
+                    type="checkbox"
+                    checked={csvTodo}
+                    onChange={(e) => setCsvTodo(e.target.checked)}
+                  />
+                  Toda la base
+                </label>
                 <button
                   className="button secondary"
                   onClick={descargarBase}
                   disabled={descargandoBase}
-                  title="Todas las vacantes entregadas (tabla ofertas), sin las que tienen el país sin confirmar"
                 >
                   <ArrowDownToLine size={16} />
-                  {descargandoBase ? "Descargando…" : "Descargar base (CSV)"}
+                  {descargandoBase ? "Descargando…" : "Descargar CSV"}
                 </button>
               </div>
               <div className="toolbar">
