@@ -164,7 +164,9 @@ def aplicar_operador(vacantes, decisiones):
     """Contrato v17: lo que el operador decidió en la bandeja vale en cada búsqueda (noche, mañana y cada hora).
     `decisiones`: {vacante_id: {"paises": [...]} | {"extranjero": True} | {"descartada": True}}. Devuelve cuántas tocó."""
     from buscador import paises
-    nombres = {p["codigo"]: p["nombre"] for p in paises.datos()["paises"]}
+    # Contrato v23: nombres de cualquier país (para que «US» se lea como Estados Unidos) y «MUNDO» como alcance mundial.
+    nombres = {**{p["codigo"]: p["nombre"] for p in paises.mundo()["lista"]},
+               **{p["codigo"]: p["nombre"] for p in paises.datos()["paises"]}, "MUNDO": "Remote - Worldwide"}
     tocadas = 0
     for v in vacantes:
         ids = [v.get("id"), *v.get("_ids_fusionados", [])]

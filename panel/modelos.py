@@ -114,7 +114,7 @@ class Perfil(Modelo):
     vive_en: str = "CO"
     modalidades: list[Literal["remoto", "hibrido", "presencial"]] = Field(default_factory=lambda: ["remoto"],
                                                                         min_length=1, max_length=3)
-    paises_presenciales_extra: list[str] = Field(default_factory=list, max_length=21)
+    paises_presenciales_extra: list[str] = Field(default_factory=list, max_length=60)
     antiguedad_dias: int = Field(default=14, ge=1, le=30)
     idiomas: list[Literal["es", "en"]] = Field(default_factory=lambda: ["es", "en"], min_length=1, max_length=2)
     ingles_maximo: Literal["sin_filtro", "A1", "A2", "B1", "B2", "C1", "C2", "native"] = "sin_filtro"
@@ -134,6 +134,10 @@ class Perfil(Modelo):
         default_factory=list, max_length=10)
     sectores_preferidos: list[str] = Field(default_factory=list, max_length=30)
     palabras_preferidas: list[str] = Field(default_factory=list, max_length=30)
+    # Contrato v23: ciudades para presencial/híbrida, permiso legal para trabajar en otros países y horarios aceptados.
+    ciudades: list[str] = Field(default_factory=list, max_length=10)
+    puede_trabajar_en: list[str] = Field(default_factory=list, max_length=30)
+    acepta_horario: list[Literal["us_este", "us_pacifico", "europa"]] = Field(default_factory=list, max_length=3)
 
     @model_validator(mode="before")
     @classmethod
@@ -154,15 +158,27 @@ class Perfil(Modelo):
     @field_validator("vive_en")
     @classmethod
     def residencia(cls, v):
-        if v not in paises.datos()["reconocidos"]:  # un perfil guardado con Brasil se sigue leyendo (contrato v12)
-            raise ValueError("La cobertura actual es LATAM y España.")
+        # Contrato v23: cualquier país de la tabla ISO mundial.
+        if v not in paises.mundo()["codigos"] and v not in paises.datos()["reconocidos"]:
+            raise ValueError("Elige un país de la lista.")
         return v
 
-    @field_validator("paises_presenciales_extra")
+    @field_validator("paises_presenciales_extra", "puede_trabajar_en")
     @classmethod
     def cobertura(cls, vs):
-        if not set(vs) <= set(paises.datos()["reconocidos"]):
-            raise ValueError("La cobertura actual es LATAM y España.")
+        validos = paises.mundo()["codigos"] | set(paises.datos()["reconocidos"])
+        if not set(vs) <= validos:
+            raise ValueError("Elige países de la lista.")
+        return list(dict.fromkeys(vs))
+
+    @field_validator("ciudades")
+    @classmethod
+    def ciudades_limpias(cls, vs):
+        return _terminos(vs)
+
+    @field_validator("acepta_horario")
+    @classmethod
+    def horarios_sin_repetir(cls, vs):
         return list(dict.fromkeys(vs))
 
     @field_validator("modalidades")
@@ -290,7 +306,9 @@ _MOTIVOS_CAMPO = {
     ("perfiles", "experiencia_max"): "Los años de experiencia van de 0 a 40.",
     ("perfiles", "experiencia_anos"): "Los años de experiencia van de 0 a 40.",
     ("perfiles", "antiguedad_dias"): "La antigüedad de publicación va de 1 a 30 días.",
-    ("perfiles", "vive_en"): "Elige en qué país vive: LATAM o España.",
+    ("perfiles", "vive_en"): "Elige en qué país vive.",
+    ("perfiles", "ciudades"): "Cada ciudad debe tener entre 2 y 60 caracteres.",
+    ("perfiles", "puede_trabajar_en"): "Elige países de la lista donde puede trabajar.",
     ("perfiles", "cargo_id"): "Elige un cargo para el perfil.",
 }
 

@@ -113,12 +113,12 @@ def test_confirmada_aparece_lista_para_el_cliente_y_no_se_repite():
 
 def test_validaciones_de_la_decision():
     r = RepositorioDemo()
-    for paises in ([], ["US"]):
+    for paises in ([], ["XX"]):  # contrato v23: un país de fuera sí vale; uno inexistente o ninguno, no
         try:
             revision.decidir(r, "rev-demo-0", "sirve", paises)
-            raise AssertionError("aceptó un país no cubierto")
+            raise AssertionError("aceptó una decisión sin países válidos")
         except Exception as e:  # noqa: BLE001
-            assert "LATAM o España" in str(e)
+            assert "país o una región" in str(e)
     assert revision.decidir(r, "rev-demo-1", "saltar")["decision"] == "saltar"
     assert r.revisiones(vacante_id="rev-demo-1")[0]["estado"] == "saltada"
 
@@ -423,3 +423,17 @@ def test_ofertas_de_consulta_por_fecha_y_por_grupos_de_vacantes(monkeypatch):
     repo.ofertas_de(vacante_ids=[f"v{n}" for n in range(250)])
     grupos = [p for t, p in pedidas if t == "ofertas"]
     assert len(grupos) == 3 and grupos[0]["vacante_id"].startswith('in.("v0","v1"')
+
+
+def test_confirmar_con_varias_etiquetas_y_paises_de_fuera():
+    """Contrato v23: «LATAM y EE. UU.» de una vez; los cubiertos van a `paises` y todos a `paises_mundo`."""
+    d = revision.con_paises({"titulo": "QA"}, revision.expandir(["LATAM", "US"]))
+    assert "CO" in d["paises"] and "US" not in d["paises"] and "US" in d["paises_mundo"]
+    assert d["confianza_pais"] == "alta" and not d["alcance_mundial"]
+    assert revision.con_paises({}, ["MUNDO"])["alcance_mundial"]
+
+
+def test_sesion_trae_todos_los_paises():
+    api = TestClient(crear_app(demo=True, repositorio=RepositorioDemo()))
+    mundo = api.get("/api/session").json()["paises_mundo"]
+    assert len(mundo) > 240 and {"codigo": "DE", "nombre": "Alemania"} in mundo

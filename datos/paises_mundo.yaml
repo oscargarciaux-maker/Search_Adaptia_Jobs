@@ -1,13 +1,15 @@
 # Generado por `python -m buscador.generar_paises_mundo` (ISO 3166-1 y 3166-2 de pycountry). No editar a
-# mano: para nombres o lugares adicionales usar datos/paises.yaml. Contrato v15.
+# mano: para nombres o lugares adicionales usar datos/paises.yaml. Contratos v15 y v23.
 paises:
 - iso2: AD
   iso3: AND
+  nombre: Andorra
   nombres:
   - andorra
   - principality of andorra
 - iso2: AE
   iso3: ARE
+  nombre: Emiratos Árabes Unidos
   nombres:
   - emirados arabes unidos
   - emiratos
@@ -17,6 +19,7 @@ paises:
   - united arab emirates
 - iso2: AF
   iso3: AFG
+  nombre: Afganistán
   nombres:
   - afeganistao
   - afganistan
@@ -24,37 +27,44 @@ paises:
   - islamic republic of afghanistan
 - iso2: AG
   iso3: ATG
+  nombre: Antigua y Barbuda
   nombres:
   - antigua and barbuda
   - antigua e barbuda
   - antigua y barbuda
 - iso2: AI
   iso3: AIA
+  nombre: Anguila
   nombres:
   - anguila
   - anguilla
 - iso2: AL
   iso3: ALB
+  nombre: Albania
   nombres:
   - albania
   - republic of albania
 - iso2: AM
   iso3: ARM
+  nombre: Armenia
   nombres:
   - armenia
   - republic of armenia
 - iso2: AO
   iso3: AGO
+  nombre: Angola
   nombres:
   - angola
   - republic of angola
 - iso2: AQ
   iso3: ATA
+  nombre: Antártida
   nombres:
   - antarctica
   - antartida
 - iso2: AR
   iso3: ARG
+  nombre: Argentina
   nombres:
   - argentina
   - argentine republic
@@ -85,17 +95,20 @@ paises:
   - tucuman
 - iso2: AS
   iso3: ASM
+  nombre: Samoa Estadounidense
   nombres:
   - american samoa
   - samoa americana
   - samoa estadounidense
 - iso2: AT
   iso3: AUT
+  nombre: Austria
   nombres:
   - austria
   - republic of austria
 - iso2: AU
   iso3: AUS
+  nombre: Australia
   nombres:
   - australia
   subdivisiones:
@@ -114,16 +127,19 @@ paises:
   - western australia
 - iso2: AW
   iso3: ABW
+  nombre: Aruba
   nombres:
   - aruba
 - iso2: AX
   iso3: ALA
+  nombre: Islas Äland
   nombres:
   - aland islands
   - ilhas aland
   - islas aland
 - iso2: AZ
   iso3: AZE
+  nombre: Azerbaiyán
   nombres:
   - azerbaidjao
   - azerbaijan
@@ -131,6 +147,7 @@ paises:
   - republic of azerbaijan
 - iso2: BA
   iso3: BIH
+  nombre: Bosnia y Herzegovina
   nombres:
   - bosnia and herzegovina
   - bosnia herzegovina
@@ -138,65 +155,77 @@ paises:
   - republic of bosnia and herzegovina
 - iso2: BB
   iso3: BRB
+  nombre: Barbados
   nombres:
   - barbados
 - iso2: BD
   iso3: BGD
+  nombre: Bangladés
   nombres:
   - banglades
   - bangladesh
   - people s republic of bangladesh
 - iso2: BE
   iso3: BEL
+  nombre: Bélgica
   nombres:
   - belgica
   - belgium
   - kingdom of belgium
 - iso2: BF
   iso3: BFA
+  nombre: Burquina Faso
   nombres:
   - burkina faso
   - burquina
   - burquina faso
 - iso2: BG
   iso3: BGR
+  nombre: Bulgaria
   nombres:
   - bulgaria
   - republic of bulgaria
 - iso2: BH
   iso3: BHR
+  nombre: Baréin
   nombres:
   - bahrain
   - barein
   - kingdom of bahrain
 - iso2: BI
   iso3: BDI
+  nombre: Burundi
   nombres:
   - burundi
   - republic of burundi
 - iso2: BJ
   iso3: BEN
+  nombre: Benín
   nombres:
   - benin
   - republic of benin
 - iso2: BL
   iso3: BLM
+  nombre: San Bartolomé
   nombres:
   - saint barthelemy
   - san bartolome
   - sao bartolomeu
 - iso2: BM
   iso3: BMU
+  nombre: Islas Bermudas
   nombres:
   - bermuda
   - islas bermudas
 - iso2: BN
   iso3: BRN
+  nombre: Brunei Darussalam
   nombres:
   - brunei
   - brunei darussalam
 - iso2: BO
   iso3: BOL
+  nombre: Bolivia
   nombres:
   - bolivia
   - bolivia estado plurinacional da
@@ -215,12 +244,14 @@ paises:
   - tarija
 - iso2: BQ
   iso3: BES
+  nombre: Islas BES
   nombres:
   - bonaire saba e santo eustaquio
   - bonaire sint eustatius and saba
   - islas bes caribe neerlandes
 - iso2: BR
   iso3: BRA
+  nombre: Brasil
   nombres:
   - brasil
   - brazil
@@ -257,11 +288,13 @@ paises:
   - tocantins
 - iso2: BS
   iso3: BHS
+  nombre: Bahamas
   nombres:
   - bahamas
   - commonwealth of the bahamas
 - iso2: BT
   iso3: BTN
+  nombre: Bután
   nombres:
   - bhutan
   - butan
@@ -269,18 +302,21 @@ paises:
   - kingdom of bhutan
 - iso2: BV
   iso3: BVT
+  nombre: Isla Bouvet
   nombres:
   - bouvet island
   - ilha bouvet
   - isla bouvet
 - iso2: BW
   iso3: BWA
+  nombre: Botsuana
   nombres:
   - botsuana
   - botswana
   - republic of botswana
 - iso2: BY
   iso3: BLR
+  nombre: Bielorrusia
   nombres:
   - belarus
   - bielo russia
@@ -288,11 +324,13 @@ paises:
   - republic of belarus
 - iso2: BZ
   iso3: BLZ
+  nombre: Belice
   nombres:
   - belice
   - belize
 - iso2: CA
   iso3: CAN
+  nombre: Canadá
   nombres:
   - canada
   subdivisiones:
@@ -317,12 +355,14 @@ paises:
   - yukon
 - iso2: CC
   iso3: CCK
+  nombre: Islas Cocos
   nombres:
   - cocos keeling islands
   - ilhas cocos
   - islas cocos keeling
 - iso2: CD
   iso3: COD
+  nombre: Congo
   nombres:
   - congo
   - congo republica democratica del
@@ -330,17 +370,20 @@ paises:
   - congo the democratic republic of the
 - iso2: CF
   iso3: CAF
+  nombre: República Centroafricana
   nombres:
   - central african republic
   - republica centro africana
   - republica centroafricana
 - iso2: CG
   iso3: COG
+  nombre: Congo
   nombres:
   - congo
   - republic of the congo
 - iso2: CH
   iso3: CHE
+  nombre: Suiza
   nombres:
   - suica
   - suiza
@@ -348,6 +391,7 @@ paises:
   - switzerland
 - iso2: CI
   iso3: CIV
+  nombre: Costa de Marfíl
   nombres:
   - costa de marfil
   - costa do marfim
@@ -356,12 +400,14 @@ paises:
   - republic of cote d ivoire
 - iso2: CK
   iso3: COK
+  nombre: Islas Cook
   nombres:
   - cook islands
   - ilhas cook
   - islas cook
 - iso2: CL
   iso3: CHL
+  nombre: Chile
   nombres:
   - chile
   - republic of chile
@@ -384,6 +430,7 @@ paises:
   - valparaiso
 - iso2: CM
   iso3: CMR
+  nombre: Camerún
   nombres:
   - camaroes
   - cameroon
@@ -391,6 +438,7 @@ paises:
   - republic of cameroon
 - iso2: CN
   iso3: CHN
+  nombre: China
   nombres:
   - china
   - people s republic of china
@@ -431,6 +479,7 @@ paises:
   - zhejiang sheng
 - iso2: CO
   iso3: COL
+  nombre: Colombia
   nombres:
   - colombia
   - republic of colombia
@@ -470,6 +519,7 @@ paises:
   - vichada
 - iso2: CR
   iso3: CRI
+  nombre: Costa Rica
   nombres:
   - costa rica
   - republic of costa rica
@@ -483,6 +533,7 @@ paises:
   - san jose
 - iso2: CU
   iso3: CUB
+  nombre: Cuba
   nombres:
   - cuba
   - republic of cuba
@@ -505,34 +556,40 @@ paises:
   - villa clara
 - iso2: CV
   iso3: CPV
+  nombre: Cabo Verde
   nombres:
   - cabo verde
   - republic of cabo verde
 - iso2: CW
   iso3: CUW
+  nombre: Curazao
   nombres:
   - curacao
   - curazao
 - iso2: CX
   iso3: CXR
+  nombre: Isla de Navidad
   nombres:
   - christmas island
   - ilha christmas
   - isla de navidad
 - iso2: CY
   iso3: CYP
+  nombre: Chipre
   nombres:
   - chipre
   - cyprus
   - republic of cyprus
 - iso2: CZ
   iso3: CZE
+  nombre: Chequia
   nombres:
   - chequia
   - czech republic
   - czechia
 - iso2: DE
   iso3: DEU
+  nombre: Alemania
   nombres:
   - alemanha
   - alemania
@@ -557,6 +614,7 @@ paises:
   - thuringen
 - iso2: DJ
   iso3: DJI
+  nombre: Yibuti
   nombres:
   - djibouti
   - djibuti
@@ -564,17 +622,20 @@ paises:
   - yibuti
 - iso2: DK
   iso3: DNK
+  nombre: Dinamarca
   nombres:
   - denmark
   - dinamarca
   - kingdom of denmark
 - iso2: DM
   iso3: DMA
+  nombre: Dominica
   nombres:
   - commonwealth of dominica
   - dominica
 - iso2: DO
   iso3: DOM
+  nombre: República Dominicana
   nombres:
   - dominican republic
   - republica dominicana
@@ -623,12 +684,14 @@ paises:
   - yuma
 - iso2: DZ
   iso3: DZA
+  nombre: Algeria
   nombres:
   - algeria
   - argelia
   - people s democratic republic of algeria
 - iso2: EC
   iso3: ECU
+  nombre: Ecuador
   nombres:
   - ecuador
   - equador
@@ -660,11 +723,13 @@ paises:
   - zamora chinchipe
 - iso2: EE
   iso3: EST
+  nombre: Estonia
   nombres:
   - estonia
   - republic of estonia
 - iso2: EG
   iso3: EGY
+  nombre: Egipto
   nombres:
   - arab republic of egypt
   - egipto
@@ -672,18 +737,21 @@ paises:
   - egypt
 - iso2: EH
   iso3: ESH
+  nombre: Sahara Occidental
   nombres:
   - saara ocidental
   - sahara occidental
   - western sahara
 - iso2: ER
   iso3: ERI
+  nombre: Eritrea
   nombres:
   - eritrea
   - eritreia
   - the state of eritrea
 - iso2: ES
   iso3: ESP
+  nombre: España
   nombres:
   - espana
   - espanha
@@ -761,30 +829,35 @@ paises:
   - zaragoza
 - iso2: ET
   iso3: ETH
+  nombre: Etiopía
   nombres:
   - ethiopia
   - etiopia
   - federal democratic republic of ethiopia
 - iso2: FI
   iso3: FIN
+  nombre: Finlandia
   nombres:
   - finland
   - finlandia
   - republic of finland
 - iso2: FJ
   iso3: FJI
+  nombre: Fiyi
   nombres:
   - fiji
   - fiyi
   - republic of fiji
 - iso2: FK
   iso3: FLK
+  nombre: Islas Falkland
   nombres:
   - falkland islands malvinas
   - ilhas malvinas falkland
   - islas falkland malvinas
 - iso2: FM
   iso3: FSM
+  nombre: Micronesia
   nombres:
   - federated states of micronesia
   - micronesia estados federados da
@@ -792,12 +865,14 @@ paises:
   - micronesia federated states of
 - iso2: FO
   iso3: FRO
+  nombre: Islas Feroe
   nombres:
   - faroe islands
   - ilhas faroe
   - islas feroe
 - iso2: FR
   iso3: FRA
+  nombre: Francia
   nombres:
   - franca
   - france
@@ -933,12 +1008,14 @@ paises:
   - yvelines
 - iso2: GA
   iso3: GAB
+  nombre: Gabón
   nombres:
   - gabao
   - gabon
   - gabonese republic
 - iso2: GB
   iso3: GBR
+  nombre: Reino Unido
   nombres:
   - britain
   - england
@@ -1178,56 +1255,67 @@ paises:
   - york
 - iso2: GD
   iso3: GRD
+  nombre: Granada
   nombres:
   - granada
   - grenada
 - iso2: GE
   iso3: GEO
+  nombre: Georgia
   nombres:
   - georgia
 - iso2: GF
   iso3: GUF
+  nombre: Guayana Francesa
   nombres:
   - french guiana
   - guayana francesa
   - guiana francesa
 - iso2: GG
   iso3: GGY
+  nombre: Guernsey
   nombres:
   - guernsey
 - iso2: GH
   iso3: GHA
+  nombre: Ghana
   nombres:
   - gana
   - ghana
   - republic of ghana
 - iso2: GI
   iso3: GIB
+  nombre: Gibraltar
   nombres:
   - gibraltar
 - iso2: GL
   iso3: GRL
+  nombre: Groenlandia
   nombres:
   - greenland
   - groenlandia
 - iso2: GM
   iso3: GMB
+  nombre: Gambia
   nombres:
   - gambia
   - republic of the gambia
 - iso2: GN
   iso3: GIN
+  nombre: Guinea
   nombres:
   - guine
   - guinea
   - republic of guinea
 - iso2: GP
   iso3: GLP
+  nombre: Guadalupe
   nombres:
   - guadalupe
   - guadeloupe
 - iso2: GQ
   iso3: GNQ
+  nombre: Guinea Ecuatorial
   nombres:
   - equatorial guinea
   - guine equatorial
@@ -1235,18 +1323,21 @@ paises:
   - republic of equatorial guinea
 - iso2: GR
   iso3: GRC
+  nombre: Grecia
   nombres:
   - grecia
   - greece
   - hellenic republic
 - iso2: GS
   iso3: SGS
+  nombre: Islas Georgias del Sur y Sándwich del Sur
   nombres:
   - georgia do sul e ilhas sandwich do sul
   - islas georgias del sur y sandwich del sur
   - south georgia and the south sandwich islands
 - iso2: GT
   iso3: GTM
+  nombre: Guatemala
   nombres:
   - guatemala
   - republic of guatemala
@@ -1275,10 +1366,12 @@ paises:
   - zacapa
 - iso2: GU
   iso3: GUM
+  nombre: Guam
   nombres:
   - guam
 - iso2: GW
   iso3: GNB
+  nombre: Guinea-Bisáu
   nombres:
   - guine bissau
   - guinea bisau
@@ -1286,23 +1379,27 @@ paises:
   - republic of guinea bissau
 - iso2: GY
   iso3: GUY
+  nombre: Guyana
   nombres:
   - guiana
   - guyana
   - republic of guyana
 - iso2: HK
   iso3: HKG
+  nombre: Hong Kong
   nombres:
   - hong kong
   - hong kong special administrative region of china
 - iso2: HM
   iso3: HMD
+  nombre: Isla Heard e Islas McDonald
   nombres:
   - heard island and mcdonald islands
   - ilha heard e ilhas mcdonald
   - isla heard e islas mcdonald
 - iso2: HN
   iso3: HND
+  nombre: Honduras
   nombres:
   - honduras
   - republic of honduras
@@ -1327,27 +1424,32 @@ paises:
   - yoro
 - iso2: HR
   iso3: HRV
+  nombre: Croacia
   nombres:
   - croacia
   - croatia
   - republic of croatia
 - iso2: HT
   iso3: HTI
+  nombre: Haití
   nombres:
   - haiti
   - republic of haiti
 - iso2: HU
   iso3: HUN
+  nombre: Hungría
   nombres:
   - hungary
   - hungria
 - iso2: ID
   iso3: IDN
+  nombre: Indonesia
   nombres:
   - indonesia
   - republic of indonesia
 - iso2: IE
   iso3: IRL
+  nombre: Irlanda
   nombres:
   - ireland
   - irlanda
@@ -1384,17 +1486,20 @@ paises:
   - wicklow
 - iso2: IL
   iso3: ISR
+  nombre: Israel
   nombres:
   - israel
   - state of israel
 - iso2: IM
   iso3: IMN
+  nombre: Isla de Man
   nombres:
   - ilha de man
   - isla de man
   - isle of man
 - iso2: IN
   iso3: IND
+  nombre: India
   nombres:
   - india
   - republic of india
@@ -1437,12 +1542,14 @@ paises:
   - west bengal
 - iso2: IO
   iso3: IOT
+  nombre: Territorio Británico del Océano Índico
   nombres:
   - british indian ocean territory
   - territorio britanico del oceano indico
   - territorio britanico do oceano indico
 - iso2: IQ
   iso3: IRQ
+  nombre: Irak
   nombres:
   - irak
   - iraq
@@ -1450,6 +1557,7 @@ paises:
   - republic of iraq
 - iso2: IR
   iso3: IRN
+  nombre: Irán
   nombres:
   - ira republica islamica do
   - iran
@@ -1458,12 +1566,14 @@ paises:
   - islamic republic of iran
 - iso2: IS
   iso3: ISL
+  nombre: Islandia
   nombres:
   - iceland
   - islandia
   - republic of iceland
 - iso2: IT
   iso3: ITA
+  nombre: Italia
   nombres:
   - italia
   - italian republic
@@ -1607,26 +1717,31 @@ paises:
   - viterbo
 - iso2: JE
   iso3: JEY
+  nombre: Jersey
   nombres:
   - jersey
 - iso2: JM
   iso3: JAM
+  nombre: Jamaica
   nombres:
   - jamaica
 - iso2: JO
   iso3: JOR
+  nombre: Jordania
   nombres:
   - hashemite kingdom of jordan
   - jordan
   - jordania
 - iso2: JP
   iso3: JPN
+  nombre: Japón
   nombres:
   - japan
   - japao
   - japon
 - iso2: KE
   iso3: KEN
+  nombre: Kenia
   nombres:
   - kenia
   - kenya
@@ -1634,6 +1749,7 @@ paises:
   - republic of kenya
 - iso2: KG
   iso3: KGZ
+  nombre: Kirguistán
   nombres:
   - kirguistan
   - kyrgyz republic
@@ -1641,6 +1757,7 @@ paises:
   - quirguistao
 - iso2: KH
   iso3: KHM
+  nombre: Camboya
   nombres:
   - cambodia
   - camboja
@@ -1648,11 +1765,13 @@ paises:
   - kingdom of cambodia
 - iso2: KI
   iso3: KIR
+  nombre: Kiribati
   nombres:
   - kiribati
   - republic of kiribati
 - iso2: KM
   iso3: COM
+  nombre: Comores
   nombres:
   - comores
   - comores islas
@@ -1660,12 +1779,14 @@ paises:
   - union of the comoros
 - iso2: KN
   iso3: KNA
+  nombre: San Cristóbal y Nieves
   nombres:
   - saint kitts and nevis
   - san cristobal y nieves
   - sao cristovao e nevis
 - iso2: KP
   iso3: PRK
+  nombre: Corea del Norte
   nombres:
   - corea del norte
   - corea republica democratica popular de
@@ -1675,6 +1796,7 @@ paises:
   - north korea
 - iso2: KR
   iso3: KOR
+  nombre: Corea del Sur
   nombres:
   - corea del sur
   - corea republica de
@@ -1683,17 +1805,20 @@ paises:
   - south korea
 - iso2: KW
   iso3: KWT
+  nombre: Kuwait
   nombres:
   - kuwait
   - state of kuwait
 - iso2: KY
   iso3: CYM
+  nombre: Islas Caimán
   nombres:
   - cayman islands
   - ilhas cayman
   - islas caiman
 - iso2: KZ
   iso3: KAZ
+  nombre: Kazajistán
   nombres:
   - cazaquistao
   - kazajistan
@@ -1701,6 +1826,7 @@ paises:
   - republic of kazakhstan
 - iso2: LA
   iso3: LAO
+  nombre: Laos
   nombres:
   - lao people s democratic republic
   - laos
@@ -1708,61 +1834,72 @@ paises:
   - republica popular democratica do laos
 - iso2: LB
   iso3: LBN
+  nombre: Líbano
   nombres:
   - lebanese republic
   - lebanon
   - libano
 - iso2: LC
   iso3: LCA
+  nombre: Santa Lucía
   nombres:
   - saint lucia
   - santa lucia
 - iso2: LI
   iso3: LIE
+  nombre: Liechtenstein
   nombres:
   - liechtenstein
   - principality of liechtenstein
 - iso2: LK
   iso3: LKA
+  nombre: Sri Lanka
   nombres:
   - democratic socialist republic of sri lanka
   - sri lanka
 - iso2: LR
   iso3: LBR
+  nombre: Liberia
   nombres:
   - liberia
   - republic of liberia
 - iso2: LS
   iso3: LSO
+  nombre: Lesoto
   nombres:
   - kingdom of lesotho
   - lesotho
   - lesoto
 - iso2: LT
   iso3: LTU
+  nombre: Lituania
   nombres:
   - lithuania
   - lituania
   - republic of lithuania
 - iso2: LU
   iso3: LUX
+  nombre: Luxemburgo
   nombres:
   - grand duchy of luxembourg
   - luxembourg
   - luxemburgo
 - iso2: LV
   iso3: LVA
+  nombre: Letonia
   nombres:
   - latvia
   - letonia
   - republic of latvia
 - iso2: LY
   iso3: LBY
+  nombre: Libia
   nombres:
   - libia
   - libya
 - iso2: MA
   iso3: MAR
+  nombre: Marruecos
   nombres:
   - kingdom of morocco
   - marrocos
@@ -1770,11 +1907,13 @@ paises:
   - morocco
 - iso2: MC
   iso3: MCO
+  nombre: Mónaco
   nombres:
   - monaco
   - principality of monaco
 - iso2: MD
   iso3: MDA
+  nombre: Moldavia
   nombres:
   - moldavia republica da
   - moldavia republica de
@@ -1783,21 +1922,25 @@ paises:
   - republic of moldova
 - iso2: ME
   iso3: MNE
+  nombre: Montenegro
   nombres:
   - montenegro
 - iso2: MF
   iso3: MAF
+  nombre: San Martín
   nombres:
   - saint martin french part
   - san martin zona francesa
   - sao martim parte francesa
 - iso2: MG
   iso3: MDG
+  nombre: Madagascar
   nombres:
   - madagascar
   - republic of madagascar
 - iso2: MH
   iso3: MHL
+  nombre: Islas Marshall
   nombres:
   - ilhas marshall
   - islas marshall
@@ -1805,6 +1948,7 @@ paises:
   - republic of the marshall islands
 - iso2: MK
   iso3: MKD
+  nombre: Macedonia del Norte
   nombres:
   - macedonia del norte
   - macedonia do norte
@@ -1812,27 +1956,32 @@ paises:
   - republic of north macedonia
 - iso2: ML
   iso3: MLI
+  nombre: Malí
   nombres:
   - mali
   - republic of mali
 - iso2: MM
   iso3: MMR
+  nombre: Birmania
   nombres:
   - birmania
   - myanmar
   - republic of myanmar
 - iso2: MN
   iso3: MNG
+  nombre: Mongolia
   nombres:
   - mongolia
 - iso2: MO
   iso3: MAC
+  nombre: Macao
   nombres:
   - macao
   - macao special administrative region of china
   - macau
 - iso2: MP
   iso3: MNP
+  nombre: Islas Marianas del Norte
   nombres:
   - commonwealth of the northern mariana islands
   - ilhas marianas do norte
@@ -1840,31 +1989,37 @@ paises:
   - northern mariana islands
 - iso2: MQ
   iso3: MTQ
+  nombre: Martinica
   nombres:
   - martinica
   - martinique
 - iso2: MR
   iso3: MRT
+  nombre: Mauritania
   nombres:
   - islamic republic of mauritania
   - mauritania
 - iso2: MS
   iso3: MSR
+  nombre: Montserrat
   nombres:
   - montserrat
 - iso2: MT
   iso3: MLT
+  nombre: Malta
   nombres:
   - malta
   - republic of malta
 - iso2: MU
   iso3: MUS
+  nombre: Mauricio
   nombres:
   - mauricio
   - mauritius
   - republic of mauritius
 - iso2: MV
   iso3: MDV
+  nombre: Islas Maldivas
   nombres:
   - islas maldivas
   - maldivas
@@ -1872,12 +2027,14 @@ paises:
   - republic of maldives
 - iso2: MW
   iso3: MWI
+  nombre: Malaui
   nombres:
   - malaui
   - malawi
   - republic of malawi
 - iso2: MX
   iso3: MEX
+  nombre: México
   nombres:
   - mexico
   - united mexican states
@@ -1916,44 +2073,52 @@ paises:
   - zacatecas
 - iso2: MY
   iso3: MYS
+  nombre: Malasia
   nombres:
   - malasia
   - malaysia
 - iso2: MZ
   iso3: MOZ
+  nombre: Mozambique
   nombres:
   - mocambique
   - mozambique
   - republic of mozambique
 - iso2: NA
   iso3: NAM
+  nombre: Namibia
   nombres:
   - namibia
   - republic of namibia
 - iso2: NC
   iso3: NCL
+  nombre: Nueva Caledonia
   nombres:
   - new caledonia
   - nova caledonia
   - nueva caledonia
 - iso2: NE
   iso3: NER
+  nombre: Niger
   nombres:
   - niger
   - republic of the niger
 - iso2: NF
   iso3: NFK
+  nombre: Isla Norfolk
   nombres:
   - ilha norfolk
   - isla norfolk
   - norfolk island
 - iso2: NG
   iso3: NGA
+  nombre: Nigeria
   nombres:
   - federal republic of nigeria
   - nigeria
 - iso2: NI
   iso3: NIC
+  nombre: Nicaragua
   nombres:
   - nicaragua
   - republic of nicaragua
@@ -1977,6 +2142,7 @@ paises:
   - rivas
 - iso2: NL
   iso3: NLD
+  nombre: Países Bajos
   nombres:
   - holanda
   - holland
@@ -2007,38 +2173,45 @@ paises:
   - zuid holland
 - iso2: 'NO'
   iso3: NOR
+  nombre: Noruega
   nombres:
   - kingdom of norway
   - noruega
   - norway
 - iso2: NP
   iso3: NPL
+  nombre: Nepal
   nombres:
   - federal democratic republic of nepal
   - nepal
 - iso2: NR
   iso3: NRU
+  nombre: Nauru
   nombres:
   - nauru
   - republic of nauru
 - iso2: NU
   iso3: NIU
+  nombre: Niue
   nombres:
   - niue
 - iso2: NZ
   iso3: NZL
+  nombre: Nueva Zelanda
   nombres:
   - new zealand
   - nova zelandia
   - nueva zelanda
 - iso2: OM
   iso3: OMN
+  nombre: Omán
   nombres:
   - oma
   - oman
   - sultanate of oman
 - iso2: PA
   iso3: PAN
+  nombre: Panamá
   nombres:
   - panama
   - republic of panama
@@ -2059,6 +2232,7 @@ paises:
   - veraguas
 - iso2: PE
   iso3: PER
+  nombre: Perú
   nombres:
   - peru
   - republic of peru
@@ -2091,11 +2265,13 @@ paises:
   - ucayali
 - iso2: PF
   iso3: PYF
+  nombre: Polinesia Francesa
   nombres:
   - french polynesia
   - polinesia francesa
 - iso2: PG
   iso3: PNG
+  nombre: Papúa Nueva Guinea
   nombres:
   - independent state of papua new guinea
   - papua new guinea
@@ -2103,6 +2279,7 @@ paises:
   - papua nueva guinea
 - iso2: PH
   iso3: PHL
+  nombre: Filipinas
   nombres:
   - filipinas
   - philippines
@@ -2217,12 +2394,14 @@ paises:
   - zamboanga sibugay
 - iso2: PK
   iso3: PAK
+  nombre: Pakistán
   nombres:
   - islamic republic of pakistan
   - pakistan
   - paquistao
 - iso2: PL
   iso3: POL
+  nombre: Polonia
   nombres:
   - poland
   - polonia
@@ -2246,22 +2425,26 @@ paises:
   - zachodniopomorskie
 - iso2: PM
   iso3: SPM
+  nombre: San Pedro y Miquelon
   nombres:
   - saint pierre and miquelon
   - san pedro y miquelon
   - sao pedro e miquelon
 - iso2: PN
   iso3: PCN
+  nombre: Pitcairn
   nombres:
   - pitcairn
 - iso2: PR
   iso3: PRI
+  nombre: Puerto Rico
   nombres:
   - porto rico
   - puerto rico
   subdivisiones: []
 - iso2: PS
   iso3: PSE
+  nombre: Palestina
   nombres:
   - palestina estado da
   - palestina estado de
@@ -2269,6 +2452,7 @@ paises:
   - the state of palestine
 - iso2: PT
   iso3: PRT
+  nombre: Portugal
   nombres:
   - portugal
   - portuguese republic
@@ -2295,12 +2479,14 @@ paises:
   - viseu
 - iso2: PW
   iso3: PLW
+  nombre: Palaos
   nombres:
   - palaos
   - palau
   - republic of palau
 - iso2: PY
   iso3: PRY
+  nombre: Paraguay
   nombres:
   - paraguai
   - paraguay
@@ -2326,17 +2512,20 @@ paises:
   - san pedro
 - iso2: QA
   iso3: QAT
+  nombre: Catar
   nombres:
   - catar
   - qatar
   - state of qatar
 - iso2: RE
   iso3: REU
+  nombre: Reunión
   nombres:
   - reuniao
   - reunion
 - iso2: RO
   iso3: ROU
+  nombre: Rumanía
   nombres:
   - romania
   - romenia
@@ -2386,12 +2575,14 @@ paises:
   - vrancea
 - iso2: RS
   iso3: SRB
+  nombre: Serbia
   nombres:
   - republic of serbia
   - serbia
   - servia
 - iso2: RU
   iso3: RUS
+  nombre: Federación Rusa
   nombres:
   - federacao russa
   - federacion rusa
@@ -2400,12 +2591,14 @@ paises:
   - russian federation
 - iso2: RW
   iso3: RWA
+  nombre: Ruanda
   nombres:
   - ruanda
   - rwanda
   - rwandese republic
 - iso2: SA
   iso3: SAU
+  nombre: Arabia Saudí
   nombres:
   - arabia saudi
   - arabia saudita
@@ -2413,29 +2606,34 @@ paises:
   - saudi arabia
 - iso2: SB
   iso3: SLB
+  nombre: Islas Salomón
   nombres:
   - ilhas salomao
   - islas salomon
   - solomon islands
 - iso2: SC
   iso3: SYC
+  nombre: Seychelles
   nombres:
   - republic of seychelles
   - seychelles
 - iso2: SD
   iso3: SDN
+  nombre: Sudán
   nombres:
   - republic of the sudan
   - sudan
   - sudao
 - iso2: SE
   iso3: SWE
+  nombre: Suecia
   nombres:
   - kingdom of sweden
   - suecia
   - sweden
 - iso2: SG
   iso3: SGP
+  nombre: Singapur
   nombres:
   - cingapura
   - republic of singapore
@@ -2443,30 +2641,35 @@ paises:
   - singapur
 - iso2: SH
   iso3: SHN
+  nombre: Santa Elena
   nombres:
   - saint helena ascension and tristan da cunha
   - santa elena ascension y tristan de acuna
   - santa helena ascensao e tristao da cunha
 - iso2: SI
   iso3: SVN
+  nombre: Eslovenia
   nombres:
   - eslovenia
   - republic of slovenia
   - slovenia
 - iso2: SJ
   iso3: SJM
+  nombre: Svalbard y Jan Mayen
   nombres:
   - svalbard and jan mayen
   - svalbard e a ilha de jan mayen
   - svalbard y jan mayen
 - iso2: SK
   iso3: SVK
+  nombre: Eslovaquia
   nombres:
   - eslovaquia
   - slovak republic
   - slovakia
 - iso2: SL
   iso3: SLE
+  nombre: Sierra Leona
   nombres:
   - republic of sierra leone
   - serra leoa
@@ -2474,28 +2677,33 @@ paises:
   - sierra leone
 - iso2: SM
   iso3: SMR
+  nombre: San Marino
   nombres:
   - republic of san marino
   - san marino
   - sao marino
 - iso2: SN
   iso3: SEN
+  nombre: Senegal
   nombres:
   - republic of senegal
   - senegal
 - iso2: SO
   iso3: SOM
+  nombre: Somalia
   nombres:
   - federal republic of somalia
   - somalia
 - iso2: SR
   iso3: SUR
+  nombre: Surinám
   nombres:
   - republic of suriname
   - surinam
   - suriname
 - iso2: SS
   iso3: SSD
+  nombre: Sudán del Sur
   nombres:
   - republic of south sudan
   - south sudan
@@ -2503,6 +2711,7 @@ paises:
   - sudao do sul
 - iso2: ST
   iso3: STP
+  nombre: Santo Tomé y Príncipe
   nombres:
   - democratic republic of sao tome and principe
   - santo tome y principe
@@ -2510,6 +2719,7 @@ paises:
   - sao tome e principe
 - iso2: SV
   iso3: SLV
+  nombre: El Salvador
   nombres:
   - el salvador
   - republic of el salvador
@@ -2530,12 +2740,14 @@ paises:
   - usulutan
 - iso2: SX
   iso3: SXM
+  nombre: Isla de San Martín
   nombres:
   - isla de san martin zona holandesa
   - sao martim parte holandesa
   - sint maarten dutch part
 - iso2: SY
   iso3: SYR
+  nombre: Siria
   nombres:
   - republica arabe da siria
   - republica arabe de siria
@@ -2544,6 +2756,7 @@ paises:
   - syrian arab republic
 - iso2: SZ
   iso3: SWZ
+  nombre: Esuatini
   nombres:
   - esuatini
   - eswatini
@@ -2551,35 +2764,41 @@ paises:
   - suazilandia
 - iso2: TC
   iso3: TCA
+  nombre: Islas Turcas y Caicos
   nombres:
   - ilhas turks e caicos
   - islas turcas y caicos
   - turks and caicos islands
 - iso2: TD
   iso3: TCD
+  nombre: Chad
   nombres:
   - chad
   - chade
   - republic of chad
 - iso2: TF
   iso3: ATF
+  nombre: Territorios Franceses del Sur
   nombres:
   - french southern territories
   - territorios franceses del sur
   - territorios franceses do sul
 - iso2: TG
   iso3: TGO
+  nombre: Togo
   nombres:
   - togo
   - togolese republic
 - iso2: TH
   iso3: THA
+  nombre: Tailandia
   nombres:
   - kingdom of thailand
   - tailandia
   - thailand
 - iso2: TJ
   iso3: TJK
+  nombre: Tayikistán
   nombres:
   - republic of tajikistan
   - tadjiquistao
@@ -2587,33 +2806,39 @@ paises:
   - tayikistan
 - iso2: TK
   iso3: TKL
+  nombre: Tokelau
   nombres:
   - tokelau
   - toquelau
 - iso2: TL
   iso3: TLS
+  nombre: Timor Oriental
   nombres:
   - democratic republic of timor leste
   - timor leste
   - timor oriental
 - iso2: TM
   iso3: TKM
+  nombre: Turkmenistán
   nombres:
   - turcomenistao
   - turkmenistan
 - iso2: TN
   iso3: TUN
+  nombre: Tunez
   nombres:
   - republic of tunisia
   - tunez
   - tunisia
 - iso2: TO
   iso3: TON
+  nombre: Tonga
   nombres:
   - kingdom of tonga
   - tonga
 - iso2: TR
   iso3: TUR
+  nombre: Turquía
   nombres:
   - republic of turkiye
   - turkey
@@ -2621,6 +2846,7 @@ paises:
   - turquia
 - iso2: TT
   iso3: TTO
+  nombre: Trinidad y Tobago
   nombres:
   - republic of trinidad and tobago
   - trinidad and tobago
@@ -2628,10 +2854,12 @@ paises:
   - trinidade e tobago
 - iso2: TV
   iso3: TUV
+  nombre: Tuvalu
   nombres:
   - tuvalu
 - iso2: TW
   iso3: TWN
+  nombre: Taiwán
   nombres:
   - taiwan
   - taiwan province of china
@@ -2639,6 +2867,7 @@ paises:
   - taiwan provincia de china
 - iso2: TZ
   iso3: TZA
+  nombre: Tanzania
   nombres:
   - tanzania
   - tanzania republica unida da
@@ -2647,22 +2876,26 @@ paises:
   - united republic of tanzania
 - iso2: UA
   iso3: UKR
+  nombre: Ucrania
   nombres:
   - ucrania
   - ukraine
 - iso2: UG
   iso3: UGA
+  nombre: Uganda
   nombres:
   - republic of uganda
   - uganda
 - iso2: UM
   iso3: UMI
+  nombre: Islas Ultramarinas Menores de Estados Unidos
   nombres:
   - ilhas menores distantes dos estados unidos
   - islas ultramarinas menores de estados unidos
   - united states minor outlying islands
 - iso2: US
   iso3: USA
+  nombre: Estados Unidos
   nombres:
   - ee uu
   - ee.uu
@@ -2749,6 +2982,7 @@ paises:
   - wyoming
 - iso2: UY
   iso3: URY
+  nombre: Uruguay
   nombres:
   - eastern republic of uruguay
   - uruguai
@@ -2775,24 +3009,28 @@ paises:
   - treinta y tres
 - iso2: UZ
   iso3: UZB
+  nombre: Uzbekistán
   nombres:
   - republic of uzbekistan
   - uzbekistan
   - uzbequistao
 - iso2: VA
   iso3: VAT
+  nombre: Santa Sede
   nombres:
   - holy see vatican city state
   - santa se cidade estado do vaticano
   - santa sede ciudad estado del vaticano
 - iso2: VC
   iso3: VCT
+  nombre: San Vicente y las Granadinas
   nombres:
   - saint vincent and the grenadines
   - san vicente y las granadinas
   - sao vicente e granadinas
 - iso2: VE
   iso3: VEN
+  nombre: Venezuela
   nombres:
   - bolivarian republic of venezuela
   - venezuela
@@ -2827,6 +3065,7 @@ paises:
   - zulia
 - iso2: VG
   iso3: VGB
+  nombre: Islas Vírgenes
   nombres:
   - british virgin islands
   - ilhas virgens britanicas
@@ -2834,6 +3073,7 @@ paises:
   - virgin islands british
 - iso2: VI
   iso3: VIR
+  nombre: Islas Vírgenes
   nombres:
   - ilhas virgens dos estados unidos
   - islas virgenes de eeuu
@@ -2841,6 +3081,7 @@ paises:
   - virgin islands u.s
 - iso2: VN
   iso3: VNM
+  nombre: Vietnam
   nombres:
   - socialist republic of viet nam
   - viet nam
@@ -2848,33 +3089,39 @@ paises:
   - vietnam
 - iso2: VU
   iso3: VUT
+  nombre: Vanuatu
   nombres:
   - republic of vanuatu
   - vanuatu
 - iso2: WF
   iso3: WLF
+  nombre: Wallis y Futuna
   nombres:
   - wallis and futuna
   - wallis e futuna
   - wallis y futuna
 - iso2: WS
   iso3: WSM
+  nombre: Samoa
   nombres:
   - independent state of samoa
   - samoa
 - iso2: YE
   iso3: YEM
+  nombre: Yemen
   nombres:
   - iemen
   - republic of yemen
   - yemen
 - iso2: YT
   iso3: MYT
+  nombre: Mayotte
   nombres:
   - maiote
   - mayotte
 - iso2: ZA
   iso3: ZAF
+  nombre: Sudáfrica
   nombres:
   - africa do sul
   - republic of south africa
@@ -2882,11 +3129,13 @@ paises:
   - sudafrica
 - iso2: ZM
   iso3: ZMB
+  nombre: Zambia
   nombres:
   - republic of zambia
   - zambia
 - iso2: ZW
   iso3: ZWE
+  nombre: Zimbabue
   nombres:
   - republic of zimbabwe
   - zimbabue

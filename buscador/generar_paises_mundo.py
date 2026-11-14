@@ -40,14 +40,16 @@ def generar():
         crudos = [c.name, getattr(c, "common_name", ""), getattr(c, "official_name", ""), es.gettext(c.name),
                   pt.gettext(c.name), *ALIAS.get(c.alpha_2, [])]
         nombres = sorted({normalizar.texto(n) for n in crudos if n and len(normalizar.texto(n)) > 2})
-        fila = {"iso2": c.alpha_2, "iso3": c.alpha_3, "nombres": nombres}
+        # Contrato v23: nombre para mostrar en el panel (español; «Bolivia, Estado Plurinacional de» → «Bolivia»).
+        visible = es.gettext(getattr(c, "common_name", "") or c.name).split(",")[0].split(" (")[0].strip()
+        fila = {"iso2": c.alpha_2, "iso3": c.alpha_3, "nombre": visible, "nombres": nombres}
         if c.alpha_2 in cubiertos or c.alpha_2 in SUBDIVISIONES_EXTRANJERAS:
             subs = {normalizar.texto(n) for s in pycountry.subdivisions.get(country_code=c.alpha_2) or []
                     for n in (s.name, sub_es.gettext(s.name)) if n}
             fila["subdivisiones"] = sorted(s for s in subs if len(s) > 2)
         salida.append(fila)
     cabecera = ("# Generado por `python -m buscador.generar_paises_mundo` (ISO 3166-1 y 3166-2 de pycountry). No editar a\n"
-                "# mano: para nombres o lugares adicionales usar datos/paises.yaml. Contrato v15.\n")
+                "# mano: para nombres o lugares adicionales usar datos/paises.yaml. Contratos v15 y v23.\n")
     DESTINO.write_text(cabecera + yaml.safe_dump({"paises": salida}, allow_unicode=True, sort_keys=False, width=120),
                        encoding="utf-8")
     return len(salida)

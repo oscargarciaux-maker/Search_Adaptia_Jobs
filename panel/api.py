@@ -107,7 +107,9 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
     @app.get("/api/session")
     def session(request: Request):
         return {"demo": demo, "sesion": demo or bool(request.cookies.get("adaptia_session")),
-                "paises": [{"codigo": p["codigo"], "nombre": p["nombre"]} for p in paises.datos()["cubiertos"]]}
+                "paises": [{"codigo": p["codigo"], "nombre": p["nombre"]} for p in paises.datos()["cubiertos"]],
+                # Contrato v23: todos los países, para residencia, mudanza y permiso legal.
+                "paises_mundo": paises.mundo()["lista"]}
 
     @app.post("/api/auth/login")
     async def login(request: Request, body: Credenciales):
