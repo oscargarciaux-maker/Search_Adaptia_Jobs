@@ -107,6 +107,10 @@ class RepositorioSupabase:
             params["cliente_id"] = "eq." + cliente_id
         return self.pedir("GET", "panel_borradores", params=params) or []
 
+    def borrar_borradores(self, cliente_id):
+        """Borrar del todo a un cliente (15 nov): sus mensajes preparados de WhatsApp."""
+        self.pedir("DELETE", "panel_borradores", params={"cliente_id": "eq." + cliente_id})
+
     def guardar_borrador(self, b):
         fila = {**b, "actualizado_en": datetime.now(timezone.utc).isoformat()}
         self.pedir("POST", "panel_borradores", params={"on_conflict": "fecha,cliente_id"},
@@ -472,6 +476,11 @@ class RepositorioDemo:
         with self.lock:
             return deepcopy([b for b in self.estado.get("borradores", [])
                              if (not fecha or b["fecha"] == fecha) and (not cliente_id or b["cliente_id"] == cliente_id)])
+
+    def borrar_borradores(self, cliente_id):
+        with self.lock:
+            self.estado["borradores"] = [b for b in self.estado.get("borradores", []) if b["cliente_id"] != cliente_id]
+            self._guardar()
 
     def guardar_borrador(self, b):
         with self.lock:

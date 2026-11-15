@@ -16,7 +16,7 @@ import requests
 
 from buscador import paises
 from panel import servicio
-from panel.modelos import AjustesAlertas, CambioBorrador, Configuracion, Contacto, DecisionRevision, EstadoRegla, SubirRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia, explicar, parcial, solo_perfil
+from panel.modelos import AjustesAlertas, BorrarCliente, ImportarClientes, CambioBorrador, Configuracion, Contacto, DecisionRevision, EstadoRegla, SubirRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia, explicar, parcial, solo_perfil
 from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase, hoy
 from panel.terminos import sugerir
 
@@ -152,6 +152,38 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
     @app.put("/api/config")
     def guardar(body: Guardar):
         return repo.guardar(body.revision, body.configuracion.model_dump(mode="json"))
+
+    # Importar clientes desde un CSV (15 nov): vista previa sin guardar, e importación todo o nada.
+    @app.get("/api/clientes/plantilla.csv")
+    def plantilla_clientes():
+        from fastapi.responses import Response
+        from panel import importar
+        return Response(importar.plantilla(), media_type="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": 'attachment; filename="plantilla-clientes.csv"'})
+
+    @app.post("/api/clientes/importar/previa")
+    def previa_importar(body: ImportarClientes):
+        from panel import importar
+        r = importar.previa(repo.config()["borrador"], body.contenido, body.actuales)
+        return {k: v for k, v in r.items() if k not in ("configuracion", "contactos", "_borrados")}
+
+    @app.post("/api/clientes/importar")
+    def importar_clientes(body: ImportarClientes):
+        from panel import importar
+        if body.revision is None:
+            raise HTTPException(422, "Falta la revisión de la configuración.")
+        if body.actuales == "borrar" and body.confirmacion.strip().upper() != "BORRAR":
+            raise HTTPException(422, "Escribe BORRAR para confirmar que se borran los clientes actuales.")
+        r = importar.importar(repo, body.revision, body.contenido, body.actuales)
+        return {**r, "estado": a_v8(repo.config())}
+
+    @app.post("/api/clientes/{cliente_id}/borrar")
+    def borrar_cliente(cliente_id: UUID, body: BorrarCliente):
+        from panel import importar
+        if body.confirmacion.strip().upper() != "BORRAR":
+            raise HTTPException(422, "Escribe BORRAR para confirmar.")
+        importar.borrar_cliente(repo, body.revision, str(cliente_id))
+        return {"borrado": True, "estado": a_v8(repo.config())}
 
     @app.post("/api/config/publicar")
     def publicar(body: Publicar):

@@ -70,6 +70,7 @@ import type {
   Revisiones,
   Regla,
   ResumenClientes,
+  PreviaImportacion,
 } from "./types";
 import "./style.css";
 
@@ -3633,6 +3634,355 @@ function BotonTema() {
   );
 }
 
+// Importar clientes desde un CSV (15 nov): vista previa sin guardar y luego importación todo o nada. Los clientes
+// quedan en el borrador como si se hubieran creado a mano; la búsqueda los usa al programar.
+function ImportarClientes({
+  revision,
+  dirty,
+  notify,
+  onListo,
+  onClose,
+}: {
+  revision: number;
+  dirty: boolean;
+  notify: (s: string, error?: boolean) => void;
+  onListo: (estado: EstadoConfig) => void;
+  onClose: () => void;
+}) {
+  const [contenido, setContenido] = useState("");
+  const [actuales, setActuales] = useState<"mantener" | "archivar" | "borrar">(
+    "mantener",
+  );
+  const [confirmacion, setConfirmacion] = useState("");
+  const [previa, setPrevia] = useState<PreviaImportacion | null>(null);
+  const [error, setError] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+  useEffect(() => {
+    if (!contenido) return;
+    let vigente = true;
+    setError("");
+    api<PreviaImportacion>("/clientes/importar/previa", {
+      method: "POST",
+      body: JSON.stringify({ contenido, actuales }),
+    })
+      .then((r) => vigente && setPrevia(r))
+      .catch((e) => {
+        if (!vigente) return;
+        setPrevia(null);
+        setError((e as Error).message);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [contenido, actuales]);
+  const listo =
+    !!previa &&
+    !previa.errores &&
+    !dirty &&
+    (actuales !== "borrar" || confirmacion.trim().toUpperCase() === "BORRAR");
+  async function importar() {
+    setOcupado(true);
+    try {
+      const r = await api<{
+        importados: number;
+        borrados: number;
+        archivados: number;
+        estado: EstadoConfig;
+      }>("/clientes/importar", {
+        method: "POST",
+        body: JSON.stringify({ contenido, actuales, revision, confirmacion }),
+      });
+      onListo(r.estado);
+      notify(
+        `${r.importados} ${r.importados === 1 ? "cliente importado" : "clientes importados"}` +
+          (r.borrados ? `, ${r.borrados} borrados` : "") +
+          (r.archivados ? `, ${r.archivados} archivados` : "") +
+          ". Revísalos y pulsa «Programar para mañana».",
+      );
+    } catch (e) {
+      notify((e as Error).message, true);
+    } finally {
+      setOcupado(false);
+    }
+  }
+  const modos = {
+    remoto: "Remoto",
+    hibrido: "Híbrido",
+    presencial: "Presencial",
+  };
+  return (
+    <Dialog
+      titulo="Importar clientes"
+      subtitulo="Sube un CSV con una fila por perfil. Nada se guarda hasta que pulses «Importar»."
+      onClose={onClose}
+      ancho
+    >
+      <div className="importar">
+        <p className="field-help">
+          Usa la plantilla: las listas van separadas por «|» y una celda vacía
+          toma el mismo valor que un perfil nuevo (meta 10, remoto, español e
+          inglés, 14 días).{" "}
+          <a
+            className="text-button"
+            href="/api/clientes/plantilla.csv"
+            download
+          >
+            Descargar plantilla
+          </a>
+        </p>
+        <div className="field">
+          <label htmlFor="importar-archivo">Archivo CSV</label>
+          <input
+            id="importar-archivo"
+            type="file"
+            accept=".csv,text/csv"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              setContenido(await f.text());
+            }}
+          />
+        </div>
+        <fieldset className="importar-actuales">
+          <legend>¿Qué hago con los clientes que ya están?</legend>
+          <label>
+            <input
+              type="radio"
+              name="actuales"
+              checked={actuales === "mantener"}
+              onChange={() => setActuales("mantener")}
+            />
+            Mantenerlos (los nuevos se suman)
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="actuales"
+              checked={actuales === "archivar"}
+              onChange={() => setActuales("archivar")}
+            />
+            Archivarlos (dejan de recibir; se pueden reactivar)
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="actuales"
+              checked={actuales === "borrar"}
+              onChange={() => setActuales("borrar")}
+            />
+            Borrarlos del todo
+          </label>
+          {actuales === "borrar" && (
+            <div className="importar-borrar">
+              <p>
+                Se quitan de la configuración junto con sus perfiles, su
+                WhatsApp y sus mensajes preparados. No se puede deshacer. Las
+                vacantes que ya recibieron y las versiones ya programadas se
+                conservan en el historial.
+              </p>
+              <div className="field">
+                <label htmlFor="importar-confirmar">
+                  Escribe BORRAR para confirmar
+                </label>
+                <input
+                  id="importar-confirmar"
+                  value={confirmacion}
+                  onChange={(e) => setConfirmacion(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+          )}
+        </fieldset>
+        {dirty && (
+          <p className="importar-error" role="alert">
+            Tienes cambios sin guardar. Guárdalos o recarga antes de importar.
+          </p>
+        )}
+        {error && (
+          <p className="importar-error" role="alert">
+            {error}
+          </p>
+        )}
+        {previa && (
+          <section className="importar-previa" aria-label="Vista previa">
+            <p className="importar-resumen">
+              <b>
+                {previa.clientes}{" "}
+                {previa.clientes === 1 ? "cliente" : "clientes"}
+              </b>{" "}
+              con {previa.perfiles}{" "}
+              {previa.perfiles === 1 ? "perfil" : "perfiles"}
+              {previa.errores
+                ? ` · ${previa.errores} ${previa.errores === 1 ? "error" : "errores"} por corregir`
+                : " · sin errores"}
+            </p>
+            {previa.borrar.length > 0 && (
+              <p className="importar-aviso">
+                Se borrarán del todo: {previa.borrar.join(", ")}.
+              </p>
+            )}
+            {previa.archivar.length > 0 && (
+              <p className="importar-aviso">
+                Se archivarán: {previa.archivar.join(", ")}.
+              </p>
+            )}
+            {previa.cargos_nuevos.length > 0 && (
+              <p className="importar-aviso">
+                Cargos nuevos: {previa.cargos_nuevos.join(", ")}. Revisa sus
+                nombres y usa «Proponer funciones».
+              </p>
+            )}
+            {previa.excede_techo && previa.metas && (
+              <p className="importar-aviso">
+                Las metas suman {previa.metas.reales} y el techo del día es{" "}
+                {previa.metas.techo}: antes de programar, sube el techo o baja
+                metas.
+              </p>
+            )}
+            {previa.columnas_desconocidas.length > 0 && (
+              <p className="importar-aviso">
+                Columnas que no se usan:{" "}
+                {previa.columnas_desconocidas.join(", ")}.
+              </p>
+            )}
+            {previa.error_general && (
+              <p className="importar-error">{previa.error_general}</p>
+            )}
+            <ul className="importar-filas">
+              {previa.filas.map((f) => (
+                <li
+                  key={f.fila}
+                  className={f.errores.length ? "con-error" : ""}
+                >
+                  <span className="importar-fila-cabeza">
+                    <span>
+                      <b>{f.cliente || "Sin nombre"}</b> ·{" "}
+                      {f.cargo || "Sin cargo"}
+                    </span>
+                    <small>
+                      Fila {f.fila}
+                      {f.vive_en ? " · " + nombrePais(f.vive_en) : ""}
+                      {f.modalidades.length
+                        ? " · " +
+                          f.modalidades
+                            .map((m) => modos[m as keyof typeof modos] || m)
+                            .join(", ")
+                        : ""}
+                      {f.meta != null ? ` · meta ${f.meta}` : ""}
+                    </small>
+                  </span>
+                  {f.errores.map((e, i) => (
+                    <span key={"e" + i} className="importar-error">
+                      {e}
+                    </span>
+                  ))}
+                  {f.avisos.map((a, i) => (
+                    <span key={"a" + i} className="importar-nota">
+                      {a}
+                    </span>
+                  ))}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
+      <div className="dialog-actions">
+        <button type="button" className="button secondary" onClick={onClose}>
+          Cancelar
+        </button>
+        <button
+          type="button"
+          className="button primary"
+          disabled={!listo || ocupado}
+          onClick={importar}
+        >
+          <Upload size={16} />
+          {ocupado
+            ? "Importando…"
+            : previa
+              ? `Importar ${previa.clientes} ${previa.clientes === 1 ? "cliente" : "clientes"}`
+              : "Importar"}
+        </button>
+      </div>
+    </Dialog>
+  );
+}
+
+// «Eliminar definitivamente» un cliente archivado (15 nov): pide escribir BORRAR.
+function BorrarClienteDialog({
+  cliente,
+  revision,
+  dirty,
+  notify,
+  onListo,
+  onClose,
+}: {
+  cliente: Cliente;
+  revision: number;
+  dirty: boolean;
+  notify: (s: string, error?: boolean) => void;
+  onListo: (estado: EstadoConfig) => void;
+  onClose: () => void;
+}) {
+  const [texto, setTexto] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+  return (
+    <Dialog titulo={`Eliminar «${cliente.nombre}»`} onClose={onClose}>
+      <p className="dialog-copy">
+        Se quita de la configuración junto con sus perfiles, su WhatsApp y sus
+        mensajes preparados. No se puede deshacer. Las vacantes que ya recibió y
+        las versiones ya programadas se conservan en el historial.
+      </p>
+      {dirty && (
+        <p className="importar-error" role="alert">
+          Tienes cambios sin guardar. Guárdalos antes de eliminar.
+        </p>
+      )}
+      <div className="field">
+        <label htmlFor="borrar-confirmar">Escribe BORRAR para confirmar</label>
+        <input
+          id="borrar-confirmar"
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          autoComplete="off"
+        />
+      </div>
+      <div className="dialog-actions">
+        <button type="button" className="button secondary" onClick={onClose}>
+          Cancelar
+        </button>
+        <button
+          type="button"
+          className="button danger-button"
+          disabled={dirty || ocupado || texto.trim().toUpperCase() !== "BORRAR"}
+          onClick={async () => {
+            setOcupado(true);
+            try {
+              const r = await api<{ estado: EstadoConfig }>(
+                `/clientes/${cliente.id}/borrar`,
+                {
+                  method: "POST",
+                  body: JSON.stringify({ revision, confirmacion: texto }),
+                },
+              );
+              onListo(r.estado);
+              notify(`«${cliente.nombre}» se eliminó definitivamente.`);
+            } catch (e) {
+              notify((e as Error).message, true);
+            } finally {
+              setOcupado(false);
+            }
+          }}
+        >
+          Eliminar definitivamente
+        </button>
+      </div>
+    </Dialog>
+  );
+}
+
 function App() {
   const [sesion, setSesion] = useState<Sesion | null>(null),
     [estado, setEstado] = useState<EstadoConfig | null>(null),
@@ -3671,6 +4021,16 @@ function App() {
   const [pendientes, setPendientes] = useState<Revision[]>([]);
   const [porCliente, setPorCliente] = useState<ResumenClientes | null>(null);
   const [detalle, setDetalle] = useState("");
+  const [importando, setImportando] = useState(false);
+  const [aBorrar, setABorrar] = useState<Cliente | null>(null);
+  function recibirEstado(e: EstadoConfig) {
+    setEstado(e);
+    setDraft(e.borrador);
+    setDirty(false);
+    setImportando(false);
+    setABorrar(null);
+    setSelectedClient(e.borrador.clientes.find((x) => x.activo)?.id || "");
+  }
   const [borradoresHoy, setBorradoresHoy] = useState<Borrador[] | null>(null);
   const previaCargos = useVistaPrevia(
     tab === "Cargos y metas" && sesion?.sesion ? draft : null,
@@ -4234,6 +4594,13 @@ function App() {
                   />
                 </div>
                 <button
+                  className="button secondary"
+                  onClick={() => setImportando(true)}
+                >
+                  <Upload size={16} />
+                  Importar clientes
+                </button>
+                <button
                   className="button primary"
                   onClick={() => {
                     setEditCliente(null);
@@ -4244,6 +4611,25 @@ function App() {
                   Nuevo cliente
                 </button>
               </div>
+              {importando && (
+                <ImportarClientes
+                  revision={estado?.revision ?? 0}
+                  dirty={dirty}
+                  notify={notify}
+                  onListo={recibirEstado}
+                  onClose={() => setImportando(false)}
+                />
+              )}
+              {aBorrar && (
+                <BorrarClienteDialog
+                  cliente={aBorrar}
+                  revision={estado?.revision ?? 0}
+                  dirty={dirty}
+                  notify={notify}
+                  onListo={recibirEstado}
+                  onClose={() => setABorrar(null)}
+                />
+              )}
               <div className="client-grid">
                 {clientes
                   .filter((c) =>
@@ -4315,6 +4701,12 @@ function App() {
                           }
                         >
                           Reactivar
+                        </button>
+                        <button
+                          className="text-button peligro"
+                          onClick={() => setABorrar(c)}
+                        >
+                          Eliminar definitivamente
                         </button>
                       </div>
                     ))}

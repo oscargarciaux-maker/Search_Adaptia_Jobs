@@ -98,7 +98,24 @@ def main():
                 raise AssertionError("Se programó una suma mayor que el techo")
             except psycopg.errors.RaiseException:
                 pass
-        print("Panel SQL: RLS, acceso exclusivo de servicio, techo diario, revisión concurrente, vigencia siguiente e historial protegido: aprobados.")
+            # Importar clientes (15 nov): el borrador resultante de «borrar del todo» lo acepta el SQL real y se programa.
+            from panel import importar
+            r, actual = c.execute("select revision, borrador from public.panel_configuracion").fetchone()
+            previa = importar.previa(actual, "nombre;cargo;vive_en;meta_diaria\nPersona A;Cargo importado;Chile;8\n"
+                                     "Persona B;QA;España;5\n", "borrar")
+            assert previa["errores"] == 0, previa
+            assert c.execute("select public.panel_guardar(%s,%s::jsonb)",
+                             (r, json.dumps(previa["configuracion"]))).fetchone()[0]["revision"] == r + 1
+            assert c.execute("select public.panel_publicar(%s)", (r + 1,)).fetchone()[0]["revision"] == r + 1
+            nombres = c.execute("select array_agg(x->>'nombre' order by x->>'nombre') from public.panel_configuracion, "
+                                "jsonb_array_elements(borrador->'clientes') x").fetchone()[0]
+            assert nombres == ["Persona A", "Persona B"], nombres
+            viejo = cfg["clientes"][0]["id"]
+            c.execute("insert into public.panel_contactos(cliente_id, telefono) values (%s, '+573000000000')", (viejo,))
+            c.execute("delete from public.panel_contactos where cliente_id=%s", (viejo,))
+            assert not c.execute("select 1 from public.panel_contactos where cliente_id=%s", (viejo,)).fetchone()
+        print("Panel SQL: RLS, acceso exclusivo de servicio, techo diario, revisión concurrente, vigencia siguiente, "
+              "historial protegido e importación de clientes: aprobados.")
     finally:
         with conectar() as c:
             c.execute(sql.SQL("drop database {}").format(sql.Identifier(nombre)))

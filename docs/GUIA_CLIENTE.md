@@ -28,6 +28,14 @@ anterior y lo dicen. Al pulsar un cliente se abre su detalle: sus últimos 7 dí
 cargo, «Ver sus vacantes», «Descargar su CSV de hoy» y sus «por confirmar» para decidir ahí mismo («Sí, sirve» usa el
 país sugerido; si no hay sugerencia, «Elegir país en Por confirmar»).
 
+**Importar clientes.** En «Clientes», «Importar clientes» sube un CSV con una fila por perfil (hay una plantilla con
+todas las columnas). Antes de guardar muestra una vista previa con los errores de cada fila; nada se guarda hasta
+pulsar «Importar». Se elige qué hacer con los clientes que ya están: mantenerlos, archivarlos o borrarlos del todo
+(escribiendo BORRAR). Los clientes importados quedan igual que si se hubieran creado a mano: se editan, se archivan y
+reciben vacantes desde la búsqueda siguiente a «Programar para mañana». Un cliente archivado también se puede
+«Eliminar definitivamente». Borrar quita al cliente, sus perfiles, su WhatsApp y sus mensajes preparados; las
+vacantes que ya recibió y las versiones ya programadas se conservan en el historial.
+
 **Modo oscuro.** El panel sigue el modo claro u oscuro del computador. El botón con el sol o la luna (arriba a la
 derecha, en todas las secciones) lo fija y queda recordado en ese navegador. Si Adaptia integra el panel, puede abrirlo
 directamente en un modo con `?tema=oscuro` o `?tema=claro` al final de la dirección; eso no cambia lo que cada persona

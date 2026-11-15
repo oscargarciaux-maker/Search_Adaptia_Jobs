@@ -241,3 +241,26 @@ export type ResumenClientes = {
   busqueda_de_hoy: boolean;
   dias: { fecha: string; estado: string; clientes: Record<string, number> }[];
 };
+// Importar clientes desde un CSV (15 nov): la vista previa que devuelve el servidor (no guarda nada).
+export type PreviaImportacion = {
+  filas: {
+    fila: number;
+    cliente: string;
+    cargo: string;
+    vive_en: string;
+    modalidades: string[];
+    meta: number | null;
+    errores: string[];
+    avisos: string[];
+  }[];
+  errores: number;
+  error_general: string;
+  columnas_desconocidas: string[];
+  clientes: number;
+  perfiles: number;
+  cargos_nuevos: string[];
+  borrar: string[];
+  archivar: string[];
+  metas: { techo: number; reales: number } | null;
+  excede_techo: boolean;
+};

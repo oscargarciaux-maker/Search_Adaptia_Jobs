@@ -467,6 +467,19 @@ class SubirRevision(Modelo):
     contenido: str = Field(min_length=1, max_length=2_000_000)
 
 
+class ImportarClientes(Modelo):
+    """Importar clientes desde un CSV (15 nov): el archivo y qué hacer con los clientes actuales."""
+    contenido: str = Field(min_length=1, max_length=2_000_000)
+    actuales: Literal["mantener", "archivar", "borrar"] = "mantener"
+    revision: int | None = Field(default=None, ge=0)
+    confirmacion: str = Field(default="", max_length=20)
+
+
+class BorrarCliente(Modelo):
+    revision: int = Field(ge=0)
+    confirmacion: str = Field(max_length=20)
+
+
 class EstadoRegla(Modelo):
     texto: str = Field(min_length=2, max_length=300)
     activa: bool

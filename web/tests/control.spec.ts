@@ -1002,3 +1002,100 @@ test("paso 9: modo oscuro con botón, recordado, por la dirección o por el sist
   await page.goto("/?tema=claro");
   await expect(html).toHaveAttribute("data-tema", "claro");
 });
+
+// Va al final: reemplaza a los clientes de la demostración.
+test("importar clientes: vista previa con errores, borrar los actuales y programar con los nuevos", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.goto("/#clientes");
+  await page.getByRole("button", { name: "Importar clientes" }).click();
+  const dialogo = page.locator("dialog[open]");
+  await expect(
+    dialogo.getByRole("link", { name: "Descargar plantilla" }),
+  ).toHaveAttribute("href", "/api/clientes/plantilla.csv");
+  const subir = (texto: string) =>
+    dialogo.getByLabel("Archivo CSV").setInputFiles({
+      name: "clientes.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(texto),
+    });
+  await subir(
+    "nombre;cargo;vive_en;modalidades\n" +
+      "Persona Uno;Product Designer;Colombia;remoto\n" +
+      "Persona Dos;Cargo Importado;Narnia;remoto\n",
+  );
+  await expect(
+    dialogo.getByText("no reconozco el país «Narnia»"),
+  ).toBeVisible();
+  await expect(
+    dialogo.getByRole("button", { name: /^Importar 2 clientes/ }),
+  ).toBeDisabled();
+
+  await subir(
+    "nombre;cargo;vive_en;modalidades;whatsapp;acepto_whatsapp\n" +
+      "Persona Uno;Product Designer;Colombia;remoto|híbrido;+57 300 111 2222;sí\n" +
+      "Persona Dos;Cargo Importado;México;remoto;;\n" +
+      "Persona Tres;QA;España;presencial;;\n",
+  );
+  await expect(dialogo.getByText("3 clientes con 3 perfiles")).toBeVisible();
+  await expect(
+    dialogo.getByText(/Cargos nuevos: Cargo Importado/),
+  ).toBeVisible();
+  await dialogo.getByLabel("Borrarlos del todo").check();
+  await expect(
+    dialogo.getByText(/Se borrarán del todo: Cliente de ejemplo/),
+  ).toBeVisible();
+  const importar = dialogo.getByRole("button", { name: "Importar 3 clientes" });
+  await expect(importar).toBeDisabled(); // falta escribir BORRAR
+  expect(await page.evaluate(revisarContraste)).toEqual([]);
+  await dialogo.getByLabel("Escribe BORRAR para confirmar").fill("BORRAR");
+  await importar.click();
+  await expect(
+    page.getByText(/3 clientes importados, \d+ borrados/),
+  ).toBeVisible();
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  await expect(page.getByText("Cliente de ejemplo 01")).toHaveCount(0);
+  for (const n of ["Persona Uno", "Persona Dos", "Persona Tres"])
+    await expect(page.getByRole("heading", { name: n })).toBeVisible();
+
+  // Quedan guardados de verdad: al recargar siguen ahí y se pueden programar.
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Persona Uno" }),
+  ).toBeVisible();
+  await page.goto("/");
+  const lista = page.getByRole("list", { name: "Clientes y su avance" });
+  await expect(lista.getByRole("button")).toHaveCount(3);
+  await page
+    .getByRole("button", { name: "Programar para mañana", exact: true })
+    .click();
+  await page
+    .locator("dialog[open]")
+    .getByRole("button", { name: "Confirmar configuración" })
+    .click();
+  await expect(page.locator(".flow-pill")).toHaveText(/Programado desde el/);
+
+  // Eliminar definitivamente un cliente archivado.
+  await page.goto("/#clientes");
+  await page.getByRole("button", { name: /^Archivar Persona Tres/ }).click();
+  await page
+    .locator("dialog[open]")
+    .getByRole("button", { name: /Archivar/ })
+    .last()
+    .click();
+  await page.getByRole("button", { name: "Guardar borrador" }).click();
+  await page.getByRole("button", { name: /Ver archivados/ }).click();
+  await page.getByRole("button", { name: "Eliminar definitivamente" }).click();
+  const borrar = page.locator("dialog[open]");
+  await borrar.getByLabel("Escribe BORRAR para confirmar").fill("BORRAR");
+  await borrar
+    .getByRole("button", { name: "Eliminar definitivamente" })
+    .click();
+  await expect(
+    page.getByText("«Persona Tres» se eliminó definitivamente."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Ver archivados/ }),
+  ).toHaveCount(0);
+});

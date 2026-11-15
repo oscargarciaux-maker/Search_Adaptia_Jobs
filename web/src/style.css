@@ -48,6 +48,7 @@
   --osc-line-verde: #2f4a3e;
   --osc-line-ambar: #6b5427;
   --osc-line-azul: #34506b;
+  --osc-line-rojo: #6a3439;
   --osc-text-neutro-fuerte: #eef3ef;
   --osc-text-neutro-medio: #b9c5bd;
   --osc-text-verde-fuerte: #e3efe8;
@@ -83,6 +84,7 @@
     --osc-line-verde: #2f4a3e;
     --osc-line-ambar: #6b5427;
     --osc-line-azul: #34506b;
+    --osc-line-rojo: #6a3439;
     --osc-text-neutro-fuerte: #eef3ef;
     --osc-text-neutro-medio: #b9c5bd;
     --osc-text-verde-fuerte: #e3efe8;
@@ -3740,4 +3742,90 @@ select.margen {
 .heading-actions .boton-tema {
   flex: 0 0 44px;
   width: 44px;
+}
+
+/* Importar clientes y eliminar definitivamente (15 nov). */
+.archived .plegable-contenido > div {
+  align-items: center;
+  gap: 12px;
+}
+.archived .plegable-contenido > div > .text-button:first-of-type {
+  margin-left: auto;
+}
+.text-button.peligro {
+  color: var(--osc-text-rojo-medio, #a3372f);
+}
+.importar {
+  display: grid;
+  gap: 14px;
+}
+.importar-actuales {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.importar-actuales legend {
+  font-weight: 650;
+  padding: 0 4px;
+}
+.importar-actuales > label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+.importar-borrar {
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--osc-bg-rojo-2, #fbefee);
+  display: grid;
+  gap: 8px;
+}
+.importar-borrar p {
+  margin: 0;
+  color: var(--osc-text-rojo-medio, #8a2f28);
+}
+.importar-error {
+  margin: 0;
+  color: var(--osc-text-rojo-medio, #a3372f);
+  font-size: 12px;
+}
+.importar-aviso,
+.importar-resumen {
+  margin: 0;
+  font-size: 13px;
+}
+.importar-aviso {
+  color: var(--osc-text-ambar-fuerte, #6b4a00);
+}
+.importar-filas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+}
+.importar-filas > li {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 3px;
+}
+.importar-filas > li.con-error {
+  border-color: var(--osc-line-rojo, #e2b3ae);
+}
+.importar-fila-cabeza {
+  display: grid;
+  gap: 2px;
+}
+.importar-fila-cabeza small,
+.importar-nota {
+  font-size: 12px;
+  color: var(--osc-text-neutro-medio, #5f6b62);
 }
