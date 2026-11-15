@@ -471,6 +471,34 @@ function CargoDialog({
       setBusy(false);
     }
   }
+  // Contrato v25: proponer la huella de funciones con el catálogo (sin IA).
+  const [proponiendo, setProponiendo] = useState(false);
+  async function proponerFunciones() {
+    setProponiendo(true);
+    try {
+      const r = await api<{ funciones: string[]; motivo: string }>(
+        "/cargos/funciones",
+        { method: "POST", body: JSON.stringify(c) },
+      );
+      if (r.funciones.length)
+        setC((v) => ({
+          ...v,
+          funciones: Array.from(
+            new Set([...(v.funciones || []), ...r.funciones]),
+          ),
+        }));
+      notify(
+        r.funciones.length
+          ? `Se propusieron ${r.funciones.length} funciones. Revisa y quita las que no correspondan.`
+          : r.motivo,
+        !r.funciones.length,
+      );
+    } catch (e) {
+      notify((e as Error).message, true);
+    } finally {
+      setProponiendo(false);
+    }
+  }
   return (
     <Dialog
       titulo={cargo ? "Editar cargo" : "Añadir un cargo"}
@@ -559,6 +587,29 @@ function CargoDialog({
             values={c.terminos_excluidos}
             onChange={(v) => setC({ ...c, terminos_excluidos: v })}
           />
+          <TagInput
+            label="Funciones del cargo"
+            values={c.funciones || []}
+            onChange={(v) => setC({ ...c, funciones: v })}
+          />
+          <div className="funciones-acciones">
+            <button
+              type="button"
+              className="button secondary small"
+              disabled={proponiendo || c.nombre.trim().length < 2}
+              onClick={proponerFunciones}
+            >
+              <Sparkles size={15} />
+              {proponiendo ? "Buscando…" : "Proponer funciones"}
+            </button>
+            <Ayuda etiqueta="Funciones del cargo">
+              Tareas y herramientas típicas del cargo. Si una vacante tiene otro
+              título pero su descripción menciona varias de estas funciones,
+              llega a «Por confirmar» como «Coincide por funciones». Se proponen
+              comparando las vacantes del cargo con las de otros cargos; revisa
+              y ajusta la lista.
+            </Ayuda>
+          </div>
           <p className="helper">
             No dependes de un listado cerrado. Puedes crear cualquier cargo y
             revisar sus términos sin modificar código.
@@ -1043,7 +1094,7 @@ function PorConfirmar({
     const mas = extras[r.vacante_id] || [];
     if (decision === "sirve" && !codigos?.length && mas.length)
       codigos = [...(pais ? [pais] : []), ...mas];
-    if (decision === "sirve" && !pais && !codigos?.length) {
+    if (decision === "sirve" && !pais && !codigos?.length && !r.funciones) {
       notify("Elige el país antes de confirmar.", true);
       return;
     }
@@ -1056,7 +1107,13 @@ function PorConfirmar({
           body: JSON.stringify({
             decision,
             paises:
-              decision === "sirve" ? (codigos?.length ? codigos : [pais]) : [],
+              decision === "sirve" && r.funciones
+                ? []
+                : decision === "sirve"
+                  ? codigos?.length
+                    ? codigos
+                    : [pais]
+                  : [],
             aplicar_a_iguales: Boolean(iguales[r.vacante_id]),
           }),
         },
@@ -1341,42 +1398,58 @@ function PorConfirmar({
             <p className="helper">
               Le serviría a: {r.clientes.join(", ") || "—"}
             </p>
+            {r.funciones && (
+              <p className="revision-funciones">
+                <span className="pill">Coincide por funciones</span> El título
+                es otro, pero la descripción coincide con las funciones del
+                cargo. Si sirve, desde mañana este título entra solo.
+              </p>
+            )}
             <div className="revision-acciones">
-              <label className="revision-pais">
-                País
-                <select
-                  aria-label={`País de ${r.titulo} en ${r.empresa}`}
-                  value={pais}
-                  onChange={(e) =>
-                    setElegido({ ...elegido, [r.vacante_id]: e.target.value })
-                  }
-                >
-                  <option value="">Elige…</option>
-                  <optgroup label="Regiones">
-                    {REGIONES.map((g) => (
-                      <option key={g.codigo} value={g.codigo}>
-                        {g.nombre}
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Países">
-                    {paises.map((p) => (
-                      <option key={p.codigo} value={p.codigo}>
-                        {p.nombre}
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
-              </label>
-              <div className="revision-extras">
-                <SelectorPaises
-                  etiqueta={`Otras etiquetas de ${r.titulo}`}
-                  valores={extras[r.vacante_id] || []}
-                  onChange={(v) => setExtras({ ...extras, [r.vacante_id]: v })}
-                  excluir={[pais]}
-                  extra={REGIONES}
-                />
-              </div>
+              {!r.funciones && (
+                <>
+                  <label className="revision-pais">
+                    País
+                    <select
+                      aria-label={`País de ${r.titulo} en ${r.empresa}`}
+                      value={pais}
+                      onChange={(e) =>
+                        setElegido({
+                          ...elegido,
+                          [r.vacante_id]: e.target.value,
+                        })
+                      }
+                    >
+                      <option value="">Elige…</option>
+                      <optgroup label="Regiones">
+                        {REGIONES.map((g) => (
+                          <option key={g.codigo} value={g.codigo}>
+                            {g.nombre}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Países">
+                        {paises.map((p) => (
+                          <option key={p.codigo} value={p.codigo}>
+                            {p.nombre}
+                          </option>
+                        ))}
+                      </optgroup>
+                    </select>
+                  </label>
+                  <div className="revision-extras">
+                    <SelectorPaises
+                      etiqueta={`Otras etiquetas de ${r.titulo}`}
+                      valores={extras[r.vacante_id] || []}
+                      onChange={(v) =>
+                        setExtras({ ...extras, [r.vacante_id]: v })
+                      }
+                      excluir={[pais]}
+                      extra={REGIONES}
+                    />
+                  </div>
+                </>
+              )}
               <button
                 type="button"
                 className={r.sugerida ? "button secondary" : "button primary"}
@@ -1386,14 +1459,16 @@ function PorConfirmar({
                 <Check size={15} />
                 {pais ? `Sirve para ${nombre(pais)}` : "Sirve"}
               </button>
-              <button
-                type="button"
-                className="button secondary"
-                disabled={ocupado === r.vacante_id}
-                onClick={() => decidir(r, "otro_pais")}
-              >
-                Solo para otro país
-              </button>
+              {!r.funciones && (
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={ocupado === r.vacante_id}
+                  onClick={() => decidir(r, "otro_pais")}
+                >
+                  Solo para otro país
+                </button>
+              )}
               <button
                 type="button"
                 className="button secondary"

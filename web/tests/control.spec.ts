@@ -366,9 +366,9 @@ test("bandeja Por confirmar: un clic confirma, atajo 4 aparta y el contador baja
   const errores: string[] = [];
   page.on("pageerror", (e) => errores.push(e.message));
   await page.goto("/");
-  await expect(tarjeta(page, "Por confirmar")).toContainText("3");
+  await expect(tarjeta(page, "Por confirmar")).toContainText("4"); // 3 de ubicación + 1 por funciones (v25)
   await ir(page, "Por confirmar");
-  await expect(page.locator(".revision")).toHaveCount(3);
+  await expect(page.locator(".revision")).toHaveCount(4);
   const primera = page.locator(".revision").first();
   await expect(primera.locator(".revision-pista")).toBeVisible();
   // Ampliación v17: cada tarjeta trae la respuesta sugerida y por qué; Enter la acepta.
@@ -383,12 +383,12 @@ test("bandeja Por confirmar: un clic confirma, atajo 4 aparta y el contador baja
   await expect(
     page.getByText(/Confirmada: se asignó a \d+ cliente/),
   ).toBeVisible();
-  await expect(page.locator(".revision")).toHaveCount(2);
+  await expect(page.locator(".revision")).toHaveCount(3);
   const otra = page.locator(".revision").first();
   await otra.focus();
   await page.keyboard.press("4");
   await expect(page.getByText("Apartada por ahora.")).toBeVisible();
-  await expect(page.locator(".revision")).toHaveCount(1);
+  await expect(page.locator(".revision")).toHaveCount(2);
   const pequenos = await page.evaluate(
     () =>
       [...document.querySelectorAll("main *")].filter(
@@ -411,7 +411,7 @@ test("bandeja Por confirmar: un clic confirma, atajo 4 aparta y el contador baja
   });
   // Al volver, la tarjeta del resumen muestra el contador al día.
   await page.getByRole("button", { name: "Volver al resumen" }).click();
-  await expect(tarjeta(page, "Por confirmar")).toContainText("1");
+  await expect(tarjeta(page, "Por confirmar")).toContainText("2");
   expect(errores).toEqual([]);
 });
 
@@ -741,4 +741,30 @@ test("contrato v23: residencia en el mundo, permiso de trabajo, horario y ciudad
   expect(perfil.ciudades).toEqual(["Berlín"]);
   expect(perfil.puede_trabajar_en).toEqual(["US"]);
   expect(perfil.acepta_horario).toEqual(["us_este"]);
+});
+
+test("contrato v25: proponer funciones y confirmar una vacante que coincide por funciones", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await ir(page, "Cargos y metas");
+  await page
+    .getByRole("button", { name: /^Editar Product Designer/ })
+    .first()
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Proponer funciones" }).click();
+  await expect(page.getByText(/Se propusieron \d+ funciones/)).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Quitar user research" }),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancelar" }).click();
+  await ir(page, "Por confirmar");
+  const tarjeta = page.locator("article", { hasText: "Experience Lead" });
+  await expect(tarjeta.getByText("Coincide por funciones")).toBeVisible();
+  await expect(tarjeta.getByText("Solo para otro país")).toHaveCount(0);
+  await tarjeta.getByRole("button", { name: /^Sirve/ }).click();
+  await expect(
+    page.getByText(/Confirmada: se asignó a 1 cliente/),
+  ).toBeVisible();
 });

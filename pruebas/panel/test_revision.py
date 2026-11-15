@@ -127,13 +127,13 @@ def test_api_de_la_bandeja_en_demostracion():
     api = TestClient(crear_app(demo=True, repositorio=RepositorioDemo()))
     h = {"origin": "http://testserver"}
     datos = api.get("/api/revisiones").json()
-    assert datos["total"] == 3 and datos["ayudan_faltantes"] == 2
+    assert datos["total"] == 4 and datos["ayudan_faltantes"] == 3  # contrato v25: más una por funciones
     primera = datos["pendientes"][0]
     assert primera["pista"] and primera["clientes"]
     assert api.post(f"/api/revisiones/{primera['vacante_id']}", json={"decision": "otra"}, headers=h).status_code == 422
     ok = api.post(f"/api/revisiones/{primera['vacante_id']}", json={"decision": "sirve", "paises": ["CO"]}, headers=h)
     assert ok.status_code == 200 and ok.json()["asignadas"] >= 1
-    assert api.get("/api/revisiones").json()["total"] == 2
+    assert api.get("/api/revisiones").json()["total"] == 3
     sin_origen = api.post("/api/revisiones/rev-demo-1", json={"decision": "saltar"})
     assert sin_origen.status_code in (401, 403)
 
@@ -210,7 +210,7 @@ def test_api_cargar_todas_en_demostracion():
         if estado["estado"] != "en_curso":
             break
         time.sleep(0.05)
-    assert estado["estado"] == "listo" and estado["resultado"]["por_confirmar"] == 3  # la demostración conserva su bandeja
+    assert estado["estado"] == "listo" and estado["resultado"]["por_confirmar"] == 4  # la demostración conserva su bandeja (3 de ubicación + 1 por funciones)
     assert api.post("/api/revisiones/cargar").status_code in (401, 403)
 
 
@@ -437,3 +437,62 @@ def test_sesion_trae_todos_los_paises():
     api = TestClient(crear_app(demo=True, repositorio=RepositorioDemo()))
     mundo = api.get("/api/session").json()["paises_mundo"]
     assert len(mundo) > 240 and {"codigo": "DE", "nombre": "Alemania"} in mundo
+
+
+# ── Contrato v25: «Coincide por funciones» ────────────────────────────────────────────────────────────────────────
+
+def test_funciones_sirve_sin_pais_asigna_y_aprende_el_titulo():
+    r = RepositorioDemo()
+    listado = revision.listar(r, hoy())["pendientes"]
+    f = next(x for x in listado if x["vacante_id"] == "rev-demo-funciones")
+    assert f["funciones"] and f["sugerida"] == "sirve"
+    resultado = revision.decidir(r, "rev-demo-funciones", "sirve")  # sin elegir país
+    assert resultado["asignadas"] == 1
+    cargo_id = configuracion_demo()["cargos"][0]["id"]
+    assert r.ajuste("titulos_aprendidos", {})[cargo_id] == ["Experience Lead"]
+
+
+def test_funciones_no_sirve_no_archiva_la_vacante():
+    r = RepositorioDemo()
+    archivadas = []
+    r.archivar_catalogo = lambda vid, razon: archivadas.append(vid)
+    revision.decidir(r, "rev-demo-funciones", "no_sirve")
+    assert archivadas == [] and r.revisiones(vacante_id="rev-demo-funciones")[0]["estado"] == "descartada"
+
+
+def test_titulos_aprendidos_entran_como_similares():
+    from panel import ejecutor
+    cfg = configuracion_demo()
+    cargo_id = cfg["cargos"][0]["id"]
+    mapa, _, _ = ejecutor.preparar({"configuracion": cfg}, hoy(), {cargo_id: ["Experience Lead"]})
+    fam = next(m for m in mapa if m["id"] == "cargo:" + cargo_id)
+    assert "Experience Lead" in fam["similares"]
+    with ejecutor.activar({"configuracion": cfg}, hoy(), {cargo_id: ["Experience Lead"]}):
+        from buscador import familias
+        assert familias.clasificar("Experience Lead")[0] == {"familia": "cargo:" + cargo_id, "coincidencia": "similar"}
+
+
+def test_preparar_cola_agrega_las_de_funciones_solo_para_perfiles_compatibles():
+    from panel.modelos import Configuracion
+    cfg_dict = configuracion_demo()
+    cfg_dict["cargos"][0]["funciones"] = ["user research", "wireframes", "figma", "design system"]
+    cfg = Configuracion.model_validate(cfg_dict)
+    rid = "cargo:" + cfg_dict["cargos"][0]["id"]
+    texto = "Tareas: user research, wireframes, Figma y design system. " * 6
+
+    def fila(vid, paises):
+        return {"id": vid, "description_full": texto,
+                "datos": {"id": vid, "titulo": "Experience Lead", "empresa": "Nexo", "ubicacion": "Remote",
+                          "paises": paises, "paises_mundo": paises, "confianza_pais": "alta", "modalidad": "remoto",
+                          "idioma": "en", "fecha_publicacion": hoy(), "anos_min": 2, "ingles": "intermedio",
+                          "familias": [{"familia": rid, "coincidencia": "funciones"}]}}
+
+    class R(RepositorioDemo):
+        def candidatas_por_funciones(self, desde=None):
+            return [fila("f-co", ["CO"]), fila("f-br", ["BR"])]  # la segunda no sirve a nadie (país)
+    r = R()
+    revision.preparar_cola(r, cfg, hoy(), {})
+    nuevas = {x["vacante_id"]: x for x in r.revisiones() if x["vacante_id"].startswith("f-")}
+    assert set(nuevas) == {"f-co"} and nuevas["f-co"]["motivo"] == revision.FUNCIONES
+    assert "user research" in nuevas["f-co"]["pista"]
+    assert {p["cargo_id"] for p in nuevas["f-co"]["perfiles"]} == {cfg_dict["cargos"][0]["id"]}

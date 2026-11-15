@@ -52,8 +52,9 @@ def objetivo_mundo(cfg):
     return sorted(salida), acepta
 
 
-def preparar(version, fecha):
+def preparar(version, fecha, aprendidos=None):
     cfg = validar_version(version)
+    aprendidos = aprendidos or {}
     mapa, roles = [], []
     nombres = {**{p["codigo"]: p["nombre"] for p in paises.mundo()["lista"]},
                **{p["codigo"]: p["nombre"] for p in paises.datos()["paises"]}}
@@ -71,8 +72,12 @@ def preparar(version, fecha):
         for p in perfiles:
             lugares.update(lugares_perfil(p, nombres))
         rid = "cargo:" + str(c.id)
+        # Contrato v25: títulos aprobados desde «Coincide por funciones» cuentan como similares del cargo.
+        similares = list(dict.fromkeys(raw["terminos_similares"] + list(aprendidos.get(str(c.id)) or [])))
+        raw["terminos_similares"] = similares
         mapa.append({"id": rid, "nombre": c.nombre, "consultas": [c.nombre, *raw["terminos_exactos"], *raw["terminos_similares"]],
-            "exactos": raw["terminos_exactos"], "similares": raw["terminos_similares"], "cercanos": raw.get("terminos_cercanos", []),
+            "exactos": raw["terminos_exactos"], "similares": similares, "cercanos": raw.get("terminos_cercanos", []),
+            "funciones": raw.get("funciones", []),
             "excluir": raw["terminos_excluidos"], "herramientas": [], "lugares": list(lugares.items()),
             "_control_cargo": raw,
             "paises_objetivo": sorted({x for p in perfiles for x in p.paises_oficina}),
@@ -96,8 +101,8 @@ def preparar(version, fecha):
 
 
 @contextmanager
-def activar(version, fecha):
-    mapa, cfg, motor = preparar(version, fecha)
+def activar(version, fecha, aprendidos=None):
+    mapa, cfg, motor = preparar(version, fecha, aprendidos)
     from buscador import contrato
     anterior_e, anterior_b, anterior_c = entrega._config_operativa, bodega._config_operativa, contrato._PANEL
     familias.configurar(mapa)
@@ -329,7 +334,13 @@ def correr(salida, modo="diario", prueba=False, repo=None):
         except Exception:  # noqa: BLE001 — sin reglas la búsqueda sigue igual que antes
             paises.cargar_reglas()
     try:
-        with activar(version, fecha):
+        aprendidos = {}
+        if hasattr(repo, "ajuste"):
+            try:  # contrato v25: títulos aprendidos en la bandeja
+                aprendidos = repo.ajuste("titulos_aprendidos", {}) or {}
+            except Exception:  # noqa: BLE001 — sin ellos la búsqueda sigue igual
+                aprendidos = {}
+        with activar(version, fecha, aprendidos):
             if hasattr(repo, "decisiones_ubicacion"):
                 try:  # contrato v17: cada decisión de la bandeja vale en esta búsqueda
                     from panel.revision import decisiones_para_busqueda

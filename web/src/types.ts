@@ -13,6 +13,7 @@ export type Cargo = {
   terminos_similares: string[];
   terminos_excluidos: string[];
   terminos_cercanos?: string[];
+  funciones?: string[];
 };
 export type Perfil = {
   id: string;
@@ -214,6 +215,8 @@ export type Revision = {
   clientes: string[];
   ayuda_faltantes: boolean;
   iguales: number;
+  motivo?: string;
+  funciones?: boolean;
 };
 export type Revisiones = {
   pendientes: Revision[];

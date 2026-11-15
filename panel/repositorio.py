@@ -126,6 +126,25 @@ class RepositorioSupabase:
     # a Supabase, y la consulta devolvía 0 aunque el catálogo tenía cientos de dudosas (13 nov).
     RAZON_POR_CONFIRMAR = "like.elegibilidad*regional*por*confirmar"
 
+    def descripciones(self, ids):
+        """Contrato v25: {id: descripción completa} del catálogo, por grupos de 100."""
+        salida = {}
+        ids = list(ids)
+        for inicio in range(0, len(ids), 100):
+            grupo = ",".join(ids[inicio:inicio + 100])
+            for r in self.pedir("GET", "catalogo_vacantes", params={"id": f"in.({grupo})",
+                                                                   "select": "id,description_full"}) or []:
+                salida[r["id"]] = r.get("description_full") or ""
+        return salida
+
+    def candidatas_por_funciones(self, desde=None):
+        """Contrato v25: vacantes activas que coinciden con un cargo solo por funciones."""
+        params = {"status": "eq.active", "datos->familias": 'cs.[{"coincidencia":"funciones"}]',
+                  "select": "id,datos,description_full"}
+        if desde:
+            params["observed_at"] = "gte." + desde
+        return self._paginas("catalogo_vacantes", "id", params, 500)
+
     def candidatas_por_confirmar(self, desde=None):
         params = {"reason": self.RAZON_POR_CONFIRMAR, "select": "id,datos,description_full"}
         if desde:
@@ -492,6 +511,24 @@ class RepositorioDemo:
                                                     "reason": "elegibilidad regional por confirmar",
                                                     "description_full": frase + " " + ("We require 2 years of "
                                                         "experience. English B2 required. We build digital products. ") * 4}})
+            # Contrato v25: una vacante con otro título que coincide por funciones con Product Designer.
+            vid = "rev-demo-funciones"
+            url = "https://example.org/empleos/" + vid
+            texto = ("Responsabilidades: user research, wireframes, prototipos en Figma, design system y pruebas de "
+                     "usabilidad con el equipo de producto. We require 2 years of experience. English B2 required. ") * 3
+            datos = {"id": vid, "titulo": "Experience Lead", "empresa": "Nexo", "ubicacion": "Remote - Colombia",
+                     "paises": ["CO"], "paises_mundo": ["CO"], "confianza_pais": "alta", "nota_pais": "",
+                     "modalidad": "remoto", "idioma": "en", "fecha_publicacion": fecha, "fecha_estimada": False,
+                     "anos_min": 2, "ingles": "intermedio", "enlace": url, "enlaces_alternativos": [url],
+                     "familias": [{"familia": "cargo:" + cfg["cargos"][0]["id"], "coincidencia": "funciones"}],
+                     "verificacion": {"estado": "verificada", "enlaces": [{"url": url, "estado": "verificada",
+                                      "comprobada_en": self.creada.isoformat()}]}}
+            filas.append({"vacante_id": vid, "estado": "pendiente", "motivo": "Coincide por funciones",
+                          "pista": "Funciones encontradas: user research, wireframes, figma, design system",
+                          "ubicacion": normalizar.texto(datos["ubicacion"]), "sugerencia": [],
+                          "perfiles": [perfil(0, True)], "prioridad": 120, "creada_en": self.creada.isoformat(),
+                          "catalogo_vacantes": {"id": vid, "datos": datos, "status": "active", "reason": None,
+                                                "description_full": texto}})
             self.estado["revisiones"] = filas
         return self.estado["revisiones"]
 
@@ -572,6 +609,26 @@ class RepositorioDemo:
 
     def candidatas_por_confirmar(self, desde=None):
         return []  # la demostración trae su bandeja ya preparada
+
+    def candidatas_por_funciones(self, desde=None):
+        return []
+
+    def descripciones(self, ids):
+        """Demostración: descripciones ficticias según el título, para proponer funciones."""
+        por_id = {v["id"]: v.get("titulo", "") for v in self.catalogo_vigente()["vacantes"]}
+        temas = {"design": "user research, wireframes, prototipos en Figma, design system, pruebas de usabilidad, "
+                           "journey maps y diseño de interacción con el equipo de producto.",
+                 "qa": "casos de prueba, automatización con Playwright, pruebas de regresión, reporte de bugs y "
+                       "pipelines de integración continua.",
+                 "front": "React, TypeScript, componentes accesibles, rendimiento web y pruebas unitarias.",
+                 "otro": "atención a clientes, reportes semanales, coordinación con proveedores y hojas de cálculo."}
+        salida = {}
+        for i in ids:
+            t = (por_id.get(i) or "").lower()
+            tema = "design" if "design" in t or "ux" in t or "ui " in t else "qa" if "qa" in t or "test" in t or \
+                "prueba" in t else "front" if "front" in t else "otro"
+            salida[i] = ("Responsabilidades: " + temas[tema] + " ") * 4
+        return salida
 
     def base_ofertas(self):
         """Filas ficticias de `ofertas` para probar la descarga: dos de hoy (una confirmada y una por confirmar) y una de

@@ -51,7 +51,7 @@ def rol_de(v, roles):
 
 def roles_de(v, roles):
     """([roles empatados en la mejor coincidencia, en el orden de la lista], grado)."""
-    grados = {f["familia"]: f["coincidencia"] for f in v.get("familias", [])}
+    grados = {f["familia"]: f["coincidencia"] for f in v.get("familias", []) if f["coincidencia"] in GRADOS}
     titulo = normalizar.texto(v.get("titulo", ""))
     mejor = None
     for orden, rol in enumerate(roles):
@@ -184,7 +184,7 @@ def ampliar(rol, elegidas, libres, cuantas, max_por_empresa, hoy):
         return sum(1 for v, _ in elegidas if evaluar(v, p, hoy)["compatible"] or
                    (v.get("_ampliacion") and evaluar_ampliada(v, p, hoy, v["_ampliacion"])["compatible"]))
     def grado_en_rol(v):
-        grados = {f["familia"]: f["coincidencia"] for f in v.get("familias", [])}
+        grados = {f["familia"]: f["coincidencia"] for f in v.get("familias", []) if f["coincidencia"] in GRADOS}
         return min((grados[f] for f in rol["familias"] if f in grados), key=GRADOS.index, default=None)
     for nivel in AMPLIACIONES:
         permitidos = ("exacto", "similar", "cercano") if nivel != "sin_dato" else ("exacto", "similar")
@@ -388,7 +388,7 @@ def embudo(vacantes, entregadas, hoy, cfg=None, resumen=None):
     salida = {r["id"]: {"nombre": r["nombre"], **{e: 0 for e in ETAPAS_EMBUDO}} for r in roles}
     filtros = {r["id"]: Counter() for r in roles}
     for v in vacantes:
-        grados = {f["familia"]: f["coincidencia"] for f in v.get("familias", [])}
+        grados = {f["familia"]: f["coincidencia"] for f in v.get("familias", []) if f["coincidencia"] in GRADOS}
         propios = [r for r in roles if any(grados.get(f) in ("exacto", "similar") for f in r["familias"])]
         if not propios:
             continue

@@ -1203,3 +1203,52 @@ def test_resumen_cuenta_de_que_fuente_vino_cada_entregada():
     assert entrega._fuente({"fuente": "LinkedIn", "fuentes": []}) == "LinkedIn"
     assert entrega._fuente({"fuente": "Computrabajo", "fuentes": ["Computrabajo", "LinkedIn"]}) == "LinkedIn"
     assert entrega._fuente({"fuente": "LinkedIn (Apify)"}) == "LinkedIn (Apify)"
+
+
+# ── Contrato v25: título genérico, funciones y propuesta de la huella ───────────────────────────────────────────
+
+FUNCIONES_PD = ["user research", "wireframes", "prototipos", "figma", "design system", "usabilidad", "journey maps",
+                "interaccion", "accesibilidad", "sketch"]
+
+
+def _con_funciones(cfg):
+    cfg["cargos"][0]["funciones"] = FUNCIONES_PD
+    return cfg
+
+
+def test_titulo_generico_con_el_cargo_en_la_descripcion_es_similar(cfg):
+    _con_funciones(cfg)
+    rid = "cargo:" + cfg["cargos"][0]["id"]
+    with ejecutor.activar({"configuracion": cfg}, hoy()):
+        desc = "Buscamos un Product Designer. Como Product Designer liderarás el diseño de la app."
+        assert familias.clasificar("Especialista Senior", desc) == [{"familia": rid, "coincidencia": "similar"}]
+        assert familias.clasificar("Especialista Senior", "Liderarás el diseño de la app.") == []
+
+
+def test_coincide_por_funciones_solo_con_suficientes_y_nunca_se_entrega_solo(cfg):
+    _con_funciones(cfg)
+    rid = "cargo:" + cfg["cargos"][0]["id"]
+    cinco = "Tareas: user research, wireframes, prototipos en Figma y pruebas de usabilidad."
+    dos = "Tareas: user research y wireframes."
+    with ejecutor.activar({"configuracion": cfg}, hoy()):
+        assert familias.clasificar("Experience Lead Nexo", cinco) == [{"familia": rid, "coincidencia": "funciones"}]
+        assert familias.clasificar("Experience Lead Nexo", dos) == []
+        v = trabajo(titulo="Experience Lead Nexo", familias=[{"familia": rid, "coincidencia": "funciones"}])
+        assert entrega.roles_de(v, entrega.config()["roles"]) == ([], None)
+
+
+def test_proponer_funciones_devuelve_lo_que_distingue_al_cargo():
+    from panel import funciones
+    del_cargo = ["Haremos user research, wireframes y prototipos en Figma con el equipo."] * 8
+    otros = ["Atención a clientes, reportes semanales y coordinación con el equipo."] * 20
+    propuestas = funciones.proponer(del_cargo, otros)
+    assert {"user research", "wireframes", "figma"} <= set(propuestas) and "equipo" not in propuestas
+    assert funciones.proponer(del_cargo[:3], otros) == []  # con menos de 5, no propone
+
+
+def test_api_proponer_funciones_en_demostracion():
+    api = TestClient(crear_app(demo=True, repositorio=RepositorioDemo()))
+    r = api.post("/api/cargos/funciones", json={"nombre": "Product Designer", "terminos_exactos": ["Product Designer"],
+                                                "terminos_similares": ["UX Designer"]},
+                 headers={"origin": "http://testserver"})
+    assert r.status_code == 200 and "user research" in r.json()["funciones"]

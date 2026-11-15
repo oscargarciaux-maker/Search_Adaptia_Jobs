@@ -309,3 +309,23 @@ def whatsapp(repo, cliente_id, fecha=None):
     texto = borradores.texto(nombre, list(grupos.items()), (r.get("ejecucion") or {}).get("fecha") or hoy(),
                              str(cliente_id or ""))
     return {"texto": texto, "vacantes": len(listas)}
+
+
+def proponer_funciones(repo, cargo):
+    """Contrato v25: huella de funciones propuesta para un cargo con el catálogo vigente. Sin IA."""
+    from panel import funciones
+    from panel.terminos import grado
+    vacantes = repo.catalogo_vigente()["vacantes"]
+    del_cargo = [v["id"] for v in vacantes if v.get("titulo") and grado(v["titulo"], cargo)[0] in ("exacto", "similar")]
+    elegidos = set(del_cargo)
+    otros = [v["id"] for v in vacantes if v["id"] not in elegidos]
+    del_cargo, otros = funciones.muestra_estable(del_cargo, 150), funciones.muestra_estable(otros, 300)
+    textos = repo.descripciones(del_cargo + otros)
+    con_texto = [textos[i] for i in del_cargo if len(textos.get(i) or "") >= 200]
+    if len(con_texto) < 5:
+        return {"funciones": [], "vacantes": len(con_texto),
+                "motivo": "Aún no hay vacantes suficientes de este cargo con descripción para proponer funciones."}
+    propuestas = funciones.proponer(con_texto, [textos[i] for i in otros if textos.get(i)],
+                                    excluir=[cargo.get("nombre", ""), *cargo.get("terminos_exactos", [])])
+    return {"funciones": propuestas, "vacantes": len(con_texto), "motivo": "" if propuestas else
+            "No se encontraron términos que distingan claramente a este cargo."}
