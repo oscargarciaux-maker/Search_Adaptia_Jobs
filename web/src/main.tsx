@@ -10,6 +10,8 @@ import {
   Archive,
   BriefcaseBusiness,
   Download,
+  Moon,
+  Sun,
   CalendarClock,
   Check,
   CheckCheck,
@@ -45,6 +47,7 @@ import {
   X,
 } from "lucide-react";
 import { api, ErrorAPI } from "./api";
+import { delSistema, guardarTema, temaElegido, type Tema } from "./tema";
 import type {
   Restriccion,
   Cargo,
@@ -3517,7 +3520,7 @@ function ClienteDetalle({
         </button>
         <button
           type="button"
-          className="button"
+          className="button secondary"
           onClick={onCsv}
           disabled={descargando}
         >
@@ -3558,13 +3561,17 @@ function ClienteDetalle({
                     Sí, sirve
                   </button>
                 ) : (
-                  <button type="button" className="button" onClick={onRevisar}>
+                  <button
+                    type="button"
+                    className="button secondary"
+                    onClick={onRevisar}
+                  >
                     Elegir país en Por confirmar
                   </button>
                 )}
                 <button
                   type="button"
-                  className="button"
+                  className="button secondary"
                   disabled={ocupado === r.vacante_id}
                   onClick={() => decidir(r, "no_sirve")}
                 >
@@ -3572,7 +3579,7 @@ function ClienteDetalle({
                 </button>
                 {r.enlace && (
                   <a
-                    className="button"
+                    className="button secondary"
                     href={r.enlace}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -3591,6 +3598,38 @@ function ClienteDetalle({
         )}
       </section>
     </Dialog>
+  );
+}
+
+function BotonTema() {
+  const [elegido, setElegido] = useState(temaElegido);
+  const [sistema, setSistema] = useState<Tema>(delSistema);
+  useEffect(() => {
+    let consulta: MediaQueryList;
+    try {
+      consulta = matchMedia("(prefers-color-scheme: dark)");
+    } catch {
+      return;
+    }
+    const seguir = () => setSistema(consulta.matches ? "oscuro" : "claro");
+    consulta.addEventListener("change", seguir);
+    return () => consulta.removeEventListener("change", seguir);
+  }, []);
+  const actual = elegido || sistema;
+  const otro: Tema = actual === "oscuro" ? "claro" : "oscuro";
+  return (
+    <button
+      type="button"
+      className="button secondary boton-tema"
+      aria-label={`Cambiar a modo ${otro}`}
+      title={`Cambiar a modo ${otro}`}
+      onClick={() => {
+        guardarTema(otro);
+        setElegido(otro);
+      }}
+    >
+      {actual === "oscuro" ? <Sun size={17} /> : <Moon size={17} />}
+    </button>
   );
 }
 
@@ -4081,46 +4120,49 @@ function App() {
                               : "Información sobre la conexión y el funcionamiento del espacio."}
               </p>
             </div>
-            {["Resumen", "Clientes", "Cargos y metas"].includes(tab) && (
-              <div className="heading-actions">
-                <span className={"flow-pill" + (dirty ? " pending" : "")}>
-                  {dirty
-                    ? "Cambios sin guardar"
-                    : estado?.publicada &&
-                        estado.publicada.revision === estado.revision
-                      ? "Programado desde el " +
-                        fecha(estado.publicada.vigente_desde)
-                      : estado?.revision
-                        ? "Borrador guardado, sin programar"
-                        : "Sin configuración programada"}
-                </span>
-                <button
-                  className="button secondary"
-                  onClick={guardarClick}
-                  disabled={!dirty || busy}
-                >
-                  <Save size={16} />
-                  {busy ? "Guardando…" : "Guardar borrador"}
-                </button>
-                <Ayuda etiqueta="Guardar y programar">
-                  <strong>Guardar borrador</strong> conserva tus cambios sin
-                  tocar la próxima búsqueda.{" "}
-                  <strong>Programar para mañana</strong> los guarda y los usa
-                  desde la búsqueda de las 6:30 a. m. (hora Colombia).
-                  «Programado desde el …» es el día desde el que las búsquedas
-                  usan esta configuración; las que ya empezaron siguen con la
-                  anterior.
-                </Ayuda>
-                <button
-                  className="button primary"
-                  onClick={() => setModal("publicar")}
-                  disabled={busy || total < 1 || excede}
-                >
-                  <CalendarClock size={16} />
-                  Programar para mañana
-                </button>
-              </div>
-            )}
+            <div className="heading-actions">
+              {["Resumen", "Clientes", "Cargos y metas"].includes(tab) && (
+                <>
+                  <span className={"flow-pill" + (dirty ? " pending" : "")}>
+                    {dirty
+                      ? "Cambios sin guardar"
+                      : estado?.publicada &&
+                          estado.publicada.revision === estado.revision
+                        ? "Programado desde el " +
+                          fecha(estado.publicada.vigente_desde)
+                        : estado?.revision
+                          ? "Borrador guardado, sin programar"
+                          : "Sin configuración programada"}
+                  </span>
+                  <button
+                    className="button secondary"
+                    onClick={guardarClick}
+                    disabled={!dirty || busy}
+                  >
+                    <Save size={16} />
+                    {busy ? "Guardando…" : "Guardar borrador"}
+                  </button>
+                  <Ayuda etiqueta="Guardar y programar">
+                    <strong>Guardar borrador</strong> conserva tus cambios sin
+                    tocar la próxima búsqueda.{" "}
+                    <strong>Programar para mañana</strong> los guarda y los usa
+                    desde la búsqueda de las 6:30 a. m. (hora Colombia).
+                    «Programado desde el …» es el día desde el que las búsquedas
+                    usan esta configuración; las que ya empezaron siguen con la
+                    anterior.
+                  </Ayuda>
+                  <button
+                    className="button primary"
+                    onClick={() => setModal("publicar")}
+                    disabled={busy || total < 1 || excede}
+                  >
+                    <CalendarClock size={16} />
+                    Programar para mañana
+                  </button>
+                </>
+              )}
+              <BotonTema />
+            </div>
           </div>
           {tab === "Resumen" && (
             <>
