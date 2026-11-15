@@ -481,11 +481,12 @@ test("resumen: tablero de una pantalla, sin menú propio, con dirección por sec
   await expect(page.locator(".tarjeta-resumen")).toHaveCount(6);
   await expect(page.locator("aside, header.topbar, footer")).toHaveCount(0);
   await expect(page.getByText("TU CENTRO DE OPORTUNIDADES")).toHaveCount(0);
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollHeight <= innerHeight,
-    ),
-  ).toBe(true);
+  // Paso 8: la lista de clientes crece con ellos (Andrés maneja 15 o más); lo demás del tablero se ve sin bajar.
+  await page.waitForTimeout(700); // termina la animación de entrada
+  const fondo = await page
+    .locator(".resumen-derecha")
+    .evaluate((e) => e.getBoundingClientRect().bottom);
+  expect(fondo).toBeLessThanOrEqual(768);
   await page.screenshot({ path: "/tmp/adaptia-resumen.png" });
   await tarjeta(page, "Clientes").click();
   await expect(page).toHaveURL(/#clientes$/);
@@ -772,4 +773,156 @@ test("contrato v25: proponer funciones y confirmar una vacante que coincide por 
   await expect(
     page.getByText(/Confirmada: se asignó a 1 cliente/),
   ).toBeVisible();
+});
+
+test("paso 8: una tarjeta por cliente, detalle con 7 días y dos columnas desde 9 clientes", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  // Una «por confirmar» propia para «Cliente de ejemplo 02» (otros recorridos ya decidieron las de la demostración).
+  const cfg = await (await page.request.get("/api/config")).json();
+  const id02 = cfg.borrador.clientes.find(
+    (c: { nombre: string }) => c.nombre === "Cliente de ejemplo 02",
+  ).id;
+  let decidida = "";
+  await page.route("**/api/revisiones", async (route) => {
+    const r = await route.fetch();
+    const j = await r.json();
+    if (!decidida) {
+      j.pendientes.unshift({
+        vacante_id: "prueba-paso-8",
+        titulo: "Diseñador de producto (prueba)",
+        empresa: "Empresa de prueba",
+        ubicacion: "Remoto",
+        modalidad: "remoto",
+        idioma: "es",
+        publicada: "",
+        enlace: "",
+        pista: "",
+        sugerencia: ["ES"],
+        sugerida: "sirve",
+        paises_sugeridos: ["ES"],
+        clientes: ["Cliente de ejemplo 02"],
+        cliente_ids: [id02],
+        ayuda_faltantes: true,
+        iguales: 0,
+      });
+      j.total += 1;
+    }
+    await route.fulfill({ response: r, json: j });
+  });
+  await page.route("**/api/revisiones/prueba-paso-8", async (route) => {
+    decidida = route.request().postDataJSON().decision;
+    await route.fulfill({ json: { asignadas: 0, iguales: 0 } });
+  });
+  await page.goto("/");
+  const lista = page.getByRole("list", { name: "Clientes y su avance" });
+  await expect(lista.getByRole("button").first()).toBeVisible();
+  // Otros recorridos pueden haber añadido clientes a la demostración.
+  const activos = await lista.getByRole("button").count();
+  expect(activos).toBeGreaterThanOrEqual(5);
+  expect(activos).toBeLessThan(9);
+  await expect(page.getByText(/activos · \d+ bajo su meta/)).toBeVisible();
+  await expect(lista).not.toHaveClass(/en-grilla/);
+  await expect(
+    lista.getByRole("button", { name: /^Cliente de ejemplo 02:/ }),
+  ).toHaveAccessibleName(/: \d+ de 17, \d+ por confirmar, bajo su meta/);
+  // Los que van peor van primero; el que está completo, después.
+  const nombres = await lista.getByRole("button").allTextContents();
+  expect(
+    nombres.findIndex((t) => t.startsWith("Cliente de ejemplo 02")),
+  ).toBeLessThan(
+    nombres.findIndex((t) => t.startsWith("Cliente de ejemplo 04")),
+  );
+
+  const nombre = "Cliente de ejemplo 02";
+  const boton02 = lista.getByRole("button", {
+    name: /^Cliente de ejemplo 02:/,
+  });
+  await expect(boton02).toHaveAccessibleName(/, [1-9]\d* por confirmar/);
+  const pendientesAntes = Number(
+    /, (\d+) por confirmar/.exec(
+      (await boton02.getAttribute("aria-label"))!,
+    )![1],
+  );
+  await boton02.click();
+  const detalle = page.locator("dialog[open]");
+  await expect(detalle.getByRole("heading", { name: nombre })).toBeVisible();
+  await expect(detalle.getByText("Últimos 7 días")).toBeVisible();
+  await expect(
+    detalle.getByRole("img", { name: /^Recibidas por día:/ }),
+  ).toBeVisible();
+  await expect(detalle.getByText("Lo que más corta en su cargo")).toBeVisible();
+  await expect(
+    detalle.getByText(`Por confirmar (${pendientesAntes})`),
+  ).toBeVisible();
+  const descarga = page.waitForEvent("download");
+  await detalle
+    .getByRole("button", { name: "Descargar su CSV de hoy" })
+    .click();
+  expect((await descarga).suggestedFilename()).toMatch(
+    /^vacantes-\d{4}-\d{2}-\d{2}-cliente-de-ejemplo-02\.csv$/,
+  );
+  // Decidir ahí mismo: «No sirve» la saca de su lista.
+  const tarjeta = detalle.locator("article", {
+    hasText: "Diseñador de producto (prueba)",
+  });
+  await expect(tarjeta.getByText("sugerido: España")).toBeVisible();
+  await tarjeta.getByRole("button", { name: "No sirve" }).click();
+  await expect(
+    detalle.getByText(`Por confirmar (${pendientesAntes - 1})`),
+  ).toBeVisible();
+  expect(decidida).toBe("no_sirve");
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await detalle.getByRole("button", { name: "Ver sus vacantes" }).click();
+  await expect(page).toHaveURL(/#vacantes$/);
+  await expect(page.locator("#result-cliente")).toHaveValue(
+    await page
+      .locator("#result-cliente option", { hasText: nombre })
+      .getAttribute("value"),
+  );
+
+  // Con 12 clientes (Andrés maneja al menos 15): dos columnas, sin desbordar.
+  await page.route("**/api/config", async (route) => {
+    const r = await route.fetch();
+    const j = await r.json();
+    const cfg = j.borrador;
+    const base = cfg.clientes[0];
+    const perfil = cfg.perfiles.find(
+      (p: { cliente_id: string }) => p.cliente_id === base.id,
+    );
+    for (let i = 0; i < 7; i++) {
+      const id = `00000000-0000-4000-8000-00000000000${i}`;
+      cfg.clientes.push({ ...base, id, nombre: `Cliente extra ${i + 1}` });
+      cfg.perfiles.push({
+        ...perfil,
+        id: `00000000-0000-4000-9000-00000000000${i}`,
+        cliente_id: id,
+      });
+    }
+    await route.fulfill({ response: r, json: j });
+  });
+  await page.goto("/");
+  await expect(lista.getByRole("button")).toHaveCount(activos + 7);
+  await expect(lista).toHaveClass(/en-grilla/);
+  const columnas = await lista.evaluate(
+    (e) => getComputedStyle(e).gridTemplateColumns.split(" ").length,
+  );
+  expect(columnas).toBe(2);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await lista.evaluate(
+      (e) => getComputedStyle(e).gridTemplateColumns.split(" ").length,
+    ),
+  ).toBe(1);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
 });

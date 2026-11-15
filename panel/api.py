@@ -333,6 +333,10 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
     def ejecuciones():
         return repo.ejecuciones()
 
+    @app.get("/api/resumen-clientes")
+    def resumen_clientes():
+        return servicio.resumen_clientes(repo)
+
     @app.get("/api/resultados")
     def resultados(cliente_id: str | None = None, fecha: str | None = None):
         if cliente_id:

@@ -9,6 +9,7 @@ import {
   ArrowUpRight,
   Archive,
   BriefcaseBusiness,
+  Download,
   CalendarClock,
   Check,
   CheckCheck,
@@ -65,6 +66,7 @@ import type {
   Revision,
   Revisiones,
   Regla,
+  ResumenClientes,
 } from "./types";
 import "./style.css";
 
@@ -2992,8 +2994,75 @@ function proximaBusqueda(ahora = new Date()) {
   return hoy;
 }
 
+type ResumenCliente = {
+  id: string;
+  nombre: string;
+  cargo: string;
+  meta: number;
+  recibidas: number | null;
+  porConfirmar: number;
+  comunidad: boolean;
+  perfiles: { cargo: string; meta: number }[];
+};
+// Paso 8: los datos de cada tarjeta de cliente (meta = suma de las metas de sus perfiles activos, como el servidor).
+function resumenDeClientes(
+  cfg: Configuracion,
+  conteo: ResumenClientes | null,
+  pendientes: Revision[],
+): ResumenCliente[] {
+  const m = conMetas(cfg);
+  const cargosActivos = new Map(
+    cfg.cargos.filter((c) => c.activo).map((c) => [c.id, c.nombre]),
+  );
+  const ultimo = conteo?.dias.at(-1);
+  const lista = cfg.clientes
+    .filter((c) => c.activo)
+    .map((c) => {
+      const ps = cfg.perfiles.filter(
+        (p) =>
+          p.activo && p.cliente_id === c.id && cargosActivos.has(p.cargo_id),
+      );
+      const perfiles = ps.map((p) => ({
+        cargo: cargosActivos.get(p.cargo_id) || "",
+        meta: m.metaDe(p),
+      }));
+      const nombres = [...new Set(perfiles.map((p) => p.cargo))];
+      return {
+        id: c.id,
+        nombre: c.nombre,
+        cargo: nombres.length
+          ? nombres.length > 2
+            ? "Varios cargos"
+            : nombres.join(" · ")
+          : "Sin perfil",
+        meta: perfiles.reduce((s, p) => s + p.meta, 0),
+        recibidas: ultimo ? ultimo.clientes[c.id] || 0 : null,
+        porConfirmar: pendientes.filter((r) =>
+          (r.cliente_ids || []).includes(c.id),
+        ).length,
+        comunidad: !!c.comunidad,
+        perfiles,
+      };
+    });
+  // Primero los que van peor; Comunidad siempre al final.
+  const avance = (c: ResumenCliente) =>
+    c.recibidas == null || !c.meta ? 1 : c.recibidas / c.meta;
+  return lista.sort(
+    (a, b) =>
+      Number(a.comunidad) - Number(b.comunidad) ||
+      avance(a) - avance(b) ||
+      a.nombre.localeCompare(b.nombre, "es"),
+  );
+}
+const bajoMeta = (c: ResumenCliente) =>
+  c.recibidas != null && c.meta > 0 && c.recibidas < c.meta / 2;
+// Desde 9 clientes las tarjetas pasan a dos columnas (decisión de Oscar, 14 nov).
+const CLIENTES_EN_GRILLA = 9;
+
 function TarjetasResumen({
   clientes,
+  diaConteo,
+  onCliente,
   perfiles,
   cargos,
   total,
@@ -3004,7 +3073,9 @@ function TarjetasResumen({
   borradores,
   go,
 }: {
-  clientes: { nombre: string; cargo: string }[];
+  clientes: ResumenCliente[];
+  diaConteo?: string;
+  onCliente: (id: string) => void;
   perfiles: number;
   cargos: Cargo[];
   total: number;
@@ -3031,13 +3102,12 @@ function TarjetasResumen({
     timeZone: "America/Bogota",
   });
   const conCupo = cargos.filter((c) => c.cupo > 0);
+  const bajos = clientes.filter(bajoMeta).length;
+  const grilla = clientes.length >= CLIENTES_EN_GRILLA;
+  const deHoy = diaConteo === hoyBogota();
   return (
     <section className="resumen-grid" aria-label="Resumen del panel">
-      <button
-        type="button"
-        className="tarjeta-resumen tarjeta-clientes"
-        onClick={() => go("Clientes")}
-      >
+      <div className="tarjeta-resumen tarjeta-clientes">
         <span className="tarjeta-cabeza">
           <Users size={18} />
           Clientes
@@ -3046,187 +3116,481 @@ function TarjetasResumen({
           {clientes.length}
           <small>
             {" "}
-            {clientes.length === 1 ? "activo" : "activos"} · {perfiles}{" "}
-            {perfiles === 1 ? "perfil" : "perfiles"}
+            {clientes.length === 1 ? "activo" : "activos"}
+            {diaConteo
+              ? ` · ${bajos} bajo su meta`
+              : ` · ${perfiles} ${perfiles === 1 ? "perfil" : "perfiles"}`}
           </small>
         </strong>
-        <ul className="clientes-mini">
-          {clientes.slice(0, 4).map((c, i) => (
-            <li key={i}>
-              <span>{c.nombre}</span>
-              <span>{c.cargo}</span>
-            </li>
-          ))}
-          {clientes.length > 4 && (
-            <li className="mas">y {clientes.length - 4} más</li>
-          )}
-        </ul>
-        <span className="tarjeta-accion">
-          Ver clientes
-          <ArrowRight size={15} />
-        </span>
-        <span className="marca-agua" aria-hidden="true">
-          {clientes.length}
-        </span>
-      </button>
-
-      <button
-        type="button"
-        className={
-          "tarjeta-resumen tarjeta-cupos " +
-          (total > 0 && total <= techo ? "green" : "amber")
-        }
-        onClick={() => go("Cargos y metas")}
-      >
-        <span className="tarjeta-cabeza">
-          <SlidersHorizontal size={17} />
-          Techo del día
-        </span>
-        <div className="cupos-fila">
-          <strong className="tarjeta-numero">
-            {total}
-            <small> / {techo}</small>
-          </strong>
+        {diaConteo && (
           <span className="tarjeta-detalle">
-            {total - comunidad} a clientes · {comunidad} a Comunidad
-          </span>
-        </div>
-        <span className="cupos-barra" aria-hidden="true">
-          {conCupo.map((c, i) => (
-            <span
-              key={c.id}
-              style={{
-                width: (c.cupo / Math.max(total, techo)) * 100 + "%",
-                background: colores[i % 5],
-                animationDelay: 120 + i * 70 + "ms",
-              }}
-            />
-          ))}
-        </span>
-        <span className="cupos-leyenda">
-          {conCupo.map((c, i) => (
-            <span key={c.id}>
-              <i style={{ background: colores[i % 5] }} />
-              {c.nombre} <b>{c.cupo}</b>
-            </span>
-          ))}
-        </span>
-        <span className="tarjeta-accion">
-          Editar cargos y metas
-          <ArrowRight size={15} />
-        </span>
-      </button>
-
-      <button
-        type="button"
-        className="tarjeta-resumen tarjeta-chica tarjeta-vacantes"
-        onClick={() => go("Vacantes")}
-      >
-        <span className="tarjeta-cabeza">
-          <BriefcaseBusiness size={16} />
-          Vacantes
-        </span>
-        <strong className="tarjeta-numero">
-          {ultima ? (r.vacantes ?? 0) : "—"}
-          {ultima && <small> / {r.meta ?? 120}</small>}
-        </strong>
-        <span className="tarjeta-detalle">
-          {ultima ? `Búsqueda del ${fecha(ultima.fecha)}` : "Sin búsquedas aún"}
-        </span>
-        <span className="tarjeta-accion">
-          Ver vacantes
-          <ArrowRight size={14} />
-        </span>
-      </button>
-
-      <button
-        type="button"
-        className={
-          "tarjeta-resumen tarjeta-chica tarjeta-confirmar" +
-          (porConfirmar ? " pendiente" : "")
-        }
-        onClick={() => go("Por confirmar")}
-      >
-        <span className="tarjeta-cabeza">
-          <MapPin size={16} />
-          Por confirmar
-          {porConfirmar > 0 && (
-            <span className="punto-vivo" aria-hidden="true" />
-          )}
-        </span>
-        <strong className="tarjeta-numero">{porConfirmar}</strong>
-        <span className="tarjeta-detalle">
-          {porConfirmar ? "Esperan tu decisión" : "Nada pendiente"}
-        </span>
-        <span className="tarjeta-accion">
-          Revisar
-          <ArrowRight size={14} />
-        </span>
-      </button>
-
-      <button
-        type="button"
-        className="tarjeta-resumen tarjeta-chica tarjeta-mensajes"
-        onClick={() => go("Mensajes")}
-      >
-        <span className="tarjeta-cabeza">
-          <MessageCircle size={16} />
-          Mensajes de hoy
-        </span>
-        <strong className="tarjeta-numero">
-          {borradores ? vivos.length : "—"}
-        </strong>
-        <span className="tarjeta-detalle">
-          {!borradores
-            ? "Ábrelos para prepararlos"
-            : vivos.length
-              ? `${enviados} ${enviados === 1 ? "enviado" : "enviados"} de ${vivos.length}`
-              : "Aún no preparados"}
-        </span>
-        <span className="tarjeta-accion">
-          Ver mensajes
-          <ArrowRight size={14} />
-        </span>
-      </button>
-
-      <button
-        type="button"
-        className="tarjeta-resumen tarjeta-actividad"
-        onClick={() => go("Actividad")}
-      >
-        <span className="evento-fecha" aria-hidden="true">
-          <b>{dia}</b>
-          <span>{mes}</span>
-        </span>
-        <span className="evento-texto">
-          <span className="tarjeta-cabeza">
-            <Clock3 size={15} />
-            Actividad
-          </span>
-          <span className="evento-titulo">
-            Próxima búsqueda: {semana} {dia} de {mes} · 6:30 a. m.
-          </span>
-          <span className="tarjeta-detalle">
-            {ultima
-              ? `Última, del ${fecha(ultima.fecha)}: ${(estadosEjecucion[ultima.estado] || ultima.estado).toLowerCase()}`
-              : "Aún no hay búsquedas registradas"}
-          </span>
-        </span>
-        {ultima && (
-          <span
-            className={
-              "pill " + (ultima.estado === "completa" ? "green" : "amber")
-            }
-          >
-            {estadosEjecucion[ultima.estado] || ultima.estado}
+            {deHoy
+              ? "Recibidas hoy de su meta del día"
+              : `Recibidas en la búsqueda del ${fecha(diaConteo)} (la de hoy aún no corre)`}
           </span>
         )}
-        <span className="tarjeta-accion">
-          Ver actividad
-          <ArrowRight size={14} />
-        </span>
-      </button>
+        {clientes.length > 0 && (
+          <ul
+            className={"clientes-lista" + (grilla ? " en-grilla" : "")}
+            aria-label="Clientes y su avance"
+          >
+            {clientes.map((c) => {
+              const pct =
+                c.recibidas == null || !c.meta
+                  ? 0
+                  : Math.min(100, Math.round((c.recibidas / c.meta) * 100));
+              const cifra =
+                c.recibidas == null
+                  ? `— / ${c.meta}`
+                  : `${c.recibidas}/${c.meta}`;
+              const pendiente = `${c.porConfirmar} por confirmar`;
+              return (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    className={"cliente-mini" + (bajoMeta(c) ? " bajo" : "")}
+                    aria-label={
+                      `${c.nombre}: ` +
+                      (c.recibidas == null
+                        ? `meta de ${c.meta}`
+                        : `${c.recibidas} de ${c.meta}`) +
+                      `, ${pendiente}` +
+                      (bajoMeta(c) ? ", bajo su meta" : "") +
+                      ". Ver detalle"
+                    }
+                    onClick={() => onCliente(c.id)}
+                  >
+                    <span className="cliente-texto">
+                      <strong>{c.nombre}</strong>
+                      <span>
+                        {c.cargo}
+                        {!grilla && c.porConfirmar > 0 && (
+                          <span className="solo-lista"> · {pendiente}</span>
+                        )}
+                      </span>
+                    </span>
+                    <span className="cliente-barra" aria-hidden="true">
+                      <span style={{ width: pct + "%" }} />
+                    </span>
+                    <span className="cliente-pie">
+                      <span className="cliente-cifra">{cifra}</span>
+                      <span className="cliente-confirmar">{pendiente}</span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <button
+          type="button"
+          className="ver-todos"
+          onClick={() => go("Clientes")}
+        >
+          Ver clientes
+          <ArrowRight size={15} />
+        </button>
+      </div>
+
+      <div className="resumen-derecha">
+        <button
+          type="button"
+          className={
+            "tarjeta-resumen tarjeta-cupos " +
+            (total > 0 && total <= techo ? "green" : "amber")
+          }
+          onClick={() => go("Cargos y metas")}
+        >
+          <span className="tarjeta-cabeza">
+            <SlidersHorizontal size={17} />
+            Techo del día
+          </span>
+          <div className="cupos-fila">
+            <strong className="tarjeta-numero">
+              {total}
+              <small> / {techo}</small>
+            </strong>
+            <span className="tarjeta-detalle">
+              {total - comunidad} a clientes · {comunidad} a Comunidad
+            </span>
+          </div>
+          <span className="cupos-barra" aria-hidden="true">
+            {conCupo.map((c, i) => (
+              <span
+                key={c.id}
+                style={{
+                  width: (c.cupo / Math.max(total, techo)) * 100 + "%",
+                  background: colores[i % 5],
+                  animationDelay: 120 + i * 70 + "ms",
+                }}
+              />
+            ))}
+          </span>
+          <span className="cupos-leyenda">
+            {conCupo.map((c, i) => (
+              <span key={c.id}>
+                <i style={{ background: colores[i % 5] }} />
+                {c.nombre} <b>{c.cupo}</b>
+              </span>
+            ))}
+          </span>
+          <span className="tarjeta-accion">
+            Editar cargos y metas
+            <ArrowRight size={15} />
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className="tarjeta-resumen tarjeta-chica tarjeta-vacantes"
+          onClick={() => go("Vacantes")}
+        >
+          <span className="tarjeta-cabeza">
+            <BriefcaseBusiness size={16} />
+            Vacantes
+          </span>
+          <strong className="tarjeta-numero">
+            {ultima ? (r.vacantes ?? 0) : "—"}
+            {ultima && <small> / {r.meta ?? 120}</small>}
+          </strong>
+          <span className="tarjeta-detalle">
+            {ultima
+              ? `Búsqueda del ${fecha(ultima.fecha)}`
+              : "Sin búsquedas aún"}
+          </span>
+          <span className="tarjeta-accion">
+            Ver vacantes
+            <ArrowRight size={14} />
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className={
+            "tarjeta-resumen tarjeta-chica tarjeta-confirmar" +
+            (porConfirmar ? " pendiente" : "")
+          }
+          onClick={() => go("Por confirmar")}
+        >
+          <span className="tarjeta-cabeza">
+            <MapPin size={16} />
+            Por confirmar
+            {porConfirmar > 0 && (
+              <span className="punto-vivo" aria-hidden="true" />
+            )}
+          </span>
+          <strong className="tarjeta-numero">{porConfirmar}</strong>
+          <span className="tarjeta-detalle">
+            {porConfirmar ? "Esperan tu decisión" : "Nada pendiente"}
+          </span>
+          <span className="tarjeta-accion">
+            Revisar
+            <ArrowRight size={14} />
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className="tarjeta-resumen tarjeta-chica tarjeta-mensajes"
+          onClick={() => go("Mensajes")}
+        >
+          <span className="tarjeta-cabeza">
+            <MessageCircle size={16} />
+            Mensajes de hoy
+          </span>
+          <strong className="tarjeta-numero">
+            {borradores ? vivos.length : "—"}
+          </strong>
+          <span className="tarjeta-detalle">
+            {!borradores
+              ? "Ábrelos para prepararlos"
+              : vivos.length
+                ? `${enviados} ${enviados === 1 ? "enviado" : "enviados"} de ${vivos.length}`
+                : "Aún no preparados"}
+          </span>
+          <span className="tarjeta-accion">
+            Ver mensajes
+            <ArrowRight size={14} />
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className="tarjeta-resumen tarjeta-actividad"
+          onClick={() => go("Actividad")}
+        >
+          <span className="evento-fecha" aria-hidden="true">
+            <b>{dia}</b>
+            <span>{mes}</span>
+          </span>
+          <span className="evento-texto">
+            <span className="tarjeta-cabeza">
+              <Clock3 size={15} />
+              Actividad
+            </span>
+            <span className="evento-titulo">
+              Próxima búsqueda: {semana} {dia} de {mes} · 6:30 a. m.
+            </span>
+            <span className="tarjeta-detalle">
+              {ultima
+                ? `Última, del ${fecha(ultima.fecha)}: ${(estadosEjecucion[ultima.estado] || ultima.estado).toLowerCase()}`
+                : "Aún no hay búsquedas registradas"}
+            </span>
+          </span>
+          {ultima && (
+            <span
+              className={
+                "pill " + (ultima.estado === "completa" ? "green" : "amber")
+              }
+            >
+              {estadosEjecucion[ultima.estado] || ultima.estado}
+            </span>
+          )}
+          <span className="tarjeta-accion">
+            Ver actividad
+            <ArrowRight size={14} />
+          </span>
+        </button>
+      </div>
     </section>
+  );
+}
+
+// Paso 8 (variante B): el detalle de un cliente desde el Resumen, con sus 7 días, lo que más le corta, su CSV y sus
+// «por confirmar» para decidir ahí mismo.
+function ClienteDetalle({
+  cliente: c,
+  dias,
+  pendientes,
+  ultima,
+  notify,
+  onCerrar,
+  onCambio,
+  onVacantes,
+  onRevisar,
+  onCsv,
+  descargando,
+}: {
+  cliente: ResumenCliente;
+  cfg: Configuracion;
+  dias: ResumenClientes["dias"];
+  pendientes: Revision[];
+  ultima?: Ejecucion;
+  notify: (s: string, error?: boolean) => void;
+  onCerrar: () => void;
+  onCambio: () => void;
+  onVacantes: () => void;
+  onRevisar: () => void;
+  onCsv: () => void;
+  descargando: boolean;
+}) {
+  const [ocupado, setOcupado] = useState("");
+  const serie = dias.map((d) => ({ fecha: d.fecha, n: d.clientes[c.id] || 0 }));
+  const tope = Math.max(c.meta, 1, ...serie.map((d) => d.n));
+  const faltan =
+    c.recibidas == null ? c.meta : Math.max(0, c.meta - c.recibidas);
+  const cortes = [...new Set(c.perfiles.map((p) => p.cargo))]
+    .map((cargo) => ({
+      cargo,
+      texto: ultima?.resumen.embudo?.[cargo]?.principal_perdida || "",
+    }))
+    .filter((x) => x.texto);
+  const nombreLugar = (codigo: string) =>
+    REGIONES.find((r) => r.codigo === codigo)?.nombre || nombrePais(codigo);
+  const paisesDe = (r: Revision) =>
+    r.funciones
+      ? []
+      : r.paises_sugeridos?.length
+        ? r.paises_sugeridos
+        : r.sugerencia[0]
+          ? [r.sugerencia[0]]
+          : null;
+  async function decidir(r: Revision, decision: "sirve" | "no_sirve") {
+    setOcupado(r.vacante_id);
+    try {
+      const res = await api<{ asignadas: number }>(
+        "/revisiones/" + encodeURIComponent(r.vacante_id),
+        {
+          method: "POST",
+          body: JSON.stringify({
+            decision,
+            paises: decision === "sirve" ? paisesDe(r) || [] : [],
+            aplicar_a_iguales: false,
+          }),
+        },
+      );
+      notify(
+        decision === "sirve"
+          ? `Confirmada: se asignó a ${res.asignadas} cliente(s).`
+          : "Descartada.",
+      );
+      onCambio();
+    } catch (e) {
+      notify((e as Error).message, true);
+    } finally {
+      setOcupado("");
+    }
+  }
+  const visibles = pendientes.slice(0, 5);
+  return (
+    <Dialog titulo={c.nombre} subtitulo={c.cargo} onClose={onCerrar} ancho>
+      <div className="detalle-cifras">
+        <div>
+          <b>{c.recibidas ?? "—"}</b>
+          <span>
+            {c.recibidas == null
+              ? "Sin búsquedas aún"
+              : `recibidas de ${c.meta}`}
+          </span>
+        </div>
+        <div className={c.porConfirmar ? "ambar" : ""}>
+          <b>{c.porConfirmar}</b>
+          <span>por confirmar</span>
+        </div>
+        <div>
+          <b>{faltan}</b>
+          <span>{faltan === 1 ? "falta" : "faltan"} para su meta</span>
+        </div>
+      </div>
+
+      {serie.length > 0 && (
+        <section className="detalle-seccion">
+          <h3>Últimos {serie.length} días</h3>
+          <div
+            className="dias-barras"
+            role="img"
+            aria-label={
+              "Recibidas por día: " +
+              serie.map((d) => `${fecha(d.fecha)}, ${d.n}`).join("; ")
+            }
+          >
+            {serie.map((d) => (
+              <div key={d.fecha} aria-hidden="true">
+                <b>{d.n}</b>
+                <i
+                  className={"barra" + (d.n < c.meta / 2 ? " bajo" : "")}
+                  style={{ height: Math.max(4, (d.n / tope) * 100) + "%" }}
+                />
+                <span>
+                  {new Date(d.fecha + "T12:00:00")
+                    .toLocaleDateString("es-CO", {
+                      weekday: "short",
+                      day: "numeric",
+                    })
+                    .replace(/[.,]/g, "")}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="detalle-seccion">
+        <h3>Sus perfiles</h3>
+        <ul className="detalle-lista">
+          {c.perfiles.map((p, i) => (
+            <li key={i}>
+              {p.cargo} · meta de {p.meta} al día
+            </li>
+          ))}
+          {!c.perfiles.length && <li>Aún no tiene perfiles activos.</li>}
+        </ul>
+      </section>
+
+      {cortes.length > 0 && (
+        <section className="detalle-seccion">
+          <h3>Lo que más corta en su cargo</h3>
+          <ul className="detalle-lista">
+            {cortes.map((x) => (
+              <li key={x.cargo}>
+                <b>{x.cargo}:</b> {x.texto}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <div className="detalle-acciones">
+        <button type="button" className="button primary" onClick={onVacantes}>
+          <BriefcaseBusiness size={16} />
+          Ver sus vacantes
+        </button>
+        <button
+          type="button"
+          className="button"
+          onClick={onCsv}
+          disabled={descargando}
+        >
+          <Download size={16} />
+          {descargando ? "Descargando…" : "Descargar su CSV de hoy"}
+        </button>
+      </div>
+
+      <section className="detalle-seccion">
+        <h3>Por confirmar ({pendientes.length})</h3>
+        {!pendientes.length && (
+          <p className="field-help">Nada pendiente para este cliente.</p>
+        )}
+        {visibles.map((r) => {
+          const paises = paisesDe(r);
+          return (
+            <article key={r.vacante_id} className="detalle-pendiente">
+              <small>
+                {r.motivo || "País por confirmar"}
+                {paises?.length
+                  ? " · sugerido: " +
+                    paises.slice(0, 3).map(nombreLugar).join(", ") +
+                    (paises.length > 3 ? ` y ${paises.length - 3} más` : "")
+                  : ""}
+              </small>
+              <strong>{r.titulo}</strong>
+              <span className="tarjeta-detalle">
+                {[r.empresa, r.ubicacion].filter(Boolean).join(" · ")}
+              </span>
+              <div className="fila-botones">
+                {paises ? (
+                  <button
+                    type="button"
+                    className="button primary"
+                    disabled={ocupado === r.vacante_id}
+                    onClick={() => decidir(r, "sirve")}
+                  >
+                    Sí, sirve
+                  </button>
+                ) : (
+                  <button type="button" className="button" onClick={onRevisar}>
+                    Elegir país en Por confirmar
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="button"
+                  disabled={ocupado === r.vacante_id}
+                  onClick={() => decidir(r, "no_sirve")}
+                >
+                  No sirve
+                </button>
+                {r.enlace && (
+                  <a
+                    className="button"
+                    href={r.enlace}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Ver aviso
+                  </a>
+                )}
+              </div>
+            </article>
+          );
+        })}
+        {pendientes.length > visibles.length && (
+          <button type="button" className="text-button" onClick={onRevisar}>
+            Ver las {pendientes.length} en Por confirmar
+          </button>
+        )}
+      </section>
+    </Dialog>
   );
 }
 
@@ -3265,6 +3629,9 @@ function App() {
   const [loadingResults, setLoadingResults] = useState(false);
   const [errorResultados, setErrorResultados] = useState(false);
   const [porConfirmar, setPorConfirmar] = useState(0);
+  const [pendientes, setPendientes] = useState<Revision[]>([]);
+  const [porCliente, setPorCliente] = useState<ResumenClientes | null>(null);
+  const [detalle, setDetalle] = useState("");
   const [borradoresHoy, setBorradoresHoy] = useState<Borrador[] | null>(null);
   const previaCargos = useVistaPrevia(
     tab === "Cargos y metas" && sesion?.sesion ? draft : null,
@@ -3292,7 +3659,10 @@ function App() {
       setSesion(s);
       if (s.sesion) {
         api<Revisiones>("/revisiones")
-          .then((r) => setPorConfirmar(r.total))
+          .then((r) => {
+            setPorConfirmar(r.total);
+            setPendientes(r.pendientes);
+          })
           .catch(() => setPorConfirmar(0));
         const [c, e] = await Promise.all([
           api<EstadoConfig>("/config"),
@@ -3328,10 +3698,20 @@ function App() {
     api<{ borradores: Borrador[] }>("/borradores")
       .then((r) => setBorradoresHoy(r.borradores))
       .catch(() => setBorradoresHoy(null));
-    api<Revisiones>("/revisiones")
-      .then((r) => setPorConfirmar(r.total))
-      .catch(() => undefined);
+    recargarResumen();
   }, [tab, sesion?.sesion]);
+  // Paso 8: recibidas de cada cliente en sus últimos 7 días y sus «por confirmar».
+  function recargarResumen() {
+    api<Revisiones>("/revisiones")
+      .then((r) => {
+        setPorConfirmar(r.total);
+        setPendientes(r.pendientes);
+      })
+      .catch(() => undefined);
+    api<ResumenClientes>("/resumen-clientes")
+      .then(setPorCliente)
+      .catch(() => setPorCliente(null));
+  }
   // Auditoría H8: la pestaña del navegador dice en qué sección estás.
   useEffect(() => {
     document.title = tab + " · Scraper";
@@ -3439,13 +3819,17 @@ function App() {
   const [csvFecha, setCsvFecha] = useState(hoyBogota());
   const [csvTodo, setCsvTodo] = useState(false);
   const [csvCliente, setCsvCliente] = useState("");
-  async function descargarBase() {
+  async function descargarBase(soloCliente?: string) {
+    // Desde el detalle de un cliente (paso 8): las de hoy de ese cliente.
+    const cliente = soloCliente ?? csvCliente,
+      todo = soloCliente ? false : csvTodo,
+      dia = soloCliente ? hoyBogota() : csvFecha;
     setDescargandoBase(true);
     try {
       const q = new URLSearchParams();
-      if (csvTodo) q.set("todo", "true");
-      else q.set("fecha", csvFecha);
-      if (csvCliente) q.set("cliente", csvCliente);
+      if (todo) q.set("todo", "true");
+      else q.set("fecha", dia);
+      if (cliente) q.set("cliente", cliente);
       const r = await fetch("/api/base.csv?" + q.toString(), {
         credentials: "same-origin",
       });
@@ -3454,13 +3838,13 @@ function App() {
       const incluidas = r.headers.get("X-Incluidas") || "?";
       const omitidas = Number(r.headers.get("X-Omitidas-Sin-Confirmar") || 0);
       const sinFila = Number(r.headers.get("X-Sin-Fila") || 0);
-      const nombreCliente = clientes.find((c) => c.id === csvCliente)?.nombre;
+      const nombreCliente = clientes.find((c) => c.id === cliente)?.nombre;
       const url = URL.createObjectURL(await r.blob());
       const enlace = document.createElement("a");
       enlace.href = url;
       enlace.download =
         "vacantes-" +
-        (csvTodo ? "base" : csvFecha) +
+        (todo ? "base" : dia) +
         "-" +
         (nombreCliente ? slug(nombreCliente) : "todas") +
         ".csv";
@@ -3742,17 +4126,9 @@ function App() {
             <>
               <AvisoUltimaBusqueda ultima={runs?.[0]} />
               <TarjetasResumen
-                clientes={clientes.map((c) => ({
-                  nombre: c.nombre,
-                  cargo:
-                    draft.cargos.find(
-                      (x) =>
-                        x.id ===
-                        draft.perfiles.find(
-                          (p) => p.cliente_id === c.id && p.activo,
-                        )?.cargo_id,
-                    )?.nombre || "Sin perfil",
-                }))}
+                clientes={resumenDeClientes(draft, porCliente, pendientes)}
+                diaConteo={porCliente?.dias.at(-1)?.fecha}
+                onCliente={setDetalle}
                 perfiles={
                   draft.perfiles.filter(
                     (p) =>
@@ -3768,6 +4144,39 @@ function App() {
                 borradores={borradoresHoy}
                 go={go}
               />
+              {detalle &&
+                (() => {
+                  const c = resumenDeClientes(
+                    draft,
+                    porCliente,
+                    pendientes,
+                  ).find((x) => x.id === detalle);
+                  return c ? (
+                    <ClienteDetalle
+                      cliente={c}
+                      cfg={draft}
+                      dias={porCliente?.dias || []}
+                      pendientes={pendientes.filter((r) =>
+                        (r.cliente_ids || []).includes(c.id),
+                      )}
+                      ultima={runs?.[0]}
+                      notify={notify}
+                      onCerrar={() => setDetalle("")}
+                      onCambio={recargarResumen}
+                      onVacantes={() => {
+                        setDetalle("");
+                        setSelectedClient(c.id);
+                        go("Vacantes");
+                      }}
+                      onRevisar={() => {
+                        setDetalle("");
+                        go("Por confirmar");
+                      }}
+                      onCsv={() => descargarBase(c.id)}
+                      descargando={descargandoBase}
+                    />
+                  ) : null;
+                })()}
             </>
           )}
           {tab === "Clientes" && (
@@ -4141,7 +4550,7 @@ function App() {
                 </label>
                 <button
                   className="button secondary"
-                  onClick={descargarBase}
+                  onClick={() => descargarBase()}
                   disabled={descargandoBase}
                 >
                   <ArrowDownToLine size={16} />

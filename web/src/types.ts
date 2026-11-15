@@ -213,6 +213,7 @@ export type Revision = {
   por_que?: string;
   frase?: string;
   clientes: string[];
+  cliente_ids?: string[];
   ayuda_faltantes: boolean;
   iguales: number;
   motivo?: string;
@@ -233,4 +234,10 @@ export type Regla = {
   conflictos: number;
   resultado: string;
   ejemplos: string[];
+};
+// Paso 8 (15 nov): recibidas de cada cliente en sus últimas búsquedas (solo conteos por id).
+export type ResumenClientes = {
+  fecha: string;
+  busqueda_de_hoy: boolean;
+  dias: { fecha: string; estado: string; clientes: Record<string, number> }[];
 };

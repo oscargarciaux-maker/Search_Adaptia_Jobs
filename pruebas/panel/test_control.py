@@ -1252,3 +1252,60 @@ def test_api_proponer_funciones_en_demostracion():
                                                 "terminos_similares": ["UX Designer"]},
                  headers={"origin": "http://testserver"})
     assert r.status_code == 200 and "user research" in r.json()["funciones"]
+
+
+def test_resumen_por_cliente_cuenta_recibidas_de_los_ultimos_dias():
+    """Paso 8 (variante B): recibidas de cada cliente por búsqueda, de la más antigua a la de hoy; solo conteos."""
+    from collections import Counter
+    from panel import servicio
+
+    class Repo:
+        def historial_ejecuciones(self, dias=7):
+            return [{"id": "e3", "fecha": "2026-11-16", "estado": "en_curso"},  # mañana: no cuenta
+                    {"id": "e2", "fecha": "2026-11-15", "estado": "completa"},
+                    {"id": "e1", "fecha": "2026-11-14", "estado": "parcial"}]
+
+        def asignaciones_por_cliente(self, ids):
+            self.pedidas = ids
+            return Counter({("e2", "c1"): 4, ("e1", "c1"): 2, ("e1", "c2"): 7})
+
+    repo = Repo()
+    r = servicio.resumen_clientes(repo, fecha="2026-11-15")
+    assert repo.pedidas == ["e2", "e1"]
+    assert r["busqueda_de_hoy"] is True
+    assert r["dias"] == [{"fecha": "2026-11-14", "estado": "parcial", "clientes": {"c1": 2, "c2": 7}},
+                         {"fecha": "2026-11-15", "estado": "completa", "clientes": {"c1": 4}}]
+    assert servicio.resumen_clientes(Repo(), fecha="2026-11-17")["busqueda_de_hoy"] is False
+
+
+def test_resumen_clientes_en_demo_y_por_confirmar_con_ids():
+    from panel import revision
+    repo = RepositorioDemo()
+    api = TestClient(crear_app(demo=True, repositorio=repo))
+    r = api.get("/api/resumen-clientes").json()
+    assert len(r["dias"]) == 7 and r["busqueda_de_hoy"]
+    activos = {c["id"] for c in configuracion_demo()["clientes"]}
+    assert set(r["dias"][-1]["clientes"]) == activos
+    pendientes = revision.listar(repo, r["fecha"])["pendientes"]
+    assert all(set(p["cliente_ids"]) <= activos and p["cliente_ids"] for p in pendientes)
+
+
+class _RepoPaginas:
+    _paginas = RepositorioSupabase._paginas
+
+    def __init__(self, filas):
+        self.filas, self.pedidos = filas, []
+
+    def pedir(self, metodo, ruta, params=None, **_):
+        self.pedidos.append(params)
+        return [f for f in self.filas if not params.get("id") or f["id"] > params["id"][3:]][:params["limit"]]
+
+
+def test_asignaciones_por_cliente_agrupa_por_busqueda_y_cliente():
+    repo = _RepoPaginas([{"id": "a1", "ejecucion_id": "e1", "cliente_id": "c1"},
+                         {"id": "a2", "ejecucion_id": "e1", "cliente_id": "c1"},
+                         {"id": "a3", "ejecucion_id": "e2", "cliente_id": "c2"}])
+    conteo = RepositorioSupabase.asignaciones_por_cliente.__get__(repo)(["e1", "e2"])
+    assert conteo == {("e1", "c1"): 2, ("e2", "c2"): 1}
+    assert repo.pedidos[0]["ejecucion_id"] == "in.(e1,e2)"
+    assert RepositorioSupabase.asignaciones_por_cliente.__get__(repo)([]) == {}

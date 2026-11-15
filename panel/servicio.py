@@ -293,6 +293,22 @@ def resultados(repo, cliente_id=None, fecha=None):
             "listas": sum(v["estado"] == "lista" for v in salida)}
 
 
+def resumen_clientes(repo, fecha=None, dias=7):
+    """Paso 8 (Resumen por cliente): recibidas de cada cliente en las últimas búsquedas, de la más antigua a la de
+    hoy. Solo conteos por id; los nombres los pone el panel privado."""
+    fecha = fecha or hoy()
+    ejecuciones = [e for e in repo.historial_ejecuciones(dias) if str(e.get("fecha", "")) <= fecha][:dias]
+    conteo = repo.asignaciones_por_cliente([str(e["id"]) for e in ejecuciones])
+    por_dia = []
+    for e in reversed(ejecuciones):
+        clientes = {}
+        for (ejecucion, cliente), n in conteo.items():
+            if ejecucion == str(e["id"]):
+                clientes[cliente] = clientes.get(cliente, 0) + n
+        por_dia.append({"fecha": str(e["fecha"]), "estado": e.get("estado", ""), "clientes": clientes})
+    return {"fecha": fecha, "busqueda_de_hoy": any(d["fecha"] == fecha for d in por_dia), "dias": por_dia}
+
+
 def whatsapp(repo, cliente_id, fecha=None):
     r = resultados(repo, cliente_id, fecha)
     from panel import borradores
