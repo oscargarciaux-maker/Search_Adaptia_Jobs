@@ -3431,3 +3431,18 @@ select.margen {
 .revision-extras .field {
   margin: 0;
 }
+/* Contrato v25: funciones del cargo y «Coincide por funciones». */
+.funciones-acciones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -4px 0 12px;
+}
+.revision-funciones {
+  margin: 4px 0 10px;
+  color: var(--ink);
+  font-size: 13px;
+}
+.revision-funciones .pill {
+  margin-right: 6px;
+}

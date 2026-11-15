@@ -48,8 +48,9 @@ def expandir(codigos):
     return salida
 
 
-def _sin_revisar(datos, fecha):
-    """'' si la vacante debe preguntarse; si no, por qué no: ya resuelta con las reglas vigentes o posiblemente cerrada."""
+def _sin_revisar(datos, fecha, solo_cierre=False):
+    """'' si la vacante debe preguntarse; si no, por qué no: ya resuelta con las reglas vigentes o posiblemente cerrada.
+    Con `solo_cierre` (contrato v25, «Coincide por funciones»: la duda es el cargo) solo mira si posiblemente cerró."""
     hoy = datetime.fromisoformat(fecha).date()
     visto = str(datos.get("visto_ultima_vez") or "")[:10]
     publicada = str(datos.get("fecha_publicacion") or "")[:10]
@@ -60,6 +61,8 @@ def _sin_revisar(datos, fecha):
             return POSIBLE_CIERRE
     except ValueError:
         pass
+    if solo_cierre:
+        return ""
     # Contratos v18/v19: la lectura de lugares mejoró; si ahora se confirma (o se descarta) sola, no se pregunta.
     r = paises.elegibles(datos.get("titulo", ""), datos.get("ubicacion", ""), (datos.get("_descripcion") or "")[:8000],
                          True if datos.get("modalidad") == "remoto" else None)
@@ -68,6 +71,7 @@ def _sin_revisar(datos, fecha):
     return ""
 DIAS_PENDIENTE = 7
 MOTIVO = "ubicación por confirmar"
+FUNCIONES = "Coincide por funciones"  # contrato v25: el título no encaja, pero la descripción sí
 # Lo único que una confirmación de país puede resolver; cualquier otro motivo deja fuera la vacante para ese perfil.
 MOTIVOS_PAIS = {"país sin elegibilidad confirmada", "no admite postular desde su país", "oficina en otro país"}
 DECISIONES = ("sirve", "otro_pais", "no_sirve", "saltar")
@@ -136,6 +140,37 @@ def _datos(fila_catalogo):
                                publicada=True)
 
 
+def _candidatos_funciones(repo, perfiles, recibidas, estrictas, fecha, desde, motivo_de, ya):
+    """Contrato v25: vacantes cuyo título no encaja con un cargo pero la descripción coincide por funciones. Solo para
+    los perfiles de ese cargo que cumplen todos sus filtros y nunca la recibieron."""
+    salida = []
+    for fila in repo.candidatas_por_funciones(desde):
+        if fila["id"] in ya:
+            continue
+        datos = _datos_ligeros(fila)
+        if datos.get("idioma") not in ("es", "en") or not datos.get("titulo") or \
+                _sin_revisar(datos, fecha, solo_cierre=True):
+            continue
+        familias_f = {f["familia"] for f in datos.get("familias") or [] if f.get("coincidencia") == "funciones"}
+        sirve, halladas = [], []
+        for cargo, p in perfiles:
+            if "cargo:" + str(cargo.id) not in familias_f or fila["id"] in recibidas.get(str(p.id), set()):
+                continue
+            if not evaluar(datos, p, fecha)["compatible"]:
+                continue
+            desc = normalizar.texto(datos.get("_descripcion", ""))[:12000]
+            halladas = halladas or [t for t in cargo.funciones if normalizar.contiene_frase(desc, normalizar.texto(t))]
+            sirve.append({"perfil_id": str(p.id), "cliente_id": str(p.cliente_id), "cargo_id": str(cargo.id),
+                          "faltan": estrictas.get(p.id, 0) < MINIMO_POR_PERFIL})
+        if sirve:
+            salida.append({"vacante_id": fila["id"], "motivo": FUNCIONES,
+                           "pista": "Funciones encontradas: " + ", ".join(halladas[:10]),
+                           "ubicacion": clave_ubicacion(datos.get("ubicacion", "")), "sugerencia": [],
+                           "perfiles": sirve, "prioridad": sum(100 if s["faltan"] else 10 for s in sirve)
+                           + max(0, 30 - _edad(datos, fecha))})
+    return salida
+
+
 def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, avance=None):
     """Arma la cola del día al final de la búsqueda (panel/ejecutor.registrar). Devuelve solo conteos.
     `completa` (contrato v17, botón «Cargar todas las dudosas»): todas las vacantes por confirmar del catálogo, también
@@ -182,6 +217,9 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, ava
                                "ubicacion": clave_ubicacion(datos.get("ubicacion", "")), "sugerencia": sugerencia(texto),
                                "perfiles": sirve, "prioridad": sum(100 if s["faltan"] else 10 for s in sirve)
                                + max(0, 30 - _edad(datos, fecha))})
+    if not completa and hasattr(repo, "candidatas_por_funciones"):
+        candidatos += _candidatos_funciones(repo, perfiles, recibidas, estrictas, fecha, desde, motivo_de,
+                                            {c["vacante_id"] for c in candidatos})
     existentes = {r["vacante_id"]: r for r in repo.revisiones()}
     reglas = {r["texto"]: r for r in repo.reglas() if r.get("activa", True)}
     ids = {c["vacante_id"] for c in candidatos}
@@ -197,12 +235,15 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, ava
         if r.get("estado") != "pendiente":
             continue
         catalogo_fila = r.get("catalogo_vacantes") or {}
-        if catalogo_fila and catalogo_fila.get("reason") != POR_CONFIRMAR:
+        if catalogo_fila and catalogo_fila.get("reason") != POR_CONFIRMAR and r.get("motivo") != FUNCIONES:
             # El sistema ya la resolvió (ficha, Get on Board, reglas) o dejó de ser entregable: no hace falta preguntar.
             vencer.setdefault(RESUELTA_SOLA, []).append(vid)
             continue
         datos_fila = _datos_ligeros(catalogo_fila) if (catalogo_fila.get("datos") or {}).get("titulo") else {}
-        motivo_fuera = motivo_de(vid, datos_fila) if datos_fila else ""
+        if datos_fila and r.get("motivo") == FUNCIONES:
+            motivo_fuera = _sin_revisar(datos_fila, fecha, solo_cierre=True)
+        else:
+            motivo_fuera = motivo_de(vid, datos_fila) if datos_fila else ""
         if motivo_fuera:
             vencer.setdefault(motivo_fuera, []).append(vid)
             continue
@@ -275,13 +316,18 @@ def listar(repo, fecha):
     salida = []
     for r in pendientes:
         datos = _datos(r.get("catalogo_vacantes"))
-        s = sugerir(datos) if datos.get("titulo") else {"decision": "", "paises": [], "motivo": "", "frase": ""}
+        if r.get("motivo") == FUNCIONES:  # contrato v25: la duda es el cargo, no el país
+            s = {"decision": "sirve", "paises": [], "motivo": "El título es otro, pero las funciones coinciden.",
+                 "frase": r.get("pista", "")}
+        else:
+            s = sugerir(datos) if datos.get("titulo") else {"decision": "", "paises": [], "motivo": "", "frase": ""}
         salida.append({"vacante_id": r["vacante_id"], "titulo": datos.get("titulo", ""), "empresa": datos.get("empresa", ""),
                        "sugerida": s["decision"], "paises_sugeridos": s["paises"], "por_que": s["motivo"],
                        "frase": s["frase"],
                        "ubicacion": datos.get("ubicacion", ""), "modalidad": datos.get("modalidad", ""),
                        "idioma": datos.get("idioma", ""), "publicada": datos.get("fecha_publicacion", ""),
                        "enlace": datos.get("enlace", ""), "pista": r.get("pista", ""), "sugerencia": r.get("sugerencia", []),
+                       "motivo": r.get("motivo", ""), "funciones": r.get("motivo") == FUNCIONES,
                        "clientes": sorted({clientes.get(p["cliente_id"], "") for p in r.get("perfiles") or []} - {""}),
                        "ayuda_faltantes": any(p.get("faltan") for p in r.get("perfiles") or []),
                        "iguales": max(0, por_ubicacion.get(r.get("ubicacion"), 0) - 1)})
@@ -301,10 +347,12 @@ def decidir(repo, vacante_id, decision, codigos=(), aplicar_a_iguales=False, fec
     rev = filas[0]
     codigos = expandir(codigos)
     asignadas = 0
+    funciones = rev.get("motivo") == FUNCIONES
     if decision == "sirve":
-        # Contrato v23: varias etiquetas a la vez, de cualquier parte (LATAM y EE. UU., Mundo…).
+        # Contrato v23: varias etiquetas a la vez, de cualquier parte (LATAM y EE. UU., Mundo…). Contrato v25: las de
+        # «Coincide por funciones» ya tienen la ubicación comprobada y no exigen país.
         validos = set(paises.mundo()["codigos"]) | set(paises.datos()["reconocidos"]) | {"MUNDO"}
-        if not codigos or set(codigos) - validos:
+        if (not codigos and not funciones) or set(codigos) - validos:
             raise ErrorRepositorio("Elige al menos un país o una región de la lista.", 422)
         asignadas = _asignar(repo, rev, codigos, fecha, por, comprobar)
         cambios = {"estado": "confirmada", "paises": codigos}
@@ -316,7 +364,12 @@ def decidir(repo, vacante_id, decision, codigos=(), aplicar_a_iguales=False, fec
         from panel.aprender import ETIQUETAS
         cambios["motivo"] = ETIQUETAS[decision] if por == "operador" else "decidida por regla"
     repo.actualizar_revision(vacante_id, {**cambios, "decidida_en": datetime.now(timezone.utc).isoformat()})
-    _al_catalogo(repo, rev, decision, codigos, por)
+    if funciones:
+        if decision == "sirve":
+            aprender_titulo(repo, rev)  # contrato v25: desde mañana este título entra como similar
+        # «No sirve» no archiva: la vacante puede servir a otro cargo.
+    else:
+        _al_catalogo(repo, rev, decision, codigos, por)
     iguales, regla = 0, False
     if aplicar_a_iguales and decision in ("sirve", "otro_pais") and not es_generica(rev.get("ubicacion")):
         repo.guardar_regla({"texto": rev["ubicacion"], "origen": "operador", "activa": True,
@@ -349,7 +402,8 @@ def _asignar(repo, rev, codigos, fecha, por, comprobar):
         raise ErrorRepositorio("Todavía no hay búsqueda de hoy. Inténtalo después de la búsqueda de la noche.", 409)
     cfg = validar_version(version)
     fila_catalogo = rev.get("catalogo_vacantes") or {}
-    datos = con_paises(_datos(fila_catalogo), codigos, por)
+    funciones = rev.get("motivo") == FUNCIONES
+    datos = con_paises(_datos(fila_catalogo), codigos, por) if codigos else _datos(fila_catalogo)
     perfiles = {str(p.id): p for p in cfg.perfiles if p.activo}
     cargos = {str(c.id): c for c in cfg.cargos}
     ids = [p["perfil_id"] for p in rev.get("perfiles") or [] if p["perfil_id"] in perfiles]
@@ -364,13 +418,16 @@ def _asignar(repo, rev, codigos, fecha, por, comprobar):
             continue
         match = evaluar(datos, p, fecha)
         afinidad, evidencia = grado(datos.get("titulo", ""), cargo.model_dump(mode="json"))
+        if funciones and not afinidad:
+            afinidad, evidencia = "cercano", {"regla": "coincide por funciones, confirmada por el operador"}
         if not match["compatible"] or not afinidad:
             continue
         nuevas.append({"ejecucion_id": ejecucion["id"], "cliente_id": str(p.cliente_id), "perfil_id": str(p.id),
                        "cargo_id": str(cargo.id), "vacante_id": rev["vacante_id"],
                        "match_grade": entrega.GRADO_CONTRATO.get(afinidad, "similar"),
                        "explicacion": [*match["pruebas"], evidencia or {"regla": "similitud textual"},
-                                       {"confirmada": {"paises": codigos, "por": por}}],
+                                       {"confirmada": {"paises": codigos, "por": por}} if codigos else
+                                       {"funciones": True, "por": por}],
                        "filtros": p.model_dump(mode="json"), "cargo_configuracion": cargo.model_dump(mode="json")})
     if nuevas:
         repo.crear_asignaciones(nuevas)
@@ -421,6 +478,8 @@ def exportar_csv(repo, fecha):
     escritor.writerow(["", "", PREGUNTA] + [""] * (len(COLUMNAS_CSV) - 3))  # sin vacante_id: al subir se ignora
     filas = []
     for r in repo.revisiones(estado="pendiente"):
+        if r.get("motivo") == FUNCIONES:  # contrato v25: el CSV es de ubicaciones; estas se deciden en el panel
+            continue
         datos = _datos_ligeros(r.get("catalogo_vacantes"))
         s = sugerir(datos)
         nombres = sorted({clientes.get(p["cliente_id"], "") for p in r.get("perfiles") or []} - {""})
@@ -669,3 +728,24 @@ def exportar_base(repo, fecha=None, cliente_id=None, todo=False):
     for f in incluidas:
         escritor.writerow([_celda(c, f.get(c)) for c in columnas])
     return "\ufeff" + salida.getvalue(), len(incluidas), len(filas) - len(incluidas), sin_fila
+
+
+TOPE_APRENDIDOS = 200
+
+
+def aprender_titulo(repo, rev):
+    """Contrato v25: el título aprobado desde «Coincide por funciones» se guarda para sus cargos en
+    `panel_ajustes.titulos_aprendidos` (sin repetir, hasta 200 por cargo)."""
+    titulo = " ".join(str((_datos(rev.get("catalogo_vacantes")) or {}).get("titulo") or "").split())
+    if not titulo or not hasattr(repo, "guardar_ajuste"):
+        return False
+    try:
+        aprendidos = dict(repo.ajuste("titulos_aprendidos", {}) or {})
+        for cargo_id in {p.get("cargo_id") for p in rev.get("perfiles") or [] if p.get("cargo_id")}:
+            lista = list(aprendidos.get(cargo_id) or [])
+            if titulo.casefold() not in {t.casefold() for t in lista}:
+                aprendidos[cargo_id] = (lista + [titulo])[-TOPE_APRENDIDOS:]
+        repo.guardar_ajuste("titulos_aprendidos", aprendidos)
+        return True
+    except Exception:  # noqa: BLE001 — la asignación ya quedó hecha; aprender es una ayuda
+        return False

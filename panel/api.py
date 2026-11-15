@@ -161,6 +161,17 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
     def expandir(body: Expansion):
         return sugerir(body.cargo)
 
+    @app.post("/api/cargos/funciones")
+    def proponer_funciones(body: dict):
+        # Contrato v25: el cargo tal como está en el borrador (nombre y términos); no guarda nada.
+        cargo = {"nombre": str(body.get("nombre") or "")[:120],
+                 "terminos_exactos": [str(x)[:120] for x in body.get("terminos_exactos") or []][:30],
+                 "terminos_similares": [str(x)[:120] for x in body.get("terminos_similares") or []][:30],
+                 "terminos_excluidos": [str(x)[:120] for x in body.get("terminos_excluidos") or []][:30]}
+        if len(cargo["nombre"].strip()) < 2:
+            raise HTTPException(422, "Escribe el nombre del cargo.")
+        return servicio.proponer_funciones(repo, cargo)
+
     @app.post("/api/vista-previa")
     def vista_previa(body: VistaPrevia):
         try:

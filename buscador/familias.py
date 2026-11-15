@@ -82,6 +82,9 @@ def preparar(mapa_crudo):
         f["_herramientas"] = [normalizar.texto(h) for h in fam.get("herramientas", [])]
         f["_genericos"] = set()
         f["_excluir"] = _regex([normalizar.texto(e) for e in fam.get("excluir", [])])
+        # Contrato v25: funciones del cargo (huella) y sus términos exactos para leer la descripción.
+        f["_funciones"] = sorted({normalizar.texto(x) for x in fam.get("funciones") or [] if normalizar.texto(x)})
+        f["_exactos_desc"] = sorted({normalizar.texto(x) for x in fam.get("exactos") or [] if normalizar.texto(x)})
         resultado.append(f)
     return resultado
 
@@ -113,6 +116,44 @@ def _grado(fam, base, extremos):
         if fam["_una"][g] & extremos:
             return _baja(g)
     return None
+
+
+# Contrato v25: títulos que no dicen el oficio; con ellos manda lo que diga la descripción.
+GENERICOS = {"profesional", "especialista", "consultor", "consultora", "analista", "coordinador", "coordinadora",
+             "asociado", "asociada", "specialist", "consultant", "professional", "associate", "lead", "senior",
+             "junior", "experto", "experta", "expert"}
+GRADO_FUNCIONES = "funciones"  # nunca se entrega solo: va a «Por confirmar» (contrato v25)
+
+
+def _por_descripcion_panel(palabras, descripcion, excluidas):
+    """Contrato v25, solo cargos del panel: {familia: grado} leyendo la descripción cuando el título no encajó."""
+    desc = normalizar.texto(descripcion)[:12000]
+    if not desc:
+        return {}
+    salida = {}
+    generico = bool(palabras) and set(palabras) <= GENERICOS | {"de", "en", "y", "and", "of", "the", "i", "ii", "iii"}
+    for fam in mapa():
+        if not fam.get("_control_cargo") or fam["id"] in excluidas:
+            continue
+        if generico and fam["_exactos_desc"]:
+            veces = sum(len(re.findall(r"(?<![a-z0-9])" + re.escape(t) + r"(?![a-z0-9])", desc))
+                        for t in fam["_exactos_desc"])
+            if veces >= 2:
+                salida[fam["id"]] = "similar"
+                continue
+        funciones = fam["_funciones"]
+        if funciones:
+            halladas = sum(1 for t in funciones if normalizar.contiene_frase(desc, t))
+            if halladas >= max(4, -(-3 * len(funciones) // 10)):
+                salida[fam["id"]] = GRADO_FUNCIONES
+    return salida
+
+
+def funciones_halladas(descripcion, familia_id):
+    """Términos de la huella del cargo que aparecen en la descripción (para mostrarlos en la bandeja)."""
+    fam = next((f for f in mapa() if f["id"] == familia_id), None)
+    desc = normalizar.texto(descripcion)[:12000]
+    return [t for t in (fam or {}).get("_funciones", []) if normalizar.contiene_frase(desc, t)]
 
 
 def clasificar(titulo, descripcion=""):
@@ -152,6 +193,8 @@ def clasificar(titulo, descripcion=""):
             if fam_id not in excluidas:
                 salida[fam_id] = "similar"
     if not salida and descripcion:
+        salida.update(_por_descripcion_panel(palabras, descripcion, excluidas))
+    if not salida and descripcion:
         desc = normalizar.texto(descripcion)[:8000]
         palabras_set = set(palabras)
         for fam in mapa():
@@ -159,8 +202,9 @@ def clasificar(titulo, descripcion=""):
                 continue
             if sum(1 for h in fam["_herramientas"] if normalizar.contiene_frase(desc, h)) >= 2:
                 salida[fam["id"]] = "cercano"
+    orden = GRADOS + [GRADO_FUNCIONES]
     return sorted(({"familia": k, "coincidencia": v} for k, v in salida.items()),
-                  key=lambda x: GRADOS.index(x["coincidencia"]))
+                  key=lambda x: orden.index(x["coincidencia"]))
 
 
 def consultas(familia_id):
