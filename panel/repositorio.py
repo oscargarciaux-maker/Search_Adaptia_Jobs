@@ -282,6 +282,19 @@ class RepositorioSupabase:
                               "perfil_id": "in.(" + ",".join(perfil_ids) + ")", "select": "id,perfil_id"}, 1000)
         return Counter(r["perfil_id"] for r in filas)
 
+    def historial_ejecuciones(self, dias=7):
+        """Las búsquedas de los últimos días, la más reciente primero (una por fecha, SQL 009)."""
+        return self.ejecuciones()[:dias]
+
+    def asignaciones_por_cliente(self, ejecucion_ids):
+        """Paso 8 (Resumen por cliente): cuántas vacantes recibió cada cliente en cada búsqueda."""
+        from collections import Counter
+        if not ejecucion_ids:
+            return Counter()
+        filas = self._paginas("panel_asignaciones", "id", {"ejecucion_id": "in.(" + ",".join(ejecucion_ids) + ")",
+                              "select": "id,ejecucion_id,cliente_id"}, 1000)
+        return Counter((r["ejecucion_id"], r["cliente_id"]) for r in filas)
+
     def crear_asignaciones(self, filas):
         self.pedir("POST", "panel_asignaciones", params={"on_conflict": "ejecucion_id,perfil_id,vacante_id"},
                    headers={"Prefer": "resolution=ignore-duplicates"}, json=filas)
@@ -591,6 +604,34 @@ class RepositorioDemo:
     def conteo_asignaciones(self, ejecucion_id, perfil_ids):
         from collections import Counter
         return Counter()
+
+    def historial_ejecuciones(self, dias=7):
+        actual = self.ejecuciones()[0]
+        base = datetime.fromisoformat(actual["fecha"]).date()
+        return [actual] + [{"id": id_demo("ejecucion-" + str(n)), "fecha": (base - timedelta(days=n)).isoformat(),
+                            "revision": 1, "estado": "completa", "resumen": {}} for n in range(1, dias)]
+
+    # Recibidas de cada cliente de ejemplo: uno bajo su meta, otro cerca y el resto completos (números fijos).
+    _RITMO_DEMO = (1.0, 0.18, 0.75, 1.0, 0.9)
+
+    def asignaciones_por_cliente(self, ejecucion_ids):
+        from collections import Counter
+        cfg = Configuracion.model_validate(configuracion_demo())
+        metas = Counter()
+        for p in cfg.perfiles:
+            metas[str(p.cliente_id)] += p.meta_diaria or 0
+        actual = self.ejecuciones()[0]["id"]
+        salida = Counter()
+        for n, e in enumerate(ejecucion_ids):
+            for i, c in enumerate(cfg.clientes):
+                ritmo = self._RITMO_DEMO[i % len(self._RITMO_DEMO)]
+                variacion = 0 if e == actual else ((i * 7 + n * 3) % 5) - 2
+                salida[(e, str(c.id))] = max(0, min(metas[str(c.id)], round(metas[str(c.id)] * ritmo) + variacion))
+        with self.lock:
+            for a in self.estado.get("asignaciones_extra", []):
+                if actual in ejecucion_ids:
+                    salida[(actual, a["cliente_id"])] += 1
+        return salida
 
     def crear_asignaciones(self, filas):
         with self.lock:

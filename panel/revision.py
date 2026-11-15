@@ -329,6 +329,7 @@ def listar(repo, fecha):
                        "enlace": datos.get("enlace", ""), "pista": r.get("pista", ""), "sugerencia": r.get("sugerencia", []),
                        "motivo": r.get("motivo", ""), "funciones": r.get("motivo") == FUNCIONES,
                        "clientes": sorted({clientes.get(p["cliente_id"], "") for p in r.get("perfiles") or []} - {""}),
+                       "cliente_ids": sorted({p["cliente_id"] for p in r.get("perfiles") or [] if p.get("cliente_id")}),
                        "ayuda_faltantes": any(p.get("faltan") for p in r.get("perfiles") or []),
                        "iguales": max(0, por_ubicacion.get(r.get("ubicacion"), 0) - 1)})
     return {"pendientes": salida, "total": len(salida), "en_espera": len(todas),
