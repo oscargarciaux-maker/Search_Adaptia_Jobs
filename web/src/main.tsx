@@ -75,7 +75,8 @@ import type {
 import "./style.css";
 
 const uid = () => crypto.randomUUID();
-const colores = ["#2b7863", "#516e88", "#836641", "#766491", "#965a63"]; // ≥4,5:1 sobre su fondo tenue
+// Sistema de Adaptia: un color por cargo, con su valor en claro y en oscuro (≥4,5:1 sobre su fondo tenue).
+const colores = [1, 2, 3, 4, 5].map((n) => `var(--cargo-${n})`);
 const fecha = (v: string) =>
   new Date(v + "T12:00:00").toLocaleDateString("es-CO", {
     day: "numeric",
@@ -4774,7 +4775,7 @@ function App() {
                         className="role-symbol"
                         style={{
                           color: colores[i % 5],
-                          background: colores[i % 5] + "15",
+                          background: `color-mix(in srgb, ${colores[i % 5]} 10%, transparent)`,
                         }}
                       >
                         {c.nombre.toLowerCase().includes("front") ? (
