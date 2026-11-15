@@ -34,7 +34,11 @@ concurrency:
 jobs:
   bodega:
     runs-on: ubuntu-latest
-    timeout-minutes: 95
+    # 15 nov: la diaria con los perfiles reales pasó de 95 min y se cortó sin registrar nada. Margen mientras se mide
+    # cada etapa (las marcas [HH:MM:SS] del registro); la pasada de las 8:30 espera en cola (concurrency: publicar).
+    timeout-minutes: 150
+    env:
+      PYTHONUNBUFFERED: "1"  # el registro muestra cada etapa al momento, aunque la corrida se corte
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6

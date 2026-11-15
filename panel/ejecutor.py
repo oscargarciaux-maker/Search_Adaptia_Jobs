@@ -285,6 +285,7 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None):
         reutilizadas = _reutilizar(repo, cfg, fecha, estrictas, filas, fila)
     except Exception:  # noqa: BLE001 — completar con días anteriores nunca impide registrar lo del día
         pass
+    bodega.etapa(f"Asignadas {len(filas)}; completar con posts a quien va corto")
     try:
         posts = _posts(repo, cfg, fecha, estrictas, filas, fila)
     except Exception:  # noqa: BLE001 — los posts son el último recurso; nunca impiden registrar lo del día
@@ -296,6 +297,7 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None):
     if hasattr(repo, "candidatas_por_confirmar"):
         try:  # contrato v16: bandeja «Por confirmar» (y lo que las reglas del operador ya resuelven solas)
             from panel import revision
+            bodega.etapa("Preparar la bandeja «Por confirmar»")
             por_confirmar = revision.preparar_cola(repo, cfg, fecha, estrictas, filas)
         except Exception:  # noqa: BLE001 — la bandeja es una ayuda; nunca impide registrar lo del día
             por_confirmar = {}
@@ -352,6 +354,7 @@ def correr(salida, modo="diario", prueba=False, repo=None):
             bodega._config_operativa["empresas_objetivo"] = sorted({v["empresa"] for v in previas
                 if any(c["activo"] and grado(v["titulo"],c)[0] for c in cargos)})[:120]
             reporte = bodega.correr(salida, modo=modo, hoy=fecha)
+            bodega.etapa("Registrar asignaciones por perfil")
             if reglas:
                 try:
                     from panel import aprender

@@ -28,6 +28,13 @@ RAIZ = Path(__file__).resolve().parent.parent
 _config_operativa = None
 
 
+
+def etapa(texto):
+    """Hora (UTC) y etapa en el registro de Actions, para ver dónde se va el tiempo de una corrida (15 nov: la
+    corrida diaria se cortó a los 95 minutos sin dejar rastro). Solo nombres de etapas y conteos: nunca datos de
+    clientes."""
+    print(f"[{datetime.now(timezone.utc):%H:%M:%S}] {texto}", flush=True)
+
 def afinidad_vigente(original, actual, rol, roles, inventario):
     """¿La vacante elegida hoy para `rol` le sigue sirviendo? Sale de la validación final (13 nov).
     - Si ya no está en el inventario (cerrada o vieja), no.
@@ -109,6 +116,7 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
             return []
         crudas, stats = resultado[0], resultado[-1]
         salud[nombre] = dict(stats, segundos=round(time.monotonic() - t0))
+        etapa(f"Fuente {nombre}: {len(crudas)} avisos en {round(time.monotonic() - t0)} s")
         return resultado
 
     def f_linkedin():
@@ -390,7 +398,9 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
                                                                 remotos_cache=estado.get("remotos_cache", {})),
                                                       hoy, trabajo, solo_mapa=solo, **argumentos_central)
     else:
+        etapa(f"Buscar en las fuentes ({modo})")
         crudas, enlaces_ats, leidas, salud = recoger(cfg, estado, hoy, trabajo, previas=previas, **argumentos_central)
+    etapa(f"Limpiar {len(crudas)} avisos nuevos y {len(previas)} guardados")
     retiradas = []
     vacantes, sin_familia, descartes = limpiar(previas, crudas, hoy, cfg["dias_maximos"], enlaces_ats, leidas,
                                                consulta=consulta or "", retiradas=retiradas)
@@ -443,6 +453,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     if cfg.get("decisiones_operador"):
         from buscador import confirmar_ubicacion
         salud["Decisiones del operador"] = {"aplicadas": confirmar_ubicacion.aplicar_operador(vacantes, cfg["decisiones_operador"])}
+    etapa("Confirmar ubicaciones desde la ficha")
     if modo != "incremental" and not consulta and not prueba and cfg.get("confirmar_ubicacion", {}).get("fichas_por_corrida"):
         # Contrato v16: antes de dejar una vacante «por confirmar», leer el país en los datos estructurados de su ficha.
         from buscador import confirmar_ubicacion
@@ -456,9 +467,11 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
             salud["Ubicación desde la ficha"] = {"error": f"{type(e).__name__}"}
         limite = (date.fromisoformat(hoy) - timedelta(days=confirmar_ubicacion.VIGENCIA_DIAS * 2)).isoformat()
         _guardar_json(trabajo / "ubicacion_fichas.json", {u: d for u, d in memoria_fichas.items() if d.get("fecha", "") >= limite})
+    etapa(f"Comprobar enlaces ({len(vacantes)} vacantes)")
     vacantes = comprobar_destinos(vacantes)
     refuerzos = []
     posts_nuevos = []
+    etapa("Refuerzo de cargos con faltantes")
     if modo != "incremental" and not consulta and not prueba and cfg.get("refuerzo", {}).get("rondas", 0):
         from buscador import entrega, refuerzo
         entregadas = _leer_json(trabajo / "entregadas.json", {})
@@ -543,6 +556,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
             guardar(pendientes)
             reintentos_centrales[nombre] = dict(resultado, pendientes=len(pendientes))
         central.limpiar_lotes_confirmados()
+    etapa("Entrega del día")
     # Entrega diaria en el formato del contrato (no en una búsqueda profunda; en una prueba no se marca nada ni se sube)
     resumen_entrega = salud_anterior.get("entrega") if modo == "incremental" else None
     historico_entregas = salud_anterior.get("historico_entregas", []) if modo == "incremental" else []
