@@ -251,8 +251,14 @@ def correo(descripcion):
 
 
 # ── Filas ──────────────────────────────────────────────────────────────────────────────────────────────────────────
-def entregable(v, idiomas=("es", "en")):
-    """Motivo por el que la vacante no puede ir en la entrega, o '' si puede."""
+# Contrato v24: lo activa `panel.ejecutor.activar` mientras corre una versión del panel, para que el catálogo, la
+# comprobación de enlaces y la selección usen la misma regla geográfica. El modo heredado no lo toca.
+_PANEL = False
+
+
+def entregable(v, idiomas=("es", "en"), panel=None):
+    """Motivo por el que la vacante no puede ir en la entrega, o '' si puede. Contrato v24: con `panel`, basta con
+    evidencia geográfica (países cubiertos o del mundo, alcance mundial o franja horaria); cada perfil decide después."""
     if v.get("tipo") == "post":
         return "post de LinkedIn: no es una oferta formal"  # contrato v11: nunca cupo ni `ofertas`
     if v.get("descartada_operador"):
@@ -266,9 +272,15 @@ def entregable(v, idiomas=("es", "en")):
         return "sin descripción completa"   # sin texto no se sabe el idioma ni se detectan copias (contrato §2)
     if v.get("idioma") not in idiomas:
         return "idioma fuera del contrato"
-    if not v.get("paises"):
+    panel = _PANEL if panel is None else panel
+    if panel and not v.get("paises") and (v.get("paises_mundo") or v.get("alcance_mundial")) and \
+            v.get("confianza_pais") in {"alta", "media"}:
+        pass  # contrato v24: sirve a perfiles que viven, se mudarían o pueden trabajar en esos países
+    elif panel and v.get("zona_utc") and v.get("nota_pais") == "por zona horaria":
+        pass  # contrato v24: remota con horario; solo llega a perfiles que aceptan esa zona
+    elif not v.get("paises"):
         return "no se puede aplicar desde los países"
-    if v.get("confianza_pais") not in {"alta", "media"} or v.get("nota_pais") == "por zona horaria":
+    elif v.get("confianza_pais") not in {"alta", "media"} or v.get("nota_pais") == "por zona horaria":
         return "elegibilidad regional por confirmar"
     if (v.get("verificacion") or {}).get("estado") == "rechazada":
         return "enlaces rechazados: " + v["verificacion"].get("motivo", "sin destino válido")

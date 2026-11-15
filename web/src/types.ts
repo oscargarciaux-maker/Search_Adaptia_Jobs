@@ -173,6 +173,8 @@ export type Embudo = {
   ampliadas: number;
   principal_perdida: string;
   filtros_que_cortan?: Record<string, number>;
+  de_su_busqueda?: number;
+  de_la_amplia?: number;
 };
 export type Contacto = {
   telefono: string;

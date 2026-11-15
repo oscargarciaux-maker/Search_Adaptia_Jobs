@@ -217,6 +217,16 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
     return crudas, enlaces_ats, empresas_leidas, salud
 
 
+def _sirve_a_perfiles(v):
+    """Contrato v24 (solo modo panel): un aviso de fuera de LATAM y España se conserva si nombra un país que algún
+    perfil necesita (residencia, mudanza, permiso o ciudad), o si pide una franja horaria y algún perfil acepta horario."""
+    cfg = config()
+    objetivo = set(cfg.get("paises_objetivo_mundo") or [])
+    if objetivo & set(v.get("paises_mundo") or []):
+        return True
+    return bool(cfg.get("acepta_horario") and v.get("zona_utc"))
+
+
 def limpiar(previas, crudas, hoy, dias_maximos, enlaces_ats, empresas_leidas, consulta="", retiradas=None):
     """Convierte, junta con lo anterior, quita viejas y cerradas. Devuelve (vacantes, títulos sin familia, conteos)."""
     sin_familia = Counter()
@@ -237,7 +247,7 @@ def limpiar(previas, crudas, hoy, dias_maximos, enlaces_ats, empresas_leidas, co
             else:
                 descartes["sin enlace donde postular"] += 1
             continue
-        if not v["paises"]:
+        if not v["paises"] and not _sirve_a_perfiles(v):
             fuera.append(v)
             continue
         nuevas.append(v)

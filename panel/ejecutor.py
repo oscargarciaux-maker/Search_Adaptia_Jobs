@@ -5,7 +5,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from buscador import bodega, entrega, familias, paises, supabase
+from buscador import bodega, entrega, familias, paises, supabase, normalizar
 from panel.afinidad import AMPLIACIONES, MINIMO_POR_PERFIL, evaluar, evaluar_ampliada
 from panel.modelos import Configuracion
 from pydantic import ValidationError
@@ -21,10 +21,11 @@ def validar_version(version):
 
 
 def lugares_perfil(p, nombres=None):
-    """Contrato v8: su país (remoto si lo acepta), las remotas regionales y, con híbrido/presencial, sus oficinas."""
+    """Contrato v8: su país (remoto si lo acepta), las remotas regionales y, con híbrido/presencial, sus oficinas.
+    Contrato v24: los países de fuera de la tabla propia van por su nombre en inglés (LinkedIn) y cada ciudad del perfil
+    es un lugar más."""
     nombres = nombres or {x["codigo"]: x["nombre"] for x in paises.datos()["paises"]}
-    # Contrato v23: residencia o mudanza fuera de LATAM y España; nombre de la tabla mundial.
-    nombres = {**{x["codigo"]: x["nombre"] for x in paises.mundo()["lista"]}, **nombres}
+    nombres = {**{x["codigo"]: x["nombre_en"] for x in paises.mundo()["lista"]}, **nombres}
     lugares = {}
     if "remoto" in p.modalidades:
         lugares["REMOTO_" + p.vive_en] = {"location": nombres[p.vive_en], "f_WT": "2"}
@@ -33,7 +34,22 @@ def lugares_perfil(p, nombres=None):
     if {"hibrido", "presencial"} & set(p.modalidades):
         for codigo in p.paises_oficina:
             lugares[codigo] = {"location": nombres[codigo]}
+        for ciudad in p.ciudades:
+            lugares["CIUDAD_" + normalizar.texto(ciudad).replace(" ", "_").upper()] = {"location": ciudad}
     return lugares
+
+
+def objetivo_mundo(cfg):
+    """Contrato v24: países (de cualquier parte) que necesitan los perfiles activos: residencia, mudanza, permiso
+    legal y el país de sus ciudades cuando se reconoce. Y si algún perfil acepta horario de otras zonas."""
+    salida = set()
+    acepta = False
+    for p in cfg.perfiles_activos():
+        salida |= {p.vive_en, *p.paises_presenciales_extra, *p.puede_trabajar_en}
+        for ciudad in p.ciudades:
+            salida |= set(paises.alcance("", ciudad).get("paises_mundo") or [])
+        acepta = acepta or bool(p.acepta_horario)
+    return sorted(salida), acepta
 
 
 def preparar(version, fecha):
@@ -70,6 +86,7 @@ def preparar(version, fecha):
     motor["paises_activos"] = sorted({p for x in mapa for p in x["paises_objetivo"]})
     motor["dias_maximos"] = max(p.antiguedad_dias for p in cfg.perfiles_activos())
     motor["control_dirigido"] = True
+    motor["paises_objetivo_mundo"], motor["acepta_horario"] = objetivo_mundo(cfg)
     motor["presupuestos"].update(linkedin_busquedas=min(300, max(24, len(roles) * 24)),
         indeed_busquedas=min(72, max(6, len(roles) * 8)), getonbrd_busquedas=min(30, len(roles) * 4),
         computrabajo_busquedas=min(90, max(12, len(roles) * 12)),
@@ -81,14 +98,15 @@ def preparar(version, fecha):
 @contextmanager
 def activar(version, fecha):
     mapa, cfg, motor = preparar(version, fecha)
-    anterior_e, anterior_b = entrega._config_operativa, bodega._config_operativa
+    from buscador import contrato
+    anterior_e, anterior_b, anterior_c = entrega._config_operativa, bodega._config_operativa, contrato._PANEL
     familias.configurar(mapa)
-    entrega._config_operativa, bodega._config_operativa = cfg, motor
+    entrega._config_operativa, bodega._config_operativa, contrato._PANEL = cfg, motor, True
     try:
         yield cfg
     finally:
         familias.configurar()
-        entrega._config_operativa, bodega._config_operativa = anterior_e, anterior_b
+        entrega._config_operativa, bodega._config_operativa, contrato._PANEL = anterior_e, anterior_b, anterior_c
 
 
 def iniciar(repo, version, fecha):

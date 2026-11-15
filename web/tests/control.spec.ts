@@ -709,7 +709,7 @@ test("contrato v23: residencia en el mundo, permiso de trabajo, horario y ciudad
     .selectOption({ label: "Alemania" });
   await dialog.getByLabel("Presencial en el perfil 1").check();
   const ciudades = dialog.getByLabel(
-    "Solo en estas ciudades (opcional), perfil 1",
+    "Ciudades donde trabajaría (la suya y a las que se mudaría), perfil 1",
   );
   await ciudades.fill("Berlín");
   await ciudades.press("Enter");

@@ -26,6 +26,13 @@ def config():
     return yaml.safe_load((RAIZ / "datos" / "entrega.yaml").read_text(encoding="utf-8"))
 
 
+def _fuente(v):
+    """Fuente principal de la vacante: «LinkedIn» si alguna copia vino de LinkedIn público, si no la primera."""
+    fuentes = [v.get("fuente") or ""] + list(v.get("fuentes") or [])
+    return "LinkedIn" if any(str(f).startswith("LinkedIn") and "Apify" not in str(f) for f in fuentes) else \
+        (fuentes[0] or "otra")
+
+
 def meta_de(rol, cfg):
     return rol.get("cupo", cfg["por_rol"])
 
@@ -294,7 +301,7 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificac
             motivos["enlaces sin comprobar o rechazados"] += 1
             descartes_rol[rol["id"]]["enlaces sin comprobar o rechazados"] += 1
             continue
-        motivo = contrato.entregable(v, tuple(cfg.get("idiomas", ["es", "en"])))
+        motivo = contrato.entregable(v, tuple(cfg.get("idiomas", ["es", "en"])), panel=panel or None)
         if motivo:
             motivos[motivo] += 1
             descartes_rol[rol["id"]][motivo] += 1
@@ -332,6 +339,8 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificac
             "idiomas": dict(Counter(v["idioma"] for v in elegidas)),
             "niveles": dict(Counter(contrato.seniority(v["titulo"]) or "sin nivel" for v in elegidas)),
             "paises": dict(Counter((v["paises"][0] if len(v["paises"]) == 1 else "varios") for v in elegidas)),
+            # Contrato v24: de qué fuente vino cada entregada (LinkedIn = búsqueda por perfil en modo panel).
+            "fuentes": dict(Counter(_fuente(v) for v in elegidas)),
             "remotas": sum(v["modalidad"] == "remoto" for v in elegidas),
             "remotas_amplias": sum(prioridad_remota(v) == 0 for v in elegidas),
             "descartadas": dict(descartes_rol[rol["id"]]),
@@ -409,6 +418,9 @@ def embudo(vacantes, entregadas, hoy, cfg=None, resumen=None):
     for rid, e in salida.items():
         r = ((resumen or {}).get("roles") or {}).get(rid, {})
         e["entregadas"], e["ampliadas"] = r.get("entregadas", 0), sum((r.get("ampliadas") or {}).values())
+        fuentes = r.get("fuentes") or {}
+        e["de_su_busqueda"] = fuentes.get("LinkedIn", 0)
+        e["de_la_amplia"] = sum(fuentes.values()) - e["de_su_busqueda"]
         caidas = {etapa: e[anterior] - e[etapa] for anterior, etapa in zip(ETAPAS_EMBUDO, ETAPAS_EMBUDO[1:])}
         mayor = max(caidas, key=caidas.get) if any(caidas.values()) else None
         e["principal_perdida"] = PERDIDA[mayor] if mayor else ""

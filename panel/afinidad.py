@@ -75,7 +75,7 @@ def evaluar(v, perfil, hoy=None):
     horario = modo not in ("hibrido", "presencial") and horario_compatible(v, p)
     if v.get("confianza_pais") not in {"alta", "media"} and not horario:
         motivos.append("país sin elegibilidad confirmada")
-    elif modo in ("hibrido", "presencial") and not mundo_v & set(p.paises_oficina):
+    elif modo in ("hibrido", "presencial") and not mundo_v & set(p.paises_oficina) and not en_sus_ciudades(v, p.ciudades):
         motivos.append("oficina en otro país")
     elif modo in ("hibrido", "presencial") and p.ciudades and otra_ciudad(v, p.ciudades):
         motivos.append("oficina en otra ciudad")
@@ -155,6 +155,12 @@ def horario_compatible(v, p):
     if utc is not None:
         franjas.append((utc - 2, utc + 2))
     return any(zona[0] <= hi and lo <= zona[1] for lo, hi in franjas)
+
+
+def en_sus_ciudades(v, ciudades):
+    """Contrato v24: la ubicación del aviso nombra una de las ciudades donde trabajaría (la ciudad implica el país)."""
+    ubicacion = normalizar.texto(v.get("ubicacion") or "")
+    return bool(ubicacion) and any(normalizar.contiene_frase(ubicacion, normalizar.texto(c)) for c in ciudades)
 
 
 def otra_ciudad(v, ciudades):

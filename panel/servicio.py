@@ -266,7 +266,7 @@ def resultados(repo, cliente_id=None, fecha=None):
             filtros["compatible"] = False
             filtros["motivos"].append("el título actual no corresponde al cargo configurado")
         es_post = actual.get("tipo") == "post"  # contrato v11: post de LinkedIn sin ficha formal, con su etiqueta
-        no_apta = contrato.entregable_post(actual) if es_post else contrato.entregable(actual)
+        no_apta = contrato.entregable_post(actual) if es_post else contrato.entregable(actual, panel=True)
         enlace = enlace_utilizable(row) if filtros["compatible"] and not no_apta else ""
         clave = row["vacante_id"]
         if clave in vistas and (vistas[clave]["estado"] == "lista" or not enlace):
