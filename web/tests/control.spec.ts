@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { revisarContraste } from "./contraste";
 
 // Sección 5 (13 nov): sin menú lateral; cada sección se abre desde su tarjeta del resumen.
 const accion: Record<string, string> = {
@@ -925,4 +926,79 @@ test("paso 8: una tarjeta por cliente, detalle con 7 días y dos columnas desde 
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+});
+
+test("paso 9: modo oscuro con botón, recordado, por la dirección o por el sistema, y con contraste AA", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
+  await page.goto("/");
+  const html = page.locator("html");
+  await expect(html).not.toHaveAttribute("data-tema", /.+/);
+  await page.getByRole("button", { name: "Cambiar a modo oscuro" }).click();
+  await expect(html).toHaveAttribute("data-tema", "oscuro");
+  await page.reload();
+  await expect(html).toHaveAttribute("data-tema", "oscuro");
+  const fondo = () =>
+    page.evaluate(
+      () => getComputedStyle(document.documentElement).backgroundColor,
+    );
+  expect(await fondo()).toBe("rgb(19, 26, 23)");
+
+  // Contraste AA en oscuro, sección por sección (y con los formularios abiertos).
+  const revisar = async (donde: string) => {
+    await page.getByRole("heading", { level: 1 }).waitFor();
+    await page.waitForTimeout(300);
+    const fallos = await page.evaluate(revisarContraste);
+    expect(fallos, donde).toEqual([]);
+  };
+  for (const h of [
+    "",
+    "#clientes",
+    "#cargos",
+    "#vacantes",
+    "#por-confirmar",
+    "#actividad",
+    "#mensajes",
+  ]) {
+    await page.goto("/" + h);
+    await revisar(h || "resumen");
+  }
+  await page.goto("/#clientes");
+  await page
+    .getByRole("button", { name: /^Editar / })
+    .first()
+    .click();
+  await revisar("formulario de cliente");
+  await page.keyboard.press("Escape");
+  await page.goto("/");
+  await page.locator(".cliente-mini").first().click();
+  await revisar("detalle de cliente");
+  await page.keyboard.press("Escape");
+
+  // Volver a claro: se recuerda igual.
+  await page.getByRole("button", { name: "Cambiar a modo claro" }).click();
+  await expect(html).toHaveAttribute("data-tema", "claro");
+  await page.reload();
+  expect(await fondo()).toBe("rgb(246, 247, 245)");
+  await revisar("resumen en claro");
+
+  // Sin elección, sigue el modo del computador.
+  await page.evaluate(() => localStorage.removeItem("tema"));
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.reload();
+  await expect(html).not.toHaveAttribute("data-tema", /.+/);
+  expect(await fondo()).toBe("rgb(19, 26, 23)");
+  await expect(
+    page.getByRole("button", { name: "Cambiar a modo claro" }),
+  ).toBeVisible();
+
+  // ?tema=oscuro (lo que mandaría Adaptia) manda sobre el sistema y no se guarda.
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.goto("/?tema=oscuro");
+  await expect(html).toHaveAttribute("data-tema", "oscuro");
+  expect(await page.evaluate(() => localStorage.getItem("tema"))).toBeNull();
+  await page.goto("/?tema=claro");
+  await expect(html).toHaveAttribute("data-tema", "claro");
 });
