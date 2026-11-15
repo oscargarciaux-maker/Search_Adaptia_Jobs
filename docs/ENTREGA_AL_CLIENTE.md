@@ -124,8 +124,8 @@ vacantes también tarda unos segundos mientras lee el catálogo. Detalle técnic
 
 **Cómo cambiar las vacantes que llegan**
 
-1. **Cargos y cupos**: crear los cargos que quieres (revisar sus denominaciones) y repartir exactamente 120.
-2. **Clientes**: cada cargo con cupo necesita al menos un perfil de cliente con sus filtros. Mira la estimación
+1. **Cargos y metas**: crear los cargos que quieres (revisar sus nombres) y fijar el techo del día (120 por defecto).
+2. **Clientes**: cada perfil tiene su meta diaria y sus filtros; las metas de los clientes reales deben caber en el techo. Mira la estimación
    «≈ N vacantes guardadas aún no entregadas» o **Estimar con búsqueda en vivo** y usa «Aplicar» si un filtro deja muy pocas.
 3. **Programar para mañana**. La versión rige desde el día siguiente en Colombia: la primera búsqueda que la usa es la de las 6:30 a. m.
    del día siguiente.
