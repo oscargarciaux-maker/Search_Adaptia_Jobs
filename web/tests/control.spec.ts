@@ -944,7 +944,7 @@ test("paso 9: modo oscuro con botón, recordado, por la dirección o por el sist
     page.evaluate(
       () => getComputedStyle(document.documentElement).backgroundColor,
     );
-  expect(await fondo()).toBe("rgb(19, 26, 23)");
+  expect(await fondo()).toBe("rgb(5, 7, 14)");
 
   // Contraste AA en oscuro, sección por sección (y con los formularios abiertos).
   const revisar = async (donde: string) => {
@@ -981,7 +981,7 @@ test("paso 9: modo oscuro con botón, recordado, por la dirección o por el sist
   await page.getByRole("button", { name: "Cambiar a modo claro" }).click();
   await expect(html).toHaveAttribute("data-tema", "claro");
   await page.reload();
-  expect(await fondo()).toBe("rgb(246, 247, 245)");
+  expect(await fondo()).toBe("rgb(240, 247, 255)");
   await revisar("resumen en claro");
 
   // Sin elección, sigue el modo del computador.
@@ -989,7 +989,7 @@ test("paso 9: modo oscuro con botón, recordado, por la dirección o por el sist
   await page.emulateMedia({ colorScheme: "dark" });
   await page.reload();
   await expect(html).not.toHaveAttribute("data-tema", /.+/);
-  expect(await fondo()).toBe("rgb(19, 26, 23)");
+  expect(await fondo()).toBe("rgb(5, 7, 14)");
   await expect(
     page.getByRole("button", { name: "Cambiar a modo claro" }),
   ).toBeVisible();

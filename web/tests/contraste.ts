@@ -27,9 +27,13 @@ export const revisarContraste = () => {
     for (let e = el; e; e = e.parentElement) {
       const cs = getComputedStyle(e);
       if (cs.backgroundImage && cs.backgroundImage.includes("gradient")) {
-        const m = cs.backgroundImage.match(/rgba?\([^)]+\)/);
-        if (m) {
-          capas.push(parse(m[0]));
+        // Un brillo translúcido encima de un degradado opaco: cuenta el color opaco, que es el fondo real.
+        const colores = (cs.backgroundImage.match(/rgba?\([^)]+\)/g) || []).map(
+          parse,
+        );
+        const opaco = colores.find((c) => c && c.a >= 1) || colores[0];
+        if (opaco) {
+          capas.push(opaco);
           break;
         }
       }
