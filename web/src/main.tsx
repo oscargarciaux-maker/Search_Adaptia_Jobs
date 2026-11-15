@@ -3676,16 +3676,19 @@ function ImportarClientes({
       vigente = false;
     };
   }, [contenido, actuales]);
+  const hayQueBorrar = actuales === "borrar" && !!previa?.borrar.length;
   const listo =
     !!previa &&
     !previa.errores &&
     !dirty &&
-    (actuales !== "borrar" || confirmacion.trim().toUpperCase() === "BORRAR");
+    (!hayQueBorrar || confirmacion.trim().toUpperCase() === "BORRAR");
   async function importar() {
     setOcupado(true);
     try {
       const r = await api<{
         importados: number;
+        actualizados: number;
+        nuevos: number;
         borrados: number;
         archivados: number;
         estado: EstadoConfig;
@@ -3695,7 +3698,7 @@ function ImportarClientes({
       });
       onListo(r.estado);
       notify(
-        `${r.importados} ${r.importados === 1 ? "cliente importado" : "clientes importados"}` +
+        `${r.actualizados} ${r.actualizados === 1 ? "cliente actualizado" : "clientes actualizados"} (conservan lo que recibieron), ${r.nuevos} ${r.nuevos === 1 ? "nuevo" : "nuevos"}` +
           (r.borrados ? `, ${r.borrados} borrados` : "") +
           (r.archivados ? `, ${r.archivados} archivados` : "") +
           ". Revísalos y pulsa «Programar para mañana».",
@@ -3745,7 +3748,9 @@ function ImportarClientes({
           />
         </div>
         <fieldset className="importar-actuales">
-          <legend>¿Qué hago con los clientes que ya están?</legend>
+          <legend>
+            ¿Qué hago con los clientes que no están en el archivo?
+          </legend>
           <label>
             <input
               type="radio"
@@ -3753,7 +3758,7 @@ function ImportarClientes({
               checked={actuales === "mantener"}
               onChange={() => setActuales("mantener")}
             />
-            Mantenerlos (los nuevos se suman)
+            Mantenerlos como están
           </label>
           <label>
             <input
@@ -3773,7 +3778,7 @@ function ImportarClientes({
             />
             Borrarlos del todo
           </label>
-          {actuales === "borrar" && (
+          {hayQueBorrar && (
             <div className="importar-borrar">
               <p>
                 Se quitan de la configuración junto con sus perfiles, su
@@ -3818,6 +3823,14 @@ function ImportarClientes({
                 ? ` · ${previa.errores} ${previa.errores === 1 ? "error" : "errores"} por corregir`
                 : " · sin errores"}
             </p>
+            <p className="importar-resumen">
+              {previa.actualizados.length}{" "}
+              {previa.actualizados.length === 1
+                ? "se actualiza"
+                : "se actualizan"}{" "}
+              (conservan lo que ya recibieron) · {previa.nuevos.length}{" "}
+              {previa.nuevos.length === 1 ? "nuevo" : "nuevos"}
+            </p>
             {previa.borrar.length > 0 && (
               <p className="importar-aviso">
                 Se borrarán del todo: {previa.borrar.join(", ")}.
@@ -3859,7 +3872,10 @@ function ImportarClientes({
                   <span className="importar-fila-cabeza">
                     <span>
                       <b>{f.cliente || "Sin nombre"}</b> ·{" "}
-                      {f.cargo || "Sin cargo"}
+                      {f.cargo || "Sin cargo"}{" "}
+                      <em className="importar-estado">
+                        {f.estado === "actualiza" ? "Se actualiza" : "Nuevo"}
+                      </em>
                     </span>
                     <small>
                       Fila {f.fila}

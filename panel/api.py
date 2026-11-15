@@ -172,9 +172,7 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         from panel import importar
         if body.revision is None:
             raise HTTPException(422, "Falta la revisión de la configuración.")
-        if body.actuales == "borrar" and body.confirmacion.strip().upper() != "BORRAR":
-            raise HTTPException(422, "Escribe BORRAR para confirmar que se borran los clientes actuales.")
-        r = importar.importar(repo, body.revision, body.contenido, body.actuales)
+        r = importar.importar(repo, body.revision, body.contenido, body.actuales, body.confirmacion)
         return {**r, "estado": a_v8(repo.config())}
 
     @app.post("/api/clientes/{cliente_id}/borrar")

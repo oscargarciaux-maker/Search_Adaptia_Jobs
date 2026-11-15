@@ -65,16 +65,56 @@ def test_columnas_obligatorias_y_archivo_vacio():
         importar.previa(_repo().config()["borrador"], "﻿  ")
 
 
-def test_mantener_no_admite_un_nombre_activo_repetido_y_archivar_si():
+def test_quien_ya_existe_se_actualiza_y_conserva_su_identidad():
+    """16 nov: importar no debe hacer desaparecer lo que alguien ya recibió. Mismo nombre = mismo cliente y, en el
+    mismo cargo, mismo perfil."""
     repo = _repo()
-    nombre = repo.config()["borrador"]["clientes"][0]["nombre"]
-    texto = f"nombre,cargo\n{nombre},QA\n"
-    assert importar.previa(repo.config()["borrador"], texto, "mantener")["errores"] == 1
-    r = importar.previa(repo.config()["borrador"], texto, "archivar")
-    assert r["errores"] == 0 and len(r["archivar"]) == 5
-    activos = [c for c in r["configuracion"]["clientes"] if c["activo"]]
-    assert [c["nombre"] for c in activos] == [nombre]
+    antes = repo.config()["borrador"]
+    cliente = antes["clientes"][1]  # «Cliente de ejemplo 02», Product Designer
+    perfil = next(p for p in antes["perfiles"] if p["cliente_id"] == cliente["id"])
+    texto = (f"nombre;cargo;vive_en;meta_diaria\n{cliente['nombre'].upper()};Product Designer;Perú;7\n"
+             f"{cliente['nombre']};QA;Perú;3\nPersona Nueva;QA;CO;5\n")
+    r = importar.previa(antes, texto, "mantener")
+    assert r["errores"] == 0 and r["actualizados"] == [cliente["nombre"].upper()] and r["nuevos"] == ["Persona Nueva"]
+    assert [f["estado"] for f in r["filas"]] == ["actualiza", "actualiza", "nuevo"]
+    cfg = r["configuracion"]
+    assert len(cfg["clientes"]) == 6  # nadie se borra con «mantener»
+    suyos = [p for p in cfg["perfiles"] if p["cliente_id"] == cliente["id"]]
+    pd = next(p for p in suyos if p["cargo_id"] == perfil["cargo_id"])
+    assert pd["id"] == perfil["id"] and pd["vive_en"] == "PE" and pd["meta_diaria"] == 7
+    assert len(suyos) == 2  # sus perfiles son los del archivo
+    # Archivar o borrar solo afecta a quienes no están en el archivo.
+    r = importar.previa(antes, texto, "archivar")
+    assert len(r["archivar"]) == 4 and cliente["nombre"] not in r["archivar"]
+    assert next(c for c in r["configuracion"]["clientes"] if c["id"] == cliente["id"])["activo"]
+    r = importar.previa(antes, texto, "borrar")
+    assert len(r["borrar"]) == 4 and cliente["id"] not in r["_borrados"]
 
+
+def test_nombre_anterior_renombra_sin_perder_la_identidad():
+    repo = _repo()
+    antes = repo.config()["borrador"]
+    cliente = antes["clientes"][0]
+    texto = f"nombre;nombre_anterior;cargo\nCamila Prueba;{cliente['nombre']};Product Designer\n"
+    r = importar.previa(antes, texto, "mantener")
+    nuevo = next(c for c in r["configuracion"]["clientes"] if c["id"] == cliente["id"])
+    assert r["errores"] == 0 and nuevo["nombre"] == "Camila Prueba" and r["nuevos"] == []
+    malo = importar.previa(antes, "nombre;nombre_anterior;cargo\nX;No Existe;QA\n", "mantener")
+    assert "nombre_anterior" in " ".join(malo["filas"][0]["errores"])
+
+
+def test_actualizar_conserva_el_whatsapp_si_la_fila_no_lo_trae_y_sigue_viendose_lo_de_hoy():
+    repo = _repo()
+    cliente = repo.config()["borrador"]["clientes"][1]
+    repo.guardar_contacto(cliente["id"], {"telefono": "+573001112222", "nombre_saludo": "Ana", "consentimiento": True})
+    antes = TestClient(crear_app(demo=True, repositorio=repo)).get("/api/resumen-clientes").json()
+    hoy_antes = antes["dias"][-1]["clientes"][cliente["id"]]
+    importar.importar(repo, repo.config()["revision"], f"nombre;cargo\n{cliente['nombre']};Product Designer\n", "borrar",
+                      "BORRAR")
+    assert {c["cliente_id"] for c in repo.contactos()} == {cliente["id"]}
+    despues = TestClient(crear_app(demo=True, repositorio=repo)).get("/api/resumen-clientes").json()
+    assert despues["dias"][-1]["clientes"][cliente["id"]] == hoy_antes
+    assert [c["id"] for c in repo.config()["borrador"]["clientes"]] == [cliente["id"]]
 
 def test_borrar_quita_clientes_perfiles_contactos_y_mensajes_y_conserva_cargos():
     repo = _repo()
@@ -83,7 +123,7 @@ def test_borrar_quita_clientes_perfiles_contactos_y_mensajes_y_conserva_cargos()
     repo.guardar_borrador({"fecha": "2026-11-15", "cliente_id": viejo, "texto": "hola", "vacantes": [], "cargos": [],
                            "estado": "pendiente"})
     cargos_antes = {c["id"] for c in repo.config()["borrador"]["cargos"]}
-    r = importar.importar(repo, repo.config()["revision"], CSV, "borrar")
+    r = importar.importar(repo, repo.config()["revision"], CSV, "borrar", "BORRAR")
     assert r["importados"] == 2 and r["borrados"] == 5 and r["cargos_nuevos"] == ["UX Writer"]
     cfg = repo.config()["borrador"]
     assert {c["nombre"] for c in cfg["clientes"]} == {"Ana Prueba", "Luis Prueba"}
