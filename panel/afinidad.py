@@ -2,7 +2,7 @@
 import re
 from datetime import date
 
-from buscador import contrato, enlaces, normalizar, paises, tiempos
+from buscador import contrato, enlaces, normalizar, paises, tasas, tiempos
 from panel.modelos import Perfil
 
 NIVELES = ["A1", "A2", "B1", "B2", "C1", "C2", "native"]
@@ -139,6 +139,7 @@ def evaluar(v, perfil, hoy=None):
 
 
 _POR_MES = {"month": 1, "year": 1 / 12}
+MARGEN_SALARIO = 0.10  # contrato v26: redondeos y variación de las tasas no descartan
 
 # Contrato v23: franjas aceptadas por el perfil, en horas UTC (incluye horario de verano).
 HORARIOS = {"us_este": (-5, -4), "us_pacifico": (-8, -7), "europa": (0, 2)}
@@ -232,17 +233,22 @@ def menciones_obligatorias(descripcion, palabras):
 
 def restriccion(v, r, titulo, descripcion):
     """Contrato v22: motivo de descarte de una restricción del perfil, o None. Solo con evidencia clara en el aviso:
-    sin salario, sin moneda igual o sin periodo comparable, nunca descarta."""
+    sin salario, sin moneda convertible o sin periodo comparable, nunca descarta. Contrato v26: otra moneda se convierte
+    con `datos/tasas_cambio.yaml` y solo descarta si queda más de un 10 % por debajo."""
     if r.tipo == "salario_minimo":
         _, minimo, maximo, moneda, periodo = contrato.salario(v.get("salario"), descripcion)
         valor = maximo if maximo != "" else minimo
-        if valor == "" or moneda != r.moneda or not periodo:
+        if valor == "" or not moneda or not periodo:
+            return None
+        valor = tasas.convertir(valor, moneda, r.moneda)
+        if valor is None:
             return None
         if "hour" in (periodo, r.periodo):
             if periodo != r.periodo:
                 return None
-            return "salario menor al aceptado" if valor < r.monto else None
-        return "salario menor al aceptado" if valor * _POR_MES[periodo] < r.monto * _POR_MES[r.periodo] else None
+            return "salario menor al aceptado" if valor < r.monto * (1 - MARGEN_SALARIO) else None
+        mensual, pedido = valor * _POR_MES[periodo], r.monto * _POR_MES[r.periodo]
+        return "salario menor al aceptado" if mensual < pedido * (1 - MARGEN_SALARIO) else None
     if r.tipo == "palabras":
         palabras = [normalizar.texto(w) for w in r.palabras]
         if any(normalizar.contiene_frase(normalizar.texto(titulo), w) for w in palabras) or \

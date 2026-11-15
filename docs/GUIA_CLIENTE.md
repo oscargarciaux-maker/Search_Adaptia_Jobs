@@ -13,7 +13,7 @@ qué ajuste añadiría más (por ejemplo, admitir experiencia o inglés no infor
 años exigidos y ~1 de cada 8 el nivel de inglés). En «Cargos y metas» cada cargo indica si alcanza para su meta. En cada perfil se puede elegir el margen de años (±3 o ±4;
 con 5 años o más no llegan vacantes junior ni de prácticas, y con 2 o menos no se filtra la experiencia), añadir
 «Prioridades» (sectores y palabras preferidas que solo ordenan) y reglas en «Este perfil NO acepta…» (salario menor
-en la misma moneda, palabras o tipo de contrato), que descartan solo si el aviso lo dice claramente. El país de residencia puede ser cualquiera; «También se mudaría a…» admite países de
+en cualquier moneda, con un margen del 10 %; palabras o tipo de contrato), que descartan solo si el aviso lo dice claramente. El país de residencia puede ser cualquiera; «También se mudaría a…» admite países de
 fuera de LATAM; con presencial o híbrida se pueden limitar ciudades; en «Permiso de trabajo y horario» se indican los
 países donde puede trabajar legalmente y los horarios que acepta (una remota que solo pide horario le llega si cruza
 esa zona). En «Por confirmar» se pueden añadir varias etiquetas a una vacante. Las «Ciudades donde trabajaría» incluyen aquellas a las que se mudaría: una vacante en una

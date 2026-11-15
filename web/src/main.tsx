@@ -2123,7 +2123,7 @@ function FiltrosPerfil({
         )}
         <p className="field-help">
           Cada regla descarta solo si el aviso lo dice claramente. El salario se
-          compara solo en la misma moneda.
+          compara también en otras monedas, con un margen del 10 %.
         </p>
       </fieldset>
     </div>

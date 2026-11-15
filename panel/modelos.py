@@ -138,7 +138,7 @@ class Perfil(Modelo):
     palabras_preferidas: list[str] = Field(default_factory=list, max_length=30)
     # Contrato v23: ciudades para presencial/híbrida, permiso legal para trabajar en otros países y horarios aceptados.
     ciudades: list[str] = Field(default_factory=list, max_length=10)
-    puede_trabajar_en: list[str] = Field(default_factory=list, max_length=30)
+    puede_trabajar_en: list[str] = Field(default_factory=list, max_length=60)  # v26: perfiles muy móviles
     acepta_horario: list[Literal["us_este", "us_pacifico", "europa"]] = Field(default_factory=list, max_length=3)
 
     @model_validator(mode="before")

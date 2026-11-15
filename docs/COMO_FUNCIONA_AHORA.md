@@ -21,6 +21,7 @@ código y probadas.
 | 10:15 a. m. | Se preparan los mensajes de WhatsApp de cada cliente. | En «Mensajes», «Abrir en WhatsApp», revisar y enviar. |
 | Cuando quieras | | Mirar el Resumen, decidir «Por confirmar» (un par de minutos) y descargar los CSV. |
 | Domingos 5:41 a. m. | Copia de seguridad cifrada de la base. | Nada. |
+| Una vez al mes | | Actualizar las tasas de cambio de los salarios: `python -m buscador.tasas --actualizar` y subir el cambio (o pedírselo a la IA). Con tasas de más de 120 días, los salarios en otra moneda dejan de descartar. |
 
 ## 3. El panel, pantalla por pantalla
 
@@ -41,7 +42,7 @@ derecha, el botón con el sol o la luna cambia entre modo claro y oscuro (por de
   - países a los que se mudaría, permiso legal para trabajar en otros países y horarios que acepta;
   - idioma del aviso, antigüedad, años de experiencia (±3 o ±4) e inglés;
   - prioridades: sectores y palabras que solo ordenan;
-  - «Este perfil NO acepta…»: salario menor, palabras o tipo de contrato.
+  - «Este perfil NO acepta…»: salario menor (comparado en cualquier moneda), palabras o tipo de contrato.
 
   Un cliente marcado **«Comunidad»** (el grupo de WhatsApp) recibe después de los reales, con lo que sobre del techo.
 - **Cargos y metas.** Aquí se define el **techo del día** (120 por defecto), que protege los consumos. Cada cargo

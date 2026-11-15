@@ -21,7 +21,8 @@ from panel.repositorio import ErrorRepositorio
 COLUMNAS = ["nombre", "comunidad", "whatsapp", "nombre_saludo", "acepto_whatsapp", "cargo", "meta_diaria", "vive_en",
             "modalidades", "ciudades", "se_mudaria_a", "puede_trabajar_en", "acepta_horario", "idiomas",
             "antiguedad_dias", "experiencia_anos", "margen_experiencia", "ingles_maximo", "sectores_preferidos",
-            "palabras_preferidas", "no_acepta_palabras", "salario_minimo", "no_acepta_contrato"]
+            "palabras_preferidas", "no_acepta_palabras", "salario_minimo", "no_acepta_contrato",
+            "nombres_del_cargo", "funciones_del_cargo"]
 OBLIGATORIAS = ("nombre", "cargo")
 ACTUALES = ("mantener", "archivar", "borrar")
 
@@ -34,6 +35,22 @@ PLANTILLA_EJEMPLO = {
     "margen_experiencia": "3", "ingles_maximo": "B2", "sectores_preferidos": "fintech", "palabras_preferidas": "Figma",
     "no_acepta_palabras": "call center", "salario_minimo": "2000 USD mes", "no_acepta_contrato": "prácticas",
 }
+
+# Regiones que se pueden escribir en las listas de países (perfiles muy móviles: «Europa», «UE», «LATAM»…).
+UE = ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT",
+      "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE"]
+EUROPA = UE + ["GB", "CH", "NO", "IS", "LI", "AD", "MC", "SM", "AL", "BA", "ME", "MK", "RS", "MD", "UA", "XK"]
+
+
+def _regiones():
+    from panel.revision import grupos_paises
+    g = grupos_paises()
+    latam = list(g["LATAM"])
+    return {"europa": EUROPA, "europe": EUROPA, "ue": UE, "union europea": UE, "eu": UE, "european union": UE,
+            "latam": latam, "latinoamerica": latam, "america latina": latam, "latam y espana": list(g["LATAM_ES"]),
+            "norteamerica": ["US", "CA", "MX"], "north america": ["US", "CA", "MX"],
+            "america": latam + ["US", "CA"], "americas": latam + ["US", "CA"], "toda america": latam + ["US", "CA"]}
+
 
 _SI = {"si", "s", "x", "true", "1", "yes", "y"}
 _NO = {"no", "n", "false", "0", ""}
@@ -117,7 +134,11 @@ def _pais(valor, errores, campo):
 
 
 def _paises(valor, errores, campo):
-    return [c for c in (_pais(v, errores, campo) for v in _lista(valor)) if c]
+    regiones, salida = _regiones(), []
+    for v in _lista(valor):
+        codigos = regiones.get(_norm(v)) or [_pais(v, errores, campo)]
+        salida += [c for c in codigos if c and c in paises.mundo()["codigos"] and c not in salida]
+    return salida
 
 
 def _mapa(valor, tabla, errores, campo, permitidos):
@@ -301,10 +322,14 @@ def previa(borrador, contenido, actuales="mantener"):
             clientes[clave] = cliente
         cargo = cargos.get(_nombre_cargo(cargo_txt)) if cargo_txt else None
         nuevo = False
+        extra_nombres, extra_funciones = _lista(datos.get("nombres_del_cargo")), _lista(datos.get("funciones_del_cargo"))
         if cargo_txt and not cargo:
             cargo = {"id": str(uuid4()), "nombre": cargo_txt[:120], "cupo": 0, "activo": True,
-                     "terminos_exactos": [cargo_txt[:120]], "terminos_similares": [], "terminos_excluidos": [],
-                     "terminos_cercanos": [], "funciones": []}
+                     "terminos_exactos": list(dict.fromkeys([cargo_txt[:120], *extra_nombres]))[:30],
+                     "terminos_similares": [], "terminos_excluidos": [], "terminos_cercanos": [],
+                     "funciones": extra_funciones[:40]}
+            for nombre in cargo["terminos_exactos"]:
+                cargos.setdefault(_nombre_cargo(nombre), cargo)
             cargos[_nombre_cargo(cargo_txt)] = cargo
             nuevos_cargos.append(cargo)
             nuevo = True
@@ -320,6 +345,8 @@ def previa(borrador, contenido, actuales="mantener"):
                 errores.append(_motivo(e))
         if nuevo:
             avisos.append(f"Cargo nuevo «{cargo['nombre']}»: revisa sus nombres y usa «Proponer funciones».")
+        elif cargo and (extra_nombres or extra_funciones) and cargo not in nuevos_cargos:
+            avisos.append(f"El cargo «{cargo['nombre']}» ya existe: sus nombres y funciones no se cambian desde aquí.")
         resultado.append({"fila": n, "cliente": nombre, "cargo": cargo["nombre"] if cargo else cargo_txt,
                           "vive_en": perfil.get("vive_en", ""), "modalidades": perfil.get("modalidades", []),
                           "meta": perfil.get("meta_diaria"), "errores": errores, "avisos": avisos,

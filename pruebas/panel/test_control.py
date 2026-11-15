@@ -1019,15 +1019,62 @@ def test_nivel_segun_los_anos(cfg):
     assert not afinidad.evaluar(pide_seis, _perfil_v22(cfg, experiencia_anos=3), hoy())["compatible"]
 
 
-def test_salario_minimo_solo_con_la_misma_moneda(cfg):
+def _tasas_fijas(monkeypatch, fecha=None):
+    from datetime import date
+    from buscador import tasas
+    monkeypatch.setattr(tasas, "tabla", lambda: {"fecha": fecha or date.today().isoformat(), "inestables": ["ARS", "VES"],
+                                                 "tasas": {"USD": 1.0, "EUR": 0.9, "COP": 4000.0, "ARS": 1500.0}})
+
+
+def test_salario_minimo_compara_en_la_misma_moneda(cfg, monkeypatch):
+    _tasas_fijas(monkeypatch)
     p = _perfil_v22(cfg, restricciones=[{"tipo": "salario_minimo", "monto": 3000, "moneda": "USD", "periodo": "month"}])
     bajo = trabajo(salario="USD 1.500 - 2.000 per month")
     alto = trabajo(salario="USD 40,000 - 50,000 per year")  # 4.166 al mes: pasa
-    otra_moneda = trabajo(salario="EUR 1.000 per month")
     sin_dato = trabajo(salario="")
     assert "salario menor al aceptado" in afinidad.evaluar(bajo, p, hoy())["motivos"]
-    for v in (alto, otra_moneda, sin_dato):
+    for v in (alto, sin_dato):
         assert "salario menor al aceptado" not in afinidad.evaluar(v, p, hoy())["motivos"]
+
+
+def test_salario_minimo_con_equivalencia_de_monedas_v26(cfg, monkeypatch):
+    _tasas_fijas(monkeypatch)
+    mil_usd = _perfil_v22(cfg, restricciones=[{"tipo": "salario_minimo", "monto": 1000, "moneda": "USD",
+                                               "periodo": "month"}])
+    motivo = "salario menor al aceptado"
+    assert motivo not in afinidad.evaluar(trabajo(salario="EUR 999 per month"), mil_usd, hoy())["motivos"]  # ≈1110 USD
+    assert motivo in afinidad.evaluar(trabajo(salario="EUR 700 per month"), mil_usd, hoy())["motivos"]  # ≈778 USD
+    assert motivo in afinidad.evaluar(trabajo(salario="COP 2.000.000 mensual"), mil_usd, hoy())["motivos"]  # 500 USD
+    assert motivo not in afinidad.evaluar(trabajo(salario="COP 4.500.000 mensual"), mil_usd, hoy())["motivos"]
+    # Margen del 10 %: 1050 frente a 1100 no descarta; 950 frente a 1100 sí.
+    mil_cien = _perfil_v22(cfg, restricciones=[{"tipo": "salario_minimo", "monto": 1100, "moneda": "USD",
+                                                "periodo": "month"}])
+    assert motivo not in afinidad.evaluar(trabajo(salario="USD 1,050 per month"), mil_cien, hoy())["motivos"]
+    assert motivo in afinidad.evaluar(trabajo(salario="USD 950 per month"), mil_cien, hoy())["motivos"]
+    # Moneda inestable, por hora frente a mensual: no se compara.
+    assert motivo not in afinidad.evaluar(trabajo(salario="ARS 100.000 por mes"), mil_usd, hoy())["motivos"]
+    assert motivo not in afinidad.evaluar(trabajo(salario="EUR 5 per hour"), mil_usd, hoy())["motivos"]
+
+
+def test_salario_con_tabla_vencida_no_descarta(cfg, monkeypatch):
+    _tasas_fijas(monkeypatch, fecha="2026-01-01")
+    p = _perfil_v22(cfg, restricciones=[{"tipo": "salario_minimo", "monto": 1000, "moneda": "USD", "periodo": "month"}])
+    assert "salario menor al aceptado" not in afinidad.evaluar(trabajo(salario="EUR 300 per month"), p, "2026-11-15")[
+        "motivos"]
+    assert "salario menor al aceptado" in afinidad.evaluar(trabajo(salario="USD 300 per month"), p, hoy())["motivos"]
+
+
+def test_actualizar_tasas_conserva_la_tabla_si_la_fuente_falla(tmp_path, monkeypatch):
+    from buscador import tasas
+    monkeypatch.setattr(tasas, "RUTA", tmp_path / "tasas.yaml")
+    tasas.tabla.cache_clear()
+    with pytest.raises(RuntimeError):
+        tasas.actualizar(lambda: {"result": "error"})
+    assert not (tmp_path / "tasas.yaml").exists()
+    tasas.actualizar(lambda: {"result": "success", "rates": {"USD": 1, "EUR": 0.9, "COP": 4000}})
+    assert tasas.tabla()["tasas"] == {"EUR": 0.9, "COP": 4000.0, "USD": 1.0}
+    assert round(tasas.convertir(900, "EUR", "USD"), 2) == 1000.0
+    tasas.tabla.cache_clear()
 
 
 def test_palabras_y_tipo_de_contrato_descartan(cfg):
