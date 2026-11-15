@@ -172,3 +172,15 @@ def test_nombres_y_funciones_solo_para_cargos_nuevos():
     antes = next(c for c in repo.config()["borrador"]["cargos"] if c["nombre"] == "QA")
     assert qa["terminos_exactos"] == antes["terminos_exactos"]  # un cargo existente no se cambia
     assert any("ya existe" in a for a in r["filas"][2]["avisos"])
+
+
+def test_admitir_ingles_y_experiencia_no_informados():
+    texto = ("nombre;cargo;ingles_maximo;experiencia_anos;admitir_ingles_no_informado;admitir_experiencia_no_informada\n"
+             "Persona A;QA;B2;5;sí;sí\nPersona B;QA;B2;5;;\nPersona C;QA;B2;5;quizás;no\n")
+    r = importar.previa(_repo().config()["borrador"], texto, "borrar")
+    assert "admitir_ingles_no_informado" in " ".join(r["filas"][2]["errores"])
+    texto = texto.replace("quizás", "no")
+    a, b, c = importar.previa(_repo().config()["borrador"], texto, "borrar")["configuracion"]["perfiles"]
+    assert a["aceptar_ingles_sin_dato"] and a["aceptar_experiencia_sin_dato"]
+    assert not b["aceptar_ingles_sin_dato"] and not b["aceptar_experiencia_sin_dato"]  # vacío = como un perfil nuevo
+    assert not c["aceptar_ingles_sin_dato"]

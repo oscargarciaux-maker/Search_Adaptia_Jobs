@@ -22,7 +22,8 @@ COLUMNAS = ["nombre", "comunidad", "whatsapp", "nombre_saludo", "acepto_whatsapp
             "modalidades", "ciudades", "se_mudaria_a", "puede_trabajar_en", "acepta_horario", "idiomas",
             "antiguedad_dias", "experiencia_anos", "margen_experiencia", "ingles_maximo", "sectores_preferidos",
             "palabras_preferidas", "no_acepta_palabras", "salario_minimo", "no_acepta_contrato",
-            "nombres_del_cargo", "funciones_del_cargo"]
+            "nombres_del_cargo", "funciones_del_cargo", "admitir_ingles_no_informado",
+            "admitir_experiencia_no_informada"]
 OBLIGATORIAS = ("nombre", "cargo")
 ACTUALES = ("mantener", "archivar", "borrar")
 
@@ -34,6 +35,7 @@ PLANTILLA_EJEMPLO = {
     "acepta_horario": "EE. UU. Este", "idiomas": "español|inglés", "antiguedad_dias": "14", "experiencia_anos": "5",
     "margen_experiencia": "3", "ingles_maximo": "B2", "sectores_preferidos": "fintech", "palabras_preferidas": "Figma",
     "no_acepta_palabras": "call center", "salario_minimo": "2000 USD mes", "no_acepta_contrato": "prácticas",
+    "admitir_ingles_no_informado": "sí", "admitir_experiencia_no_informada": "sí",
 }
 
 # Regiones que se pueden escribir en las listas de países (perfiles muy móviles: «Europa», «UE», «LATAM»…).
@@ -238,6 +240,12 @@ def _perfil(datos, errores, avisos):
         valor = _entero(datos.get(campo), errores, campo)
         if valor is not None:
             p[clave] = valor
+    # La mayoría de los avisos no dice el nivel de inglés ni los años: sin admitirlos, un perfil con esos filtros
+    # descarta casi todo (búsqueda del 15 nov). Vacío = como un perfil nuevo del panel (no admitidos).
+    for campo, clave in (("admitir_ingles_no_informado", "aceptar_ingles_sin_dato"),
+                         ("admitir_experiencia_no_informada", "aceptar_experiencia_sin_dato")):
+        if datos.get(campo):
+            p[clave] = _si_no(datos[campo], errores, campo)
     meta = _entero(datos.get("meta_diaria"), errores, "meta_diaria")
     p["meta_diaria"] = META_POR_DEFECTO if meta is None else meta
     ingles = _INGLES.get(_norm(datos.get("ingles_maximo")))
