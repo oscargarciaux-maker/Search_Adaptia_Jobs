@@ -3446,3 +3446,7 @@ select.margen {
 .revision-funciones .pill {
   margin-right: 6px;
 }
+/* Paso 7: cargo con una sola lista visible y opciones avanzadas plegadas. */
+.opciones-cargo {
+  margin: 4px 0 12px;
+}

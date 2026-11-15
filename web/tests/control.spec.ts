@@ -572,7 +572,7 @@ test("reunión 14 nov: comas separan términos y el cliente se recupera tras cer
   await ir(page, "Cargos y metas");
   await page.getByRole("button", { name: "Añadir cargo" }).first().click();
   const cargo = page.locator("dialog", { hasText: "Añadir un cargo" });
-  const afines = cargo.getByLabel("Cargos afines");
+  const afines = cargo.getByLabel("Nombres del cargo");
   await afines.fill("UX Writer, Content Designer; Redactor UX");
   await afines.press("Enter");
   for (const t of ["UX Writer", "Content Designer", "Redactor UX"])
@@ -753,6 +753,11 @@ test("contrato v25: proponer funciones y confirmar una vacante que coincide por 
     .first()
     .click();
   const dialog = page.getByRole("dialog");
+  // Paso 7: una sola lista visible; lo demás, plegado en «Opciones avanzadas».
+  await expect(dialog.getByLabel("Nombres del cargo")).toBeVisible();
+  await expect(dialog.getByLabel("Excluir estos términos")).toHaveCount(0);
+  await dialog.getByRole("button", { name: /^Opciones avanzadas/ }).click();
+  await expect(dialog.getByLabel("Excluir estos términos")).toBeVisible();
   await dialog.getByRole("button", { name: "Proponer funciones" }).click();
   await expect(page.getByText(/Se propusieron \d+ funciones/)).toBeVisible();
   await expect(

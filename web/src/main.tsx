@@ -562,54 +562,81 @@ function CargoDialog({
             Buscar denominaciones afines
           </button>
           {nota && <p className="helper note">{nota}</p>}
+          {/* Paso 7 (reunión 14 nov): una sola lista visible. Por dentro se conserva la diferencia: lo que ya era
+              principal sigue siéndolo y lo nuevo entra como afín. */}
           <TagInput
-            label="Denominaciones principales"
-            values={c.terminos_exactos}
-            onChange={(v) => setC({ ...c, terminos_exactos: v })}
-          />
-          <TagInput
-            label="Cargos afines"
-            values={c.terminos_similares}
-            onChange={(v) => setC({ ...c, terminos_similares: v })}
-          />
-          <TagInput
-            label="Cargos cercanos (solo si faltan vacantes)"
-            values={c.terminos_cercanos || []}
-            onChange={(v) => setC({ ...c, terminos_cercanos: v })}
+            label="Nombres del cargo"
+            values={Array.from(
+              new Set([...c.terminos_exactos, ...c.terminos_similares]),
+            )}
+            onChange={(v) => {
+              const exactos = c.terminos_exactos.filter((x) => v.includes(x));
+              setC({
+                ...c,
+                terminos_exactos: exactos,
+                terminos_similares: v.filter((x) => !exactos.includes(x)),
+              });
+            }}
           />
           <p className="helper">
-            Si un cliente no llega a 5 vacantes en el día, se completan primero
-            con avisos que no dicen años o inglés y luego con estos oficios
-            vecinos. En «Vacantes» aparecen marcadas como «Ampliada».
+            Todas las formas en que las empresas llaman a este cargo, en español
+            o inglés. Escríbelas una a una con Enter o pégalas separadas por
+            comas.
           </p>
-          <TagInput
-            label="Excluir estos términos"
-            values={c.terminos_excluidos}
-            onChange={(v) => setC({ ...c, terminos_excluidos: v })}
-          />
-          <TagInput
-            label="Funciones del cargo"
-            values={c.funciones || []}
-            onChange={(v) => setC({ ...c, funciones: v })}
-          />
-          <div className="funciones-acciones">
-            <button
-              type="button"
-              className="button secondary small"
-              disabled={proponiendo || c.nombre.trim().length < 2}
-              onClick={proponerFunciones}
-            >
-              <Sparkles size={15} />
-              {proponiendo ? "Buscando…" : "Proponer funciones"}
-            </button>
-            <Ayuda etiqueta="Funciones del cargo">
-              Tareas y herramientas típicas del cargo. Si una vacante tiene otro
-              título pero su descripción menciona varias de estas funciones,
-              llega a «Por confirmar» como «Coincide por funciones». Se proponen
-              comparando las vacantes del cargo con las de otros cargos; revisa
-              y ajusta la lista.
-            </Ayuda>
-          </div>
+          <Plegable
+            className="opciones-cargo"
+            inicial={Boolean(
+              (c.terminos_cercanos || []).length ||
+                c.terminos_excluidos.length ||
+                (c.funciones || []).length,
+            )}
+            mostrar={
+              "Opciones avanzadas" +
+              ((c.funciones || []).length
+                ? ` · ${(c.funciones || []).length} funciones`
+                : "")
+            }
+            ocultar="Ocultar opciones avanzadas"
+          >
+            <TagInput
+              label="Funciones del cargo"
+              values={c.funciones || []}
+              onChange={(v) => setC({ ...c, funciones: v })}
+            />
+            <div className="funciones-acciones">
+              <button
+                type="button"
+                className="button secondary small"
+                disabled={proponiendo || c.nombre.trim().length < 2}
+                onClick={proponerFunciones}
+              >
+                <Sparkles size={15} />
+                {proponiendo ? "Buscando…" : "Proponer funciones"}
+              </button>
+              <Ayuda etiqueta="Funciones del cargo">
+                Tareas y herramientas típicas del cargo. Si una vacante tiene
+                otro título pero su descripción menciona varias de estas
+                funciones, llega a «Por confirmar» como «Coincide por
+                funciones». Se proponen comparando las vacantes del cargo con
+                las de otros cargos; revisa y ajusta la lista.
+              </Ayuda>
+            </div>
+            <TagInput
+              label="Cargos cercanos (solo si faltan vacantes)"
+              values={c.terminos_cercanos || []}
+              onChange={(v) => setC({ ...c, terminos_cercanos: v })}
+            />
+            <p className="helper">
+              Si un cliente no llega a 5 vacantes en el día, se completan
+              primero con avisos que no dicen años o inglés y luego con estos
+              oficios vecinos. En «Vacantes» aparecen marcadas como «Ampliada».
+            </p>
+            <TagInput
+              label="Excluir estos términos"
+              values={c.terminos_excluidos}
+              onChange={(v) => setC({ ...c, terminos_excluidos: v })}
+            />
+          </Plegable>
           <p className="helper">
             No dependes de un listado cerrado. Puedes crear cualquier cargo y
             revisar sus términos sin modificar código.
