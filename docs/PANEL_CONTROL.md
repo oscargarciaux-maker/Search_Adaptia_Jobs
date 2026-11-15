@@ -16,24 +16,33 @@ Ambas se aplican por el instalador automático tras el respaldo; no hace falta c
 
 ## 1. Cómo preparar la búsqueda del siguiente día
 
-**Navegación (13 nov).** El panel no tiene menú propio: será una opción («Scraper») dentro de Adaptia. El **Resumen**
-muestra seis tarjetas (Clientes, Cargos y cupos, Vacantes, Por confirmar, Mensajes de hoy y Actividad); cada una abre su
-sección y «Volver al resumen» regresa. Cada sección tiene su dirección (`#clientes`, `#cargos`, `#vacantes`,
+Panorama corto y vigente: [COMO_FUNCIONA_AHORA.md](COMO_FUNCIONA_AHORA.md).
+
+**Navegación (13 nov, actualizada el 15 nov).** El panel no tiene menú propio: será una opción («Scraper») dentro de
+Adaptia. El **Resumen** muestra el bloque verde de clientes (una tarjeta por cliente con lo recibido frente a su meta;
+dos columnas desde 9 clientes; al tocarla se abre su detalle) y las tarjetas Techo del día, Vacantes, Por confirmar,
+Mensajes de hoy y Actividad; cada una abre su sección y «Volver al resumen» regresa. El botón sol/luna cambia el modo
+claro/oscuro (por defecto sigue al computador; `?tema=oscuro|claro` en la dirección lo fija sin guardarlo). Cada sección tiene su dirección (`#clientes`, `#cargos`, `#vacantes`,
 `#por-confirmar`, `#mensajes`, `#actividad`), así que el botón atrás del navegador funciona y se puede enlazar directo.
 
-1. Abrir **Cargos y cupos**. Añadir los cargos necesarios y repartir 120 vacantes diarias entre ellos. Por ejemplo,
-   Product Designer 50, Frontend 40 y QA 30. Se permite un borrador inferior a 120; solo se programa al completar 120.
-2. En cada cargo, revisar sus denominaciones principales, afines y exclusiones. **Buscar denominaciones afines** ofrece
+1. Abrir **Cargos y metas**. Definir el **techo del día** (120 por defecto, el máximo para cuidar los consumos) y
+   añadir los cargos necesarios. Ya no se reparten cupos: el cupo de cada cargo es la suma de las metas diarias de sus
+   perfiles (contrato v21). Se puede programar cuando las metas de los clientes reales caben en el techo; el cliente
+   «Comunidad» recibe después, con lo que sobre.
+2. En cada cargo, revisar sus «Nombres del cargo» y, en «Opciones avanzadas», las funciones del cargo (con
+   «Proponer funciones», contrato v25), los cargos cercanos y las exclusiones. **Buscar denominaciones afines** ofrece
    variantes y vocabulario disponible. Al guardar un cargo nuevo sin términos, primero se muestran sugerencias para
    revisarlas; después se confirma. Se puede escribir cualquier cargo y añadir términos sin modificar código.
 3. En **Clientes → Nuevo cliente**, usar un nombre o referencia interna. No se necesita teléfono ni contraseña del cliente.
-4. Añadir uno o más perfiles y elegir el cargo, **el país donde vive**, **las modalidades que acepta** (remoto, híbrido,
-   presencial; una o varias), plazo de publicación, idioma del aviso, experiencia e inglés. Remoto incluye toda vacante
+4. Añadir uno o más perfiles y elegir el cargo, su **meta diaria**, **el país donde vive** (cualquiera, v23), **las
+   modalidades que acepta** (remoto, híbrido, presencial; una o varias), plazo de publicación, idioma del aviso, años
+   de experiencia con su margen, inglés, prioridades y restricciones (v22), ciudades, permiso de trabajo y horarios
+   aceptados (v23–v24). Remoto incluye toda vacante
    remota abierta a su país (LATAM, Latinoamérica, mundial, España abierta a LATAM, listas que lo nombran); híbrido y
    presencial, solo con oficina en su país o en los opcionales «También se mudaría a…». Reglas: CONTRATO_DATOS_v8.md.
    Un cliente puede tener varios perfiles.
    Debajo de cada perfil aparece una **estimación**: cuántas vacantes ya guardadas y aún no entregadas cumplirían hoy
-   ese perfil, y qué ajuste sumaría más (con «Aplicar» para admitir datos no informados). En **Cargos y cupos** cada
+   ese perfil, y qué ajuste sumaría más (con «Aplicar» para admitir datos no informados). En **Cargos y metas** cada
    cargo muestra «alcanza para el cupo», «puede quedar corto» o «probable faltante». Usa las mismas reglas de la
    selección, no busca en internet ni guarda nada; un cargo nuevo empieza bajo porque todavía no se ha buscado.
    **Rescate hasta 5 (contrato v11):** si aun así falta, se admiten avisos con hasta 2 años de diferencia, hasta 4 por empresa, vacantes de días anteriores que esa persona nunca recibió y búsquedas de Apify dirigidas a ella. Como último recurso,
@@ -52,13 +61,13 @@ sección y «Volver al resumen» regresa. Cada sección tiene su dirección (`#c
 5. **Guardar borrador** conserva los cambios; todavía no cambia la búsqueda confirmada. Una advertencia muestra cambios
    sin guardar. Si otra ventana guardó antes, se rechaza la revisión antigua: recargar y revisar antes de guardar otra vez.
 6. **Programar para mañana** muestra la distribución, guarda los cambios pendientes y confirma una versión inmutable.
-   Entra en vigor al día siguiente según Bogotá. Se exige un perfil activo por cada cargo con cupo positivo.
+   Entra en vigor al día siguiente según Bogotá. Se exige un perfil activo por cada cargo con meta positiva.
 7. **Mensajes**: cada mañana cada cliente con WhatsApp y aceptación tiene su mensaje (al menos 5 vacantes cuando existen, sin repetir). «Abrir en WhatsApp» abre su chat con el texto escrito; se revisa, se envía y se marca «enviado». El número y el nombre para saludar se añaden en la ficha del cliente.
-8. En **Actividad**, comprobar la captura y sus faltantes; ahí también se configuran los **avisos por correo**. «Dónde se pierden las vacantes de cada cargo» muestra el embudo: encontradas → con descripción → país e idioma confirmados → nuevas → enlace comprobado → cumplen filtros → entregadas, con la mayor pérdida. No se inventan vacantes ni se completan cupos con duplicados,
+8. En **Actividad**, comprobar la captura y sus faltantes (los avisos por correo se retiraron del panel; GitHub avisa al dueño si un flujo falla). «Dónde se pierden las vacantes de cada cargo» muestra el embudo: encontradas → con descripción → país e idioma confirmados → nuevas → enlace comprobado → cumplen filtros → entregadas, con la mayor pérdida. No se inventan vacantes ni se completan cupos con duplicados,
    ubicaciones ajenas o enlaces pendientes. Si las fuentes no ofrecen suficientes resultados, se indica el déficit.
 
 Archivar un cliente o cargo lo retira de la siguiente configuración que se programe. Conserva versiones, asignaciones
-y resultados anteriores. Se puede reactivar desde el listado archivado. Archivar un cargo obliga a redistribuir su cupo.
+y resultados anteriores. Se puede reactivar desde el listado archivado.
 Editar un borrador no modifica una versión ya confirmada ni los criterios de la corrida que comenzó.
 
 ## 2. Qué significan los filtros
@@ -66,11 +75,13 @@ Editar un borrador no modifica una versión ya confirmada ni los criterios de la
 | Campo | Regla aplicada |
 |---|---|
 | Cargo | Términos principales/afines, exclusiones y coincidencia textual; ver explicación por resultado |
-| Países | Elegibilidad positiva para alguno de esos países dentro de LATAM/España; país desconocido no cuenta |
+| Ubicación | Remota abierta a su país, al mundo o a un país con permiso; horario aceptado; presencial/híbrida en su país, mudanza o ciudades (v23–v24); país desconocido no cuenta |
 | Modalidad | Remoto, híbrido, presencial o cualquiera; remoto extranjero restringido no pasa por ser remoto |
 | Publicación | Edad de la fecha real de publicación, entre 1 y 30 días configurables; fecha desconocida/estimada no pasa |
 | Idioma del aviso | Español, inglés o ambos; es distinto del nivel de inglés solicitado |
-| Experiencia | Años mínimos exigidos por la vacante dentro del rango configurado; vacío significa sin ese límite |
+| Experiencia | Años exigidos dentro de ±3 o ±4 de los del perfil; con 5+ años no llegan junior/prácticas; con 2 o menos no se filtra (v20, v22) |
+| Restricciones | Salario menor en la misma moneda, palabras o tipo de contrato; descartan solo con evidencia clara y nunca por lo «deseable» (v22) |
+| Prioridades | Sectores y palabras preferidas: solo ordenan cuando hay más candidatas que la meta (v22) |
 | Inglés requerido | Hasta el nivel del cliente; se rechaza un nivel obligatorio superior, no uno solamente deseable |
 | Datos no informados | Si se filtra experiencia/inglés, solo se admiten sin evidencia si se marca expresamente la opción |
 
@@ -81,7 +92,7 @@ no primera detección: encontrada hoy no significa publicada hoy. Todas las fuen
 Entre resultados pertinentes se priorizan remotos. Dentro del mismo grado y prioridad remota, se favorece a los
 clientes menos cubiertos y se diversifican empresas, idiomas y fuentes. No existe un mínimo individual garantizado.
 Una vacante válida para tres clientes cuenta una sola vez en el cupo del cargo; cada cliente puede ver un subconjunto
-diferente. Las 120 son oportunidades distintas, no 120 por persona ni una suma de enlaces repetidos.
+diferente. El techo del día cuenta oportunidades distintas, no vacantes por persona ni enlaces repetidos.
 
 ## 3. Cómo revisar y compartir
 

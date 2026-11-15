@@ -67,7 +67,7 @@ similares y cercanos rotan en las búsquedas; no se promete agotar todas las com
 La limpieza de 30 días solo afecta al buscador activo; no borra ofertas de Supabase. Apify busca fichas formales de
 LinkedIn con un tope de USD 5/mes; las publicaciones solo aportan una oferta si se verifica
 su ficha original. La búsqueda pagada del feed está desactivada para reservar el crédito a fichas formales.
-Con el panel activo, los cupos configurados suman 120; antes se mantienen seis roles por veinte. Si un rol queda corto, hay búsquedas adicionales gratuitas
+Con el panel activo, cada perfil tiene su meta diaria bajo un techo del día (120 por defecto, contrato v21); antes se mantienen seis roles por veinte. Si un rol queda corto, hay búsquedas adicionales gratuitas
 acotadas y un reporte de los motivos. La continuidad se mide entre días distintos, conservando la memoria de entregas. El panel muestra faltantes sin relajar filtros.
 Decisiones, límites y seguimiento futuro: [`docs/COBERTURA_HISTORICO.md`](docs/COBERTURA_HISTORICO.md).
 
