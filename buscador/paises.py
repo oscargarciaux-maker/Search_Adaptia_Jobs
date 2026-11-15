@@ -457,7 +457,8 @@ def mundo():
     `lista`: [{codigo, nombre}] por nombre; `nombres`: (nombre normalizado, ISO2) del más largo al más corto, con las
     subdivisiones de los extranjeros frecuentes (estados de EE. UU.…) salvo las que comparten nombre con un país."""
     filas = yaml.safe_load(RUTA_MUNDO.read_text(encoding="utf-8"))["paises"] if RUTA_MUNDO.exists() else []
-    lista = sorted(({"codigo": m["iso2"], "nombre": m.get("nombre") or m["iso2"]} for m in filas),
+    lista = sorted(({"codigo": m["iso2"], "nombre": m.get("nombre") or m["iso2"],
+                     "nombre_en": m.get("nombre_en") or m.get("nombre") or m["iso2"]} for m in filas),
                    key=lambda x: normalizar.sin_tildes(x["nombre"]).lower())
     paises_n = {(n, m["iso2"]) for m in filas for n in m["nombres"]}
     de_pais = {n for n, _ in paises_n}

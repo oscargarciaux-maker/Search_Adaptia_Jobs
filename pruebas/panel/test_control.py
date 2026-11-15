@@ -1094,8 +1094,8 @@ def _vacante_texto(ubicacion, descripcion=""):
     from buscador import paises as geo
     lugar = geo.elegibles("Product Designer", ubicacion, descripcion, None)
     return trabajo(paises=lugar["paises"], modalidad=lugar["modalidad"], confianza_pais=lugar["confianza"],
-                   paises_mundo=lugar["paises_mundo"], alcance_mundial=lugar["alcance_mundial"],
-                   zona_utc=lugar["zona_utc"], ubicacion=ubicacion,
+                   nota_pais=lugar["nota"], paises_mundo=lugar["paises_mundo"],
+                   alcance_mundial=lugar["alcance_mundial"], zona_utc=lugar["zona_utc"], ubicacion=ubicacion,
                    _descripcion=trabajo()["_descripcion"] + " " + descripcion)
 
 
@@ -1153,3 +1153,53 @@ def test_residencia_de_cualquier_pais_y_paises_validos():
         _perfil_mundo(vive_en="XX")
     with pytest.raises(ValidationError):
         _perfil_mundo(puede_trabajar_en=["ZZ"])
+
+
+# ── Contrato v24: búsqueda por perfil, ciudades con mudanza y admisión de países objetivo ───────────────────────
+
+def test_lugares_de_busqueda_en_ingles_y_por_ciudad():
+    p = _perfil_mundo(vive_en="DE", modalidades=["remoto", "presencial"], ciudades=["Madrid, España"])
+    lugares = ejecutor.lugares_perfil(p)
+    assert lugares["REMOTO_DE"]["location"] == "Germany" and lugares["DE"] == {"location": "Germany"}
+    assert {"location": "Madrid, España"} in lugares.values()
+    # Los países propios conservan su nombre de siempre.
+    assert ejecutor.lugares_perfil(_perfil_mundo())["REMOTO_CO"]["location"] == "Colombia"
+
+
+def test_la_ciudad_implica_el_pais():
+    p = _perfil_mundo(modalidades=["presencial"], ciudades=["Medellín", "Madrid"])
+    assert afinidad.evaluar(_vacante_texto("Madrid, Spain (On-site)"), p, hoy())["compatible"]
+    assert not afinidad.evaluar(_vacante_texto("Barcelona, Spain (On-site)"), p, hoy())["compatible"]
+    assert not afinidad.evaluar(_vacante_texto("Bogotá, Colombia (On-site)"), p, hoy())["compatible"]
+
+
+def test_admision_conserva_los_paises_objetivo_solo_en_modo_panel(monkeypatch):
+    from buscador import contrato
+    berlin = _vacante_texto("Berlin, Germany (On-site)")
+    monkeypatch.setattr(bodega, "_config_operativa", {"paises_objetivo_mundo": ["DE"], "acepta_horario": False})
+    assert bodega._sirve_a_perfiles(berlin)
+    monkeypatch.setattr(bodega, "_config_operativa", {"paises_objetivo_mundo": ["US"], "acepta_horario": False})
+    assert not bodega._sirve_a_perfiles(berlin)
+    est = _vacante_texto("Remote", "You must overlap with EST hours.")
+    monkeypatch.setattr(bodega, "_config_operativa", {"paises_objetivo_mundo": [], "acepta_horario": True})
+    assert bodega._sirve_a_perfiles(est)
+    # Selección: en modo heredado sigue bloqueando lo que no tiene países cubiertos; en panel decide cada perfil.
+    assert contrato.entregable(berlin, panel=False) == "no se puede aplicar desde los países"
+    assert contrato.entregable(berlin, panel=True) == ""
+    assert contrato.entregable(est, panel=False) == "elegibilidad regional por confirmar"
+    assert contrato.entregable(est, panel=True) == ""
+    sin_dato = _vacante_texto("Remote")
+    assert contrato.entregable(sin_dato, panel=True) == "elegibilidad regional por confirmar"
+
+
+def test_objetivo_mundo_suma_residencia_mudanza_permiso_y_ciudades(cfg):
+    cfg["perfiles"][0].update(vive_en="DE", paises_presenciales_extra=["CA"], puede_trabajar_en=["US"],
+                              ciudades=["Lisboa, Portugal"], acepta_horario=["europa"], modalidades=["presencial"])
+    objetivo, acepta = ejecutor.objetivo_mundo(Configuracion.model_validate(cfg))
+    assert {"DE", "CA", "US", "PT", "CO"} <= set(objetivo) and acepta
+
+
+def test_resumen_cuenta_de_que_fuente_vino_cada_entregada():
+    assert entrega._fuente({"fuente": "LinkedIn", "fuentes": []}) == "LinkedIn"
+    assert entrega._fuente({"fuente": "Computrabajo", "fuentes": ["Computrabajo", "LinkedIn"]}) == "LinkedIn"
+    assert entrega._fuente({"fuente": "LinkedIn (Apify)"}) == "LinkedIn (Apify)"

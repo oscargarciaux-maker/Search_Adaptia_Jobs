@@ -1832,6 +1832,13 @@ function EmbudoCargos({
                   Mayor pérdida: {e.principal_perdida}
                 </p>
               )}
+              {(e.de_su_busqueda ?? 0) + (e.de_la_amplia ?? 0) > 0 && (
+                <p className="field-help">
+                  Origen de las entregadas: {e.de_su_busqueda ?? 0} de su
+                  búsqueda propia (LinkedIn por perfil) · {e.de_la_amplia ?? 0}{" "}
+                  de la búsqueda amplia
+                </p>
+              )}
             </section>
           );
         })}
@@ -2524,14 +2531,17 @@ function ClienteDialog({
                   </Plegable>
                   <TagInput
                     label={
-                      "Solo en estas ciudades (opcional), perfil " + (i + 1)
+                      "Ciudades donde trabajaría (la suya y a las que se mudaría), perfil " +
+                      (i + 1)
                     }
                     values={p.ciudades || []}
                     onChange={(v) => patch(p.id, { ciudades: v })}
                   />
                   <p className="field-help">
-                    Para presencial o híbrida. Vacío: cualquier ciudad. Un aviso
-                    sin ciudad no se descarta.
+                    Para presencial o híbrida. Una vacante en una de estas
+                    ciudades le sirve aunque su país no esté arriba. Escribe
+                    «Ciudad, País» si el nombre se repite en otros países.
+                    Vacío: cualquier ciudad; un aviso sin ciudad no se descarta.
                   </p>
                 </div>
               )}
