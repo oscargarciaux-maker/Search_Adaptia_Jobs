@@ -35,8 +35,9 @@ claro/oscuro (por defecto sigue al computador; `?tema=oscuro|claro` en la direcc
    revisarlas; después se confirma. Se puede escribir cualquier cargo y añadir términos sin modificar código.
 3. En **Clientes → Nuevo cliente**, usar un nombre o referencia interna. Para varios a la vez, **Importar clientes**
    sube un CSV (plantilla en `/api/clientes/plantilla.csv`, una fila por perfil, listas con «|»): vista previa sin
-   guardar, errores por fila y luego importación todo o nada en el borrador; los clientes actuales se mantienen, se
-   archivan o se borran del todo (escribiendo BORRAR). Borrar del todo quita cliente, perfiles, contacto y mensajes
+   guardar, errores por fila y luego importación todo o nada en el borrador. Quien ya existe (mismo nombre o
+   `nombre_anterior`) se actualiza conservando su id y el de sus perfiles del mismo cargo; los clientes que no están en
+   el archivo se mantienen, se archivan o se borran del todo (escribiendo BORRAR). Borrar del todo quita cliente, perfiles, contacto y mensajes
    preparados; `panel_versiones`, `panel_asignaciones` y `ofertas` no se tocan (historial). No se necesita teléfono ni contraseña del cliente.
 4. Añadir uno o más perfiles y elegir el cargo, su **meta diaria**, **el país donde vive** (cualquiera, v23), **las
    modalidades que acepta** (remoto, híbrido, presencial; una o varias), plazo de publicación, idioma del aviso, años

@@ -1036,9 +1036,16 @@ test("importar clientes: vista previa con errores, borrar los actuales y program
     "nombre;cargo;vive_en;modalidades;whatsapp;acepto_whatsapp\n" +
       "Persona Uno;Product Designer;Colombia;remoto|híbrido;+57 300 111 2222;sí\n" +
       "Persona Dos;Cargo Importado;México;remoto;;\n" +
-      "Persona Tres;QA;España;presencial;;\n",
+      "Persona Tres;QA;España;presencial;;\n" +
+      "Cliente de ejemplo 02;Product Designer;Colombia;remoto;;\n",
   );
-  await expect(dialogo.getByText("3 clientes con 3 perfiles")).toBeVisible();
+  await expect(dialogo.getByText("4 clientes con 4 perfiles")).toBeVisible();
+  // Quien ya existe se actualiza y conserva lo que recibió (16 nov); los demás son nuevos.
+  await expect(
+    dialogo.getByText(
+      /1 se actualiza \(conservan lo que ya recibieron\) · 3 nuevos/,
+    ),
+  ).toBeVisible();
   await expect(
     dialogo.getByText(/Cargos nuevos: Cargo Importado/),
   ).toBeVisible();
@@ -1046,13 +1053,13 @@ test("importar clientes: vista previa con errores, borrar los actuales y program
   await expect(
     dialogo.getByText(/Se borrarán del todo: Cliente de ejemplo/),
   ).toBeVisible();
-  const importar = dialogo.getByRole("button", { name: "Importar 3 clientes" });
+  const importar = dialogo.getByRole("button", { name: "Importar 4 clientes" });
   await expect(importar).toBeDisabled(); // falta escribir BORRAR
   expect(await page.evaluate(revisarContraste)).toEqual([]);
   await dialogo.getByLabel("Escribe BORRAR para confirmar").fill("BORRAR");
   await importar.click();
   await expect(
-    page.getByText(/3 clientes importados, \d+ borrados/),
+    page.getByText(/1 cliente actualizado .*3 nuevos, \d+ borrados/),
   ).toBeVisible();
   await expect(page.locator("dialog[open]")).toHaveCount(0);
   await expect(page.getByText("Cliente de ejemplo 01")).toHaveCount(0);
@@ -1066,7 +1073,11 @@ test("importar clientes: vista previa con errores, borrar los actuales y program
   ).toBeVisible();
   await page.goto("/");
   const lista = page.getByRole("list", { name: "Clientes y su avance" });
-  await expect(lista.getByRole("button")).toHaveCount(3);
+  await expect(lista.getByRole("button")).toHaveCount(4);
+  // El cliente actualizado sigue mostrando lo que recibió hoy.
+  await expect(
+    lista.getByRole("button", { name: /^Cliente de ejemplo 02:/ }),
+  ).toHaveAccessibleName(/: [1-9]\d* de 10/);
   await page
     .getByRole("button", { name: "Programar para mañana", exact: true })
     .click();

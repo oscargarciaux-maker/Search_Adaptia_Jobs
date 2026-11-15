@@ -3916,3 +3916,13 @@ select.margen {
 .toolbar > .button.secondary:not(:last-child) {
   margin-left: auto;
 }
+
+.importar-estado {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--osc-bg-verde-2);
+  color: var(--osc-text-azul-medio);
+}

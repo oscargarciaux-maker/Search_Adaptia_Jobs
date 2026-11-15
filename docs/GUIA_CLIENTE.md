@@ -30,8 +30,9 @@ país sugerido; si no hay sugerencia, «Elegir país en Por confirmar»).
 
 **Importar clientes.** En «Clientes», «Importar clientes» sube un CSV con una fila por perfil (hay una plantilla con
 todas las columnas). Antes de guardar muestra una vista previa con los errores de cada fila; nada se guarda hasta
-pulsar «Importar». Conviene marcar «sí» en `admitir_ingles_no_informado` y `admitir_experiencia_no_informada`:
-la mayoría de los avisos no dice el nivel de inglés ni los años, y sin admitirlos el perfil los descarta. Se elige qué hacer con los clientes que ya están: mantenerlos, archivarlos o borrarlos del todo
+pulsar «Importar». Quien ya está en el panel (mismo nombre, o el de la columna `nombre_anterior` si se le cambia
+el nombre) se actualiza: conserva lo que ya recibió y no se le repiten vacantes. Conviene marcar «sí» en `admitir_ingles_no_informado` y `admitir_experiencia_no_informada`:
+la mayoría de los avisos no dice el nivel de inglés ni los años, y sin admitirlos el perfil los descarta. Se elige qué hacer con los clientes que no están en el archivo: mantenerlos, archivarlos o borrarlos del todo
 (escribiendo BORRAR). Los clientes importados quedan igual que si se hubieran creado a mano: se editan, se archivan y
 reciben vacantes desde la búsqueda siguiente a «Programar para mañana». Un cliente archivado también se puede
 «Eliminar definitivamente». Borrar quita al cliente, sus perfiles, su WhatsApp y sus mensajes preparados; las

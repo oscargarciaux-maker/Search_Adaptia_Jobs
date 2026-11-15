@@ -250,6 +250,7 @@ export type PreviaImportacion = {
     vive_en: string;
     modalidades: string[];
     meta: number | null;
+    estado: "actualiza" | "nuevo";
     errores: string[];
     avisos: string[];
   }[];
@@ -258,6 +259,8 @@ export type PreviaImportacion = {
   columnas_desconocidas: string[];
   clientes: number;
   perfiles: number;
+  actualizados: string[];
+  nuevos: string[];
   cargos_nuevos: string[];
   borrar: string[];
   archivar: string[];

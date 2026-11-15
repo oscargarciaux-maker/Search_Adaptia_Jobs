@@ -23,7 +23,7 @@ COLUMNAS = ["nombre", "comunidad", "whatsapp", "nombre_saludo", "acepto_whatsapp
             "antiguedad_dias", "experiencia_anos", "margen_experiencia", "ingles_maximo", "sectores_preferidos",
             "palabras_preferidas", "no_acepta_palabras", "salario_minimo", "no_acepta_contrato",
             "nombres_del_cargo", "funciones_del_cargo", "admitir_ingles_no_informado",
-            "admitir_experiencia_no_informada"]
+            "admitir_experiencia_no_informada", "nombre_anterior"]
 OBLIGATORIAS = ("nombre", "cargo")
 ACTUALES = ("mantener", "archivar", "borrar")
 
@@ -276,28 +276,43 @@ def _nombre_cargo(texto):
 
 
 def previa(borrador, contenido, actuales="mantener"):
-    """Lo que quedaría en el borrador. No guarda nada. Devuelve las filas con sus errores y avisos, los cargos nuevos,
-    los clientes que se archivan o se borran, las metas y la configuración resultante."""
+    """Lo que quedaría en el borrador. No guarda nada.
+
+    Quien ya está en el panel (mismo nombre, o el de la columna `nombre_anterior`) se **actualiza**: conserva su
+    identidad y la de sus perfiles del mismo cargo, así no pierde lo que ya recibió ni se le repiten vacantes (16 nov).
+    `actuales` decide qué pasa con los clientes que **no** están en el archivo: mantener, archivar o borrar."""
     if actuales not in ACTUALES:
-        raise ErrorRepositorio("Elige qué hacer con los clientes actuales.", 422)
+        raise ErrorRepositorio("Elige qué hacer con los clientes que no están en el archivo.", 422)
     filas, desconocidas = leer(contenido)
     cfg = Configuracion.model_validate(borrador).model_dump(mode="json")
-    previos = [c for c in cfg["clientes"]]
-    borrados = [c for c in previos if actuales == "borrar"]
-    archivados = [c for c in previos if actuales == "archivar" and c["activo"]]
-    if actuales == "borrar":
-        ids = {c["id"] for c in borrados}
-        cfg["clientes"] = [c for c in cfg["clientes"] if c["id"] not in ids]
-        cfg["perfiles"] = [p for p in cfg["perfiles"] if p["cliente_id"] not in ids]
-    for c in cfg["clientes"]:
-        if actuales == "archivar":
-            c["activo"] = False
-    activos_previos = {_norm(c["nombre"]) for c in cfg["clientes"] if c["activo"]}
+    existentes = {}
+    for c in sorted(cfg["clientes"], key=lambda c: not c["activo"]):  # con nombres repetidos, primero el activo
+        existentes.setdefault(_norm(c["nombre"]), c)
+
+    def buscado(datos):
+        return _norm(datos.get("nombre_anterior") or datos.get("nombre", ""))
+
+    actualizados_ids = {existentes[k]["id"] for k in (buscado(d) for _, d in filas) if k in existentes}
+    restantes = [c for c in cfg["clientes"] if c["id"] not in actualizados_ids]
+    borrados = [c for c in restantes if actuales == "borrar"]
+    archivados = [c for c in restantes if actuales == "archivar" and c["activo"]]
+    ids_borrados = {c["id"] for c in borrados}
+    cfg["clientes"] = [c for c in cfg["clientes"] if c["id"] not in ids_borrados]
+    for c in archivados:
+        c["activo"] = False
+    # Los perfiles de quien se actualiza se reemplazan por los del archivo; sus ids se reutilizan por cargo.
+    anteriores = {}
+    for perfil in cfg["perfiles"]:
+        if perfil["cliente_id"] in actualizados_ids:
+            anteriores.setdefault((perfil["cliente_id"], perfil["cargo_id"]), []).append(perfil["id"])
+    cfg["perfiles"] = [x for x in cfg["perfiles"]
+                       if x["cliente_id"] not in ids_borrados and x["cliente_id"] not in actualizados_ids]
     cargos = {}
     for c in cfg["cargos"]:
         for nombre in [c["nombre"], *c.get("terminos_exactos", [])]:
             cargos.setdefault(_nombre_cargo(nombre), c)
-    nuevos_cargos, clientes, contactos, resultado = [], {}, {}, []
+    nuevos_cargos, clientes, contactos, resultado, actualizados, nuevos = [], {}, {}, [], [], []
+    perfiles_de = {}
     for n, datos in filas:
         errores, avisos = [], []
         nombre = " ".join(datos.get("nombre", "").split())
@@ -307,12 +322,27 @@ def previa(borrador, contenido, actuales="mantener"):
         if not cargo_txt:
             errores.append("Falta el cargo.")
         clave = _norm(nombre)
-        if nombre and clave in activos_previos:
-            errores.append("Ya hay un cliente activo con ese nombre en el panel.")
         cliente = clientes.get(clave)
+        estado = "actualiza" if cliente and cliente["id"] in actualizados_ids else "nuevo"
         if nombre and not cliente:
-            cliente = {"id": str(uuid4()), "nombre": nombre[:100], "activo": True,
-                       "comunidad": _si_no(datos.get("comunidad"), errores, "comunidad")}
+            previo = existentes.get(buscado(datos))
+            if datos.get("nombre_anterior") and not previo:
+                errores.append(f"nombre_anterior: no hay en el panel un cliente llamado «{datos['nombre_anterior']}».")
+            otro = existentes.get(clave)
+            if previo and otro and otro["id"] != previo["id"] and otro["id"] not in ids_borrados:
+                errores.append("Ya hay otro cliente en el panel con el nombre nuevo.")
+            comunidad = _si_no(datos.get("comunidad"), errores, "comunidad") if datos.get("comunidad") else None
+            if previo:
+                cliente = previo
+                cliente.update(nombre=nombre[:100], activo=True)
+                if comunidad is not None:
+                    cliente["comunidad"] = comunidad
+                estado = "actualiza"
+                actualizados.append(nombre)
+            else:
+                cliente = {"id": str(uuid4()), "nombre": nombre[:100], "activo": True, "comunidad": bool(comunidad)}
+                cfg["clientes"].append(cliente)
+                nuevos.append(nombre)
             if datos.get("whatsapp"):
                 telefono = _telefono(datos["whatsapp"], errores)
                 acepto = _si_no(datos.get("acepto_whatsapp"), errores, "acepto_whatsapp")
@@ -325,7 +355,7 @@ def previa(borrador, contenido, actuales="mantener"):
                         errores.append("whatsapp: el número no es válido (código de país y 8 a 15 dígitos).")
                 if not acepto:
                     avisos.append("No consta que aceptó WhatsApp: no tendrá mensaje diario hasta marcarlo.")
-            else:
+            elif estado == "nuevo":
                 avisos.append("Sin WhatsApp: no tendrá mensaje diario.")
             clientes[clave] = cliente
         cargo = cargos.get(_nombre_cargo(cargo_txt)) if cargo_txt else None
@@ -336,8 +366,8 @@ def previa(borrador, contenido, actuales="mantener"):
                      "terminos_exactos": list(dict.fromkeys([cargo_txt[:120], *extra_nombres]))[:30],
                      "terminos_similares": [], "terminos_excluidos": [], "terminos_cercanos": [],
                      "funciones": extra_funciones[:40]}
-            for nombre in cargo["terminos_exactos"]:
-                cargos.setdefault(_nombre_cargo(nombre), cargo)
+            for nombre_cargo in cargo["terminos_exactos"]:
+                cargos.setdefault(_nombre_cargo(nombre_cargo), cargo)
             cargos[_nombre_cargo(cargo_txt)] = cargo
             nuevos_cargos.append(cargo)
             nuevo = True
@@ -346,7 +376,12 @@ def previa(borrador, contenido, actuales="mantener"):
             avisos.append(f"El cargo «{cargo['nombre']}» estaba archivado: se reactiva.")
         perfil = _perfil(datos, errores, avisos)
         if cliente and cargo:
-            perfil.update(id=str(uuid4()), cliente_id=cliente["id"], cargo_id=cargo["id"])
+            reutilizables = anteriores.get((cliente["id"], cargo["id"])) or []
+            perfil.update(id=reutilizables.pop(0) if reutilizables else str(uuid4()),
+                          cliente_id=cliente["id"], cargo_id=cargo["id"])
+            if cargo["id"] in perfiles_de.setdefault(cliente["id"], set()):
+                avisos.append(f"Este cliente ya tiene otro perfil de «{cargo['nombre']}» en el archivo.")
+            perfiles_de[cliente["id"]].add(cargo["id"])
             try:
                 perfil = Perfil.model_validate(perfil).model_dump(mode="json")
             except ValidationError as e:
@@ -355,14 +390,14 @@ def previa(borrador, contenido, actuales="mantener"):
             avisos.append(f"Cargo nuevo «{cargo['nombre']}»: revisa sus nombres y usa «Proponer funciones».")
         elif cargo and (extra_nombres or extra_funciones) and cargo not in nuevos_cargos:
             avisos.append(f"El cargo «{cargo['nombre']}» ya existe: sus nombres y funciones no se cambian desde aquí.")
-        resultado.append({"fila": n, "cliente": nombre, "cargo": cargo["nombre"] if cargo else cargo_txt,
+        resultado.append({"fila": n, "cliente": nombre, "estado": estado,
+                          "cargo": cargo["nombre"] if cargo else cargo_txt,
                           "vive_en": perfil.get("vive_en", ""), "modalidades": perfil.get("modalidades", []),
                           "meta": perfil.get("meta_diaria"), "errores": errores, "avisos": avisos,
-                          "_perfil": perfil, "_cliente": cliente})
+                          "_perfil": perfil})
     hay_errores = any(r["errores"] for r in resultado)
     configuracion, metas, error_general = None, None, ""
     if not hay_errores:
-        cfg["clientes"] += [c for c in clientes.values()]
         cfg["cargos"] += nuevos_cargos
         cfg["perfiles"] += [r["_perfil"] for r in resultado]
         try:
@@ -371,17 +406,17 @@ def previa(borrador, contenido, actuales="mantener"):
         except ValidationError as e:
             error_general = modelos.explicar(e)
     for r in resultado:
-        r.pop("_perfil"), r.pop("_cliente")
+        r.pop("_perfil")
     return {"filas": resultado, "errores": sum(len(r["errores"]) for r in resultado) + bool(error_general),
             "error_general": error_general, "columnas_desconocidas": desconocidas,
             "clientes": len(clientes), "perfiles": len(resultado),
+            "actualizados": actualizados, "nuevos": nuevos,
             "cargos_nuevos": [c["nombre"] for c in nuevos_cargos],
             "borrar": [c["nombre"] for c in borrados], "archivar": [c["nombre"] for c in archivados],
             "metas": metas, "excede_techo": bool(metas and metas["reales"] > metas["techo"]),
             "configuracion": configuracion, "contactos": contactos, "_borrados": [c["id"] for c in borrados]}
 
-
-def importar(repo, revision, contenido, actuales="mantener"):
+def importar(repo, revision, contenido, actuales="mantener", confirmacion=""):
     """Guarda el resultado de `previa` en el borrador (todo o nada) y después los contactos. Con «borrar», también
     borra los contactos y los mensajes preparados de los clientes anteriores."""
     estado = repo.config()
@@ -390,13 +425,16 @@ def importar(repo, revision, contenido, actuales="mantener"):
     r = previa(estado["borrador"], contenido, actuales)
     if r["errores"]:
         raise ErrorRepositorio("El archivo tiene errores: revisa la vista previa y corrígelos antes de importar.", 422)
+    if r["_borrados"] and confirmacion.strip().upper() != "BORRAR":
+        raise ErrorRepositorio("Escribe BORRAR para confirmar que se borran los clientes que no están en el archivo.", 422)
     guardado = repo.guardar(revision, r["configuracion"])
     for cliente_id in r["_borrados"]:
         repo.borrar_contacto(cliente_id)
         repo.borrar_borradores(cliente_id)
     for cliente_id, contacto in r["contactos"].items():
         repo.guardar_contacto(cliente_id, contacto)
-    return {"importados": r["clientes"], "perfiles": r["perfiles"], "borrados": len(r["_borrados"]),
+    return {"importados": r["clientes"], "actualizados": len(r["actualizados"]), "nuevos": len(r["nuevos"]),
+            "perfiles": r["perfiles"], "borrados": len(r["_borrados"]),
             "archivados": len(r["archivar"]), "cargos_nuevos": r["cargos_nuevos"], "estado": guardado}
 
 
