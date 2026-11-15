@@ -1,0 +1,29 @@
+# Contrato v26: unidades de cada moneda por 1 USD. Se actualiza con `python -m buscador.tasas --actualizar`.
+# Con más de 120 días no se convierte (nunca se descarta con tasas viejas).
+fecha: '2026-11-15'
+fuente: open.er-api.com
+base: USD
+tasas:
+  EUR: 0.905984
+  COP: 3285.261046
+  MXN: 18.553067
+  ARS: 1547.0336
+  CLP: 992.200356
+  PEN: 3.406102
+  BRL: 5.648053
+  UYU: 40.693726
+  DOP: 60.950781
+  GTQ: 7.659179
+  CRC: 452.751669
+  VES: 914.0218
+  GBP: 0.756391
+  CAD: 1.425922
+  AED: 3.6725
+  CHF: 0.838392
+  BOB: 11.803952
+  PYG: 6204.018191
+  HNL: 26.955156
+  NIO: 36.899171
+inestables:
+- ARS
+- VES

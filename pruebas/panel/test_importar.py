@@ -138,3 +138,37 @@ def test_api_previa_importar_y_confirmacion():
                     json={"revision": nueva, "confirmacion": "no"}).status_code == 422
     assert api.post(f"/api/clientes/{cliente}/borrar", headers=origen,
                     json={"revision": nueva, "confirmacion": "BORRAR"}).status_code == 200
+
+
+def test_regiones_en_listas_de_paises_para_perfiles_moviles():
+    texto = ("nombre;cargo;vive_en;puede_trabajar_en;se_mudaria_a;acepta_horario\n"
+             "Persona Móvil;Product Manager;Emiratos Árabes Unidos;Emiratos|Europa;UE;Europa\n"
+             "Persona América;Product Designer;CO;Toda América;;\n")
+    r = importar.previa(_repo().config()["borrador"], texto, "borrar")
+    assert r["errores"] == 0
+    movil, america = r["configuracion"]["perfiles"]
+    assert movil["vive_en"] == "AE" and movil["puede_trabajar_en"][0] == "AE"
+    assert {"DE", "FR", "ES", "GB", "CH"} <= set(movil["puede_trabajar_en"])
+    assert set(importar.UE) == set(movil["paises_presenciales_extra"]) and "GB" not in movil["paises_presenciales_extra"]
+    assert movil["acepta_horario"] == ["europa"]
+    assert {"US", "CA", "MX", "AR"} <= set(america["puede_trabajar_en"])
+
+
+def test_nombres_y_funciones_solo_para_cargos_nuevos():
+    texto = ("nombre;cargo;nombres_del_cargo;funciones_del_cargo\n"
+             "Persona IA;AI Product Manager;AI Product Owner|Product Manager IA;agentes de voz|LLM|chatbot\n"
+             "Otra IA;AI Product Owner;;\n"
+             "Persona QA;QA;QA Lead;pruebas\n")
+    repo = _repo()
+    r = importar.previa(repo.config()["borrador"], texto, "borrar")
+    assert r["errores"] == 0 and r["cargos_nuevos"] == ["AI Product Manager"]
+    cargo = next(c for c in r["configuracion"]["cargos"] if c["nombre"] == "AI Product Manager")
+    assert cargo["terminos_exactos"] == ["AI Product Manager", "AI Product Owner", "Product Manager IA"]
+    assert cargo["funciones"] == ["agentes de voz", "LLM", "chatbot"]
+    # «AI Product Owner» es un nombre del cargo nuevo: la segunda persona va al mismo cargo.
+    perfiles = r["configuracion"]["perfiles"]
+    assert perfiles[0]["cargo_id"] == perfiles[1]["cargo_id"] == cargo["id"]
+    qa = next(c for c in r["configuracion"]["cargos"] if c["nombre"] == "QA")
+    antes = next(c for c in repo.config()["borrador"]["cargos"] if c["nombre"] == "QA")
+    assert qa["terminos_exactos"] == antes["terminos_exactos"]  # un cargo existente no se cambia
+    assert any("ya existe" in a for a in r["filas"][2]["avisos"])
