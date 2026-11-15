@@ -2,12 +2,13 @@
 import re
 from datetime import date
 
-from buscador import contrato, enlaces, normalizar, tiempos
+from buscador import contrato, enlaces, normalizar, paises, tiempos
 from panel.modelos import Perfil
 
 NIVELES = ["A1", "A2", "B1", "B2", "C1", "C2", "native"]
 CAMPOS_FILTRO = ("id", "titulo", "paises", "confianza_pais", "modalidad", "idioma", "publicada_en",
-                 "fecha_publicacion", "fecha_estimada", "ids_agrupados", "salario")
+                 "fecha_publicacion", "fecha_estimada", "ids_agrupados", "salario", "paises_mundo", "alcance_mundial",
+                 "zona_utc", "ubicacion")
 
 
 def ligera(datos, descripcion=None):
@@ -68,12 +69,21 @@ def evaluar(v, perfil, hoy=None):
     todas = {"remoto", "hibrido", "presencial"} <= set(p.modalidades)
     if modo in ("remoto", "hibrido", "presencial") and modo not in p.modalidades or (modo not in ("remoto", "hibrido", "presencial") and not todas):
         motivos.append("modalidad diferente")
-    if v.get("confianza_pais") not in {"alta", "media"}:
+    # Contrato v23: países de cualquier parte (`paises_mundo`), alcance mundial, permiso legal y horario aceptado.
+    mundo_v = paises_v | set(v.get("paises_mundo") or [])
+    puede = {p.vive_en, *p.puede_trabajar_en}
+    horario = modo not in ("hibrido", "presencial") and horario_compatible(v, p)
+    if v.get("confianza_pais") not in {"alta", "media"} and not horario:
         motivos.append("país sin elegibilidad confirmada")
-    elif modo in ("hibrido", "presencial") and not paises_v & set(p.paises_oficina):
+    elif modo in ("hibrido", "presencial") and not mundo_v & set(p.paises_oficina):
         motivos.append("oficina en otro país")
-    elif modo not in ("hibrido", "presencial") and p.vive_en not in paises_v:
+    elif modo in ("hibrido", "presencial") and p.ciudades and otra_ciudad(v, p.ciudades):
+        motivos.append("oficina en otra ciudad")
+    elif modo not in ("hibrido", "presencial") and not (
+            p.vive_en in paises_v or puede & set(v.get("paises_mundo") or []) or v.get("alcance_mundial") or horario):
         motivos.append("no admite postular desde su país")
+    elif horario and p.vive_en not in paises_v and not puede & set(v.get("paises_mundo") or []):
+        pruebas.append("Remota con horario compatible")
     else:
         pruebas.append("Remota abierta a su país" if modo == "remoto" else "Ubicación compatible")
     if v.get("idioma") not in p.idiomas:
@@ -129,6 +139,36 @@ def evaluar(v, perfil, hoy=None):
 
 
 _POR_MES = {"month": 1, "year": 1 / 12}
+
+# Contrato v23: franjas aceptadas por el perfil, en horas UTC (incluye horario de verano).
+HORARIOS = {"us_este": (-5, -4), "us_pacifico": (-8, -7), "europa": (0, 2)}
+
+
+def horario_compatible(v, p):
+    """Una remota que solo pide franja horaria sirve si la franja cruza una zona aceptada o la del país donde vive
+    (±2 h). Sin `zona_utc` no aplica."""
+    zona = v.get("zona_utc")
+    if not zona:
+        return False
+    franjas = [HORARIOS[h] for h in p.acepta_horario]
+    utc = paises.datos()["utc"].get(p.vive_en)
+    if utc is not None:
+        franjas.append((utc - 2, utc + 2))
+    return any(zona[0] <= hi and lo <= zona[1] for lo, hi in franjas)
+
+
+def otra_ciudad(v, ciudades):
+    """True si la ubicación del aviso nombra una ciudad y no es ninguna de las del perfil. Sin ciudad, no descarta."""
+    ubicacion = normalizar.texto(v.get("ubicacion") or "")
+    if not ubicacion:
+        return False
+    if any(normalizar.contiene_frase(ubicacion, normalizar.texto(c)) for c in ciudades):
+        return False
+    limpia = re.sub(r"\s*\(.*?\)", "", v.get("ubicacion") or "")
+    codigo = next(iter(v.get("paises") or v.get("paises_mundo") or []), "")
+    ciudad = normalizar.texto(contrato._ciudad(limpia, codigo) or "")
+    # Si la «ciudad» es en realidad el nombre de un país («Colombia (On-site)»), el aviso no dice ciudad.
+    return bool(ciudad) and not paises.paises_en_texto(ciudad)
 
 # Contrato v22 (14 nov, pedido de Oscar): lo que el aviso pide solo como deseable no descarta. Marcas editables; se
 # buscan como palabras completas en la línea u oración, o en el encabezado de la sección.

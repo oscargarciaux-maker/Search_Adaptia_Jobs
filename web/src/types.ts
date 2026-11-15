@@ -35,6 +35,9 @@ export type Perfil = {
   restricciones?: Restriccion[];
   sectores_preferidos?: string[];
   palabras_preferidas?: string[];
+  ciudades?: string[];
+  puede_trabajar_en?: string[];
+  acepta_horario?: string[];
 };
 // Contrato v22: «Este perfil NO acepta…». Cada regla descarta solo con evidencia clara en el aviso.
 export type Restriccion =
@@ -111,6 +114,7 @@ export type Sesion = {
   demo: boolean;
   sesion: boolean;
   paises: { codigo: string; nombre: string }[];
+  paises_mundo?: { codigo: string; nombre: string }[];
 };
 export type Limitante = {
   motivo: string;

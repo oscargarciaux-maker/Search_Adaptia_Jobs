@@ -3421,3 +3421,13 @@ select.margen {
   align-self: flex-start;
   min-height: 40px;
 }
+/* Contrato v23: países del mundo, permiso de trabajo y horario. */
+.otros-paises {
+  margin: 10px 0;
+}
+.revision-extras {
+  flex: 1 1 260px;
+}
+.revision-extras .field {
+  margin: 0;
+}

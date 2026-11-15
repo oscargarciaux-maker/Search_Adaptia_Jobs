@@ -27,6 +27,10 @@ def trabajo(**op):
     v["verificacion"] = {"estado": "verificada", "enlaces": [{"url": v["enlace"], "estado": "verificada",
         "comprobada_en": datetime.now(timezone.utc).isoformat()}]}
     v.update(op)
+    if "paises" in op and "alcance_mundial" not in op:
+        # Contrato v23: al cambiar los países de la vacante de prueba, sus campos del mundo dicen lo mismo.
+        v["alcance_mundial"] = False
+        v["paises_mundo"] = op.get("paises_mundo", list(op["paises"]))
     return v
 
 
@@ -466,7 +470,9 @@ def test_ingles_precalculado_en_el_catalogo_da_el_mismo_veredicto():
 def _vacante_en(ubicacion, titulo="Product Designer"):
     from buscador import paises as geo
     lugar = geo.elegibles(titulo, ubicacion, "", None)
-    return trabajo(paises=lugar["paises"], modalidad=lugar["modalidad"], confianza_pais=lugar["confianza"])
+    return trabajo(paises=lugar["paises"], modalidad=lugar["modalidad"], confianza_pais=lugar["confianza"],
+                   paises_mundo=lugar["paises_mundo"], alcance_mundial=lugar["alcance_mundial"],
+                   zona_utc=lugar["zona_utc"], ubicacion=ubicacion)
 
 
 @pytest.mark.parametrize("ubicacion,esperado", [
@@ -1075,3 +1081,75 @@ def test_lo_deseable_no_descarta(cfg, texto, descarta):
 def test_en_el_titulo_siempre_descarta(cfg):
     p = _perfil_v22(cfg, restricciones=[{"tipo": "palabras", "palabras": ["Java"]}])
     assert not afinidad.evaluar(trabajo(titulo="Java Product Designer"), p, hoy())["compatible"]
+
+
+# ── Contrato v23: ubicaciones del mundo, permiso legal, ciudades y horario compatible ────────────────────────────
+
+def _perfil_mundo(**cambios):
+    return Perfil.model_validate({"id": str(uuid4()), "cliente_id": str(uuid4()), "cargo_id": str(uuid4()),
+                                  "vive_en": "CO", "modalidades": ["remoto"], **cambios})
+
+
+def _vacante_texto(ubicacion, descripcion=""):
+    from buscador import paises as geo
+    lugar = geo.elegibles("Product Designer", ubicacion, descripcion, None)
+    return trabajo(paises=lugar["paises"], modalidad=lugar["modalidad"], confianza_pais=lugar["confianza"],
+                   paises_mundo=lugar["paises_mundo"], alcance_mundial=lugar["alcance_mundial"],
+                   zona_utc=lugar["zona_utc"], ubicacion=ubicacion,
+                   _descripcion=trabajo()["_descripcion"] + " " + descripcion)
+
+
+def test_vive_en_alemania_recibe_la_presencial_de_berlin():
+    berlin = _vacante_texto("Berlin, Germany (On-site)")
+    assert berlin["paises"] == [] and berlin["paises_mundo"] == ["DE"]
+    assert afinidad.evaluar(berlin, _perfil_mundo(vive_en="DE", modalidades=["presencial"]), hoy())["compatible"]
+    assert not afinidad.evaluar(berlin, _perfil_mundo(modalidades=["presencial"]), hoy())["compatible"]
+    # Se mudaría a Alemania aunque viva en Colombia.
+    assert afinidad.evaluar(berlin, _perfil_mundo(modalidades=["presencial"], paises_presenciales_extra=["DE"]),
+                            hoy())["compatible"]
+
+
+def test_permiso_legal_recibe_la_remota_restringida_a_ese_pais():
+    solo_us = _vacante_texto("Remote", "Candidates must reside in the US.")
+    assert not afinidad.evaluar(solo_us, _perfil_mundo(), hoy())["compatible"]
+    assert afinidad.evaluar(solo_us, _perfil_mundo(puede_trabajar_en=["US"]), hoy())["compatible"]
+
+
+def test_vive_fuera_de_latam_recibe_las_remotas_mundiales():
+    mundial = _vacante_texto("Remote - Worldwide")
+    assert afinidad.evaluar(mundial, _perfil_mundo(vive_en="AU"), hoy())["compatible"]
+    assert not afinidad.evaluar(_vacante_texto("Remote - LATAM"), _perfil_mundo(vive_en="AU"), hoy())["compatible"]
+
+
+def test_horario_compatible_solo_si_el_perfil_acepta_esa_zona():
+    est = _vacante_texto("Remote", "You must overlap with EST hours.")
+    assert est["zona_utc"] == [-7, -3] and est["confianza_pais"] == "baja"
+    # Vive en España (UTC+1): no le sirve salvo que acepte el horario del Este de EE. UU.
+    assert not afinidad.evaluar(est, _perfil_mundo(vive_en="ES"), hoy())["compatible"]
+    r = afinidad.evaluar(est, _perfil_mundo(vive_en="ES", acepta_horario=["us_este"]), hoy())
+    assert r["compatible"] and "Remota con horario compatible" in r["pruebas"]
+    # Colombia (UTC-5) ya está dentro de la franja por su propio país.
+    assert afinidad.evaluar(est, _perfil_mundo(), hoy())["compatible"]
+
+
+def test_ciudades_descartan_solo_si_el_aviso_nombra_otra():
+    p = _perfil_mundo(modalidades=["presencial"], ciudades=["Medellín"])
+    assert not afinidad.evaluar(_vacante_texto("Bogotá, Colombia (On-site)"), p, hoy())["compatible"]
+    assert afinidad.evaluar(_vacante_texto("Medellín, Antioquia, Colombia (On-site)"), p, hoy())["compatible"]
+    assert afinidad.evaluar(_vacante_texto("Colombia (On-site)"), p, hoy())["compatible"]
+
+
+def test_vacantes_sin_campos_del_mundo_siguen_igual():
+    vieja = trabajo(paises=["CO"])
+    for k in ("paises_mundo", "alcance_mundial", "zona_utc"):
+        vieja.pop(k, None)
+    assert afinidad.evaluar(vieja, _perfil_mundo(), hoy())["compatible"]
+    assert not afinidad.evaluar(vieja, _perfil_mundo(vive_en="MX"), hoy())["compatible"]
+
+
+def test_residencia_de_cualquier_pais_y_paises_validos():
+    assert _perfil_mundo(vive_en="DE").vive_en == "DE"
+    with pytest.raises(ValidationError):
+        _perfil_mundo(vive_en="XX")
+    with pytest.raises(ValidationError):
+        _perfil_mundo(puede_trabajar_en=["ZZ"])

@@ -169,9 +169,8 @@ def _patron(frases):
     return re.compile(r"(?<![a-z0-9])(?:" + alternativas + r")(?![a-z0-9])")
 
 
-def _por_zona_horaria(t):
-    """Países de LATAM dentro de la franja horaria que pide el aviso, o None si no pide ninguna.
-    Recibe el texto en minúsculas y sin tildes pero con sus signos ("utc-3"): la normalización general quita el guion."""
+def _rangos_zona(t):
+    """Franjas UTC (min, max) que pide el aviso. Texto en minúsculas, sin tildes, con sus signos («utc-3»)."""
     rangos = []
     for m in _ZONA.finditer(t):
         a = int(m.group(2)) * (1 if m.group(1) == "+" else -1)
@@ -180,6 +179,12 @@ def _por_zona_horaria(t):
     for nombre, valor in _ZONAS_US.items():
         if re.search(r"(?<![a-z])" + nombre + r"(?![a-z])", t):
             rangos.append((valor - 2, valor + 2))
+    return rangos
+
+
+def _por_zona_horaria(t):
+    """Países de LATAM dentro de la franja horaria que pide el aviso, o None si no pide ninguna."""
+    rangos = _rangos_zona(t)
     if not rangos:
         return None
     utc = datos()["utc"]
@@ -270,7 +275,12 @@ def combinar(resultados):
         nota = notas[0] if len(notas) == 1 else ""
     modos = {r["modalidad"] for r in resultados}
     modo = next((m for m in MODALIDADES if m in modos), sorted(modos)[0])
-    return {"paises": union, "modalidad": modo, "confianza": confianza, "nota": nota}
+    zonas = [r["zona_utc"] for r in resultados if r.get("zona_utc")]
+    return {"paises": union, "modalidad": modo, "confianza": confianza, "nota": nota,
+            # Contrato v23: todos los países nombrados (cubiertos o no), alcance mundial y franja horaria pedida.
+            "paises_mundo": sorted({c for r in resultados for c in r.get("paises_mundo") or []}),
+            "alcance_mundial": any(r.get("alcance_mundial") for r in resultados),
+            "zona_utc": [min(z[0] for z in zonas), max(z[1] for z in zonas)] if zonas else None}
 
 
 # Contrato v13: códigos al final de la ubicación. LinkedIn y los portales escriben «Bucharest, ro» o «Barcelona, es»
@@ -418,8 +428,9 @@ def cargar_reglas(reglas=()):
 
 
 def elegibles(titulo, ubicacion, descripcion="", remoto=None):
-    """Países desde los que se puede aplicar, con modalidad, confianza y una nota corta."""
-    r = _elegibles(titulo, ubicacion, descripcion, remoto)
+    """Países desde los que se puede aplicar, con modalidad, confianza y una nota corta (y, desde v23, `paises_mundo`,
+    `alcance_mundial` y `zona_utc`)."""
+    r = {**_elegibles(titulo, ubicacion, descripcion, remoto), **alcance(titulo, ubicacion, descripcion)}
     if r["confianza"] != "baja" or not (_REGLAS["exactas"] or _REGLAS["frases"]):
         return r
     texto = clave(ubicacion)
@@ -438,6 +449,60 @@ def elegibles(titulo, ubicacion, descripcion="", remoto=None):
                     "nota": "regla del operador" if origen == "operador" else "regla aprendida"}
         return r
     return {**r, "paises": [], "confianza": "alta", "nota": "regla: solo otro país"}
+
+
+@lru_cache(maxsize=1)
+def mundo():
+    """Contrato v23: la tabla mundial (datos/paises_mundo.yaml) para el panel y para reconocer países de cualquier parte.
+    `lista`: [{codigo, nombre}] por nombre; `nombres`: (nombre normalizado, ISO2) del más largo al más corto, con las
+    subdivisiones de los extranjeros frecuentes (estados de EE. UU.…) salvo las que comparten nombre con un país."""
+    filas = yaml.safe_load(RUTA_MUNDO.read_text(encoding="utf-8"))["paises"] if RUTA_MUNDO.exists() else []
+    lista = sorted(({"codigo": m["iso2"], "nombre": m.get("nombre") or m["iso2"]} for m in filas),
+                   key=lambda x: normalizar.sin_tildes(x["nombre"]).lower())
+    paises_n = {(n, m["iso2"]) for m in filas for n in m["nombres"]}
+    de_pais = {n for n, _ in paises_n}
+    propios = {p["codigo"] for p in datos()["paises"]}
+    subs = {(n, m["iso2"]) for m in filas if m["iso2"] not in propios for n in m.get("subdivisiones", [])
+            if n not in de_pais and len(n) > 3}
+    nombres = sorted(paises_n | subs, key=lambda x: -len(x[0]))
+    por_nombre = {}
+    for n, c in nombres:
+        por_nombre.setdefault(n, set()).add(c)
+    # Una sola expresión con las frases más largas primero: en cada posición gana la más larga.
+    patron = re.compile(r"(?<![a-z0-9])(" + "|".join(re.escape(n) for n in por_nombre) + r")(?![a-z0-9])") \
+        if por_nombre else None
+    return {"lista": lista, "codigos": {m["iso2"] for m in filas}, "por_nombre": por_nombre, "patron": patron}
+
+
+def paises_en_texto(texto):
+    """ISO2 de los países (de cualquier parte) que nombra un texto normalizado. La frase más larga gana («New Mexico»
+    es EE. UU., no México)."""
+    m = mundo()
+    if not texto or m["patron"] is None:
+        return set()
+    return {c for hallado in m["patron"].finditer(texto) for c in m["por_nombre"][hallado.group(1)]}
+
+
+def alcance(titulo, ubicacion, descripcion=""):
+    """Contrato v23: países que el aviso nombra como lugar o como alcance permitido (cubiertos o no), si es remoto para
+    cualquier lugar y la franja horaria que pide. Sin IA: tabla ISO y las mismas frases de residencia del motor."""
+    d = datos()
+    ubicacion_n = normalizar.texto(_expandir_codigos(ubicacion))
+    titulo_n = normalizar.texto(titulo)
+    hallados = paises_en_texto(ubicacion_n)
+    remoto_en = re.search(r"\bremote\s+(?:only\s+)?(?:in|from|within)\s+([a-z /.+]{2,80})", titulo_n)
+    frases = _restricciones(normalizar.texto(descripcion)[:30000]) + _restricciones(titulo_n) + \
+        ([remoto_en.group(1)] if remoto_en else [])
+    for frase in frases:
+        hallados |= paises_en_texto(frase)
+        if re.match(r"(us|usa|u s)\b", frase):
+            hallados.add("US")
+        if re.match(r"uk\b", frase):
+            hallados.add("GB")
+    mundial = _nombra(ubicacion_n, d["mundo"]) or bool(_REMOTO.search(titulo_n) and _nombra(titulo_n, d["mundo"]))
+    rangos = _rangos_zona(normalizar.sin_tildes(f"{ubicacion} {titulo} {descripcion[:6000]}").lower())
+    return {"paises_mundo": sorted(hallados), "alcance_mundial": bool(mundial),
+            "zona_utc": [min(a for a, _ in rangos), max(b for _, b in rangos)] if rangos else None}
 
 
 def _elegibles(titulo, ubicacion, descripcion="", remoto=None):

@@ -8,7 +8,8 @@ CAMPOS_PUBLICOS = ["id", "titulo", "empresa", "ubicacion", "familias", "paises",
                    "nota_pais", "idioma", "ingles", "nivel", "anos_min", "salario", "herramientas",
                    "fecha_publicacion", "fecha_estimada", "visto_primera_vez", "visto_ultima_vez", "fuente", "fuentes",
                    "enlace", "enlace_directo", "tipo_enlace", "resumen", "publicada_en", "detectada_en", "vista_en",
-                   "verificacion", "rol_entrega_actual", "enlaces_alternativos", "duplicada_de", "ids_agrupados"]
+                   "verificacion", "rol_entrega_actual", "enlaces_alternativos", "duplicada_de", "ids_agrupados",
+                   "paises_mundo", "alcance_mundial", "zona_utc"]
 
 
 def huella(empresa, titulo, enlace=""):
@@ -55,7 +56,7 @@ def crear(titulo, empresa, enlace, fuente, ubicacion="", descripcion="", fecha="
         "_lugares": lugares,
         "familias": fams,
         "paises": lugar["paises"], "confianza_pais": lugar["confianza"], "modalidad": lugar["modalidad"],
-        "nota_pais": lugar["nota"],
+        "nota_pais": lugar["nota"], **_mundo(lugar),
         "idioma": etiquetas.idioma(texto), "ingles": etiquetas.ingles(descripcion), "nivel": normalizar.nivel(titulo),
         "anos_min": etiquetas.anos_min(descripcion), "salario": etiquetas.salario(descripcion),
         "herramientas": familias.herramientas_en(descripcion, [f["familia"] for f in fams]) if descripcion else [],
@@ -92,7 +93,7 @@ def crear_post(titulo, empresa, enlace, ubicacion="", texto="", fecha="", remoto
         "id": "post-" + huella(empresa, titulo, principal), "tipo": "post", "contacto": contacto or {},
         "titulo": titulo, "empresa": empresa, "ubicacion": ubicacion, "_lugares": lugares, "familias": fams,
         "paises": lugar["paises"], "confianza_pais": lugar["confianza"], "modalidad": lugar["modalidad"],
-        "nota_pais": lugar["nota"], "idioma": etiquetas.idioma(f"{titulo}\n{texto}"), "ingles": etiquetas.ingles(texto),
+        "nota_pais": lugar["nota"], **_mundo(lugar), "idioma": etiquetas.idioma(f"{titulo}\n{texto}"), "ingles": etiquetas.ingles(texto),
         "nivel": normalizar.nivel(titulo), "anos_min": etiquetas.anos_min(texto), "salario": etiquetas.salario(texto),
         "herramientas": [], "fecha_publicacion": (fecha or "")[:10], "fecha_estimada": not fecha,
         "publicada_en": tiempos.instante(fecha), "detectada_en": capturada, "vista_en": capturada,
@@ -124,7 +125,13 @@ def _lugares(v):
 
 def _aplicar_lugar(v, lugar):
     v.update(paises=lugar["paises"], modalidad=lugar["modalidad"], confianza_pais=lugar["confianza"],
-             nota_pais=lugar["nota"])
+             nota_pais=lugar["nota"], **_mundo(lugar))
+
+
+def _mundo(lugar):
+    """Contrato v23: campos del mundo (países de cualquier parte, alcance mundial y franja horaria)."""
+    return {"paises_mundo": lugar.get("paises_mundo") or [], "alcance_mundial": bool(lugar.get("alcance_mundial")),
+            "zona_utc": lugar.get("zona_utc")}
 
 
 def reetiquetar(v, publicada=False):

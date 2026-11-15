@@ -23,6 +23,8 @@ def validar_version(version):
 def lugares_perfil(p, nombres=None):
     """Contrato v8: su país (remoto si lo acepta), las remotas regionales y, con híbrido/presencial, sus oficinas."""
     nombres = nombres or {x["codigo"]: x["nombre"] for x in paises.datos()["paises"]}
+    # Contrato v23: residencia o mudanza fuera de LATAM y España; nombre de la tabla mundial.
+    nombres = {**{x["codigo"]: x["nombre"] for x in paises.mundo()["lista"]}, **nombres}
     lugares = {}
     if "remoto" in p.modalidades:
         lugares["REMOTO_" + p.vive_en] = {"location": nombres[p.vive_en], "f_WT": "2"}
@@ -37,7 +39,8 @@ def lugares_perfil(p, nombres=None):
 def preparar(version, fecha):
     cfg = validar_version(version)
     mapa, roles = [], []
-    nombres = {p["codigo"]: p["nombre"] for p in paises.datos()["paises"]}
+    nombres = {**{p["codigo"]: p["nombre"] for p in paises.mundo()["lista"]},
+               **{p["codigo"]: p["nombre"] for p in paises.datos()["paises"]}}
     comunidades = {c.id for c in cfg.clientes if c.comunidad}
     for c in cfg.cargos:
         perfiles = cfg.perfiles_activos(c.id) if c.activo else []

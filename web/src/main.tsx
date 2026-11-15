@@ -151,6 +151,9 @@ function perfilNuevo(cliente: string, cargo: string): Perfil {
     vive_en: "CO",
     modalidades: ["remoto"],
     paises_presenciales_extra: [],
+    ciudades: [],
+    puede_trabajar_en: [],
+    acepta_horario: [],
     antiguedad_dias: 14,
     idiomas: ["es", "en"],
     ingles_maximo: "sin_filtro",
@@ -901,12 +904,101 @@ const estadosMensaje: Record<Borrador["estado"], string> = {
 };
 
 // Contrato v19: regiones que se eligen de una vez (el servidor las convierte en sus países).
+// Contrato v23: todos los países (llegan con la sesión). Se guardan aquí para no pasarlos por cada componente.
+let MUNDO: { codigo: string; nombre: string }[] = [];
+const nombrePais = (codigo: string) =>
+  MUNDO.find((p) => p.codigo === codigo)?.nombre || codigo;
+const sinTildes = (t: string) =>
+  t
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+function SelectorPaises({
+  etiqueta,
+  valores,
+  onChange,
+  excluir = [],
+  extra = [],
+}: {
+  etiqueta: string;
+  valores: string[];
+  onChange: (v: string[]) => void;
+  excluir?: string[];
+  extra?: { codigo: string; nombre: string }[];
+}) {
+  const [texto, setTexto] = useState("");
+  const id = useId();
+  const opciones = [...extra, ...MUNDO].filter(
+    (o) => !valores.includes(o.codigo) && !excluir.includes(o.codigo),
+  );
+  const nombre = (c: string) =>
+    extra.find((o) => o.codigo === c)?.nombre || nombrePais(c);
+  function agregar(valor: string) {
+    const t = sinTildes(valor);
+    if (!t) return false;
+    const o =
+      opciones.find((x) => sinTildes(x.nombre) === t) ||
+      opciones.find((x) => sinTildes(x.nombre).startsWith(t));
+    if (!o) return false;
+    onChange([...valores, o.codigo]);
+    setTexto("");
+    return true;
+  }
+  return (
+    <div className="field">
+      <label htmlFor={id}>{etiqueta}</label>
+      <div className="tagbox">
+        {valores.map((c) => (
+          <span className="term" key={c}>
+            {nombre(c)}
+            <button
+              type="button"
+              aria-label={"Quitar " + nombre(c)}
+              onClick={() => onChange(valores.filter((x) => x !== c))}
+            >
+              <X size={12} />
+            </button>
+          </span>
+        ))}
+        <input
+          id={id}
+          list={id + "-lista"}
+          placeholder="Escribe un país y pulsa Enter"
+          value={texto}
+          onChange={(e) => {
+            // Elegir de la lista desplegable lo añade al momento.
+            if (
+              opciones.some(
+                (o) => sinTildes(o.nombre) === sinTildes(e.target.value),
+              )
+            )
+              agregar(e.target.value);
+            else setTexto(e.target.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              agregar(texto);
+            }
+          }}
+        />
+        <datalist id={id + "-lista"}>
+          {opciones.map((o) => (
+            <option key={o.codigo} value={o.nombre} />
+          ))}
+        </datalist>
+      </div>
+    </div>
+  );
+}
 const REGIONES: { codigo: string; nombre: string }[] = [
   { codigo: "LATAM", nombre: "LATAM (todos los países)" },
   { codigo: "SUD_CENTRO_MX", nombre: "Sudamérica, Centroamérica y México" },
   { codigo: "SUDAMERICA", nombre: "Sudamérica" },
   { codigo: "CENTROAMERICA", nombre: "Centroamérica" },
   { codigo: "LATAM_ES", nombre: "LATAM y España" },
+  { codigo: "MUNDO", nombre: "Mundo (remoto en cualquier lugar)" },
 ];
 const ETIQUETA_SUGERIDA: Record<string, string> = {
   sirve: "sirve",
@@ -925,6 +1017,7 @@ function PorConfirmar({
 }) {
   const [datos, setDatos] = useState<Revisiones | null>(null);
   const [elegido, setElegido] = useState<Record<string, string>>({});
+  const [extras, setExtras] = useState<Record<string, string[]>>({});
   const [iguales, setIguales] = useState<Record<string, boolean>>({});
   const [ocupado, setOcupado] = useState("");
   async function cargar() {
@@ -943,9 +1036,13 @@ function PorConfirmar({
   const nombre = (codigo: string) =>
     paises.find((p) => p.codigo === codigo)?.nombre ||
     REGIONES.find((r) => r.codigo === codigo)?.nombre ||
-    codigo;
+    nombrePais(codigo);
   async function decidir(r: Revision, decision: string, codigos?: string[]) {
     const pais = elegido[r.vacante_id] ?? r.sugerencia[0] ?? "";
+    // Contrato v23: etiquetas adicionales (por ejemplo LATAM y Estados Unidos a la vez).
+    const mas = extras[r.vacante_id] || [];
+    if (decision === "sirve" && !codigos?.length && mas.length)
+      codigos = [...(pais ? [pais] : []), ...mas];
     if (decision === "sirve" && !pais && !codigos?.length) {
       notify("Elige el país antes de confirmar.", true);
       return;
@@ -1271,6 +1368,15 @@ function PorConfirmar({
                   </optgroup>
                 </select>
               </label>
+              <div className="revision-extras">
+                <SelectorPaises
+                  etiqueta={`Otras etiquetas de ${r.titulo}`}
+                  valores={extras[r.vacante_id] || []}
+                  onChange={(v) => setExtras({ ...extras, [r.vacante_id]: v })}
+                  excluir={[pais]}
+                  extra={REGIONES}
+                />
+              </div>
               <button
                 type="button"
                 className={r.sugerida ? "button secondary" : "button primary"}
@@ -2266,11 +2372,22 @@ function ClienteDialog({
                       })
                     }
                   >
-                    {paises.map((pais) => (
-                      <option key={pais.codigo} value={pais.codigo}>
-                        {pais.nombre}
-                      </option>
-                    ))}
+                    <optgroup label="LATAM y España">
+                      {paises.map((pais) => (
+                        <option key={pais.codigo} value={pais.codigo}>
+                          {pais.nombre}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Resto del mundo">
+                      {MUNDO.filter(
+                        (x) => !paises.some((c) => c.codigo === x.codigo),
+                      ).map((pais) => (
+                        <option key={pais.codigo} value={pais.codigo}>
+                          {pais.nombre}
+                        </option>
+                      ))}
+                    </optgroup>
                   </select>
                 </div>
               </div>
@@ -2325,9 +2442,14 @@ function ClienteDialog({
                         className="text-button"
                         onClick={() =>
                           patch(p.id, {
-                            paises_presenciales_extra: paises
-                              .map((x) => x.codigo)
-                              .filter((x) => x !== p.vive_en),
+                            paises_presenciales_extra: [
+                              ...paises
+                                .map((x) => x.codigo)
+                                .filter((x) => x !== p.vive_en),
+                              ...p.paises_presenciales_extra.filter(
+                                (x) => !paises.some((c) => c.codigo === x),
+                              ),
+                            ],
                           })
                         }
                       >
@@ -2378,9 +2500,102 @@ function ClienteDialog({
                           </label>
                         ))}
                     </div>
+                    <SelectorPaises
+                      etiqueta={
+                        "Otros países, fuera de LATAM y España (perfil " +
+                        (i + 1) +
+                        ")"
+                      }
+                      valores={p.paises_presenciales_extra.filter(
+                        (x) => !paises.some((c) => c.codigo === x),
+                      )}
+                      onChange={(v) =>
+                        patch(p.id, {
+                          paises_presenciales_extra: [
+                            ...p.paises_presenciales_extra.filter((x) =>
+                              paises.some((c) => c.codigo === x),
+                            ),
+                            ...v,
+                          ],
+                        })
+                      }
+                      excluir={[p.vive_en, ...paises.map((c) => c.codigo)]}
+                    />
                   </Plegable>
+                  <TagInput
+                    label={
+                      "Solo en estas ciudades (opcional), perfil " + (i + 1)
+                    }
+                    values={p.ciudades || []}
+                    onChange={(v) => patch(p.id, { ciudades: v })}
+                  />
+                  <p className="field-help">
+                    Para presencial o híbrida. Vacío: cualquier ciudad. Un aviso
+                    sin ciudad no se descarta.
+                  </p>
                 </div>
               )}
+              <Plegable
+                className="otros-paises"
+                inicial={
+                  !!(p.puede_trabajar_en?.length || p.acepta_horario?.length)
+                }
+                mostrar={
+                  "Permiso de trabajo y horario (opcional)" +
+                  ((p.puede_trabajar_en?.length || 0) +
+                  (p.acepta_horario?.length || 0)
+                    ? ` · ${(p.puede_trabajar_en?.length || 0) + (p.acepta_horario?.length || 0)}`
+                    : "")
+                }
+                ocultar="Ocultar permiso y horario"
+              >
+                <SelectorPaises
+                  etiqueta={
+                    "Puede trabajar legalmente en… (perfil " + (i + 1) + ")"
+                  }
+                  valores={p.puede_trabajar_en || []}
+                  onChange={(v) => patch(p.id, { puede_trabajar_en: v })}
+                  excluir={[p.vive_en]}
+                />
+                <p className="field-help">
+                  Por visa o ciudadanía. Las remotas restringidas a esos países
+                  también le llegan.
+                </p>
+                <fieldset className="field plain">
+                  <legend>Acepta trabajar en horario de…</legend>
+                  <div className="check-line">
+                    {(
+                      [
+                        ["us_este", "EE. UU. Este"],
+                        ["us_pacifico", "EE. UU. Pacífico"],
+                        ["europa", "Europa"],
+                      ] as [string, string][]
+                    ).map(([v, t]) => (
+                      <label key={v}>
+                        <input
+                          type="checkbox"
+                          aria-label={`Horario ${t} en el perfil ${i + 1}`}
+                          checked={(p.acepta_horario || []).includes(v)}
+                          onChange={(e) =>
+                            patch(p.id, {
+                              acepta_horario: e.target.checked
+                                ? [...(p.acepta_horario || []), v]
+                                : (p.acepta_horario || []).filter(
+                                    (x) => x !== v,
+                                  ),
+                            })
+                          }
+                        />
+                        {t}
+                      </label>
+                    ))}
+                  </div>
+                  <p className="field-help">
+                    La zona de su país siempre cuenta. Una remota que solo pide
+                    horario le llega si cruza alguna de estas zonas.
+                  </p>
+                </fieldset>
+              </Plegable>
               <div className="form-grid">
                 <div className="field">
                   <label>Antigüedad máxima de publicación</label>
@@ -2961,6 +3176,7 @@ function App() {
     setError("");
     try {
       const s = await api<Sesion>("/session");
+      MUNDO = s.paises_mundo || [];
       setSesion(s);
       if (s.sesion) {
         api<Revisiones>("/revisiones")
@@ -4291,7 +4507,8 @@ function ClientCard({
         {p && (
           <div className="client-lugar">
             <span>
-              {paises.find((x) => x.codigo === p.vive_en)?.nombre || p.vive_en}
+              {paises.find((x) => x.codigo === p.vive_en)?.nombre ||
+                nombrePais(p.vive_en)}
               {p.paises_presenciales_extra.length > 0 &&
                 " +" + p.paises_presenciales_extra.length}
             </span>

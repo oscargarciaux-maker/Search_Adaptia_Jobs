@@ -112,8 +112,14 @@ def sugerencia(texto):
 
 
 def con_paises(datos, codigos, por="operador"):
-    """La vacante con los países confirmados (nota visible en el panel)."""
-    return dict(datos, paises=list(codigos), confianza_pais="alta", nota_pais=f"confirmada por {por}")
+    """La vacante con los países confirmados (nota visible en el panel). Contrato v23: los cubiertos van a `paises`;
+    todos (también los de fuera de LATAM y España) a `paises_mundo`; «MUNDO» marca alcance mundial."""
+    cubiertos = set(paises.datos()["codigos"])
+    codigos = list(codigos)
+    return dict(datos, paises=[c for c in codigos if c in cubiertos],
+                paises_mundo=[c for c in codigos if c != "MUNDO"],
+                alcance_mundial="MUNDO" in codigos or bool(datos.get("alcance_mundial")) and not codigos,
+                confianza_pais="alta", nota_pais=f"confirmada por {por}")
 
 
 def _datos_ligeros(fila_catalogo):
@@ -296,9 +302,10 @@ def decidir(repo, vacante_id, decision, codigos=(), aplicar_a_iguales=False, fec
     codigos = expandir(codigos)
     asignadas = 0
     if decision == "sirve":
-        cubiertos = set(paises.datos()["codigos"])
-        if not codigos or set(codigos) - cubiertos:
-            raise ErrorRepositorio("Elige al menos un país de LATAM o España.", 422)
+        # Contrato v23: varias etiquetas a la vez, de cualquier parte (LATAM y EE. UU., Mundo…).
+        validos = set(paises.mundo()["codigos"]) | set(paises.datos()["reconocidos"]) | {"MUNDO"}
+        if not codigos or set(codigos) - validos:
+            raise ErrorRepositorio("Elige al menos un país o una región de la lista.", 422)
         asignadas = _asignar(repo, rev, codigos, fecha, por, comprobar)
         cambios = {"estado": "confirmada", "paises": codigos}
     elif decision == "saltar":

@@ -693,3 +693,52 @@ test("contrato v22: restricciones, prioridades y margen de años en el perfil", 
     { tipo: "palabras", palabras: ["call center"] },
   ]);
 });
+
+test("contrato v23: residencia en el mundo, permiso de trabajo, horario y ciudades", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/");
+  await ir(page, "Clientes");
+  await page
+    .getByRole("button", { name: "Editar Cliente de ejemplo 01", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByLabel("País de residencia del perfil 1")
+    .selectOption({ label: "Alemania" });
+  await dialog.getByLabel("Presencial en el perfil 1").check();
+  const ciudades = dialog.getByLabel(
+    "Solo en estas ciudades (opcional), perfil 1",
+  );
+  await ciudades.fill("Berlín");
+  await ciudades.press("Enter");
+  await dialog
+    .getByRole("button", { name: "Permiso de trabajo y horario (opcional)" })
+    .click();
+  const permiso = dialog.getByLabel("Puede trabajar legalmente en… (perfil 1)");
+  await permiso.fill("Estados Unidos");
+  await permiso.press("Enter");
+  await expect(
+    dialog.getByRole("button", { name: "Quitar Estados Unidos" }),
+  ).toBeVisible();
+  await dialog.getByLabel("Horario EE. UU. Este en el perfil 1").check();
+  await dialog.getByRole("button", { name: "Aplicar cambios" }).click();
+  await expect(
+    page.locator(".client-card", { hasText: "Cliente de ejemplo 01" }),
+  ).toContainText("Alemania");
+  await page
+    .getByRole("button", { name: "Guardar borrador", exact: true })
+    .click();
+  await expect(
+    page.getByText("Borrador guardado.", { exact: false }),
+  ).toBeVisible();
+  const cfg = await (await request.get("/api/config")).json();
+  const perfil = cfg.borrador.perfiles.find(
+    (p: { cliente_id: string }) => p.cliente_id === cfg.borrador.clientes[0].id,
+  );
+  expect(perfil.vive_en).toBe("DE");
+  expect(perfil.ciudades).toEqual(["Berlín"]);
+  expect(perfil.puede_trabajar_en).toEqual(["US"]);
+  expect(perfil.acepta_horario).toEqual(["us_este"]);
+});
