@@ -163,7 +163,9 @@ def evaluar(v, perfil, hoy=None):
         if nivel not in NIVELES:
             pruebas.append("Inglés no informado")
         elif obligatorio and NIVELES.index(nivel) > NIVELES.index(p.ingles_maximo):
-            blando("inglés requerido superior al indicado", f"Pide inglés {'nativo' if nivel == 'native' else nivel}")
+            # Contrato v32 (decisión de Oscar, 16 nov): si el aviso EXIGE más inglés que el del perfil, no llega.
+            # Si lo pide como deseable o no lo dice, sí llega.
+            motivos.append("inglés requerido superior al indicado")
         else:
             pruebas.append(f"Inglés {nivel}" + (" deseable" if not obligatorio else " requerido"))
     titulo, descripcion = v.get("titulo") or "", v.get("_descripcion") or ""

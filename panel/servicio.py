@@ -20,6 +20,7 @@ SUGERENCIAS = {
     "no admite postular desde su país": "Añadir un país donde puede trabajar en remoto",
     "modalidad diferente": "Aceptar otra modalidad",
     "idioma del aviso diferente": "Aceptar avisos en español e inglés",
+    "inglés requerido superior al indicado": "Subir el nivel de inglés del perfil",  # contrato v32
 }
 _POR_CARGO = {}
 _log = logging.getLogger(__name__)

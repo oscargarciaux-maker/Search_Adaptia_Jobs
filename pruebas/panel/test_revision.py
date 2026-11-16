@@ -1,4 +1,5 @@
 """Contrato v16: bandeja «Por confirmar» — cola diaria, decisiones de un clic, reglas sin ubicaciones genéricas."""
+import pytest
 from fastapi.testclient import TestClient
 
 from buscador import catalogo, tiempos, vacante
@@ -19,6 +20,12 @@ def _fila(n, ubicacion, titulo="Product Designer", texto=TEXTO):
                                                                 "comprobada_en": tiempos.ahora()}]})
     f = catalogo.fila(v, hoy() + "T00:00:00Z")
     return {"id": f["id"], "datos": f["datos"], "description_full": f["description_full"]}
+
+
+@pytest.fixture(autouse=True)
+def _bandeja_sin_sugerencias_automaticas(monkeypatch):
+    """Estas pruebas miran la bandeja; las sugerencias claras aplicadas solas (v32) se prueban aparte."""
+    monkeypatch.setattr(revision, "APLICAR_SUGERENCIAS", False)
 
 
 class Repo(RepositorioDemo):
@@ -490,3 +497,17 @@ def test_preparar_cola_agrega_las_de_funciones_solo_para_perfiles_compatibles():
     assert set(nuevas) == {"f-co"} and nuevas["f-co"]["motivo"] == revision.FUNCIONES
     assert "user research" in nuevas["f-co"]["pista"]
     assert {p["cargo_id"] for p in nuevas["f-co"]["perfiles"]} == {cfg_dict["cargos"][0]["id"]}
+
+
+def test_v32_sugerencia_clara_se_aplica_sola_y_la_dudosa_espera(monkeypatch):
+    monkeypatch.setattr(revision, "APLICAR_SUGERENCIAS", True)
+    cfg, _ = _cfg()
+    clara = _fila(1, "Remote Remoto x")  # «Preferably based in Colombia or Mexico»: países cubiertos, sin extranjeros
+    dudosa = _fila(2, "Remote Remoto y", texto=("We are looking for a Product Designer to join our team. We require 2 "
+                                                "years of experience. English B2 required. We build products. ") * 3)
+    r = Repo([clara, dudosa])
+    resumen = revision.preparar_cola(r, cfg, hoy(), {p.id: 0 for p in cfg.perfiles})
+    estados = {x["vacante_id"]: x["estado"] for x in r.revisiones()}
+    assert estados[clara["id"]] == "confirmada" and estados[dudosa["id"]] == "pendiente"
+    assert resumen["resueltas_por_sugerencia"] == 1
+    assert r.revisiones(vacante_id=clara["id"])[0]["motivo"] == "decidida por sugerencia clara"
