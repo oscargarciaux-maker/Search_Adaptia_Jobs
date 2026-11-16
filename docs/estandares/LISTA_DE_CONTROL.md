@@ -22,7 +22,7 @@ Cada auditoría (skill `auditoria-codigo`, cada mes) se mide contra esta lista.
 | Ninguna clave, ID ni dato de clientes en el repositorio | ✅ | `pruebas/test_repositorio.py`; hook `bloquear_secretos.py` |
 | Validación estricta de entradas (`extra="forbid"`, longitudes) (API3, API6) | ✅ | `panel/modelos.py` (pydantic) |
 | Dependencias sin vulnerabilidades conocidas (A06) | ✅ | `pip-audit` y `npm audit` en CI (job `auditoria`) |
-| Dependencias fijadas con huella (integridad, A08) | ✅ | `requirements.lock` con `--require-hashes`; `test_dependencias.py` |
+| Dependencias fijadas con huella (integridad, A08) | ✅ | `requirements.txt` con `--require-hashes`; `test_dependencias.py` |
 | Errores sin detalles internos al usuario (ASVS 7.4) | ✅ | `_mensaje_sql` y manejadores de error |
 | Registro de errores tolerados sin datos sensibles (ASVS 7.1) | ✅ | `buscador/registro.py` |
 | La sesión no vence mientras se usa (refresh token) | ⬜ | PR 5 (hoy dura 1 h) |
@@ -44,7 +44,7 @@ Cada auditoría (skill `auditoria-codigo`, cada mes) se mide contra esta lista.
 | Control | Estado | Evidencia |
 |---|---|---|
 | RLS activo en todas las tablas públicas | ✅ | `probar_inventario`, flujo «Inventario de la base» |
-| Sin permisos para `anon`/`authenticated` | ✅ | igual |
+| Sin permisos para `anon`/`authenticated` | ✅ | SQL 017 quitó los de `ofertas` y `entrega_de_hoy` (los encontró el inventario real del 16 nov); `probar_lote_grande` |
 | Funciones `security definer` con `search_path` fijo | ✅ | igual |
 | Migraciones con hash registrado, sin editar las ya aplicadas, respaldo cifrado antes | ✅ | `migraciones.py`, `probar_migraciones` |
 | Copia semanal cifrada y restauración probada | ✅ | `respaldo.yml`; `probar_migraciones` (restauración) |
@@ -57,7 +57,7 @@ Cada auditoría (skill `auditoria-codigo`, cada mes) se mide contra esta lista.
 | Factor | Estado | Evidencia |
 |---|---|---|
 | Configuración y secretos en el entorno, no en el código | ✅ | secretos de GitHub y del alojamiento |
-| Dependencias declaradas y aisladas | ✅ | `requirements.lock`, `package-lock.json`, Docker |
+| Dependencias declaradas y aisladas | ✅ | `requirements.txt`, `package-lock.json`, Docker |
 | Procesos sin estado (el estado vive en Supabase y en la rama `publicado`) | ✅ | `docs/OPERACION_Y_RECUPERACION.md` |
 | Registros a la salida estándar con marcas de tiempo | ✅ | `bodega.etapa`, `registro.aviso` |
 | Igualdad entre desarrollo y producción | ⚠️ | la demostración usa datos ficticios; Docker reproduce producción |
