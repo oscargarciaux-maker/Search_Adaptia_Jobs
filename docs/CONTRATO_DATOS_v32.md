@@ -25,6 +25,12 @@
    - queda con el motivo «decidida por sugerencia clara». No enseña al aprendizaje: solo aprende de lo que decide la
      persona;
    - lo dudoso (mezclas, Europa o EMEA, «cualquier lugar», sin evidencia) sigue preguntándose.
+5. **Ubicaciones de EE. UU. como las muestra LinkedIn** (caso Danna, 16 nov). «Chicago, IL», «Austin, TX»,
+   «Remote, US», «Greater Chicago Area» y «San Francisco Bay Area» ahora tienen país (`paises_mundo` = US):
+   - antes no lo tenían y se descartaban al entrar, aunque un perfil viviera en EE. UU.;
+   - «, CO», «, AR» y «, PA» siguen sin decidir solos, porque también son países cubiertos (v15);
+   - «Baja California» es México, no California.
+
 4. **Las fuentes respetan su límite de tiempo:**
    - un tiempo restante de 0 detiene la fuente. Antes se leía como «sin límite», y LinkedIn tardó 101 min el 16 nov;
    - LinkedIn usa ~65 % de su tiempo para buscar y el resto para releer fichas sin descripción. Esa relectura dio

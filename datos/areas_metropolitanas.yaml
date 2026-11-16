@@ -36,3 +36,26 @@ leon: MX
 santiago: CL
 cordoba: AR
 san jose: CR
+# Estados Unidos y Canadá (LinkedIn: «Greater Chicago Area», «San Francisco Bay Area», «Nueva York y alrededores»).
+chicago: US
+new york: US
+new york city: US
+nueva york: US
+san francisco bay: US
+san francisco: US
+los angeles: US
+boston: US
+seattle: US
+austin: US
+dallas fort worth: US
+houston: US
+miami fort lauderdale: US
+atlanta: US
+denver: US
+washington dc baltimore: US
+phoenix: US
+san diego: US
+philadelphia: US
+toronto: CA
+vancouver: CA
+montreal: CA
