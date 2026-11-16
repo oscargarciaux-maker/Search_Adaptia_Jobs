@@ -74,6 +74,8 @@ presupuestos:
   linkedin_relectura: 300      # avisos ya guardados sin descripción que se releen tras la búsqueda
   computrabajo_busquedas: 60   # páginas de resultados de Computrabajo (17 países; se postula en el mismo portal)
   computrabajo_fichas: 150     # fichas de Computrabajo a las que se les lee la descripción
+  elempleo_busquedas: 20       # búsquedas en Elempleo (Colombia; se postula en el mismo portal; PR 1b)
+  elempleo_fichas: 80          # fichas de Elempleo que se leen (fecha, salario y modalidad estructurados)
   pausa_linkedin: [1.0, 2.5]   # segundos entre peticiones a LinkedIn
   indeed_busquedas: 90
   apify_busquedas: 60          # solo con APIFY_TOKEN

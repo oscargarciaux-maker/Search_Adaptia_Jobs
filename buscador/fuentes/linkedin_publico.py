@@ -62,7 +62,11 @@ def ficha(pagina):
 def combinaciones(mapa, paises_activos):
     """Todas las combinaciones (familia, lugar) que se pueden buscar."""
     lugares = [(p, {"location": nombre}) for p, nombre in paises_activos] + LUGARES_EXTRA
-    return [(f["id"], cobertura.consultas(f), clave, params) for f in mapa for clave, params in f.get("lugares", lugares)]
+    salida = [(f["id"], cobertura.consultas(f), clave, params) for f in mapa for clave, params in f.get("lugares", lugares)]
+    # PR 1b: títulos en español en los lugares de los perfiles que solo aceptan avisos en español (modo panel).
+    salida += [(f["id"], f["consultas_es"], clave + ":ES", params) for f in mapa if f.get("consultas_es")
+               for clave, params in f.get("lugares_es", [])]
+    return salida
 
 
 def consulta_or(consultas, maximo=4):
