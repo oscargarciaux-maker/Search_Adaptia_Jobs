@@ -2,7 +2,7 @@
 import pandas as pd
 
 from buscador import bodega, vacante
-from buscador.fuentes import ats, brave, getonbrd, indeed, linkedin_apify, linkedin_publico, remotos
+from buscador.fuentes import ats, getonbrd, indeed, linkedin_apify, linkedin_publico, remotos
 
 TARJETAS_LINKEDIN = """
 <li><div class="base-card" data-entity-urn="urn:li:jobPosting:4483216798">
@@ -165,12 +165,6 @@ def test_get_on_board_y_apify():
                                         "descriptionText": "Figma", "applyUrl": "https://jobs.lever.co/acme/1"})
     assert a["enlace_directo"] == "https://jobs.lever.co/acme/1" and a["fecha"] == "2026-10-26"
     assert linkedin_apify.buscar(None, "", [], {}, "2026-10-28", token="")[1]["omitida"]
-
-
-def test_brave_rota_consultas_y_se_omite_sin_clave():
-    a, b = brave.consultas_del_dia(5, 1), brave.consultas_del_dia(5, 2)
-    assert len(a) == 5 and a != b
-    assert brave.buscar(None, 5, 1, clave="")[1]["omitida"]
 
 
 def test_limpiar_junta_quita_viejas_y_cerradas():

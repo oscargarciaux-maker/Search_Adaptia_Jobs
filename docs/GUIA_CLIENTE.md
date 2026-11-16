@@ -3,6 +3,8 @@
 La revisión v6 incorpora un panel privado para el operador. La guía de uso detallada está en [PANEL_CONTROL.md](PANEL_CONTROL.md):
 añadir clientes/perfiles, revisar cargos afines, repartir cupos, guardar, programar y copiar resultados para WhatsApp.
 El acceso real requiere configurar inicio de sesión más adelante; la demostración usa datos ficticios.
+Las claves y accesos (qué es cada una, dónde se guardan y cómo se entregan al propietario) están en
+[Credenciales y accesos](CREDENCIALES_Y_ACCESOS.md); la guía no contiene valores privados.
 
 Cada perfil tiene su «Meta diaria» (cuántas vacantes al día busca; 10 por defecto) y en «Cargos y metas» se define el
 «Techo del día» (120 por defecto), el máximo para cuidar los consumos. El cupo de cada cargo es la suma de las metas de

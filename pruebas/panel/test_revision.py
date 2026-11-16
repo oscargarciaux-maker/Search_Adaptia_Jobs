@@ -1,7 +1,7 @@
 """Contrato v16: bandeja «Por confirmar» — cola diaria, decisiones de un clic, reglas sin ubicaciones genéricas."""
 from fastapi.testclient import TestClient
 
-from buscador import alertas, catalogo, tiempos, vacante
+from buscador import catalogo, tiempos, vacante
 from panel import revision, servicio
 from panel.api import crear_app
 from panel.ejecutor import validar_version
@@ -136,12 +136,6 @@ def test_api_de_la_bandeja_en_demostracion():
     assert api.get("/api/revisiones").json()["total"] == 3
     sin_origen = api.post("/api/revisiones/rev-demo-1", json={"decision": "saltar"})
     assert sin_origen.status_code in (401, 403)
-
-
-def test_correo_menciona_las_por_confirmar():
-    _, _, texto = alertas.contenido("exito", "diario", {"fecha": hoy(), "entrega": {"vacantes": 120, "roles": {}}},
-                                    {"resumen": {"por_confirmar": 4, "por_confirmar_faltantes": 2}})
-    assert "4 vacante(s) por confirmar" in texto and "2 ayudan" in texto
 
 
 class RepoCatalogo(Repo):

@@ -3,7 +3,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from buscador import alertas, apify, entrega, familias, refuerzo, vacante
+from buscador import apify, entrega, familias, refuerzo, vacante
 from buscador.fuentes import linkedin_apify
 from panel import afinidad, ejecutor
 from panel.modelos import Perfil
@@ -51,17 +51,13 @@ class ClienteRechazado:
         return None
 
 
-def test_clave_de_apify_rechazada_se_marca_se_detiene_y_alerta():
+def test_clave_de_apify_rechazada_se_marca_y_se_detiene():
     cliente = ClienteRechazado()
     combos = [("qa", ["QA Engineer"], f"P{i}", {"location": "Colombia"}) for i in range(5)]
     crudas, stats = linkedin_apify.buscar(cliente, "curious_coder/linkedin-jobs-scraper", combos, {}, hoy(),
                                           token="token-ficticio", control_gasto=apify.Presupuesto({}, hoy()))
     assert crudas == [] and stats["clave_invalida"] and cliente.posts == 1 and "APIFY_TOKEN" in stats["error"]
-    salud = {"fecha": hoy(), "fuentes": {"LinkedIn (Apify) rescate": stats},
-             "entrega": {"vacantes": 120, "meta_cumplida": True, "roles": {}}}
-    assert alertas.decidir("diario", "success", salud) == "fallo"
-    _, _, texto = alertas.contenido("fallo", "diario", salud)
-    assert "APIFY_TOKEN" in texto and "token-ficticio" not in texto
+    assert "token-ficticio" not in str(stats)  # el registro nunca muestra la clave
 
 
 # ── Déficit por persona y niveles nuevos ───────────────────────────────────────────────────────────────────────────

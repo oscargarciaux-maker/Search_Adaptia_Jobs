@@ -37,6 +37,7 @@ Instalación privada, Docker, configuración y guía detallada: [Panel de contro
 
 | Para quién / tarea | Documento vigente |
 |---|---|
+| Guardar y consultar accesos, distinguir claves y compartirlos con el propietario | [Credenciales y accesos](docs/CREDENCIALES_Y_ACCESOS.md) |
 | Operador: clientes, filtros, cupos y vacantes | [Manual del cliente](docs/GUIA_CLIENTE.md) |
 | Administrador: instalar o actualizar sin perder datos | [Instalación](docs/INSTALACION.md) |
 | Configurar una vez y aplicar SQL/activación automáticamente | [Instalación automática](docs/INSTALACION_AUTOMATICA.md) |

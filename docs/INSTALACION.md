@@ -26,7 +26,6 @@ los límites gratuitos y precios se comprueban en cada proveedor.
 | GitHub | Obligatorio para la automatización actual | Propiedad del repositorio, Actions, variables, secretos y recuperación de acceso |
 | Supabase | Obligatorio para persistencia/entrega | Organización/proyecto, SQL Editor administrativo, claves y respaldos |
 | Apify | Necesario si se quiere el refuerzo formal LinkedIn | Cuenta, crédito/ciclo, actor y límite global de consumo |
-| Brave Search | Opcional | Clave, condiciones y presupuesto independiente |
 
 Cada responsable debe tener acceso con su propia cuenta y los permisos mínimos necesarios. Una invitación al
 repositorio no concede automáticamente administración de Supabase o Apify. Activar recuperación y segundo factor
@@ -89,8 +88,8 @@ La nocturna y las búsquedas profundas pueden usar este refuerzo, compartiendo e
 no ejecuta Apify. El diagnóstico general valida la cuenta sin lanzar el actor; `probar_apify=true` sí puede consumir hasta
 USD 0,01 y no forma parte de las reservas normales. No repetir esa prueba sin necesidad.
 
-El máximo de USD 5 corresponde a Apify de este proyecto; no es un precio total garantizado de GitHub, base, alojamiento,
-Brave o futuro WhatsApp. Tarifas, reservas y límites: [APIFY_LINKEDIN.md](APIFY_LINKEDIN.md).
+El máximo de USD 5 corresponde a Apify de este proyecto; no es un precio total garantizado de GitHub, base, alojamiento
+o futuro WhatsApp. Tarifas, reservas y límites: [APIFY_LINKEDIN.md](APIFY_LINKEDIN.md).
 
 ## 6. Variables del modo manual
 
@@ -114,8 +113,7 @@ En modo automático esos pasos los realiza Preparar Supabase; su ejecución exit
 
 1. **Actions → Diagnóstico → Run workflow → main → solo_supabase=true**, dejando `probar_apify=false`.
    Es una lectura de conexión/columnas de `ofertas`; no demuestra escritura ni comprueba por sí sola todo el catálogo v2.
-2. Opcionalmente ejecutar Diagnóstico general para comprobar fuentes/cuenta. Un Brave no configurado es opcional;
-   un Supabase obligatorio fallido debe resolverse antes de operar. Un resultado de una fuente no acredita todo el mercado.
+2. Opcionalmente ejecutar Diagnóstico general para comprobar fuentes/cuenta. Un Supabase obligatorio fallido debe resolverse antes de operar. Un resultado de una fuente no acredita todo el mercado.
 3. Habilitar **Bodega nocturna** desde su menú si estaba deshabilitada.
 4. Ejecutar **Run workflow → main → modo=diario → prueba=true**. No escribe ofertas ni actualiza `publicado`.
    Puede dejar artefactos temporales en el runner; no demuestra persistencia real.
@@ -147,8 +145,7 @@ La configuración horaria efectiva es el `cron` de los flujos en UTC; `hora_bode
 
 ## 9. Opcionales, límites y documentación que se entrega
 
-Brave se habilita únicamente si se necesita búsqueda web adicional, guardando `BRAVE_API_KEY` y revisando su plan y gasto.
-No es obligatorio para usar las fuentes existentes. No se garantiza gratuidad de opciones de terceros ni de futuros canales.
+No se garantiza gratuidad de opciones de terceros ni de futuros canales.
 
 Entregar al operador [GUIA_CLIENTE.md](GUIA_CLIENTE.md), al administrador [OPERACION_Y_RECUPERACION.md](OPERACION_Y_RECUPERACION.md),
 y a ambas partes [TRASPASO.md](TRASPASO.md) y [ACEPTACION_Y_ESTADO.md](ACEPTACION_Y_ESTADO.md). `PLAN.md` es histórico,

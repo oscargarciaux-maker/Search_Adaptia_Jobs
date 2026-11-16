@@ -18,7 +18,7 @@ from pathlib import Path
 import yaml
 
 from buscador import calidad, contrato, cobertura, enlaces, familias, normalizar, paises, tiempos, vacante
-from buscador.fuentes import (ats, brave, computrabajo, elempleo, getonbrd, indeed, linkedin_apify, linkedin_publico,
+from buscador.fuentes import (ats, computrabajo, elempleo, getonbrd, indeed, linkedin_apify, linkedin_publico,
                               publicaciones_apify, remotos)
 from buscador.http import Cliente
 
@@ -211,20 +211,12 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
     for c in crudas:
         if c.get("fuente") in ("LinkedIn", "Indeed", "LinkedIn (Apify)", publicaciones_apify.NOMBRE) and c.get("empresa") and familias.clasificar(c["titulo"]):
             empresas.add(c["empresa"])
-    # Descubrir portales nuevos: nombres de empresas y tableros que encuentre Brave
+    # Descubrir portales nuevos con los nombres de empresas que trajeron las demás fuentes
     nuevos = []
     try:
         t0 = time.monotonic()
         nuevos, probadas = ats.descubrir(Cliente(pausa=(0.05, 0.15)), sorted(empresas), estado["ats_probadas"],
                                          p["empresas_por_probar"], hoy, filas_ats)
-        tableros_brave, stats_brave = brave.buscar(Cliente(pausa=(1.0, 1.3)), p["brave_busquedas"],
-                                                   date.fromisoformat(hoy).timetuple().tm_yday)
-        salud["Brave (descubre empresas)"] = stats_brave
-        conocidos = {(f["sistema"], f["slug"]) for f in filas_ats + nuevos}
-        for t in tableros_brave:
-            if (t["sistema"], t["slug"]) not in conocidos:
-                nuevos.append({"empresa": t["slug"], "sistema": t["sistema"], "slug": t["slug"], "origen": "Brave",
-                               "agregada": hoy})
         salud["Descubrir portales"] = {"empresas_probadas": probadas, "portales_nuevos": len(nuevos),
                                        "segundos": round(time.monotonic() - t0)}
     except Exception as e:  # noqa: BLE001
@@ -313,7 +305,7 @@ def limpiar(previas, crudas, hoy, dias_maximos, enlaces_ats, empresas_leidas, co
 
 
 PRUEBA = {"minutos_por_fuente": 3, "linkedin_busquedas": 6, "linkedin_fichas": 8, "indeed_busquedas": 2,
-          "apify_busquedas": 2, "remotos_paginas": 8, "empresas_por_probar": 5, "brave_busquedas": 2,
+          "apify_busquedas": 2, "remotos_paginas": 8, "empresas_por_probar": 5,
           "getonbrd_busquedas": 3}
 
 

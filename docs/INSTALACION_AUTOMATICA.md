@@ -1,6 +1,9 @@
 # Instalación y actualizaciones automáticas
 
 Este es el camino preferido para entregar el proyecto. Sustituye copiar los SQL 001–010 y activar variables a mano.
+Antes de configurar secretos, organizar los valores privados en el gestor del cliente siguiendo
+[Credenciales y accesos](CREDENCIALES_Y_ACCESOS.md): distingue contraseña PostgreSQL, URI completa, clave API y clave de
+respaldo, y explica cuándo se quitan los corchetes de `[YOUR-PASSWORD]`.
 La configuración inicial de cuentas/secretos sigue correspondiendo al propietario; las siguientes actualizaciones las
 ejecuta GitHub. Un PR incorpora código; la ejecución **Preparar Supabase** acredita la instalación de esa versión.
 
