@@ -107,6 +107,44 @@ def _terminos(vs):
 META_POR_DEFECTO = 10  # contrato v21: meta diaria de un perfil nuevo
 
 
+MODOS = ("remoto", "hibrido", "presencial")
+
+
+class Ubicacion(Modelo):
+    """Contrato v30: un lugar donde trabajaría (países y ciudades) y las modalidades que acepta ahí. La primera fila es
+    donde vive. Reemplaza en el formulario a «se mudaría a» y «puede trabajar legalmente en»."""
+    paises: list[str] = Field(default_factory=list, max_length=60)
+    ciudades: list[str] = Field(default_factory=list, max_length=10)
+    modalidades: list[Literal["remoto", "hibrido", "presencial"]] = Field(default_factory=lambda: ["remoto"],
+                                                                        min_length=1, max_length=3)
+
+    @field_validator("paises")
+    @classmethod
+    def paises_validos(cls, vs):
+        from panel.revision import expandir  # regiones («LATAM», «Europa»…) → sus países
+        vs = expandir(vs)
+        validos = paises.mundo()["codigos"] | set(paises.datos()["reconocidos"])
+        if not set(vs) <= validos:
+            raise ValueError("Elige países de la lista en cada ubicación.")
+        return vs[:60]
+
+    @field_validator("ciudades")
+    @classmethod
+    def ciudades_limpias(cls, vs):
+        return _terminos(vs)
+
+    @field_validator("modalidades")
+    @classmethod
+    def sin_repetir(cls, vs):
+        return list(dict.fromkeys(vs))
+
+    @model_validator(mode="after")
+    def con_lugar(self):
+        if not self.paises and not self.ciudades:
+            raise ValueError("Cada ubicación necesita al menos un país o una ciudad.")
+        return self
+
+
 class Perfil(Modelo):
     id: UUID
     cliente_id: UUID
@@ -140,6 +178,10 @@ class Perfil(Modelo):
     ciudades: list[str] = Field(default_factory=list, max_length=10)
     puede_trabajar_en: list[str] = Field(default_factory=list, max_length=60)  # v26: perfiles muy móviles
     acepta_horario: list[Literal["us_este", "us_pacifico", "europa"]] = Field(default_factory=list, max_length=3)
+    # Contrato v30: dónde trabajaría, en filas. Si viene, manda: los campos de arriba (vive_en, modalidades, ciudades,
+    # paises_presenciales_extra, puede_trabajar_en) se calculan desde las filas para quien aún los lee (búsqueda por
+    # lugares, admisión). Si no viene (perfiles anteriores, importador), `filas` las arma con esos campos.
+    ubicaciones: list[Ubicacion] = Field(default_factory=list, max_length=10)
 
     @model_validator(mode="before")
     @classmethod
@@ -206,7 +248,40 @@ class Perfil(Modelo):
         if self.experiencia_min is not None and self.experiencia_max is not None and self.experiencia_min > self.experiencia_max:
             raise ValueError("El mínimo de experiencia no puede superar al máximo.")
         self.paises_presenciales_extra = [c for c in self.paises_presenciales_extra if c != self.vive_en]
+        if self.ubicaciones:
+            self._campos_desde_filas()
         return self
+
+    @property
+    def filas(self):
+        """Contrato v30: las filas de ubicación; las de un perfil anterior se arman con sus campos (sin guardarlas,
+        para que quien edite esos campos siga viendo su efecto)."""
+        return self.ubicaciones or self._filas_desde_campos()
+
+    def _filas_desde_campos(self):
+        """Contrato v30: un perfil anterior en filas, con el mismo resultado que tenía. Fila 1: donde vive, con sus
+        modalidades y ciudades. Fila 2: los países a los que se mudaría (híbrido/presencial). Fila 3: los países donde
+        puede trabajar legalmente (remoto)."""
+        filas = [Ubicacion(paises=[self.vive_en], ciudades=self.ciudades, modalidades=self.modalidades)]
+        presencial = [m for m in self.modalidades if m != "remoto"]
+        if self.paises_presenciales_extra and presencial:
+            filas.append(Ubicacion(paises=self.paises_presenciales_extra, ciudades=self.ciudades,
+                                   modalidades=presencial))
+        if self.puede_trabajar_en and "remoto" in self.modalidades:
+            filas.append(Ubicacion(paises=self.puede_trabajar_en, modalidades=["remoto"]))
+        return filas
+
+    def _campos_desde_filas(self):
+        primera = self.ubicaciones[0]
+        if primera.paises:
+            self.vive_en = primera.paises[0]
+        self.modalidades = [m for m in MODOS if any(m in f.modalidades for f in self.ubicaciones)]
+        self.ciudades = list(dict.fromkeys(c for f in self.ubicaciones for c in f.ciudades))[:10]
+        self.paises_presenciales_extra = list(dict.fromkeys(
+            c for f in self.ubicaciones if {"hibrido", "presencial"} & set(f.modalidades) for c in f.paises
+            if c != self.vive_en))[:60]
+        self.puede_trabajar_en = list(dict.fromkeys(
+            c for f in self.ubicaciones if "remoto" in f.modalidades for c in f.paises if c != self.vive_en))[:60]
 
 
 class Configuracion(Modelo):
@@ -311,6 +386,8 @@ _MOTIVOS_CAMPO = {
     ("perfiles", "vive_en"): "Elige en qué país vive.",
     ("perfiles", "ciudades"): "Cada ciudad debe tener entre 2 y 60 caracteres.",
     ("perfiles", "puede_trabajar_en"): "Elige países de la lista donde puede trabajar.",
+    ("perfiles", "paises"): "Elige países de la lista en cada ubicación.",
+    ("perfiles", "ubicaciones"): "Revisa las ubicaciones del perfil: hasta 10 filas, cada una con país o ciudad.",
     ("perfiles", "cargo_id"): "Elige un cargo para el perfil.",
 }
 

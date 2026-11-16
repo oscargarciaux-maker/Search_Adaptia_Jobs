@@ -56,7 +56,7 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
     .getByLabel("Nombre o referencia del cliente")
     .fill("Prueba operadora");
   // Sección 7a: el cliente nuevo ya trae su primer perfil; los demás, con un enlace discreto.
-  await expect(dialog.getByText("PERFIL 1")).toBeVisible();
+  await expect(dialog.getByText("PERFIL 1", { exact: true })).toBeVisible();
   await expect(
     dialog.getByRole("button", { name: "Añadir otro perfil" }),
   ).toBeVisible();
@@ -93,50 +93,50 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await expect(
     dialog.getByText("Busca vacantes que pidan de 1 a 7 años."),
   ).toBeVisible();
-  // Contrato v8: país de residencia y varias modalidades, sin las 21 casillas.
+  // Contrato v30: dónde trabajaría, en filas «Ciudades · Países · modalidades»; la primera es donde vive.
+  await dialog.getByRole("button", { name: "Quitar Colombia" }).click();
+  const paises1 = dialog.getByLabel("Países de la ubicación 1, perfil 1");
+  await paises1.fill("México");
+  await paises1.press("Enter");
+  await dialog.getByLabel("Presencial en la ubicación 1 del perfil 1").check();
+  // La explicación de las filas está en su ayuda, no a la vista.
+  await expect(dialog.getByText(/Una fila por lugar/)).toBeHidden();
   await dialog
-    .getByLabel("País de residencia del perfil 1")
-    .selectOption({ label: "México" });
-  await expect(dialog.getByText("Seleccionar LATAM y España")).toHaveCount(0);
-  await dialog.getByLabel("Presencial en el perfil 1").check();
-  // La explicación de las modalidades está en su ayuda, no a la vista.
-  await expect(dialog.getByText(/solo con oficina en su país/)).toBeHidden();
-  await dialog
-    .getByRole("button", { name: "Más información: modalidades" })
+    .getByRole("button", { name: "Más información: ubicaciones" })
     .hover();
-  await expect(dialog.getByText(/solo con oficina en su país/)).toBeVisible();
-  await expect(dialog.getByText("También se mudaría a…")).toBeVisible();
-  // Países a los que se mudaría: botón claro y «Seleccionar todos / Quitar todos».
-  await dialog.getByRole("button", { name: "Mostrar países" }).click();
-  await dialog.getByRole("button", { name: "Seleccionar todos" }).click();
-  const paisesMudanza = dialog.locator(".country-grid input");
-  expect(await paisesMudanza.count()).toBeGreaterThan(10);
-  await expect(dialog.locator(".country-grid input:not(:checked)")).toHaveCount(
-    0,
-  );
-  await dialog.getByRole("button", { name: "Quitar todos" }).click();
-  await expect(dialog.locator(".country-grid input:checked")).toHaveCount(0);
+  await expect(dialog.getByText(/Una fila por lugar/)).toBeVisible();
+  await dialog.getByRole("button", { name: "Añadir otra ubicación" }).click();
+  const paises2 = dialog.getByLabel("Países de la ubicación 2, perfil 1");
+  await paises2.fill("España");
+  await paises2.press("Enter");
+  await dialog
+    .getByRole("button", { name: "Quitar la ubicación 2 del perfil 1" })
+    .click();
+  await expect(paises2).toHaveCount(0);
+  // Sin las casillas antiguas: «se mudaría», países sueltos y «admitir no informado».
+  await expect(dialog.getByText("También se mudaría a…")).toHaveCount(0);
+  await expect(
+    dialog.getByText("Admitir experiencia no informada"),
+  ).toHaveCount(0);
+  // «Inglés requerido» solo aparece si acepta avisos en inglés.
+  await dialog.getByLabel("Inglés", { exact: true }).uncheck();
+  await expect(dialog.getByLabel("Inglés del perfil 1")).toHaveCount(0);
+  await dialog.getByLabel("Inglés", { exact: true }).check();
+  await expect(dialog.getByLabel("Inglés del perfil 1")).toBeVisible();
   // Estimación en vivo: en demostración usa avisos ficticios y no sale a internet.
   await expect(dialog.getByText(/No gasta Apify/)).toBeVisible();
   await dialog
-    .getByRole("button", { name: "Estimar con búsqueda en vivo" })
+    .getByRole("button", { name: "Buscar en internet ahora" })
     .click();
   await expect(
     dialog.getByText(/encontradas? ahora en las fuentes cumplen?/),
   ).toBeVisible();
   await expect(dialog.getByText(/Es una muestra/)).toBeVisible();
-  // Vista previa: estima con el catálogo y permite admitir datos no informados.
+  // Vista previa: la cifra se actualiza sola mientras se edita, con el catálogo guardado.
   // La estimación en vivo también dice «cumple(n) este perfil»: buscar la frase propia de la vista previa.
   await expect(
     dialog.getByText(/guardadas? aún no entregadas? cumplen? este perfil/),
   ).toBeVisible();
-  const aplicar = dialog.getByRole("button", { name: "Aplicar", exact: true });
-  if (await aplicar.count()) {
-    await aplicar.first().click();
-    await expect(
-      dialog.getByLabel("Admitir experiencia no informada"),
-    ).toBeChecked();
-  }
   await dialog
     .getByRole("button", { name: "Añadir cliente", exact: true })
     .click();
@@ -715,7 +715,7 @@ test("contrato v22: restricciones, prioridades y margen de años en el perfil", 
   ]);
 });
 
-test("contrato v23: residencia en el mundo, permiso de trabajo, horario y ciudades", async ({
+test("contrato v23 y v30: ubicaciones en filas, permiso de trabajo, horario y ciudades", async ({
   page,
   request,
 }) => {
@@ -725,24 +725,26 @@ test("contrato v23: residencia en el mundo, permiso de trabajo, horario y ciudad
     .getByRole("button", { name: "Editar Cliente de ejemplo 01", exact: true })
     .click();
   const dialog = page.getByRole("dialog");
-  await dialog
-    .getByLabel("País de residencia del perfil 1")
-    .selectOption({ label: "Alemania" });
-  await dialog.getByLabel("Presencial en el perfil 1").check();
-  const ciudades = dialog.getByLabel(
-    "Ciudades donde trabajaría (la suya y a las que se mudaría), perfil 1",
-  );
+  // Contrato v30: primera fila en Alemania (Berlín, presencial) y otra fila de EE. UU. en remoto (antes «puede
+  // trabajar legalmente en»).
+  await dialog.getByRole("button", { name: "Quitar Colombia" }).click();
+  const paises1 = dialog.getByLabel("Países de la ubicación 1, perfil 1");
+  await paises1.fill("Alemania");
+  await paises1.press("Enter");
+  await dialog.getByLabel("Presencial en la ubicación 1 del perfil 1").check();
+  const ciudades = dialog.getByLabel("Ciudades de la ubicación 1, perfil 1");
   await ciudades.fill("Berlín");
   await ciudades.press("Enter");
-  await dialog
-    .getByRole("button", { name: "Permiso de trabajo y horario (opcional)" })
-    .click();
-  const permiso = dialog.getByLabel("Puede trabajar legalmente en… (perfil 1)");
-  await permiso.fill("Estados Unidos");
-  await permiso.press("Enter");
+  await dialog.getByRole("button", { name: "Añadir otra ubicación" }).click();
+  const paises2 = dialog.getByLabel("Países de la ubicación 2, perfil 1");
+  await paises2.fill("Estados Unidos");
+  await paises2.press("Enter");
   await expect(
     dialog.getByRole("button", { name: "Quitar Estados Unidos" }),
   ).toBeVisible();
+  await dialog
+    .getByRole("button", { name: "Horario aceptado (opcional)" })
+    .click();
   await dialog.getByLabel("Horario EE. UU. Este en el perfil 1").check();
   await dialog.getByRole("button", { name: "Aplicar cambios" }).click();
   await expect(
@@ -762,6 +764,14 @@ test("contrato v23: residencia en el mundo, permiso de trabajo, horario y ciudad
   expect(perfil.ciudades).toEqual(["Berlín"]);
   expect(perfil.puede_trabajar_en).toEqual(["US"]);
   expect(perfil.acepta_horario).toEqual(["us_este"]);
+  expect(perfil.ubicaciones).toEqual([
+    {
+      paises: ["DE"],
+      ciudades: ["Berlín"],
+      modalidades: ["remoto", "presencial"],
+    },
+    { paises: ["US"], ciudades: [], modalidades: ["remoto"] },
+  ]);
 });
 
 test("contrato v25: proponer funciones y confirmar una vacante que coincide por funciones", async ({
@@ -1313,5 +1323,52 @@ test("contrato v29: vacantes en vista dividida, ficha completa, teclado y celula
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+  expect(errores).toEqual([]);
+});
+
+test("contrato v30: bandera del WhatsApp, contacto precargado y guardado sin esperar", async ({
+  page,
+}) => {
+  const errores: string[] = [];
+  page.on("pageerror", (e) => errores.push(e.message));
+  // El servidor tarda en guardar el WhatsApp: el formulario no debe esperarlo.
+  let guardado = "";
+  await page.route(/\/api\/contactos\/[^/]+$/, async (route) => {
+    if (route.request().method() === "PUT") {
+      await new Promise((listo) => setTimeout(listo, 2500));
+      guardado = route.request().postDataJSON().telefono;
+    }
+    await route.continue();
+  });
+  await page.goto("/");
+  await ir(page, "Clientes");
+  // Otros recorridos importan o archivan clientes: se usa el primero que haya.
+  const editar = page
+    .locator(".client-card")
+    .first()
+    .getByRole("button", { name: /^Editar / });
+  await editar.click();
+  const dialog = page.getByRole("dialog");
+  const consentimiento = dialog.getByLabel(
+    "Aceptó recibir vacantes por WhatsApp",
+  );
+  if (!(await consentimiento.isChecked())) await consentimiento.check();
+  const telefono = dialog.getByLabel("Número con código de país");
+  await telefono.fill("+34 600 111 222");
+  await expect(dialog.getByRole("img", { name: "País: España" })).toBeVisible();
+  await telefono.fill("+57 300 111 2233");
+  await expect(
+    dialog.getByRole("img", { name: "País: Colombia" }),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Aplicar cambios" }).click();
+  await expect(dialog).toHaveCount(0, { timeout: 1500 });
+  // Al volver a abrirlo, el número ya está (sin esperar a que el servidor responda).
+  await editar.click();
+  await expect(dialog.getByLabel("Número con código de país")).toHaveValue(
+    "+57 300 111 2233",
+    { timeout: 1000 },
+  );
+  await expect.poll(() => guardado, { timeout: 5000 }).toBe("+57 300 111 2233");
+  expect(await page.evaluate(revisarContraste)).toEqual([]);
   expect(errores).toEqual([]);
 });

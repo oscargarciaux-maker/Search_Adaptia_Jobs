@@ -1,4 +1,5 @@
 """Filtros verificables por perfil. No infiere compatibilidad con un CV ni llama a una IA."""
+from functools import lru_cache
 import re
 from datetime import date
 
@@ -93,6 +94,9 @@ def relajado(perfil, nivel):
         if "remoto" in p.modalidades:
             return None
         cambio["modalidades"] = [*p.modalidades, "remoto"]
+        # Contrato v30: la remota se acepta desde donde vive (primera fila).
+        primera, *resto = p.filas
+        cambio["ubicaciones"] = [primera.model_copy(update={"modalidades": [*primera.modalidades, "remoto"]}), *resto]
     if nivel in ("experiencia_cercana", "empresa_4"):
         # El aviso sí dice años: se admiten hasta 2 de diferencia con el rango del perfil (nunca país, idioma ni plazo).
         if p.experiencia_min is not None:
@@ -113,28 +117,11 @@ def evaluar(v, perfil, hoy=None):
     p = perfil if isinstance(perfil, Perfil) else Perfil.model_validate(perfil)
     hoy = date.fromisoformat(hoy) if isinstance(hoy, str) else hoy or date.today()
     motivos, pruebas = [], []
-    # Contrato v8: remoto → que admita postular desde su país; híbrido/presencial → oficina en su país o en los extra.
-    modo, paises_v = v.get("modalidad"), set(v.get("paises") or [])
-    todas = {"remoto", "hibrido", "presencial"} <= set(p.modalidades)
-    if modo in ("remoto", "hibrido", "presencial") and modo not in p.modalidades or (modo not in ("remoto", "hibrido", "presencial") and not todas):
-        motivos.append("modalidad diferente")
-    # Contrato v23: países de cualquier parte (`paises_mundo`), alcance mundial, permiso legal y horario aceptado.
-    mundo_v = paises_v | set(v.get("paises_mundo") or [])
-    puede = {p.vive_en, *p.puede_trabajar_en}
-    horario = modo not in ("hibrido", "presencial") and horario_compatible(v, p)
-    if v.get("confianza_pais") not in {"alta", "media"} and not horario:
-        motivos.append("país sin elegibilidad confirmada")
-    elif modo in ("hibrido", "presencial") and not mundo_v & set(p.paises_oficina) and not en_sus_ciudades(v, p.ciudades):
-        motivos.append("oficina en otro país")
-    elif modo in ("hibrido", "presencial") and p.ciudades and otra_ciudad(v, p.ciudades):
-        motivos.append("oficina en otra ciudad")
-    elif modo not in ("hibrido", "presencial") and not (
-            p.vive_en in paises_v or puede & set(v.get("paises_mundo") or []) or v.get("alcance_mundial") or horario):
-        motivos.append("no admite postular desde su país")
-    elif horario and p.vive_en not in paises_v and not puede & set(v.get("paises_mundo") or []):
-        pruebas.append("Remota con horario compatible")
-    else:
-        pruebas.append("Remota abierta a su país" if modo == "remoto" else "Ubicación compatible")
+    # Contrato v30: la ubicación cumple si alguna fila del perfil (países, ciudades y modalidades) acepta la vacante.
+    fallos, prueba = lugar(v, p)
+    motivos.extend(fallos)
+    if not fallos:
+        pruebas.append(prueba)
     if v.get("idioma") not in p.idiomas:
         motivos.append("idioma del aviso diferente")
     # Contrato v27: solo la ubicación, el idioma y las reglas del sistema (30 días, fecha confirmada) descartan. Lo demás
@@ -197,6 +184,44 @@ MARGEN_SALARIO = 0.10  # contrato v26: redondeos y variación de las tasas no de
 HORARIOS = {"us_este": (-5, -4), "us_pacifico": (-8, -7), "europa": (0, 2)}
 
 
+def lugar(v, p):
+    """(motivos, prueba) de la ubicación. Contrato v8/v23/v24 por fila (v30): remoto → que admita postular desde un
+    país de la fila (o mundial, o con horario aceptado); híbrido/presencial → oficina en un país o una ciudad de la
+    fila. Si ninguna fila sirve, los motivos son los de la primera (donde vive)."""
+    modo, paises_v = v.get("modalidad"), set(v.get("paises") or [])
+    mundo_v = paises_v | set(v.get("paises_mundo") or [])
+    horario = modo not in ("hibrido", "presencial") and horario_compatible(v, p)
+    sin_pais = v.get("confianza_pais") not in {"alta", "media"} and not horario
+    primeros = None
+    for fila in p.filas:
+        motivos, prueba = _en_fila(v, fila, modo, mundo_v, horario, sin_pais)
+        if not motivos:
+            return [], prueba
+        primeros = primeros or motivos
+    return primeros or ["no admite postular desde su país"], ""
+
+
+def _en_fila(v, fila, modo, mundo_v, horario, sin_pais):
+    modos = ("remoto", "hibrido", "presencial")
+    motivos = []
+    if (modo in modos and modo not in fila.modalidades) or (modo not in modos and not set(modos) <= set(fila.modalidades)):
+        motivos.append("modalidad diferente")
+    paises_fila = set(fila.paises)
+    if sin_pais:
+        return motivos + ["país sin elegibilidad confirmada"], ""
+    if modo in ("hibrido", "presencial"):
+        if not mundo_v & paises_fila and not en_sus_ciudades(v, fila.ciudades):
+            return motivos + ["oficina en otro país"], ""
+        if fila.ciudades and otra_ciudad(v, fila.ciudades):
+            return motivos + ["oficina en otra ciudad"], ""
+        return motivos, "Ubicación compatible"
+    if mundo_v & paises_fila or v.get("alcance_mundial"):
+        return motivos, "Remota abierta a su país" if modo == "remoto" else "Ubicación compatible"
+    if horario:
+        return motivos, "Remota con horario compatible"
+    return motivos + ["no admite postular desde su país"], ""
+
+
 def horario_compatible(v, p):
     """Una remota que solo pide franja horaria sirve si la franja cruza una zona aceptada o la del país donde vive
     (±2 h). Sin `zona_utc` no aplica."""
@@ -226,8 +251,14 @@ def otra_ciudad(v, ciudades):
     limpia = re.sub(r"\s*\(.*?\)", "", v.get("ubicacion") or "")
     codigo = next(iter(v.get("paises") or v.get("paises_mundo") or []), "")
     ciudad = normalizar.texto(contrato._ciudad(limpia, codigo) or "")
-    # Si la «ciudad» es en realidad el nombre de un país («Colombia (On-site)»), el aviso no dice ciudad.
-    return bool(ciudad) and not paises.paises_en_texto(ciudad)
+    # Si la «ciudad» es en realidad el nombre de un país («Colombia (On-site)»), el aviso no dice ciudad. Solo nombres
+    # de país completos: «New York» también es un estado y sí es una ciudad (contrato v30).
+    return bool(ciudad) and ciudad not in _nombres_de_pais()
+
+
+@lru_cache(maxsize=1)
+def _nombres_de_pais():
+    return {normalizar.texto(x) for p in paises.mundo()["lista"] for x in (p["nombre"], p.get("nombre_en") or "") if x}
 
 # Contrato v22 (14 nov, pedido de Oscar): lo que el aviso pide solo como deseable no descarta. Marcas editables; se
 # buscan como palabras completas en la línea u oración, o en el encabezado de la sección.

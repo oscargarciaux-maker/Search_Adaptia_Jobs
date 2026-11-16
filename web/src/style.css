@@ -772,9 +772,9 @@ h1 {
   font-size: 14px;
   font-weight: 700;
   color: var(--osc-text-neutro-medio, #51644b);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Lista grande (PR 4): el nombre completo se ve; un nombre largo pasa a la línea siguiente en vez de cortarse. */
+  overflow-wrap: anywhere;
+  line-height: 1.35;
 }
 .client-title > span {
   display: block;
@@ -1820,8 +1820,10 @@ h1 {
   .page-heading h1 {
     font-size: 23px;
   }
+  /* Lista grande (PR 4): los botones se reparten en filas a la derecha, no en una columna alta. */
   .heading-actions {
-    flex-direction: column;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     padding-top: 3px;
     gap: 7px;
   }
@@ -2371,6 +2373,10 @@ h1 {
   }
   .toolbar {
     flex-wrap: wrap;
+  }
+  /* El buscador ocupa su propia línea en el celular (antes quedaba en «Bu…»). */
+  .toolbar > .search-input {
+    flex-basis: 100%;
   }
 }
 /* Vista previa: estimación con el catálogo guardado antes de programar */
@@ -3804,9 +3810,21 @@ select.margen {
   border: 1px solid var(--line);
   border-radius: 99px;
 }
+.nueva-restriccion,
+.restricciones select,
+.restricciones input:not([type="checkbox"]) {
+  border: 1px solid var(--osc-line-verde, #dfe7d8);
+  border-radius: 6px;
+  background: var(--osc-bg-neutro-1, #fcfdfa);
+  color: var(--osc-text-verde-medio, #536c45);
+  padding: 8px 11px;
+  font-size: 12px;
+  min-height: 39px;
+}
 .nueva-restriccion {
   align-self: flex-start;
-  min-height: 40px;
+  font-weight: 600;
+  cursor: pointer;
 }
 /* Contrato v23: países del mundo, permiso de trabajo y horario. */
 .otros-paises {
@@ -4357,5 +4375,139 @@ select.margen {
     gap: 6px;
     min-height: 40px;
     margin-bottom: 8px;
+  }
+}
+
+/* Contrato v30 (lista grande, PR 4): formulario del cliente más horizontal y ubicaciones en filas. */
+.cliente-cabecera {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 17px;
+  align-items: start;
+  margin-bottom: 8px;
+}
+.cliente-cabecera .whatsapp-contacto {
+  margin: 0;
+}
+.telefono {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.telefono input {
+  flex: 1;
+  min-width: 0;
+}
+.bandera {
+  font-size: 22px;
+  line-height: 1;
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.form-grid.tres {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+}
+/* «Años de experiencia» y su margen, lado a lado en la misma columna. */
+.form-grid.tres > .field:last-child {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 10px;
+  align-content: start;
+}
+.form-grid.tres > .field:last-child > label,
+.form-grid.tres > .field:last-child > .field-help {
+  grid-column: 1 / -1;
+}
+.form-grid.tres select.margen {
+  margin-top: 0;
+}
+.ubicaciones {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 14px 12px;
+  margin: 14px 0;
+  min-width: 0;
+}
+.ubicaciones > legend {
+  font-weight: 600;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ubicacion-fila {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: start;
+  padding: 8px 0 10px;
+  border-bottom: 1px dashed var(--line);
+}
+.ubicacion-fila .field {
+  margin: 0;
+}
+.ubicacion-titulo {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.ubicacion-fila > .icon {
+  position: absolute;
+  top: 2px;
+  right: 0;
+}
+.ubicacion-modos {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+.ubicacion-modos label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+}
+.ubicaciones-pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+}
+/* Barras de desplazamiento redondeadas dentro del formulario. */
+.dialog {
+  scrollbar-width: thin;
+  scrollbar-color: var(--osc-line-azul, #c5d3e8) transparent;
+}
+.dialog::-webkit-scrollbar,
+.tagbox::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.dialog::-webkit-scrollbar-thumb,
+.tagbox::-webkit-scrollbar-thumb {
+  background: var(--osc-line-azul, #c5d3e8);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+.dialog::-webkit-scrollbar-track {
+  background: transparent;
+}
+@media (max-width: 700px) {
+  .cliente-cabecera,
+  .form-grid.tres,
+  .ubicacion-fila {
+    grid-template-columns: 1fr;
   }
 }
