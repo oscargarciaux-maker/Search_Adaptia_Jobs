@@ -41,7 +41,7 @@ jobs:
       PYTHONUNBUFFERED: "1"  # el registro muestra cada etapa al momento, aunque la corrida se corte
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
