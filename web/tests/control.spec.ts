@@ -186,9 +186,16 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await expect(
     page.getByRole("button", { name: "Programar para mañana", exact: true }),
   ).toBeDisabled();
-  await page.getByLabel("Techo del día", { exact: true }).fill("130");
+  // Lista grande del 16 nov: el techo se puede borrar del todo y se valida al salir del campo.
+  const techo = page.getByLabel("Techo del día", { exact: true });
+  await techo.fill("");
+  await expect(techo).toHaveValue("");
+  await techo.fill("130");
+  await techo.blur();
   await expect(page.getByText(/pasan el techo/)).toHaveCount(0);
-  await expect(page.getByText("Meta del día:").first()).toBeVisible();
+  await expect(page.locator(".cifras-cargo").first()).toContainText(
+    "Meta del día",
+  );
   await expect(page.getByText(/guardadas sin entregar/).first()).toBeVisible();
   // Accesibilidad: al cerrar con Escape el foco vuelve al botón que abrió la ventana; ningún texto bajo 12 px.
   await page.getByRole("button", { name: "Añadir cargo", exact: true }).click();
@@ -909,7 +916,7 @@ test("paso 8: una tarjeta por cliente, detalle con 7 días y dos columnas desde 
   const columnas = await lista.evaluate(
     (e) => getComputedStyle(e).gridTemplateColumns.split(" ").length,
   );
-  expect(columnas).toBe(2);
+  expect(columnas).toBe(3); // lista grande del 16 nov: con muchos clientes, 3 columnas que caben en 1366×768
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -1085,7 +1092,9 @@ test("importar clientes: vista previa con errores, borrar los actuales y program
     .locator("dialog[open]")
     .getByRole("button", { name: "Confirmar configuración" })
     .click();
-  await expect(page.locator(".flow-pill")).toHaveText(/Programado desde el/);
+  await expect(page.locator(".flow-pill")).toHaveText(
+    /se usa desde la búsqueda de mañana/,
+  );
 
   // Eliminar definitivamente un cliente archivado.
   await page.goto("/#clientes");
@@ -1194,4 +1203,50 @@ test("auditoría axe: sin fallos serios de accesibilidad en ninguna pantalla", a
     .click();
   await page.getByRole("dialog").waitFor();
   await graves("formulario de cliente");
+});
+
+test("lista grande 16 nov: detalle en dos paneles, editar perfil y archivar cargos arrastrando", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.goto("/");
+  await expect(page.locator(".flow-pill")).not.toHaveText(/Programado desde/);
+  await page.locator(".cliente-mini").first().click();
+  const detalle = page.getByRole("dialog");
+  await expect(detalle.locator(".detalle-dos-paneles")).toBeVisible();
+  await expect(detalle.locator(".detalle-derecha")).toContainText(
+    "Por confirmar",
+  );
+  await detalle.getByRole("button", { name: "Editar perfil" }).first().click();
+  await expect(
+    page.getByRole("dialog").getByText("Editar cliente", { exact: false }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await page.goto("/#cargos");
+  const tarjeta = page.locator(".role-card").first();
+  const nombre = (await tarjeta.locator("h3").textContent()) || "";
+  await tarjeta.dragTo(page.locator(".cargos-archivados"));
+  const dialogo = page.getByRole("dialog");
+  await expect(dialogo).toContainText("Archivar cargo");
+  await expect(dialogo.getByRole("alert")).toContainText("cliente");
+  await dialogo.getByRole("button", { name: "Archivar", exact: true }).click();
+  await expect(page.locator(".cargos-archivados")).toContainText(nombre);
+  // Vuelve solo al asignárselo a un perfil.
+  await page.goto("/#clientes");
+  await page
+    .getByRole("button", { name: /^Editar / })
+    .first()
+    .click();
+  const cargo = page.getByLabel("Cargo del perfil 1");
+  const valor = await cargo
+    .locator("option", { hasText: nombre + " (archivado" })
+    .getAttribute("value");
+  await cargo.selectOption(valor || "");
+  await page.getByRole("button", { name: "Aplicar cambios" }).click();
+  await page.goto("/#cargos");
+  await expect(
+    page.locator(".role-card h3", { hasText: nombre }),
+  ).toBeVisible();
+  expect(await page.evaluate(revisarContraste)).toEqual([]);
 });
