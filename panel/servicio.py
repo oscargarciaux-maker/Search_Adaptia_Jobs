@@ -5,7 +5,7 @@ import logging
 import threading
 import time
 
-from buscador import contrato, enlaces, vacante
+from buscador import contrato, enlaces, registro, vacante
 from panel.afinidad import (AMPLIACIONES, ETIQUETAS_AMPLIACION, MINIMO_POR_PERFIL, enlace_utilizable, evaluar,
                             evaluar_ampliada, evaluar_post, post_ubicacion)
 from panel.repositorio import ErrorRepositorio, hoy
@@ -298,6 +298,39 @@ def resultados(repo, cliente_id=None, fecha=None):
         vistas[clave] = ficha
     return {**{k: r[k] for k in ("ejecucion", "clientes")}, "vacantes": salida,
             "listas": sum(v["estado"] == "lista" for v in salida)}
+
+
+def ficha(repo, vacante_id, traer=True, obtener=None):
+    """Contrato v29: lo que muestra el panel a la derecha de la lista. La descripción va en bloques de texto (nunca
+    HTML). Si el catálogo no la tiene, se lee una sola vez de la ficha original (lista fija de dominios, 1 MB, 12 s) y
+    se guarda para la próxima vez."""
+    from buscador import ficha as fichas
+    fila = repo.vacante(vacante_id)
+    if not fila:
+        raise ErrorRepositorio("Esa vacante ya no está en la base. Recarga la lista.", 404)
+    datos = fila.get("datos") or {}
+    texto, origen = fila.get("description_full") or datos.get("_descripcion") or "", "guardada"
+    urls = [datos.get("enlace_directo"), datos.get("enlace"), *(datos.get("enlaces_alternativos") or [])]
+    if not texto.strip() and datos.get("tipo") != "post":
+        texto, origen = "", "sin_descripcion"
+        if traer:
+            try:
+                texto = fichas.traer_descripcion(urls, datos.get("titulo", ""), obtener=obtener)
+            except Exception as e:  # noqa: BLE001 - una ficha caída no debe romper el panel
+                registro.aviso("servicio:ficha", e)
+            if texto:
+                origen = "traida"
+                try:
+                    repo.guardar_descripcion(vacante_id, texto)
+                except Exception as e:  # noqa: BLE001 - se muestra aunque no se pueda guardar
+                    registro.aviso("servicio:ficha-guardar", e)
+    return {"id": vacante_id, "titulo": datos.get("titulo", ""), "empresa": datos.get("empresa", ""),
+            "ubicacion": datos.get("ubicacion", ""), "modalidad": datos.get("modalidad", ""),
+            "salario": datos.get("salario") or "", "publicada": datos.get("fecha_publicacion", ""),
+            "anos_min": datos.get("anos_min"), "ingles": datos.get("ingles") or "", "nivel": datos.get("nivel") or "",
+            "enlace": datos.get("enlace", ""), "enlace_directo": datos.get("enlace_directo", ""),
+            "tipo": datos.get("tipo") or "", "activa": fila.get("status", "active") == "active",
+            "bloques": fichas.bloques(texto), "origen": origen if texto else "sin_descripcion"}
 
 
 def resumen_clientes(repo, fecha=None, dias=7):

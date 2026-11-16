@@ -53,6 +53,10 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         import threading
         threading.Thread(target=precargar, daemon=True).start()
     app.state.repo, app.state.demo = repo, demo
+    # Contrato v29: copias cortas en memoria. Cualquier escritura del panel (POST/PUT/PATCH/DELETE) sube el sello e
+    # invalida los resultados guardados; la búsqueda nocturna corre en otro proceso y la cubre la vigencia de 2 min.
+    sello = [0]
+    copias_resultados, copias_fichas = {}, {}
 
     @app.middleware("http")
     async def proteccion(request: Request, siguiente):
@@ -79,7 +83,10 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
                         return JSONResponse({"detail": "Sesión vencida o acceso no autorizado."}, status_code=401)
                 except (requests.RequestException, ValueError):
                     return JSONResponse({"detail": "No se pudo verificar la sesión."}, status_code=503)
+        escribe = request.url.path.startswith("/api/") and request.method not in {"GET", "HEAD", "OPTIONS"}
+        sello[0] += escribe
         response = await siguiente(request)
+        sello[0] += escribe
         response.headers.update({"X-Content-Type-Options": "nosniff", "Referrer-Policy": "same-origin",
             "X-Frame-Options": "DENY", "Cache-Control": "no-store" if request.url.path.startswith("/api/") else "no-cache",
             "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"})
@@ -270,9 +277,13 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
 
     # Contrato v16: bandeja «Por confirmar».
     @app.get("/api/revisiones")
-    def leer_revisiones():
+    def leer_revisiones(pagina: int | None = None, por_pagina: int = 25, cliente_id: str | None = None):
         from panel import revision
-        return revision.listar(repo, hoy())
+        if cliente_id:
+            UUID(cliente_id)
+        if pagina is not None and (pagina < 1 or not 1 <= por_pagina <= 100):
+            raise HTTPException(422, "Página no válida.")
+        return revision.listar(repo, hoy(), pagina=pagina, por_pagina=por_pagina, cliente_id=cliente_id)
 
     @app.post("/api/revisiones/cargar")
     def cargar_revisiones():
@@ -357,7 +368,29 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         if fecha:
             from datetime import date
             date.fromisoformat(fecha)
-        return servicio.resultados(repo, cliente_id, fecha)
+        clave, actual = (cliente_id or "", fecha or ""), sello[0]
+        guardado = copias_resultados.get(clave)
+        if guardado and guardado[0] == actual and time.monotonic() - guardado[1] < 120:
+            return guardado[2]
+        valor = servicio.resultados(repo, cliente_id, fecha)
+        if len(copias_resultados) > 200:
+            copias_resultados.clear()
+        copias_resultados[clave] = (actual, time.monotonic(), valor)
+        return valor
+
+    @app.get("/api/vacantes/{vacante_id}/ficha")
+    def ficha_vacante(vacante_id: str):
+        """Contrato v29: la ficha completa de una vacante (descripción en bloques, sin HTML)."""
+        if not 3 <= len(vacante_id) <= 80:
+            raise HTTPException(422, "Vacante no reconocida.")
+        guardada = copias_fichas.get(vacante_id)
+        if guardada and time.monotonic() - guardada[0] < 600:
+            return guardada[1]
+        valor = servicio.ficha(repo, vacante_id, traer=not demo)
+        if len(copias_fichas) > 500:
+            copias_fichas.clear()
+        copias_fichas[vacante_id] = (time.monotonic(), valor)
+        return valor
 
     @app.get("/api/whatsapp/{cliente_id}")
     def whatsapp(cliente_id: str, fecha: str | None = None):

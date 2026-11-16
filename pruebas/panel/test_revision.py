@@ -31,7 +31,7 @@ class Repo(RepositorioDemo):
     def candidatas_por_confirmar(self, desde):
         return self._candidatas
 
-    def revisiones(self, estado=None, vacante_id=None):  # añade el catálogo como lo hace Supabase
+    def revisiones(self, estado=None, vacante_id=None, ligera=False):  # añade el catálogo como lo hace Supabase
         filas = super().revisiones(estado, vacante_id)
         por_id = {c["id"]: c for c in self._candidatas}
         return [dict(r, catalogo_vacantes={**por_id.get(r["vacante_id"], {}), "status": "archived",
