@@ -94,7 +94,8 @@ def vista_previa(repo, cfg, fecha=None):
         raw = c.model_dump(mode="json")
         if not raw["terminos_exactos"]:  # igual que la captura dirigida
             raw["terminos_exactos"] = sugerir(c.nombre, consultar_esco=False)["terminos_exactos"]
-        del_cargo = _del_cargo(catalogo, raw)
+        # Contrato v27: los cargos cercanos entran directamente, después de exactos y similares.
+        del_cargo = _del_cargo(catalogo, raw) + _del_cargo(catalogo, raw, cercanas=True)
         disponibles = set()
         for p in cfg.perfiles:
             if not p.activo or p.cargo_id != c.id or p.cliente_id not in clientes:
@@ -102,7 +103,7 @@ def vista_previa(repo, cfg, fecha=None):
             ids, limitantes = _contar(del_cargo, p, fecha)
             disponibles |= ids
             perfiles[str(p.id)] = {"compatibles": len(ids), "del_cargo": len(del_cargo), "limitantes": limitantes,
-                                   "ampliables": _ampliables(del_cargo, _del_cargo(catalogo, raw, cercanas=True), p, fecha, ids)}
+                                   "ampliables": _ampliables(del_cargo, [], p, fecha, ids)}
         n = len(disponibles)
         estado = ("sin_cupo" if not c.cupo else "alcanza" if n >= c.cupo else "justo" if n * 2 >= c.cupo
                   else "insuficiente")
@@ -261,7 +262,7 @@ def resultados(repo, cliente_id=None, fecha=None):
                 row = dict(row, catalogo_vacantes=v)
         ampliacion = next((e["ampliacion"] for e in row.get("explicacion") or [] if isinstance(e, dict) and e.get("ampliacion")), "")
         filtros = evaluar_ampliada(actual, row["filtros"], hoy(), ampliacion) if ampliacion else evaluar(actual, row["filtros"], hoy())
-        afinidad_cargo,_ = grado(actual["titulo"],row["cargo_configuracion"], cercanos=ampliacion == "cargo_cercano")
+        afinidad_cargo, _ = grado(actual["titulo"], row["cargo_configuracion"], cercanos=True)  # v27
         if not afinidad_cargo:
             filtros["compatible"] = False
             filtros["motivos"].append("el título actual no corresponde al cargo configurado")
@@ -280,7 +281,7 @@ def resultados(repo, cliente_id=None, fecha=None):
             "estado": "lista" if enlace else "retirada" if v.get("status") != "active" else
                       "entregada" if pasada and filtros["compatible"] and not no_apta else "por_confirmar",
             "entregada_el": dia if pasada else "",
-            "motivos": filtros["motivos"], "ampliacion": ETIQUETAS_AMPLIACION.get(ampliacion, "") if not es_post else "",
+            "motivos": filtros["motivos"], "avisos": filtros.get("avisos", []), "ampliacion": ETIQUETAS_AMPLIACION.get(ampliacion, "") if not es_post else "",
             "tipo": "post" if es_post else "", "contacto": (datos.get("contacto") or {}) if es_post else {}}
         if ficha["estado"] == "entregada" and enlaces.sirve(datos.get("enlace") or ""):
             ficha["enlace"] = datos["enlace"]  # para consultarla; no cuenta como lista ni va al WhatsApp

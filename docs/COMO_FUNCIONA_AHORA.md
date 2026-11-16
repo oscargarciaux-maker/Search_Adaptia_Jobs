@@ -73,17 +73,22 @@ siguiente. La búsqueda que ya empezó no cambia.
    - Presencial o híbrida: en su país, en uno al que se mudaría o en una de sus ciudades.
    - Si no se sabe, puede ir a «Por confirmar» (hasta 10 al día, primero las de quien va corto): un país desconocido
      nunca completa la meta.
-3. **Filtros del perfil:**
-   - idioma del aviso (solo español o inglés), publicación de hasta 30 días e inglés exigido;
-   - años de experiencia: con 5 años o más no llegan vacantes junior ni de prácticas; con 2 o menos no se filtran los
-     años;
-   - restricciones del perfil, que descartan solo si el aviso lo dice claramente. Lo marcado como «deseable» o «nice
-     to have» no descarta.
-4. **Enlace comprobado.** Solo se entregan enlaces donde de verdad se postula y que siguen abiertos.
-5. **Cuántas.** Primero se cubren las metas de los clientes reales, sin pasar el techo. Después Comunidad recibe con lo
+3. **Idioma y fecha (descartan):**
+   - el idioma del aviso, solo español o inglés según el perfil;
+   - la publicación, de hasta 30 días.
+   - **Desde el 16 nov (contrato v27) solo esto y la ubicación descartan.**
+4. **Lo demás del perfil solo ordena y deja una etiqueta.** Las que encajan en todo van primero, y las demás llegan
+   después con lo que no cumplen («Pide 7 años», «Pide inglés C1», «Salario menor al que pide»…):
+   - años y nivel;
+   - inglés exigido;
+   - restricciones;
+   - la antigüedad que pidió el perfil.
+5. **Enlace comprobado.** Solo se entregan enlaces donde de verdad se postula y que siguen abiertos.
+6. **Cuántas.** Primero se cubren las metas de los clientes reales, sin pasar el techo. Después Comunidad recibe con lo
    que sobre. Entre varias candidatas ganan las que coinciden con las prioridades, con variedad de empresas, países y
    fuentes.
-6. **Si alguien no llega a 5.** Se amplía con avisos que no dicen años o inglés, cargos cercanos, vacantes de días
+7. **Si alguien no llega a 5.** Los cargos cercanos ya entran directo. Como último recurso: remotas abiertas a su
+   país, más de la misma empresa, vacantes de días
    anteriores que esa persona nunca recibió y, como último recurso, posts de LinkedIn etiquetados «Post». Nunca se
    repite una vacante a la misma persona.
 
@@ -155,7 +160,8 @@ El repositorio está preparado para que una IA lo lea y lo cambie con cuidado.
 
 - Uso diario: [GUIA_CLIENTE.md](GUIA_CLIENTE.md) y [PANEL_CONTROL.md](PANEL_CONTROL.md).
 - Qué cambió y cuándo: [HISTORIAL_CAMBIOS.md](HISTORIAL_CAMBIOS.md).
-- Reglas de los datos: [CONTRATO_DATOS_v25.md](CONTRATO_DATOS_v25.md) (funciones), [v24](CONTRATO_DATOS_v24.md)
+- Reglas de los datos: [CONTRATO_DATOS_v27.md](CONTRATO_DATOS_v27.md) (qué descarta y qué solo ordena; «Aplicar
+  hoy»), [v25](CONTRATO_DATOS_v25.md) (funciones), [v24](CONTRATO_DATOS_v24.md)
   (búsqueda por perfil), [v23](CONTRATO_DATOS_v23.md) (ubicaciones del mundo), [v22](CONTRATO_DATOS_v22.md) (filtros
   del perfil) y [v21](CONTRATO_DATOS_v21.md) (metas y techo).
 - Entrega y traspaso al Supabase del cliente: [ENTREGA_AL_CLIENTE.md](ENTREGA_AL_CLIENTE.md) e

@@ -98,6 +98,28 @@ def main():
                 raise AssertionError("Se programó una suma mayor que el techo")
             except psycopg.errors.RaiseException:
                 pass
+            # SQL 016 (contrato v27): «Aplicar hoy». Con la búsqueda de hoy corriendo se rechaza; al terminar, la
+            # ejecución de hoy pasa a la versión nueva (anotando la anterior) y la versión rige desde hoy en Bogotá.
+            try:
+                c.execute("select public.panel_publicar_hoy(%s)", (r + 2,))
+                raise AssertionError("Se aplicó hoy con una búsqueda en curso")
+            except psycopg.errors.RaiseException:
+                pass
+            c.execute("reset role")
+            c.execute("update public.panel_ejecuciones set estado='completa' where id=%s", (ejecucion,))
+            c.execute("set role service_role")
+            c.execute("select public.panel_guardar(%s,%s::jsonb)", (r + 2, json.dumps(amplia)))
+            hoy_bogota = c.execute("select (now() at time zone 'America/Bogota')::date").fetchone()[0]
+            c.execute("reset role")
+            c.execute("update public.panel_ejecuciones set fecha=%s where id=%s", (hoy_bogota, ejecucion))
+            c.execute("set role service_role")
+            aplicada = c.execute("select public.panel_publicar_hoy(%s)", (r + 3,)).fetchone()[0]
+            assert aplicada["vigente_desde"] == hoy_bogota.isoformat()
+            c.execute("reset role")
+            revision, anteriores = c.execute("select revision,resumen->'revisiones_anteriores' from "
+                                             "public.panel_ejecuciones where id=%s", (ejecucion,)).fetchone()
+            assert revision == r + 3 and anteriores == [1]
+            assert c.execute("select count(*) from public.panel_asignaciones").fetchone()[0] == 1  # nada se borra
             # Importar clientes (15 nov): el borrador resultante de «borrar del todo» lo acepta el SQL real y se programa.
             from panel import importar
             r, actual = c.execute("select revision, borrador from public.panel_configuracion").fetchone()

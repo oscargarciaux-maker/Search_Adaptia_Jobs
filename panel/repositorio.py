@@ -35,6 +35,9 @@ _SIN_015 = ("Reparte exactamente 120 vacantes", "Los cupos superan 120")
 
 
 def _mensaje_sql(mensaje):
+    if "panel_publicar_hoy" in mensaje:  # contrato v27: la función de SQL 016 aún no está instalada
+        return ("La base todavía no tiene «Aplicar hoy» (SQL 016). En GitHub → Actions, corre «Preparar Supabase» y "
+                "vuelve a intentarlo. Mientras tanto, «Programar para mañana» sigue funcionando.")
     if any(m in mensaje for m in _SIN_015):
         return ("La base todavía no tiene la actualización de metas por perfil (SQL 015). En GitHub → Actions, corre "
                 "«Preparar Supabase» y vuelve a intentarlo.")
@@ -313,6 +316,14 @@ class RepositorioSupabase:
             raise ErrorRepositorio("La configuración cambió. Recarga antes de programar.", 409)
         Configuracion.model_validate(actual["borrador"]).validar_publicacion()
         return self.pedir("POST", "rpc/panel_publicar", json={"p_revision": revision})
+
+    def publicar_hoy(self, revision):
+        """Contrato v27: el borrador rige desde hoy para las búsquedas que faltan hoy (SQL 016)."""
+        actual = self.config()
+        if actual["revision"] != revision:
+            raise ErrorRepositorio("La configuración cambió. Recarga antes de aplicar.", 409)
+        Configuracion.model_validate(actual["borrador"]).validar_publicacion()
+        return self.pedir("POST", "rpc/panel_publicar_hoy", json={"p_revision": revision})
 
     def operativa(self, fecha):
         filas = self.pedir("GET", "panel_versiones", params={"vigente_desde": "lte." + fecha, "order": "vigente_desde.desc,revision.desc", "limit": 1})
@@ -742,6 +753,16 @@ class RepositorioDemo:
             self._guardar()
             return {"revision": revision, "vigente_desde": manana}
 
+    def publicar_hoy(self, revision):
+        with self.lock:
+            if revision != self.estado["revision"]:
+                raise ErrorRepositorio("La configuración cambió. Recarga antes de aplicar.", 409)
+            Configuracion.model_validate(self.estado["borrador"]).validar_publicacion()
+            self.estado["publicada"] = {"revision": revision, "vigente_desde": hoy(),
+                                        "configuracion": deepcopy(self.estado["borrador"])}
+            self._guardar()
+            return {"revision": revision, "vigente_desde": hoy()}
+
     def catalogo_vigente(self):
         """Catálogo ficticio estable con proporciones parecidas a las reales: pocos avisos dicen años o nivel de inglés."""
         from panel.afinidad import ligera
@@ -811,6 +832,7 @@ class RepositorioDemo:
                 identificador = uuid5(NAMESPACE_DNS, cargo["id"] + str(n)).hex[:16]
                 url = "https://example.org/empleos/" + identificador
                 dias = n % 10
+                anos = 7 if n % 7 == 6 else n % 5  # contrato v27: algunas piden más años y llegan con su etiqueta
                 publicada = (datetime.fromisoformat(hoy()) - timedelta(days=dias)).date().isoformat()
                 titulo = ({"Product Designer": ["Product Designer", "UX Designer", "Interaction Designer"],
                            "Frontend": ["Frontend Developer", "Frontend Engineer", "Desarrollador Frontend"],
@@ -818,8 +840,8 @@ class RepositorioDemo:
                 v = {"id": identificador, "titulo": titulo, "empresa": ["Estudio Norte", "Orbita", "Forma", "Nexo", "Lumen"][n % 5],
                      "ubicacion": "Remote - Worldwide", "paises": ["CO", "ES"], "confianza_pais": "alta",
                      "modalidad": "remoto", "idioma": "en" if n % 2 else "es", "fecha_publicacion": publicada,
-                     "fecha_estimada": False, "anos_min": n % 5, "ingles": "intermedio",
-                     "_descripcion": (f"English B2 required. We require {n % 5} years of experience. We build digital products with a collaborative team. " * 5),
+                     "fecha_estimada": False, "anos_min": anos, "ingles": "intermedio",
+                     "_descripcion": (f"English B2 required. We require {anos} years of experience. We build digital products with a collaborative team. " * 5),
                      "enlace": url, "enlace_directo": "", "enlaces_alternativos": [url],
                      "verificacion": {"estado": "verificada", "enlaces": [{"url": url, "estado": "verificada",
                         "comprobada_en": self.creada.isoformat()}]}}

@@ -25,11 +25,35 @@ def ligera(datos, descripcion=None):
     return v
 
 
+# Contrato v27: regla del sistema (no del perfil): nunca se entrega una vacante publicada hace más de 30 días.
+def _dias_maximos():
+    try:
+        import yaml
+        from pathlib import Path
+        ruta = Path(__file__).resolve().parent.parent / "datos" / "config.yaml"
+        return int(yaml.safe_load(ruta.read_text(encoding="utf-8")).get("dias_maximos", 30))
+    except Exception:  # noqa: BLE001 — sin config se usa el valor del contrato
+        return 30
+
+
+ANTIGUEDAD_SISTEMA = _dias_maximos()  # el mismo límite que usa la captura (`datos/config.yaml`)
+AVISO_RESTRICCION = {"salario menor al aceptado": "Salario menor al que pide",
+                     "menciona algo que el perfil no acepta": "Menciona algo que no acepta",
+                     "tipo de contrato no aceptado": "Tipo de contrato que no acepta"}
+
+
+def faltas(resultado):
+    """Contrato v27: cuántas cosas del perfil no cumple una vacante compatible (0 = encaja en todo). Sirve para ordenar."""
+    return len(resultado.get("incumple") or ())
+
+
 # Contrato v9: niveles de ampliación para que cada perfil reciba un mínimo diario. País, idioma, plazo, enlace y los
 # requisitos que el aviso sí declara nunca se amplían.
 MINIMO_POR_PERFIL = 5
-# Orden de uso; los dos últimos son el «último recurso» que aprobó Oscar el 12 nov (contrato v11).
-AMPLIACIONES = ("sin_dato", "cargo_cercano", "remota_cercana", "experiencia_cercana", "empresa_4")
+# Contrato v27: los datos sin informar ya no descartan y los cargos cercanos entran directamente, así que solo quedan como
+# último recurso la remota abierta a su país (un perfil sin «remoto») y más vacantes de la misma empresa (v11).
+# Los nombres antiguos se conservan en ETIQUETAS_AMPLIACION y `relajado` para leer asignaciones ya guardadas.
+AMPLIACIONES = ("remota_cercana", "empresa_4")
 ETIQUETAS_AMPLIACION = {"sin_dato": "aviso sin años o inglés informados", "cargo_cercano": "cargo cercano",
                         "remota_cercana": "remota abierta a su país",
                         "experiencia_cercana": "experiencia cercana (±2 años)",
@@ -57,7 +81,8 @@ def relajado(perfil, nivel):
 def evaluar_ampliada(v, perfil, hoy, nivel):
     """Evaluación con el perfil relajado del nivel; el título cercano lo decide quien llama (grado del cargo)."""
     p = relajado(perfil, nivel)
-    return evaluar(v, p, hoy) if p else {"compatible": False, "motivos": ["ampliación no aplicable"], "pruebas": []}
+    return evaluar(v, p, hoy) if p else {"compatible": False, "motivos": ["ampliación no aplicable"], "incumple": [], "avisos": [],
+                                         "pruebas": []}
 
 
 def evaluar(v, perfil, hoy=None):
@@ -88,28 +113,33 @@ def evaluar(v, perfil, hoy=None):
         pruebas.append("Remota abierta a su país" if modo == "remoto" else "Ubicación compatible")
     if v.get("idioma") not in p.idiomas:
         motivos.append("idioma del aviso diferente")
+    # Contrato v27: solo la ubicación, el idioma y las reglas del sistema (30 días, fecha confirmada) descartan. Lo demás
+    # del perfil (años, nivel, inglés, restricciones y su antigüedad) ordena y deja un aviso de lo que no cumple.
+    incumple, avisos = [], []
+    def blando(codigo, texto):
+        incumple.append(codigo)
+        avisos.append(texto)
     publicada = tiempos.instante(v.get("publicada_en"))
     try:
         fecha = date.fromisoformat((publicada or v.get("fecha_publicacion") or "")[:10])
         edad = (hoy - fecha).days
-        if v.get("fecha_estimada") or not 0 <= edad <= p.antiguedad_dias:
+        if v.get("fecha_estimada") or not 0 <= edad <= ANTIGUEDAD_SISTEMA:
             motivos.append("publicación fuera del plazo")
+        elif edad > p.antiguedad_dias:
+            blando("publicación fuera del plazo del perfil", f"Publicada hace {edad} días")
         else:
             pruebas.append(f"Publicada hace {edad} días")
     except (ValueError, TypeError):
         motivos.append("fecha de publicación sin confirmar")
     # La vista previa precalcula estos dos datos con las mismas funciones para no conservar descripciones.
     minimo = v["_anos_minimos"] if "_anos_minimos" in v else contrato.anos(v.get("_descripcion", ""), v.get("anos_min"))[0]
-    # Contrato v22: con 2 años o menos, junior abierto (sin filtro de experiencia).
+    # Contrato v22: con 2 años o menos, junior abierto (sin aviso de experiencia).
     junior_abierto = p.experiencia_anos is not None and p.experiencia_anos <= 2
     if (p.experiencia_min is not None or p.experiencia_max is not None) and not junior_abierto:
         if minimo in ("", None):
-            if not p.aceptar_experiencia_sin_dato:
-                motivos.append("experiencia no informada")
-            else:
-                pruebas.append("Experiencia no informada, admitida por configuración")
+            pruebas.append("Experiencia no informada")
         elif (p.experiencia_min is not None and minimo < p.experiencia_min) or (p.experiencia_max is not None and minimo > p.experiencia_max):
-            motivos.append("experiencia fuera del rango")
+            blando("experiencia fuera del rango", f"Pide {minimo} año{'s' if minimo != 1 else ''} de experiencia")
         else:
             pruebas.append(f"Exige {minimo} años de experiencia")
     if p.ingles_maximo != "sin_filtro":
@@ -119,23 +149,21 @@ def evaluar(v, perfil, hoy=None):
         nivel = partes[1] if len(partes) > 1 else ""
         obligatorio = len(partes) > 2 and partes[2] == "1"
         if nivel not in NIVELES:
-            if not p.aceptar_ingles_sin_dato:
-                motivos.append("inglés requerido sin confirmar")
-            else:
-                pruebas.append("Inglés no informado, admitido por configuración")
+            pruebas.append("Inglés no informado")
         elif obligatorio and NIVELES.index(nivel) > NIVELES.index(p.ingles_maximo):
-            motivos.append("inglés requerido superior al indicado")
+            blando("inglés requerido superior al indicado", f"Pide inglés {'nativo' if nivel == 'native' else nivel}")
         else:
             pruebas.append(f"Inglés {nivel}" + (" deseable" if not obligatorio else " requerido"))
     titulo, descripcion = v.get("titulo") or "", v.get("_descripcion") or ""
     if p.experiencia_anos is not None and p.experiencia_anos >= 5 and (
             contrato.seniority(titulo) in ("intern", "junior") or contrato.tipo_contrato(titulo, descripcion) == "internship"):
-        motivos.append("nivel inferior al del perfil")
+        blando("nivel inferior al del perfil", "Es de nivel junior o prácticas")
     for r in p.restricciones:
         motivo = restriccion(v, r, titulo, descripcion)
         if motivo:
-            motivos.append(motivo)
-    return {"compatible": not motivos, "motivos": motivos, "pruebas": pruebas}
+            blando(motivo, AVISO_RESTRICCION.get(motivo, motivo))
+    return {"compatible": not motivos, "motivos": motivos, "incumple": incumple, "avisos": avisos,
+            "pruebas": pruebas}
 
 
 _POR_MES = {"month": 1, "year": 1 / 12}

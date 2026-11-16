@@ -101,6 +101,7 @@ export type Vacante = {
   enlace: string;
   estado: string;
   motivos: string[];
+  avisos?: string[];
   ampliacion?: string;
   tipo?: string;
   contacto?: { perfil?: string; correo?: string };

@@ -2533,6 +2533,29 @@ h1 {
   border-color: var(--osc-line-ambar, #ecd9ae);
   color: var(--osc-text-ambar-fuerte, #7a5a17);
 }
+.vacancy-tags .no-cumple {
+  background: var(--osc-bg-neutro-2, #f2f3f2);
+  border-color: var(--osc-line-neutro, #d8dcd9);
+  color: var(--osc-text-neutro-medio, #4b524d);
+}
+.distintivo-comunidad {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px dashed currentColor;
+  border-radius: 999px;
+  color: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.cliente-mini.es-comunidad {
+  border-style: dashed;
+}
 .vacancy-tags .post-tag {
   background: var(--osc-bg-azul-2, #eaf1fb);
   border-color: var(--osc-line-azul, #b9cdea);

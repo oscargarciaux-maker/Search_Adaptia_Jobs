@@ -45,6 +45,7 @@ import {
   Users,
   Workflow,
   X,
+  Zap,
 } from "lucide-react";
 import { api, ErrorAPI } from "./api";
 import { delSistema, guardarTema, temaElegido, type Tema } from "./tema";
@@ -3064,6 +3065,19 @@ const bajoMeta = (c: ResumenCliente) =>
 // Desde 9 clientes las tarjetas pasan a dos columnas (decisión de Oscar, 14 nov).
 const CLIENTES_EN_GRILLA = 9;
 
+// Contrato v27: el cliente «Comunidad» lleva un distintivo discreto para reconocerlo sin que llame toda la atención.
+function DistintivoComunidad() {
+  return (
+    <span
+      className="distintivo-comunidad"
+      title="Recibe después de los clientes reales, con lo que sobra del techo"
+    >
+      <Users size={11} aria-hidden="true" />
+      Comunidad
+    </span>
+  );
+}
+
 function TarjetasResumen({
   clientes,
   diaConteo,
@@ -3153,9 +3167,13 @@ function TarjetasResumen({
                 <li key={c.id}>
                   <button
                     type="button"
-                    className={"cliente-mini" + (bajoMeta(c) ? " bajo" : "")}
+                    className={
+                      "cliente-mini" +
+                      (bajoMeta(c) ? " bajo" : "") +
+                      (c.comunidad ? " es-comunidad" : "")
+                    }
                     aria-label={
-                      `${c.nombre}: ` +
+                      `${c.nombre}${c.comunidad ? " (Comunidad)" : ""}: ` +
                       (c.recibidas == null
                         ? `meta de ${c.meta}`
                         : `${c.recibidas} de ${c.meta}`) +
@@ -3166,7 +3184,10 @@ function TarjetasResumen({
                     onClick={() => onCliente(c.id)}
                   >
                     <span className="cliente-texto">
-                      <strong>{c.nombre}</strong>
+                      <strong>
+                        {c.nombre}
+                        {c.comunidad && <DistintivoComunidad />}
+                      </strong>
                       <span>
                         {c.cargo}
                         {!grilla && c.porConfirmar > 0 && (
@@ -4207,13 +4228,14 @@ function App() {
       setBusy(false);
     }
   }
-  async function programar() {
+  async function programar(hoyMismo = false) {
     setBusy(true);
     try {
       const e = dirty ? await guardar() : estado;
       if (!e) return;
+      // Contrato v27: «Aplicar hoy» rige para las búsquedas que faltan hoy; lo ya entregado no cambia.
       const r = await api<{ revision: number; vigente_desde: string }>(
-        "/config/publicar",
+        hoyMismo ? "/config/aplicar-hoy" : "/config/publicar",
         { method: "POST", body: JSON.stringify({ revision: e.revision }) },
       );
       setEstado({
@@ -4222,7 +4244,9 @@ function App() {
       });
       setModal(null);
       notify(
-        "Configuración programada para el " + fecha(r.vigente_desde) + ".",
+        hoyMismo
+          ? "Configuración aplicada desde hoy. La próxima búsqueda de hoy ya la usa."
+          : "Configuración programada para el " + fecha(r.vigente_desde) + ".",
       );
     } catch (e) {
       notify((e as Error).message, true);
@@ -5266,6 +5290,11 @@ function App() {
             faltante; no se rellena con duplicados ni con vacantes fuera de los
             filtros.
           </p>
+          <p className="helper note">
+            <strong>Aplicar hoy</strong> la usa desde la próxima búsqueda de hoy
+            (la manual, la de las 8:30 o la de cada hora). Lo que ya se entregó
+            hoy no cambia.
+          </p>
           {sesion.demo && (
             <p className="demo-inline">
               Demostración: esta acción no programa una búsqueda real.
@@ -5280,9 +5309,17 @@ function App() {
               Revisar
             </button>
             <button
+              className="button secondary"
+              disabled={busy}
+              onClick={() => programar(true)}
+            >
+              <Zap size={16} />
+              Aplicar hoy
+            </button>
+            <button
               className="button primary"
               disabled={busy}
-              onClick={programar}
+              onClick={() => programar()}
             >
               {busy ? (
                 <Loader2 size={16} className="spin" />
@@ -5470,7 +5507,10 @@ function ClientCard({
     <article className="client-card card">
       <div className="client-top">
         <div className="client-title">
-          <h3>{c.nombre}</h3>
+          <h3>
+            {c.nombre}
+            {c.comunidad && <DistintivoComunidad />}
+          </h3>
           <span>
             {cargo?.nombre || "Sin perfil"}
             {perfiles.length > 1 ? " + " + (perfiles.length - 1) : ""}
@@ -5596,6 +5636,15 @@ function VacancyCard({ v }: { v: Vacante }) {
             Post
           </span>
         )}
+        {(v.avisos || []).map((a) => (
+          <span
+            key={a}
+            className="no-cumple"
+            title="No cumple esto del perfil. Llega igual porque solo la ubicación y el idioma descartan; va después de las que encajan en todo."
+          >
+            {a}
+          </span>
+        ))}
         {v.ampliacion && (
           <span
             className="amplified"
