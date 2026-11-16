@@ -216,6 +216,9 @@ export type Revision = {
   idioma: string;
   publicada: string;
   enlace: string;
+  // Contrato v34: salario tal como lo dice el aviso y países que el sistema leyó en él (sin confirmar).
+  salario?: string;
+  paises?: string[];
   pista: string;
   sugerencia: string[];
   // Ampliación v17: respuesta sugerida por código y su motivo ("" = hay que leerla).

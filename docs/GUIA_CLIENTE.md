@@ -42,6 +42,13 @@ en dos paneles: a la izquierda sus últimos 7 días, sus perfiles, lo que más c
 sus vacantes» y «Descargar su CSV de hoy»; a la derecha sus «por confirmar» para decidir ahí mismo («Sí, sirve» usa
 el país sugerido; si no hay sugerencia, «Elegir país en Por confirmar»).
 
+**«Por confirmar» rápido (16 nov, contrato v34).** Cada noche se guarda un resumen corto de cada vacante pendiente y
+la pantalla solo lee eso, así que cambiar de página es inmediato. Cada vacante muestra ubicación, modalidad, salario,
+publicación e idioma, como en «Vacantes», y los países que leyó el sistema como etiquetas. «Para» queda fijo a la
+izquierda y dice cuántas tiene cada cliente. Los avisos de LinkedIn conservan saltos de línea, viñetas y negritas.
+Después de fusionar este cambio, corre una vez «Preparar Supabase» en GitHub (añade una columna); mientras tanto todo
+funciona como antes.
+
 **Vacantes y «Por confirmar» (16 nov, contrato v29).** Las dos pantallas muestran la lista a la izquierda y el aviso
 completo a la derecha (datos, etiquetas, por qué coincide y la descripción con su formato), como en LinkedIn. Con ↑/↓
 se cambia de vacante; la dirección recuerda la que estaba abierta. En el celular se toca una vacante y su ficha ocupa
