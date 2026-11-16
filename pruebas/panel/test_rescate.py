@@ -72,12 +72,14 @@ def test_deficit_por_perfil_y_conteos_sin_datos_de_clientes(cfg):
     assert cfg["perfiles"][0]["id"] not in str(resumen) and cfg["clientes"][0]["id"] not in str(resumen)  # solo conteos
 
 
-def test_experiencia_cercana_solo_cuando_faltan(cfg):
-    pide_7 = CON_DATO.replace("3 years", "7 years")  # el perfil admite 0–5: 7 está a 2 años
+def test_v27_anos_fuera_del_rango_entran_directo_y_despues_de_las_que_encajan(cfg):
+    """Contrato v27: los años ya no descartan ni hacen falta ampliar; solo ordenan (primero lo que encaja)."""
+    pide_7 = CON_DATO.replace("3 years", "7 years")  # el perfil admite 0–5
     pide_9 = CON_DATO.replace("3 years", "9 years")
-    elegidas, resumen, _, rid = _elegir(cfg, [_oferta("Product Designer", 1, pide_7), _oferta("Product Designer", 2, pide_9)])
-    marcas = [v.get("_ampliacion") for v, _ in elegidas[rid]]
-    assert marcas == ["experiencia_cercana"] and resumen["ampliadas"] == {"experiencia_cercana": 1}
+    elegidas, resumen, _, rid = _elegir(cfg, [_oferta("Product Designer", 1, pide_9), _oferta("Product Designer", 2, pide_7),
+                                              _oferta("Product Designer", 3, CON_DATO)])
+    assert [v.get("_ampliacion") for v, _ in elegidas[rid]] == [None, None, None] and not resumen["ampliadas"]
+    assert "3 years" in elegidas[rid][0][0]["_descripcion"]  # la que encaja en todo va primero
     p = Perfil.model_validate(cfg["perfiles"][0])
     assert afinidad.relajado(p, "experiencia_cercana").experiencia_max == 7
 

@@ -56,8 +56,6 @@ def roles_de(v, roles):
     mejor = None
     for orden, rol in enumerate(roles):
         en_rol = [grados[f] for f in rol["familias"] if f in grados]
-        if "_perfiles" in rol:
-            en_rol = [g for g in en_rol if g != "cercano"]  # oficios vecinos: solo para ampliar (contrato v9)
         if not en_rol:
             continue
         if rol.get("titulo") and not any(normalizar.contiene_frase(titulo, normalizar.texto(p)) for p in rol["titulo"]):
@@ -104,18 +102,26 @@ def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False, 
         rasgos = _rasgos(v)
         for k in conteo:
             conteo[k][rasgos[k]] += 1
-    def destinatarios(v):
-        if not perfiles: return set()
-        from panel.afinidad import evaluar
-        return {p["cliente_id"] for p in perfiles if evaluar(v,p,hoy)["compatible"]}
-    atendidos = Counter(k for v,_ in iniciales for k in destinatarios(v))
+    from panel.afinidad import MINIMO_POR_PERFIL
+    def encaje(v):
+        """(perfiles a los que sirve, lo mínimo que incumple para alguno de ellos; contrato v27)."""
+        if not perfiles:
+            return set(), 0
+        from panel.afinidad import evaluar, faltas
+        resultados = [(p.get("id") or p["cliente_id"], evaluar(v, p, hoy)) for p in perfiles]
+        sirve = [(c, r) for c, r in resultados if r["compatible"]]
+        return {c for c, _ in sirve}, min((faltas(r) for _, r in sirve), default=0)
+    atendidos = Counter(k for v,_ in iniciales for k in encaje(v)[0])
     # Contrato v22: sectores y palabras preferidas de los perfiles solo ordenan (pesan cuando sobran candidatas).
     terminos = set()
     if perfiles:
         from panel.afinidad import coincidencias_preferidas, preferidos
         terminos = preferidos(perfiles)
-    resto = [(v, g, dict(_rasgos(v), _destinatarios=destinatarios(v),
-                         _preferidas=coincidencias_preferidas(v, terminos) if terminos else 0)) for v, g in candidatas]
+    resto = []
+    for v, g in candidatas:
+        clientes, incumple = encaje(v)
+        resto.append((v, g, dict(_rasgos(v), _destinatarios=clientes, _faltas=incumple,
+                                 _preferidas=coincidencias_preferidas(v, terminos) if terminos else 0)))
     hoy_d = date.fromisoformat(hoy)
     while resto and len(elegidas) < cuantas:
         def costo(item):
@@ -128,7 +134,12 @@ def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False, 
         resto = [x for x in resto if conteo["empresa"][x[2]["empresa"]] < max_por_empresa]
         if not resto:
             break
-        mejor = min(resto, key=lambda item: (GRADOS.index(item[1]),
+        # Contrato v27: primero las que más encajan; cada cosa que no cumple pesa como un grado de coincidencia menos.
+        # Contrato v27: antes, cualquier perfil del cargo que aún no llega al mínimo de 5 (así nadie queda en cero
+        # mientras otro acumula); después, las que más encajan.
+        mejor = min(resto, key=lambda item: (
+                    0 if any(atendidos[k] < MINIMO_POR_PERFIL for k in item[2]["_destinatarios"]) else 1,
+                    GRADOS.index(item[1]) + item[2]["_faltas"],
                     prioridad_remota(item[0]) if preferir_remotas else 0,
                     min((atendidos[k] for k in item[2]["_destinatarios"]),default=0),costo(item)))
         resto.remove(mejor)

@@ -194,7 +194,7 @@ def test_regiones_en_listas_de_paises_para_perfiles_moviles():
     assert {"US", "CA", "MX", "AR"} <= set(america["puede_trabajar_en"])
 
 
-def test_nombres_y_funciones_solo_para_cargos_nuevos():
+def test_nombres_y_funciones_crean_o_se_anaden_sin_quitar_nada():
     texto = ("nombre;cargo;nombres_del_cargo;funciones_del_cargo\n"
              "Persona IA;AI Product Manager;AI Product Owner|Product Manager IA;agentes de voz|LLM|chatbot\n"
              "Otra IA;AI Product Owner;;\n"
@@ -210,8 +210,14 @@ def test_nombres_y_funciones_solo_para_cargos_nuevos():
     assert perfiles[0]["cargo_id"] == perfiles[1]["cargo_id"] == cargo["id"]
     qa = next(c for c in r["configuracion"]["cargos"] if c["nombre"] == "QA")
     antes = next(c for c in repo.config()["borrador"]["cargos"] if c["nombre"] == "QA")
-    assert qa["terminos_exactos"] == antes["terminos_exactos"]  # un cargo existente no se cambia
-    assert any("ya existe" in a for a in r["filas"][2]["avisos"])
+    assert qa["terminos_exactos"] == antes["terminos_exactos"]  # contrato v27: a un cargo existente solo se le añade
+    assert qa["terminos_similares"] == [*antes["terminos_similares"], "QA Lead"] and qa["funciones"][-1] == "pruebas"
+    fila_qa = next(f for f in r["filas"] if f["cliente"] == "Persona QA")
+    assert any("se le añaden 1 nombres" in a for a in fila_qa["avisos"])
+    # Un nombre que el cargo ya tiene no se repite.
+    otra = importar.previa(repo.config()["borrador"], "nombre;cargo;nombres_del_cargo\nX;QA;QA\n", "mantener")
+    assert next(c for c in otra["configuracion"]["cargos"] if c["nombre"] == "QA")["terminos_similares"] == \
+        antes["terminos_similares"]
 
 
 def test_admitir_ingles_y_experiencia_no_informados():

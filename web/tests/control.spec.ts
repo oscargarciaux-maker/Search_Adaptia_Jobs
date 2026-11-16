@@ -1110,3 +1110,48 @@ test("importar clientes: vista previa con errores, borrar los actuales y program
     page.getByRole("button", { name: /Ver archivados/ }),
   ).toHaveCount(0);
 });
+
+test("contrato v27: aplicar hoy, etiquetas de lo que no cumple y distintivo de Comunidad", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/");
+  await ir(page, "Clientes");
+  await page
+    .getByRole("button", { name: "Editar Cliente de ejemplo 02", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel(/Es «Comunidad»/).check();
+  await dialog.getByRole("button", { name: "Aplicar cambios" }).click();
+  await expect(
+    page.locator(".client-card h3", { hasText: "Cliente de ejemplo 02" }),
+  ).toContainText("Comunidad");
+  await page
+    .getByRole("button", { name: "Programar para mañana", exact: true })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Aplicar hoy", exact: true })
+    .click();
+  await expect(
+    page.getByText("Configuración aplicada desde hoy", { exact: false }),
+  ).toBeVisible();
+  const cfg = await (await request.get("/api/config")).json();
+  const hoy = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+  }).format(new Date());
+  expect(cfg.publicada.vigente_desde).toBe(hoy);
+  await page.getByRole("button", { name: "Volver al resumen" }).click();
+  await expect(
+    page.getByRole("button", { name: /Cliente de ejemplo 02 \(Comunidad\)/ }),
+  ).toBeVisible();
+  expect(await page.evaluate(revisarContraste)).toEqual([]);
+  // Una vacante que pide más años que el perfil llega igual, con su etiqueta.
+  await ir(page, "Vacantes");
+  await expect(
+    page
+      .locator(".no-cumple", { hasText: "Pide 7 años de experiencia" })
+      .first(),
+  ).toBeVisible();
+  expect(await page.evaluate(revisarContraste)).toEqual([]);
+});

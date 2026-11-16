@@ -187,6 +187,10 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
     def publicar(body: Publicar):
         return repo.publicar(body.revision)
 
+    @app.post("/api/config/aplicar-hoy")
+    def aplicar_hoy(body: Publicar):
+        return repo.publicar_hoy(body.revision)
+
     @app.post("/api/cargos/expandir")
     def expandir(body: Expansion):
         return sugerir(body.cargo)

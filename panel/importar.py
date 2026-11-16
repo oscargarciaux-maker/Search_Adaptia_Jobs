@@ -389,7 +389,19 @@ def previa(borrador, contenido, actuales="mantener"):
         if nuevo:
             avisos.append(f"Cargo nuevo «{cargo['nombre']}»: revisa sus nombres y usa «Proponer funciones».")
         elif cargo and (extra_nombres or extra_funciones) and cargo not in nuevos_cargos:
-            avisos.append(f"El cargo «{cargo['nombre']}» ya existe: sus nombres y funciones no se cambian desde aquí.")
+            # Contrato v27: en un cargo que ya existe, los nombres y funciones del archivo se AÑADEN (nunca se quita ni
+            # se reemplaza nada), para que encuentre más vacantes sin cambiar lo que ya buscaba.
+            conocidos = {_nombre_cargo(t) for k in ("terminos_exactos", "terminos_similares", "terminos_excluidos",
+                                                    "terminos_cercanos") for t in cargo.get(k, [])}
+            nombres = [t[:120] for t in dict.fromkeys(extra_nombres) if _nombre_cargo(t) not in conocidos]
+            nombres = nombres[:max(0, 30 - len(cargo.get("terminos_similares", [])))]
+            funciones = [t for t in dict.fromkeys(extra_funciones) if t not in cargo.get("funciones", [])]
+            funciones = funciones[:max(0, 40 - len(cargo.get("funciones", [])))]
+            if nombres or funciones:
+                cargo["terminos_similares"] = [*cargo.get("terminos_similares", []), *nombres]
+                cargo["funciones"] = [*cargo.get("funciones", []), *funciones]
+                avisos.append(f"Al cargo «{cargo['nombre']}» se le añaden {len(nombres)} nombres y {len(funciones)} "
+                              "funciones; no se quita ninguno.")
         resultado.append({"fila": n, "cliente": nombre, "estado": estado,
                           "cargo": cargo["nombre"] if cargo else cargo_txt,
                           "vive_en": perfil.get("vive_en", ""), "modalidades": perfil.get("modalidades", []),

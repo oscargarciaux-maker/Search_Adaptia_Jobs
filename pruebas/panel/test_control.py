@@ -106,14 +106,38 @@ def test_perfil_no_puede_referenciar_otro_cliente(cfg):
     ({"fecha_publicacion": "2020-01-01"}, "publicación"),
     ({"fecha_publicacion": "2099-01-01"}, "publicación"),
     ({"fecha_publicacion": ""}, "fecha"),
-    ({"anos_min": 10}, "experiencia"),
-    ({"anos_min": None}, "experiencia"),
-    ({"ingles": "fluido", "_descripcion": "English C1 required. " * 20}, "inglés"),
 ])
 def test_filtros_independientes_excluyen_antes_de_repartir(cfg, cambio, motivo):
     p = cfg["perfiles"][0]
     r = afinidad.evaluar(trabajo(**cambio), p, hoy())
     assert not r["compatible"] and any(motivo in m for m in r["motivos"])
+
+
+@pytest.mark.parametrize("cambio,aviso", [
+    ({"anos_min": 10}, "Pide 10 años de experiencia"),
+    ({"ingles": "fluido", "_descripcion": "English C1 required. " * 20}, "Pide inglés C1"),
+])
+def test_v27_anos_e_ingles_no_descartan_y_dejan_aviso(cfg, cambio, aviso):
+    """Contrato v27: solo la ubicación y el idioma descartan; lo demás ordena y queda como etiqueta."""
+    p = cfg["perfiles"][0]
+    r = afinidad.evaluar(trabajo(**cambio), p, hoy())
+    assert r["compatible"] and aviso in r["avisos"] and afinidad.faltas(r) == 1
+    assert afinidad.faltas(afinidad.evaluar(trabajo(), p, hoy())) == 0
+
+
+def test_v27_sin_dato_de_anos_no_descarta_ni_avisa(cfg):
+    p = cfg["perfiles"][0]
+    r = afinidad.evaluar(trabajo(anos_min=None), p, hoy())
+    assert r["compatible"] and not r["avisos"]
+
+
+def test_v27_antiguedad_del_perfil_ordena_pero_30_dias_descarta(cfg):
+    p = dict(cfg["perfiles"][0], antiguedad_dias=7)
+    veinte = (date.fromisoformat(hoy()) - timedelta(days=20)).isoformat()
+    cuarenta = (date.fromisoformat(hoy()) - timedelta(days=40)).isoformat()
+    r = afinidad.evaluar(trabajo(fecha_publicacion=veinte), p, hoy())
+    assert r["compatible"] and "Publicada hace 20 días" in r["avisos"]
+    assert not afinidad.evaluar(trabajo(fecha_publicacion=cuarenta), p, hoy())["compatible"]
 
 
 def test_inglés_deseable_y_datos_faltantes_son_decisiones_explicitas(cfg):
@@ -375,16 +399,15 @@ def test_vista_previa_usa_las_mismas_reglas_que_la_seleccion():
                 assert afinidad.evaluar(ligera, p, hoy()) == afinidad.evaluar(v, p, hoy())
 
 
-def test_vista_previa_muestra_lo_que_bloquea_y_cuanto_se_gana_al_admitir_sin_dato(cfg):
+def test_v27_vista_previa_ya_no_corta_por_datos_sin_informar(cfg):
     repo = RepositorioDemo()
     modelo = Configuracion.model_validate(cfg)
     r = servicio.vista_previa(repo, modelo)
     pid = str(modelo.perfiles[0].id)
-    combinada = r["perfiles"][pid]["limitantes"][0]
-    assert combinada["sugerencia"] == "Admitir experiencia e inglés no informados"
+    assert r["perfiles"][pid]["compatibles"] > 0
+    assert not any("no informad" in l["sugerencia"] for l in r["perfiles"][pid]["limitantes"])
     modelo.perfiles[0].aceptar_experiencia_sin_dato = modelo.perfiles[0].aceptar_ingles_sin_dato = True
-    despues = servicio.vista_previa(repo, modelo)["perfiles"][pid]["compatibles"]
-    assert despues == r["perfiles"][pid]["compatibles"] + combinada["vacantes"] > 0
+    assert servicio.vista_previa(repo, modelo)["perfiles"][pid]["compatibles"] == r["perfiles"][pid]["compatibles"]
     assert set(r["cargos"]) == {c["id"] for c in cfg["cargos"]}
     assert all(c["estado"] in {"alcanza", "justo", "insuficiente", "sin_cupo"} for c in r["cargos"].values())
 
@@ -556,7 +579,8 @@ def test_en_vivo_aplica_cargo_y_filtros_del_perfil_y_no_devuelve_vacantes(cfg, e
               _crudo("UX Designer", "Remote - Worldwide", 2, True),
               _crudo("Product Designer", "Remote - Worldwide", 2, True),  # mismo enlace: se cuenta una vez
               _crudo("Product Designer", "Bogotá, Colombia", 3),            # presencial en otro país
-              _crudo("Product Designer", "Remote - LATAM", 4, True, dias=20),  # fuera del plazo
+              _crudo("Product Designer", "Remote - LATAM", 4, True, dias=20),  # fuera del plazo del perfil: solo avisa
+              _crudo("Product Designer", "Remote - LATAM", 6, True, dias=40),  # más de 30 días: regla del sistema
               _crudo("Contador", "Remote - LATAM", 5, True)]                 # otro cargo
     llamadas = []
 
@@ -566,7 +590,7 @@ def test_en_vivo_aplica_cargo_y_filtros_del_perfil_y_no_devuelve_vacantes(cfg, e
     c = Configuracion.model_validate(cfg)
     r = servicio.estimacion_en_vivo(RepositorioDemo(), c, cfg["perfiles"][0]["id"], fuentes=fuentes)
     assert llamadas == [("Product Designer", "MX", servicio.LIMITE_SEGUNDOS)]
-    assert r["del_cargo"] == 4 and r["compatibles"] == 2 and r["nuevas"] == 2
+    assert r["del_cargo"] == 5 and r["compatibles"] == 3 and r["nuevas"] == 3
     assert [l["motivo"] for l in r["limitantes"]] == ["publicación fuera del plazo"]  # Bogotá falla dos filtros
     assert "vacantes" not in r and "Es una muestra" in r["nota"]
 
@@ -733,19 +757,16 @@ def _elegir(cfg, ofertas):
     return elegidas[rid], resumen["roles"][rid]
 
 
-def test_perfil_bajo_el_minimo_se_completa_primero_sin_dato_y_luego_cercanos(cfg_un_perfil):
+def test_v27_sin_dato_y_cercanos_entran_directo_despues_de_lo_que_encaja(cfg_un_perfil):
     con_dato = trabajo()["_descripcion"]  # dice 3 años e inglés B2: cumple el perfil
     ofertas = ([_oferta("Product Designer", n, con_dato) for n in range(2)] +
                [_oferta("Product Designer", 10, SIN_DATO)] +
                [_oferta("UX Researcher", 20 + n, SIN_DATO) for n in range(3)] +
                [_oferta("Product Designer", 30, con_dato, ubicacion="Bogotá, Colombia", remoto=None)])  # presencial
     elegidas, resumen = _elegir(cfg_un_perfil, ofertas)
-    marcas = [v.get("_ampliacion") for v, _ in elegidas]
-    assert len(elegidas) == 5 and marcas.count(None) == 2
-    assert marcas.count("sin_dato") == 1 and marcas.count("cargo_cercano") == 2
-    assert not any(v["empresa"] == "Empresa 30" for v, _ in elegidas)  # la modalidad/país nunca se amplía para un remoto
-    assert resumen["ampliadas"] == {"sin_dato": 1, "cargo_cercano": 2}
-    assert all(g == "cercano" for v, g in elegidas if v.get("_ampliacion") == "cargo_cercano")
+    assert len(elegidas) == 6 and not any(v.get("_ampliacion") for v, _ in elegidas) and not resumen["ampliadas"]
+    assert not any(v["empresa"] == "Empresa 30" for v, _ in elegidas)  # la ubicación sí descarta
+    assert [g for _, g in elegidas][:3] == ["exacto"] * 3 and [g for _, g in elegidas][3:] == ["cercano"] * 3
 
 
 def test_con_cinco_que_cumplen_no_se_amplia_y_el_cupo_manda(cfg_un_perfil):
@@ -769,7 +790,7 @@ def test_presencial_puede_ampliar_a_remotas_abiertas_a_su_pais(cfg_un_perfil):
     assert [v.get("_ampliacion") for v, _ in elegidas] == ["remota_cercana"] * 3
 
 
-def test_registro_asigna_lo_ampliado_solo_a_quien_no_llega_y_el_panel_lo_marca(cfg):
+def test_registro_v27_asigna_sin_marcar_como_ampliada_una_vacante_sin_datos(cfg):
     p_estricto = cfg["perfiles"][0]
     rid = "cargo:" + cfg["cargos"][0]["id"]
     ampliada = dict(_oferta("Product Designer", 1, SIN_DATO), _ampliacion="sin_dato")
@@ -789,8 +810,8 @@ def test_registro_asigna_lo_ampliado_solo_a_quien_no_llega_y_el_panel_lo_marca(c
     ejecutor.registrar(repo, {"revision": 1, "configuracion": cfg}, hoy())
     perfiles = {a["perfil_id"] for a in asignaciones}
     assert p_estricto["id"] in perfiles
-    assert all({"ampliacion": "sin_dato"} in a["explicacion"] for a in asignaciones)
-    assert repo.ejecucion["resumen"]["ampliadas"] == len(asignaciones)
+    assert not any({"ampliacion": "sin_dato"} in a["explicacion"] for a in asignaciones)  # v27: ya cumple
+    assert repo.ejecucion["resumen"]["ampliadas"] == 0
     # El panel muestra la marca; el texto para WhatsApp no.
     fila = dict(asignaciones[0], catalogo_vacantes={"id": ampliada["id"], "status": "active", "datos": dict(
         ampliada, verificacion={"estado": "verificada", "enlaces": [{"url": ampliada["enlace"], "estado": "verificada",
@@ -799,7 +820,7 @@ def test_registro_asigna_lo_ampliado_solo_a_quien_no_llega_y_el_panel_lo_marca(c
         def resultados(self, cliente_id, fecha):
             return {"ejecucion": repo.ejecucion, "clientes": [], "filas": [fila]}
     r = servicio.resultados(Resultados())
-    assert r["vacantes"][0]["ampliacion"] == "aviso sin años o inglés informados" and r["vacantes"][0]["estado"] == "lista"
+    assert r["vacantes"][0]["ampliacion"] == "" and r["vacantes"][0]["estado"] == "lista"
     texto = servicio.whatsapp(Resultados(), None)["texto"]
     assert ampliada["titulo"] in texto and "mpliad" not in texto and "sin años" not in texto
 
@@ -951,8 +972,8 @@ def test_con_cinco_anos_entra_un_aviso_de_ocho_y_no_uno_de_nueve(cfg):
     base = dict(paises=["CO", "ES"], confianza_pais="alta")
     ocho = afinidad.evaluar(trabajo(_descripcion="We require 8 years of experience. " * 4, anos_min=8, **base), p, hoy())
     nueve = afinidad.evaluar(trabajo(_descripcion="We require 9 years of experience. " * 4, anos_min=9, **base), p, hoy())
-    assert "experiencia fuera del rango" not in ocho["motivos"]
-    assert "experiencia fuera del rango" in nueve["motivos"]
+    assert "experiencia fuera del rango" not in ocho["incumple"]
+    assert "experiencia fuera del rango" in nueve["incumple"]
     # El rescate por persona (v11) sigue sumando ±2 sobre el rango de ±3.
     assert afinidad.relajado(p, "experiencia_cercana").experiencia_max == 10
 
@@ -1009,14 +1030,14 @@ def test_margen_de_cuatro_anos(cfg):
 def test_nivel_segun_los_anos(cfg):
     junior = trabajo(titulo="Junior Product Designer")
     senior = _perfil_v22(cfg, experiencia_anos=7)
-    assert "nivel inferior al del perfil" in afinidad.evaluar(junior, senior, hoy())["motivos"]
-    assert "nivel inferior al del perfil" in afinidad.evaluar(trabajo(titulo="Product Design Intern"), senior, hoy())["motivos"]
+    assert "nivel inferior al del perfil" in afinidad.evaluar(junior, senior, hoy())["incumple"]
+    assert "nivel inferior al del perfil" in afinidad.evaluar(trabajo(titulo="Product Design Intern"), senior, hoy())["incumple"]
     assert afinidad.evaluar(trabajo(titulo="Senior Product Designer", anos_min=6), senior, hoy())["compatible"]
     # Con 2 años o menos no hay filtro de experiencia: entra aunque pida 8 años.
     nuevo = _perfil_v22(cfg, experiencia_anos=1)
     pide_seis = trabajo(anos_min=8)
     assert afinidad.evaluar(pide_seis, nuevo, hoy())["compatible"]
-    assert not afinidad.evaluar(pide_seis, _perfil_v22(cfg, experiencia_anos=3), hoy())["compatible"]
+    assert "experiencia fuera del rango" in afinidad.evaluar(pide_seis, _perfil_v22(cfg, experiencia_anos=3), hoy())["incumple"]
 
 
 def _tasas_fijas(monkeypatch, fecha=None):
@@ -1032,9 +1053,9 @@ def test_salario_minimo_compara_en_la_misma_moneda(cfg, monkeypatch):
     bajo = trabajo(salario="USD 1.500 - 2.000 per month")
     alto = trabajo(salario="USD 40,000 - 50,000 per year")  # 4.166 al mes: pasa
     sin_dato = trabajo(salario="")
-    assert "salario menor al aceptado" in afinidad.evaluar(bajo, p, hoy())["motivos"]
+    assert "salario menor al aceptado" in afinidad.evaluar(bajo, p, hoy())["incumple"]
     for v in (alto, sin_dato):
-        assert "salario menor al aceptado" not in afinidad.evaluar(v, p, hoy())["motivos"]
+        assert "salario menor al aceptado" not in afinidad.evaluar(v, p, hoy())["incumple"]
 
 
 def test_salario_minimo_con_equivalencia_de_monedas_v26(cfg, monkeypatch):
@@ -1042,26 +1063,26 @@ def test_salario_minimo_con_equivalencia_de_monedas_v26(cfg, monkeypatch):
     mil_usd = _perfil_v22(cfg, restricciones=[{"tipo": "salario_minimo", "monto": 1000, "moneda": "USD",
                                                "periodo": "month"}])
     motivo = "salario menor al aceptado"
-    assert motivo not in afinidad.evaluar(trabajo(salario="EUR 999 per month"), mil_usd, hoy())["motivos"]  # ≈1110 USD
-    assert motivo in afinidad.evaluar(trabajo(salario="EUR 700 per month"), mil_usd, hoy())["motivos"]  # ≈778 USD
-    assert motivo in afinidad.evaluar(trabajo(salario="COP 2.000.000 mensual"), mil_usd, hoy())["motivos"]  # 500 USD
-    assert motivo not in afinidad.evaluar(trabajo(salario="COP 4.500.000 mensual"), mil_usd, hoy())["motivos"]
+    assert motivo not in afinidad.evaluar(trabajo(salario="EUR 999 per month"), mil_usd, hoy())["incumple"]  # ≈1110 USD
+    assert motivo in afinidad.evaluar(trabajo(salario="EUR 700 per month"), mil_usd, hoy())["incumple"]  # ≈778 USD
+    assert motivo in afinidad.evaluar(trabajo(salario="COP 2.000.000 mensual"), mil_usd, hoy())["incumple"]  # 500 USD
+    assert motivo not in afinidad.evaluar(trabajo(salario="COP 4.500.000 mensual"), mil_usd, hoy())["incumple"]
     # Margen del 10 %: 1050 frente a 1100 no descarta; 950 frente a 1100 sí.
     mil_cien = _perfil_v22(cfg, restricciones=[{"tipo": "salario_minimo", "monto": 1100, "moneda": "USD",
                                                 "periodo": "month"}])
-    assert motivo not in afinidad.evaluar(trabajo(salario="USD 1,050 per month"), mil_cien, hoy())["motivos"]
-    assert motivo in afinidad.evaluar(trabajo(salario="USD 950 per month"), mil_cien, hoy())["motivos"]
+    assert motivo not in afinidad.evaluar(trabajo(salario="USD 1,050 per month"), mil_cien, hoy())["incumple"]
+    assert motivo in afinidad.evaluar(trabajo(salario="USD 950 per month"), mil_cien, hoy())["incumple"]
     # Moneda inestable, por hora frente a mensual: no se compara.
-    assert motivo not in afinidad.evaluar(trabajo(salario="ARS 100.000 por mes"), mil_usd, hoy())["motivos"]
-    assert motivo not in afinidad.evaluar(trabajo(salario="EUR 5 per hour"), mil_usd, hoy())["motivos"]
+    assert motivo not in afinidad.evaluar(trabajo(salario="ARS 100.000 por mes"), mil_usd, hoy())["incumple"]
+    assert motivo not in afinidad.evaluar(trabajo(salario="EUR 5 per hour"), mil_usd, hoy())["incumple"]
 
 
 def test_salario_con_tabla_vencida_no_descarta(cfg, monkeypatch):
     _tasas_fijas(monkeypatch, fecha="2026-01-01")
     p = _perfil_v22(cfg, restricciones=[{"tipo": "salario_minimo", "monto": 1000, "moneda": "USD", "periodo": "month"}])
     assert "salario menor al aceptado" not in afinidad.evaluar(trabajo(salario="EUR 300 per month"), p, "2026-11-15")[
-        "motivos"]
-    assert "salario menor al aceptado" in afinidad.evaluar(trabajo(salario="USD 300 per month"), p, hoy())["motivos"]
+        "incumple"]
+    assert "salario menor al aceptado" in afinidad.evaluar(trabajo(salario="USD 300 per month"), p, hoy())["incumple"]
 
 
 def test_actualizar_tasas_conserva_la_tabla_si_la_fuente_falla(tmp_path, monkeypatch):
@@ -1083,11 +1104,11 @@ def test_palabras_y_tipo_de_contrato_descartan(cfg):
     con_java = trabajo(_descripcion=trabajo()["_descripcion"] + " Strong Java experience required.")
     javascript = trabajo(_descripcion=trabajo()["_descripcion"] + " JavaScript and Figma.")
     freelance = trabajo(titulo="Product Designer (Freelance)")
-    assert "menciona algo que el perfil no acepta" in afinidad.evaluar(con_java, p, hoy())["motivos"]
+    assert "menciona algo que el perfil no acepta" in afinidad.evaluar(con_java, p, hoy())["incumple"]
     assert afinidad.evaluar(javascript, p, hoy())["compatible"]  # palabra completa: JavaScript no es Java
-    assert "tipo de contrato no aceptado" in afinidad.evaluar(freelance, p, hoy())["motivos"]
+    assert "tipo de contrato no aceptado" in afinidad.evaluar(freelance, p, hoy())["incumple"]
     # La ampliación nunca relaja una restricción.
-    assert not afinidad.evaluar_ampliada(con_java, p, hoy(), "experiencia_cercana")["compatible"]
+    assert afinidad.evaluar_ampliada(con_java, p, hoy(), "empresa_4")["incumple"]  # la ampliación no las borra
     with pytest.raises(ValidationError):
         _perfil_v22(cfg, restricciones=[{"tipo": "palabras", "palabras": []}])
 
@@ -1122,12 +1143,12 @@ def test_lo_deseable_no_descarta(cfg, texto, descarta):
     """14 nov, pedido de Oscar: si el aviso menciona algo solo como deseable, no se descarta la vacante."""
     p = _perfil_v22(cfg, restricciones=[{"tipo": "palabras", "palabras": ["Java", "call center"]}])
     v = trabajo(_descripcion=trabajo()["_descripcion"] + "\n" + texto)
-    assert ("menciona algo que el perfil no acepta" in afinidad.evaluar(v, p, hoy())["motivos"]) is descarta
+    assert ("menciona algo que el perfil no acepta" in afinidad.evaluar(v, p, hoy())["incumple"]) is descarta
 
 
 def test_en_el_titulo_siempre_descarta(cfg):
     p = _perfil_v22(cfg, restricciones=[{"tipo": "palabras", "palabras": ["Java"]}])
-    assert not afinidad.evaluar(trabajo(titulo="Java Product Designer"), p, hoy())["compatible"]
+    assert "menciona algo que el perfil no acepta" in afinidad.evaluar(trabajo(titulo="Java Product Designer"), p, hoy())["incumple"]
 
 
 # ── Contrato v23: ubicaciones del mundo, permiso legal, ciudades y horario compatible ────────────────────────────
@@ -1356,3 +1377,16 @@ def test_asignaciones_por_cliente_agrupa_por_busqueda_y_cliente():
     assert conteo == {("e1", "c1"): 2, ("e2", "c2"): 1}
     assert repo.pedidos[0]["ejecucion_id"] == "in.(e1,e2)"
     assert RepositorioSupabase.asignaciones_por_cliente.__get__(repo)([]) == {}
+
+
+def test_sin_sql_016_aplicar_hoy_explica_como_instalarla():
+    from panel.repositorio import _mensaje_sql
+    texto = _mensaje_sql("Could not find the function public.panel_publicar_hoy(p_revision) in the schema cache")
+    assert "SQL 016" in texto and "Preparar Supabase" in texto
+
+
+def test_demo_aplicar_hoy_rige_desde_hoy(tmp_path):
+    r = RepositorioDemo(tmp_path / "demo.json")
+    assert r.publicar_hoy(r.config()["revision"])["vigente_desde"] == hoy()
+    with pytest.raises(ErrorRepositorio):
+        r.publicar_hoy(r.config()["revision"] + 1)

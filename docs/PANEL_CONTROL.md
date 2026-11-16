@@ -85,7 +85,7 @@ Editar un borrador no modifica una versión ya confirmada ni los criterios de la
 | Publicación | Edad de la fecha real de publicación, entre 1 y 30 días configurables; fecha desconocida/estimada no pasa |
 | Idioma del aviso | Español, inglés o ambos; es distinto del nivel de inglés solicitado |
 | Experiencia | Años exigidos dentro de ±3 o ±4 de los del perfil; con 5+ años no llegan junior/prácticas; con 2 o menos no se filtra (v20, v22) |
-| Restricciones | Salario menor (en cualquier moneda con margen del 10 %, v26), palabras o tipo de contrato; descartan solo con evidencia clara y nunca por lo «deseable» (v22) |
+| Restricciones | Salario menor (en cualquier moneda con margen del 10 %, v26), palabras o tipo de contrato. Desde v27 no descartan: ordenan y dejan una etiqueta, solo con evidencia clara y nunca por lo «deseable» (v22) |
 | Prioridades | Sectores y palabras preferidas: solo ordenan cuando hay más candidatas que la meta (v22) |
 | Inglés requerido | Hasta el nivel del cliente; se rechaza un nivel obligatorio superior, no uno solamente deseable |
 | Datos no informados | Si se filtra experiencia/inglés, solo se admiten sin evidencia si se marca expresamente la opción |

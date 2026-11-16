@@ -434,7 +434,9 @@ familias:
             analista de testing, testing analyst]
   similares: [qa manual, manual tester, tester manual, performance tester, pruebas de rendimiento, qa lead, test lead,
               mobile tester, game tester, probador de videojuegos, accessibility tester, uat tester,
-              software quality engineer, qa specialist, especialista qa]
+              software quality engineer, qa specialist, especialista qa, qa manager, head of qa, qa team lead,
+              lead qa engineer, quality assurance lead, quality assurance manager, test manager, qa coordinator,
+              lider de qa, lider qa, jefe de qa, coordinador de qa, gerente de qa]
   cercanos: [test automation developer, software developer in test, ingeniero de automatización de pruebas]
   herramientas: [selenium, cypress, playwright, appium, jmeter, postman, jira, testrail, cucumber, gherkin,
                  pruebas automatizadas, test cases, casos de prueba]
