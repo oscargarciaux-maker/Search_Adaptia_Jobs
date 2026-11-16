@@ -79,6 +79,14 @@ Si a una persona le faltan vacantes para llegar a 5, pueden aparecer **posts de 
 
 Nada se envía solo. Cada mañana, en «Mensajes», cada cliente con WhatsApp y aceptación tiene su mensaje listo: «Abrir en WhatsApp» abre su chat con el texto escrito para revisarlo y enviarlo. No hay seguimiento de postulaciones.
 
+**Mensajes (16 nov, contrato v31).** Cada mensaje lleva hasta 10 vacantes, con máximo 2 de la misma empresa, y si
+quedan más dice «Tengo N vacantes más para ti; si quieres, te las paso». Solo entran enlaces comprobados en las
+últimas 24 horas. Escribe tu número en «Mi número» y pulsa «Mandarme todos a mi WhatsApp»: te llega a tu propio chat
+un enlace por cliente (en varias partes si son muchos); desde el teléfono tocas cada uno y envías su mensaje. Arriba,
+«Enviados hoy» es una lista para ir marcando. La sesión del panel ya no se cierra cada hora: se renueva sola hasta
+«Cerrar sesión» o 30 días sin entrar. En «Actividad», el embudo de cada cargo dice en qué etapa se pierden más vacantes
+y «Qué hacer».
+
 Los apartados siguientes describen también el scraper heredado y sus consultas técnicas en Supabase. **Con panel activo,
 los cargos son configurables y role_id adopta cargo:<UUID>; no hay que buscar siempre role_id=qa.** Las vistas antiguas
 no calculan los filtros privados del panel; consultar las asignaciones desde la nueva interfaz.

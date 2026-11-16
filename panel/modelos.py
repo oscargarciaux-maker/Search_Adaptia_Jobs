@@ -513,6 +513,17 @@ class Contacto(Modelo):
         return v
 
 
+class AjusteOperador(Modelo):
+    """Contrato v31: el WhatsApp del operador, para «Mandarme todos a mi WhatsApp». Vacío lo borra."""
+    telefono: str = Field(default="", max_length=25)
+
+    @field_validator("telefono")
+    @classmethod
+    def telefono_valido(cls, v):
+        from panel.borradores import normalizar_telefono
+        return normalizar_telefono(v) if v.strip() else ""
+
+
 class CambioBorrador(Modelo):
     texto: str | None = Field(default=None, min_length=1, max_length=4000)
     estado: Literal["pendiente", "abierto", "enviado", "descartado"] | None = None

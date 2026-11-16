@@ -10,6 +10,8 @@ from panel.repositorio import hoy
 
 MINIMO = 5
 MAXIMO = 10
+POR_EMPRESA = 2  # contrato v31: variedad en el mensaje, como en la entrega diaria
+LARGO_ENLACE = 7000  # contrato v31: wa.me con textos más largos falla en algunos teléfonos; se parte en varios
 SALUDOS = ("Hola {nombre} 👋", "¡Hola, {nombre}!", "Hola {nombre}, ¿cómo vas?", "¡Buen día, {nombre}!")
 INTROS = ("Hoy encontré {n} vacantes de {cargo} que creo que te pueden interesar:",
           "Te comparto {n} oportunidades de {cargo} que vi hoy y encajan con lo que buscas:",
@@ -75,8 +77,13 @@ def _linea(i, v):
     return f"{i}. {titulo} · {empresa}" + (f" ({modo})" if modo else "") + f"\n{v['enlace']}"
 
 
-def texto(nombre, grupos, fecha, cliente_id=""):
-    """Mensaje humano: saludo, una frase con el cargo, la lista corta y un cierre. `grupos`: [(cargo, [vacantes])]."""
+def _empresa(v):
+    return " ".join(str(v.get("empresa") or "").casefold().split())
+
+
+def texto(nombre, grupos, fecha, cliente_id="", mas=0):
+    """Mensaje humano: saludo, una frase con el cargo, la lista corta y un cierre. `grupos`: [(cargo, [vacantes])].
+    `mas` (contrato v31): cuántas otras vacantes listas quedaron fuera del tope de 10."""
     semilla = f"{fecha}:{cliente_id}"
     n = sum(len(vs) for _, vs in grupos)
     nombre = " ".join(str(nombre or "").split()) or "¿cómo estás?"
@@ -93,6 +100,8 @@ def texto(nombre, grupos, fecha, cliente_id=""):
         partes.append("\n\n".join(lineas))
     if any(es_post(v) for _, vs in grupos for v in vs):
         partes.append(NOTA_POSTS)
+    if mas > 0:
+        partes.append(f"Tengo {mas} vacante{'s' if mas != 1 else ''} más para ti; si quieres, te las paso.")
     partes.append(_elegir(CIERRES, semilla + "c"))
     return "\n\n".join(partes)
 
@@ -122,7 +131,7 @@ def generar(repo, fecha=None, dias_atras=3):
             resultado["conservados"] += 1
             continue
         ya = {vid for b in repo.borradores(cliente_id=cliente_id) if b.get("fecha") != fecha for vid in b.get("vacantes", [])}
-        elegidas, vistos = [], set(ya)
+        elegidas, vistos, sobran, empresas = [], set(ya), set(), {}
         for dia in range(dias_atras + 1):
             if len(elegidas) >= MAXIMO or (dia and len(elegidas) >= MINIMO):
                 break
@@ -130,9 +139,15 @@ def generar(repo, fecha=None, dias_atras=3):
             for v in servicio.resultados(repo, cliente_id, f)["vacantes"]:
                 if not dia and v["estado"] == "por_confirmar":
                     resultado["por_recomprobar"] += 1  # del día, con el enlace aún por recomprobar
-                if v["estado"] == "lista" and v["id"] not in vistos and len(elegidas) < MAXIMO:
-                    vistos.add(v["id"])
+                if v["estado"] != "lista" or v["id"] in vistos:
+                    continue
+                vistos.add(v["id"])
+                # Contrato v31: hasta 10 y máximo 2 de la misma empresa; las que quedan fuera se ofrecen («Tengo más…»).
+                if len(elegidas) < MAXIMO and (es_post(v) or empresas.get(_empresa(v), 0) < POR_EMPRESA):
+                    empresas[_empresa(v)] = empresas.get(_empresa(v), 0) + 1
                     elegidas.append(v)
+                else:
+                    sobran.add(v["id"])
         elegidas = con_posts(elegidas)
         if not elegidas:
             resultado["sin_vacantes"] += 1
@@ -142,13 +157,51 @@ def generar(repo, fecha=None, dias_atras=3):
             nombres.setdefault(v.get("cargo_nombre") or "tu perfil", []).append(v)
         grupos = list(nombres.items())
         # Solo el nombre que el operador eligió para saludar: la referencia interna del cliente no va en el mensaje.
-        cuerpo = texto(contacto.get("nombre_saludo") or "", grupos, fecha, cliente_id)
+        cuerpo = texto(contacto.get("nombre_saludo") or "", grupos, fecha, cliente_id, mas=len(sobran))
         repo.guardar_borrador({"fecha": fecha, "cliente_id": cliente_id, "texto": cuerpo,
                                "vacantes": [v["id"] for v in elegidas], "cargos": [c for c, _ in grupos],
                                "estado": "pendiente", "editado": False})
         resultado["generados"] += 1
         resultado["con_pocas"] += len(elegidas) < MINIMO
     return resultado
+
+
+def para_operador(repo, fecha=None):
+    """Contrato v31: «Mandarme todos a mi WhatsApp». Un mensaje al número del operador (Ajustes) con un enlace por
+    cliente que abre su chat con el mensaje escrito. Si el texto no cabe en un enlace, se parte en varios. No envía
+    nada: el operador abre el enlace y, desde su teléfono, toca cada cliente."""
+    from panel.repositorio import ErrorRepositorio
+    fecha = fecha or hoy()
+    operador = (repo.ajuste("operador", {}) or {}).get("telefono", "")
+    if not operador:
+        raise ErrorRepositorio("Guarda primero tu número de WhatsApp en «Mi número».", 422)
+    contactos = {c["cliente_id"]: c for c in repo.contactos()}
+    version = repo.operativa(fecha) or {}
+    nombres = {c["id"]: c["nombre"] for c in (version.get("configuracion") or {}).get("clientes", [])}
+    lineas = []
+    for b in repo.borradores(fecha=fecha):
+        c = contactos.get(b["cliente_id"])
+        if b.get("estado") not in ("pendiente", "abierto") or not c:
+            continue
+        nombre = " ".join((nombres.get(b["cliente_id"]) or c.get("nombre_saludo") or "Cliente").split())
+        lineas.append(f"*{nombre}* ({len(b.get('vacantes', []))} vacantes):\n{enlace_whatsapp(c['telefono'], b['texto'])}")
+    if not lineas:
+        return {"partes": [], "clientes": 0}
+    partes, actual = [], []
+    for linea in lineas:
+        prueba = "\n\n".join([*actual, linea])
+        if actual and len(enlace_whatsapp(operador, prueba)) > LARGO_ENLACE:
+            partes.append(actual)
+            actual = [linea]
+        else:
+            actual.append(linea)
+    partes.append(actual)
+    salida = []
+    for n, grupo in enumerate(partes, 1):
+        cabeza = f"Mensajes de hoy ({n} de {len(partes)}). Toca cada enlace para abrir el chat del cliente:"
+        cuerpo = cabeza + "\n\n" + "\n\n".join(grupo)
+        salida.append({"texto": cuerpo, "enlace": enlace_whatsapp(operador, cuerpo), "clientes": len(grupo)})
+    return {"partes": salida, "clientes": len(lineas)}
 
 
 def main():

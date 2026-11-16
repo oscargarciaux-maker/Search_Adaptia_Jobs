@@ -324,7 +324,9 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await expect(page.getByText("Avisos por correo")).toHaveCount(0);
   // Sección 8: el embudo de la última búsqueda se ve abierto, en tarjetas y sin desbordar.
   const embudo = page.locator(".embudo-cargo").first();
-  await expect(embudo.getByText("Enlace comprobado")).toBeVisible();
+  // Contrato v31: etapas con nombres claros y qué hacer en la que más pierde.
+  await expect(embudo.getByText("Abiertas y vigentes hoy")).toBeVisible();
+  await expect(embudo.getByText("Qué hacer:")).toBeVisible();
   for (const ancho of [1366, 390]) {
     await page.setViewportSize({ width: ancho, height: 900 });
     expect(
@@ -1369,6 +1371,44 @@ test("contrato v30: bandera del WhatsApp, contacto precargado y guardado sin esp
     { timeout: 1000 },
   );
   await expect.poll(() => guardado, { timeout: 5000 }).toBe("+57 300 111 2233");
+  expect(await page.evaluate(revisarContraste)).toEqual([]);
+  expect(errores).toEqual([]);
+});
+
+test("contrato v31: mi número, mandarme todos a mi WhatsApp y lista de enviados", async ({
+  page,
+}) => {
+  const errores: string[] = [];
+  page.on("pageerror", (e) => errores.push(e.message));
+  await page.goto("/");
+  await ir(page, "Mensajes");
+  const mandar = page.getByRole("button", {
+    name: "Mandarme todos a mi WhatsApp",
+  });
+  const numero = page.getByLabel("Mi número");
+  // Sin número guardado no se puede mandar.
+  if (!(await numero.inputValue())) await expect(mandar).toBeDisabled();
+  await numero.fill("+57 311 222 3344");
+  await page.getByRole("button", { name: "Guardar", exact: true }).click();
+  await expect(page.getByText("Tu número quedó guardado.")).toBeVisible();
+  await page.getByRole("button", { name: "Preparar mensajes" }).click();
+  await mandar.click();
+  const parte = page
+    .getByRole("link", { name: "Abrir en mi WhatsApp" })
+    .first();
+  await expect(parte).toHaveAttribute(
+    "href",
+    /^https:\/\/wa\.me\/573112223344\?text=/,
+  );
+  // Lista de enviados: marcar uno sube la cuenta.
+  const enviados = page.locator("fieldset.enviados");
+  const total = await enviados.locator("input").count();
+  const antes = await enviados.locator("input:checked").count();
+  const libre = enviados.locator("input:not(:checked)").first();
+  await libre.check();
+  await expect(enviados.locator("legend")).toHaveText(
+    `Enviados hoy: ${antes + 1} de ${total}`,
+  );
   expect(await page.evaluate(revisarContraste)).toEqual([]);
   expect(errores).toEqual([]);
 });

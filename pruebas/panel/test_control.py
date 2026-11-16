@@ -283,7 +283,7 @@ def test_api_autoriza_solo_operador_confirmado_y_no_confia_en_cookie():
         assert c.get("/api/config").status_code == 401
 
 
-@pytest.mark.parametrize("estado,horas", [("active", 7), ("closed", 0), ("archived", 0), ("active", -1)])
+@pytest.mark.parametrize("estado,horas", [("active", 25), ("closed", 0), ("archived", 0), ("active", -1)])  # v31: 24 h
 def test_whatsapp_excluye_cierres_caducidad_y_fechas_futuras(estado, horas):
     repo = RepositorioDemo()
     r = repo.resultados(None)

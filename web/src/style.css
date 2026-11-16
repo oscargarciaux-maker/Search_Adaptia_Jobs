@@ -4511,3 +4511,78 @@ select.margen {
     grid-template-columns: 1fr;
   }
 }
+
+/* Contrato v31 (lista grande, PR 5): mensajes en horizontal, «Mi número» y la lista de enviados. */
+@media (min-width: 900px) {
+  .mensaje {
+    grid-template-columns: minmax(220px, 1fr) minmax(0, 2fr);
+    grid-template-areas:
+      "lado texto"
+      "acciones texto";
+    align-items: start;
+  }
+  .mensaje > .mensaje-lado {
+    grid-area: lado;
+  }
+  .mensaje > textarea {
+    grid-area: texto;
+    min-height: 220px;
+  }
+  .mensaje > .alerts-actions {
+    grid-area: acciones;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+.para-mi {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+.para-mi .field {
+  margin: 0;
+  min-width: 260px;
+}
+.para-mi-numero {
+  display: flex;
+  gap: 8px;
+}
+.para-mi-partes {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+.para-mi-partes li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.enviados {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 14px 10px;
+  margin: 0 0 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+.enviados legend {
+  font-weight: 600;
+  padding: 0 4px;
+}
+.embudo-solucion {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--osc-bg-azul-2, #eaf3ff);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+}
