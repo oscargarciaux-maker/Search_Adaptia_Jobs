@@ -65,9 +65,29 @@ def test_ficha_enlazada_da_la_ubicacion():
     def obtener(url):
         pedidos.append(url)
         return html
-    texto = "Postula aquí https://jobs.lever.co/acme/1 o en https://www.linkedin.com/jobs/view/1"
+    texto = ("Postula aquí http://169.254.169.254/latest https://sitio-cualquiera.example/x "
+             "https://jobs.lever.co/acme/1 o en https://www.linkedin.com/jobs/view/1")
     assert pa.ubicacion_en_enlaces(texto, "Product Designer", obtener=obtener) == ("Bogotá, CO", None)
-    assert pedidos == ["https://jobs.lever.co/acme/1"]  # LinkedIn ya lo resuelve `resolver_oferta`
+    # Solo dominios de la lista fija: ni direcciones internas ni sitios arbitrarios; LinkedIn lo resuelve otra función.
+    assert pedidos == ["https://jobs.lever.co/acme/1"]
+
+
+def test_lectura_acotada_corta_descargas_grandes_y_dominios_desconocidos():
+    class Respuesta:
+        status_code, headers, encoding = 200, {}, "utf-8"
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def iter_content(self, n): return iter([b"x" * 600_000, b"y" * 600_000])
+    class Sesion:
+        def get(self, *a, **k): return Respuesta()
+    import buscador.verificar_enlaces as ve
+    original = ve.publica
+    ve.publica = lambda url: True
+    try:
+        assert pa._leer_acotado("https://jobs.lever.co/acme/1", Sesion()) is None  # pasa de 1 MB
+        assert pa._leer_acotado("https://sitio-cualquiera.example/x", Sesion()) is None
+    finally:
+        ve.publica = original
 
 
 def test_consultas_con_lugar_de_quien_va_corto():

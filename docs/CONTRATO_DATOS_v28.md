@@ -28,8 +28,11 @@ información, sobre todo la ubicación, y que lleguen marcados para que el clien
       el mundo);
    5. el país donde la misma empresa tiene todas sus otras vacantes confirmadas en el catálogo
       (`paises_por_empresa`);
-   6. el `JobPosting` de la primera ficha enlazada fuera de LinkedIn, leído como en v16 (`confirmar_ubicacion`):
-      solo GET y nunca formularios.
+   6. el `JobPosting` de la primera ficha enlazada, leído como en v16 (`confirmar_ubicacion`):
+      - solo GET y nunca formularios;
+      - solo en dominios de la lista fija de sistemas de postulación y portales (`datos/dominios.yaml`), para que quien
+        escribe el post no pueda elegir a qué servidor se conecta el sistema;
+      - con un tope de 1 MB y 12 s, y sin seguir redirecciones fuera de esa lista.
 3. **Marcas del post** (en el catálogo, solo en posts):
    - `ubicacion_deducida`: de dónde salió el país;
    - `ubicacion_sin_confirmar`: ninguna pista sirvió. Su modalidad queda vacía en vez de suponer presencial.

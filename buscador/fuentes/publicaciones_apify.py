@@ -318,16 +318,53 @@ def consultas_post(terminos, maximo=2, lugares=()):
     return salida
 
 
+MAX_BYTES_FICHA = 1_000_000
+
+
+def _dominio_conocido(url):
+    """Solo sistemas de postulación y portales de la lista fija (`datos/dominios.yaml`): quien escribe el post no
+    elige a qué servidor se conecta el sistema (evita SSRF y descargas de sitios arbitrarios)."""
+    d = enlaces.dominios()
+    h = enlaces.host(url)
+    return bool(h) and not enlaces._en(h, d["agregadores"]) and (enlaces._en(h, d["originales"]) or
+                                                                  enlaces._en(h, d["portales"]))
+
+
+def _leer_acotado(url, sesion, segundos=12):
+    """HTML de una ficha con tope de 1 MB y de tiempo, sin seguir redirecciones fuera de la lista fija."""
+    from urllib.parse import urljoin
+    from buscador.verificar_enlaces import NAVEGADOR, publica
+    plazo = time.monotonic() + segundos
+    destino = url
+    for _ in range(4):
+        if not _dominio_conocido(destino) or not publica(destino) or time.monotonic() >= plazo:
+            return None
+        with sesion.get(destino, headers=NAVEGADOR, allow_redirects=False, stream=True, timeout=(5, 8)) as r:
+            if r.status_code in (301, 302, 303, 307, 308) and r.headers.get("Location"):
+                destino = urljoin(destino, r.headers["Location"])
+                continue
+            if r.status_code != 200:
+                return None
+            partes, total = [], 0
+            for trozo in r.iter_content(65536):
+                total += len(trozo)
+                if total > MAX_BYTES_FICHA or time.monotonic() >= plazo:
+                    return None
+                partes.append(trozo)
+            return b"".join(partes).decode(r.encoding or "utf-8", errors="replace")
+    return None
+
+
 def ubicacion_en_enlaces(texto, titulo, maximo=2, obtener=None):
-    """(ubicación, remoto) del JobPosting de la primera ficha fuera de LinkedIn que enlaza el post, o None. Solo GET a
-    destinos públicos, sin formularios (reusa `confirmar_ubicacion`)."""
+    """(ubicación, remoto) del JobPosting de la primera ficha enlazada en un sistema de postulación o portal conocido,
+    o None. Solo GET acotado, sin formularios (reusa la lectura de `confirmar_ubicacion`)."""
     from buscador import confirmar_ubicacion as cu
     if obtener is None:
         import requests
         sesion = requests.Session()
-        obtener = lambda url: cu._obtener(url, sesion, time.monotonic() + 12)  # noqa: E731
+        obtener = lambda url: _leer_acotado(url, sesion)  # noqa: E731
     urls = [u.rstrip(".,;:!?)") for u in re.findall(r"https?://[^\s<>\"']+", texto or "")]
-    for url in [u for u in urls if not enlaces.es_linkedin(u) and "forms." not in u][:maximo]:
+    for url in [u for u in urls if not enlaces.es_linkedin(u) and _dominio_conocido(u)][:maximo]:
         try:
             html = obtener(url)
         except Exception as e:  # noqa: BLE001 — una ficha caída no impide el post
