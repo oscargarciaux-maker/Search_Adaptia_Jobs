@@ -195,14 +195,27 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
 
     @app.post("/api/auth/logout")
     def logout(request: Request):
-        token = request.cookies.get(COOKIE_SESION, "")
-        if token and not demo:
-            try:  # contrato v31: también se anula el token de renovación en Supabase
-                repo.sesion.post(repo.url + "/auth/v1/logout", headers={**repo.cabeceras, "Authorization": "Bearer " + token},
-                                 timeout=10)
-            except requests.RequestException as e:
+        anulada = True
+        if not demo:
+            # Contrato v31: también se anula la renovación en Supabase (todas las sesiones de ese usuario). Si el
+            # acceso ya venció, primero se obtiene uno nuevo con la renovación para poder anularla.
+            token = request.cookies.get(COOKIE_SESION, "")
+            renovacion = request.cookies.get(COOKIE_RENOVAR, "")
+            try:
+                if renovacion and (not token or not _usuario(token)):
+                    token = (_renovar(renovacion) or {}).get("access_token", "")
+                if token:
+                    r = repo.sesion.post(repo.url + "/auth/v1/logout", params={"scope": "global"},
+                                         headers={**repo.cabeceras, "Authorization": "Bearer " + token}, timeout=10)
+                    anulada = r.status_code in (200, 204)
+                else:
+                    anulada = not renovacion
+            except (requests.RequestException, ValueError) as e:
+                anulada = False
                 registro.aviso("api:logout", e)
-        response = JSONResponse({"sesion": False})
+            if not anulada:
+                registro.aviso("api:logout", RuntimeError("no se pudo anular la renovación en Supabase"))
+        response = JSONResponse({"sesion": False, "anulada": anulada})
         response.delete_cookie(COOKIE_SESION, path="/", secure=not demo, httponly=True, samesite="strict")
         response.delete_cookie(COOKIE_RENOVAR, path="/api/", secure=not demo, httponly=True, samesite="strict")
         return response

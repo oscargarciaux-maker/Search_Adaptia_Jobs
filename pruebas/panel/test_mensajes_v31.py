@@ -87,8 +87,11 @@ def test_sesion_se_renueva_sola_con_el_token_de_renovacion():
         cookies = r.headers.get_list("set-cookie")
         assert any(x.startswith("adaptia_session=nuevo") and "HttpOnly" in x for x in cookies)
         assert any(x.startswith("adaptia_renovar=renovar-2") and "Path=/api/" in x for x in cookies)
-        # Al cerrar sesión se borran las dos cookies y se anula la renovación en Supabase.
-        c.cookies.set("adaptia_session", "nuevo")
+        # Al cerrar sesión se borran las dos cookies y se anula la renovación en Supabase, aunque el acceso ya haya
+        # vencido (aquí /auth/v1/user responde 401): primero se renueva y con ese acceso se anula.
+        c.cookies.set("adaptia_session", "vencido")
+        llamadas.clear()
         salida = c.post("/api/auth/logout", headers={"origin": "https://panel.example"})
         assert sum('adaptia_' in x and 'Max-Age=0' in x for x in salida.headers.get_list("set-cookie")) == 2
-        assert any(u.endswith("/auth/v1/logout") for u, _ in llamadas)
+        assert [u.rsplit("/", 1)[-1] for u, _ in llamadas] == ["token", "logout"]
+        assert salida.json()["anulada"] is True
