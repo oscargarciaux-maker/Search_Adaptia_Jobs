@@ -18,11 +18,13 @@ from buscador import paises
 from buscador.fuentes.publicaciones_apify import PREFIJOS
 from buscador import registro
 from panel import servicio
-from panel.modelos import BorrarCliente, ImportarClientes, CambioBorrador, Configuracion, Contacto, DecisionRevision, EstadoRegla, SubirRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia, explicar, parcial, solo_perfil
+from panel.modelos import AjusteOperador, BorrarCliente, ImportarClientes, CambioBorrador, Configuracion, Contacto, DecisionRevision, EstadoRegla, SubirRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia, explicar, parcial, solo_perfil
 from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase, hoy
 from panel.terminos import sugerir
 
 RAIZ = Path(__file__).resolve().parent.parent
+COOKIE_SESION, COOKIE_RENOVAR = "adaptia_session", "adaptia_renovar"
+DIAS_RENOVACION = 30
 PREFIJOS_MOSTRAR = {"1": "US", "44": "GB", "49": "DE", "33": "FR", "39": "IT", "351": "PT", "55": "BR", "31": "NL",
                     "41": "CH", "353": "IE", "61": "AU", "1809": "DO", "1829": "DO", "1849": "DO", "1787": "PR"}
 
@@ -64,6 +66,31 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
     sello = [0]
     copias_resultados, copias_fichas = {}, {}
 
+    def _usuario(token):
+        r = repo.sesion.get(repo.url + "/auth/v1/user", headers={**repo.cabeceras, "Authorization": "Bearer " + token},
+                            timeout=15)
+        return r.json() if r.status_code == 200 else {}
+
+    def _autorizado(usuario):
+        return usuario.get("email", "").casefold() in operadores and bool(usuario.get("email_confirmed_at"))
+
+    def _renovar(renovacion):
+        """Contrato v31: tokens nuevos de Supabase con el token de renovación, o None."""
+        if not renovacion or len(renovacion) > 512:
+            return None
+        r = repo.sesion.post(repo.url + "/auth/v1/token", params={"grant_type": "refresh_token"},
+                             headers=repo.cabeceras, json={"refresh_token": renovacion}, timeout=15)
+        datos = r.json() if r.status_code == 200 else {}
+        return datos if datos.get("access_token") and datos.get("refresh_token") else None
+
+    def _poner_cookies(response, datos):
+        response.set_cookie(COOKIE_SESION, datos["access_token"],
+                            max_age=min(int(datos.get("expires_in", 3600)), 3600),
+                            httponly=True, secure=True, samesite="strict", path="/")
+        # Solo viaja a /api/ y nunca la lee el navegador; dura 30 días o hasta «Cerrar sesión».
+        response.set_cookie(COOKIE_RENOVAR, datos["refresh_token"], max_age=DIAS_RENOVACION * 86400,
+                            httponly=True, secure=True, samesite="strict", path="/api/")
+
     @app.middleware("http")
     async def proteccion(request: Request, siguiente):
         if request.url.path.startswith("/api/"):
@@ -77,22 +104,27 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
                     return JSONResponse({"detail": "Petición no válida."}, status_code=400)
                 if longitud > 1_000_000:
                     return JSONResponse({"detail": "La petición es demasiado grande."}, status_code=413)
-            publicas = {"/api/session", "/api/auth/login", "/api/auth/logout", "/api/health"}
-            if not demo and request.url.path not in publicas:
-                token = request.cookies.get("adaptia_session", "")
-                if not token:
-                    return JSONResponse({"detail": "Inicia sesión para continuar."}, status_code=401)
-                try:
-                    r = await run_in_threadpool(repo.sesion.get, repo.url + "/auth/v1/user", headers={**repo.cabeceras, "Authorization": "Bearer " + token}, timeout=15)
-                    usuario = r.json() if r.status_code == 200 else {}
-                    if usuario.get("email", "").casefold() not in operadores or not usuario.get("email_confirmed_at"):
-                        return JSONResponse({"detail": "Sesión vencida o acceso no autorizado."}, status_code=401)
-                except (requests.RequestException, ValueError):
-                    return JSONResponse({"detail": "No se pudo verificar la sesión."}, status_code=503)
+        publicas = {"/api/session", "/api/auth/login", "/api/auth/logout", "/api/health"}
+        renovada = None
+        if request.url.path.startswith("/api/") and not demo and request.url.path not in publicas:
+            token = request.cookies.get(COOKIE_SESION, "")
+            try:
+                usuario = await run_in_threadpool(_usuario, token) if token else {}
+                if not _autorizado(usuario):
+                    # Contrato v31: la sesión no vence a la hora; se renueva sola con el token de renovación hasta
+                    # «Cerrar sesión». El usuario renovado se vuelve a comprobar (operador y correo confirmado).
+                    renovada = await run_in_threadpool(_renovar, request.cookies.get(COOKIE_RENOVAR, ""))
+                    if not renovada or not _autorizado(renovada.get("user") or {}):
+                        texto = "Inicia sesión para continuar." if not token else "Sesión vencida o acceso no autorizado."
+                        return JSONResponse({"detail": texto}, status_code=401)
+            except (requests.RequestException, ValueError):
+                return JSONResponse({"detail": "No se pudo verificar la sesión."}, status_code=503)
         escribe = request.url.path.startswith("/api/") and request.method not in {"GET", "HEAD", "OPTIONS"}
         sello[0] += escribe
         response = await siguiente(request)
         sello[0] += escribe
+        if renovada:
+            _poner_cookies(response, renovada)
         response.headers.update({"X-Content-Type-Options": "nosniff", "Referrer-Policy": "same-origin",
             "X-Frame-Options": "DENY", "Cache-Control": "no-store" if request.url.path.startswith("/api/") else "no-cache",
             "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"})
@@ -122,7 +154,8 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
 
     @app.get("/api/session")
     def session(request: Request):
-        return {"demo": demo, "sesion": demo or bool(request.cookies.get("adaptia_session")),
+        # Contrato v31: con solo el token de renovación la sesión sigue abierta; la próxima consulta la renueva.
+        return {"demo": demo, "sesion": demo or bool(request.cookies.get(COOKIE_SESION) or request.cookies.get(COOKIE_RENOVAR)),
                 "paises": [{"codigo": p["codigo"], "nombre": p["nombre"]} for p in paises.datos()["cubiertos"]],
                 # Contrato v23: todos los países, para residencia, mudanza y permiso legal.
                 "paises_mundo": [{"codigo": x["codigo"], "nombre": x["nombre"]} for x in paises.mundo()["lista"]],
@@ -153,14 +186,25 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         except (requests.RequestException, ValueError):
             raise HTTPException(503, "No se pudo verificar el acceso.") from None
         response = JSONResponse({"sesion": True})
-        response.set_cookie("adaptia_session", datos["access_token"], max_age=min(int(datos.get("expires_in", 3600)), 3600),
-                            httponly=True, secure=True, samesite="strict", path="/")
+        if datos.get("refresh_token"):
+            _poner_cookies(response, datos)
+        else:
+            response.set_cookie(COOKIE_SESION, datos["access_token"], max_age=min(int(datos.get("expires_in", 3600)), 3600),
+                                httponly=True, secure=True, samesite="strict", path="/")
         return response
 
     @app.post("/api/auth/logout")
-    def logout():
+    def logout(request: Request):
+        token = request.cookies.get(COOKIE_SESION, "")
+        if token and not demo:
+            try:  # contrato v31: también se anula el token de renovación en Supabase
+                repo.sesion.post(repo.url + "/auth/v1/logout", headers={**repo.cabeceras, "Authorization": "Bearer " + token},
+                                 timeout=10)
+            except requests.RequestException as e:
+                registro.aviso("api:logout", e)
         response = JSONResponse({"sesion": False})
-        response.delete_cookie("adaptia_session", path="/", secure=not demo, httponly=True, samesite="strict")
+        response.delete_cookie(COOKIE_SESION, path="/", secure=not demo, httponly=True, samesite="strict")
+        response.delete_cookie(COOKIE_RENOVAR, path="/api/", secure=not demo, httponly=True, samesite="strict")
         return response
 
     @app.get("/api/config")
@@ -270,6 +314,24 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
             salida.append({**x, "enlace": b.enlace_whatsapp(c["telefono"], x["texto"]) if c else "",
                            "pocas": len(x.get("vacantes", [])) < b.MINIMO})
         return {"fecha": fecha, "borradores": salida}
+
+    # Contrato v31: el número del operador y «Mandarme todos a mi WhatsApp».
+    @app.get("/api/ajustes/operador")
+    def leer_operador():
+        return {"telefono": (repo.ajuste("operador", {}) or {}).get("telefono", "")}
+
+    @app.put("/api/ajustes/operador")
+    def guardar_operador(body: AjusteOperador):
+        repo.guardar_ajuste("operador", body.model_dump())
+        return body.model_dump()
+
+    @app.get("/api/borradores/para-mi")
+    def borradores_para_mi(fecha: str | None = None):
+        from panel import borradores as b
+        if fecha:
+            from datetime import date
+            date.fromisoformat(fecha)
+        return b.para_operador(repo, fecha)
 
     @app.post("/api/borradores/generar")
     def generar_borradores():

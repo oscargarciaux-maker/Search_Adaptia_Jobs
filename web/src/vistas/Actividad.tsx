@@ -1,0 +1,206 @@
+// Actividad: embudo por cargo con soluciones (contrato v31) y reglas de ubicación aprendidas (v17).
+import React, { useEffect, useState } from "react";
+import { api } from "../api";
+import { Ayuda, Plegable } from "../comunes";
+import type { Embudo, Regla } from "../types";
+
+// Contrato v17: reglas de ubicación. Las «aprendidas» las crea el código solo a partir de tus decisiones.
+export function ReglasAprendidas({
+  notify,
+}: {
+  notify: (s: string, error?: boolean) => void;
+}) {
+  const [reglas, setReglas] = useState<Regla[] | null>(null);
+  async function cargar() {
+    try {
+      setReglas((await api<{ reglas: Regla[] }>("/reglas")).reglas);
+    } catch (e) {
+      notify((e as Error).message, true);
+      setReglas([]);
+    }
+  }
+  useEffect(() => {
+    cargar();
+  }, []);
+  async function cambiar(r: Regla) {
+    try {
+      await api("/reglas/estado", {
+        method: "POST",
+        body: JSON.stringify({ texto: r.texto, activa: !r.activa }),
+      });
+      notify(r.activa ? "Regla desactivada." : "Regla activada.");
+      await cargar();
+    } catch (e) {
+      notify((e as Error).message, true);
+    }
+  }
+  return (
+    <section className="card activity reglas">
+      <div className="section-title">
+        <h2>
+          Reglas de ubicación{" "}
+          <Ayuda etiqueta="reglas de ubicación">
+            Las del operador salen de «Aplicar a las iguales». Las aprendidas
+            las crea el sistema solo, sin IA, cuando dos o más de tus decisiones
+            coinciden en un lugar; si una decisión nueva las contradice, se
+            desactivan solas. Solo resuelven ubicaciones dudosas: nunca cambian
+            un país ya reconocido.
+          </Ayuda>
+        </h2>
+      </div>
+      <Plegable
+        mostrar={
+          "Ver reglas de ubicación" + (reglas ? ` (${reglas.length})` : "")
+        }
+        ocultar="Ocultar reglas de ubicación"
+      >
+        {!reglas ? (
+          <p className="helper">Cargando…</p>
+        ) : !reglas.length ? (
+          <p className="helper">
+            Todavía no hay reglas. Aparecerán cuando confirmes vacantes en «Por
+            confirmar».
+          </p>
+        ) : (
+          <ul className="reglas-lista">
+            {reglas.map((r) => (
+              <li key={r.texto} className={r.activa ? "" : "inactiva"}>
+                <div>
+                  <strong>«{r.texto}»</strong> → {r.resultado}
+                  <span className="helper">
+                    {" "}
+                    · {r.origen === "aprendida"
+                      ? "aprendida"
+                      : "del operador"}{" "}
+                    · usada {r.usos} {r.usos === 1 ? "vez" : "veces"}
+                    {r.conflictos ? ` · ${r.conflictos} en conflicto` : ""}
+                    {r.activa ? "" : " · desactivada"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => cambiar(r)}
+                >
+                  {r.activa ? "Desactivar" : "Activar"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Plegable>
+    </section>
+  );
+}
+
+// Contrato v31: nombres que se entienden sin conocer el código («enlace comprobado» confundía).
+export const etapasEmbudo: [keyof Embudo, string][] = [
+  ["encontradas", "Encontradas en las fuentes"],
+  ["con_descripcion", "Con el aviso completo leído"],
+  ["entregables", "Con país e idioma claros"],
+  ["nuevas", "Que nadie había recibido"],
+  ["cumplen_filtros", "Le sirven a algún cliente"],
+  ["enlace_comprobado", "Abiertas y vigentes hoy"],
+  ["entregadas", "Entregadas"],
+];
+// Qué hacer cuando una etapa es la que más vacantes pierde.
+const SOLUCIONES: Partial<Record<keyof Embudo, string>> = {
+  con_descripcion:
+    "No hace falta hacer nada: cada noche se leen primero los avisos más nuevos de este cargo. Si se repite varios días, añade nombres del cargo en español para que entren Computrabajo y Elempleo, que traen el aviso completo.",
+  entregables:
+    "Revisa «Por confirmar»: las vacantes cuyo país no se pudo confirmar están ahí y, si dices que sirven, llegan hoy mismo.",
+  nuevas:
+    "Ya se entregó casi todo lo publicado de este cargo. Añade otros nombres del cargo («Nombres del cargo») o cargos cercanos para ampliar la búsqueda.",
+  cumplen_filtros:
+    "Revisa la ubicación y el idioma de los perfiles de este cargo: añade una ubicación (por ejemplo remoto en LATAM) o acepta avisos en inglés. Debajo dice qué filtro corta más.",
+  enlace_comprobado:
+    "No hace falta hacer nada: la segunda pasada de las 8:30 comprueba más enlaces, y lo que no alcance queda guardado para mañana.",
+};
+
+// Sección 8 (13 nov): una tarjeta por cargo en vez de una tabla ancha; cabe en el móvil sin scroll horizontal.
+export function EmbudoCargos({
+  embudo,
+  abierto = false,
+}: {
+  embudo: Record<string, Embudo>;
+  abierto?: boolean;
+}) {
+  return (
+    <Plegable
+      className="funnel"
+      inicial={abierto}
+      mostrar="Ver dónde se pierden las vacantes"
+      ocultar="Ocultar dónde se pierden las vacantes"
+    >
+      <div className="embudo-lista">
+        {Object.entries(embudo).map(([cargo, e]) => {
+          // La etapa que más vacantes pierde respecto a la anterior.
+          let peor = -1,
+            perdida = 0;
+          etapasEmbudo.forEach(([k], n) => {
+            if (n === 0) return;
+            const caida =
+              ((e[etapasEmbudo[n - 1][0]] as number) || 0) -
+              ((e[k] as number) || 0);
+            if (caida > perdida) {
+              perdida = caida;
+              peor = n;
+            }
+          });
+          return (
+            <section className="embudo-cargo" key={cargo}>
+              <h4>
+                <span>{cargo}</span>
+                <span className="embudo-entregadas">
+                  Entregadas {e.entregadas}
+                </span>
+              </h4>
+              <ol className="embudo-etapas">
+                {etapasEmbudo.map(([k, t], n) => (
+                  <li key={k} className={n === peor ? "mayor-perdida" : ""}>
+                    <strong>{e[k] as number}</strong>
+                    <span>
+                      {t}
+                      {k === "entregadas" && (
+                        <Ayuda etiqueta={"entregadas de " + cargo}>
+                          Puede ser más que la etapa anterior: además de las
+                          nuevas de esta búsqueda, incluye vacantes por
+                          ampliación (para que cada persona llegue a 5) y
+                          vacantes de días anteriores que esa persona aún no
+                          había recibido.
+                        </Ayuda>
+                      )}
+                    </span>
+                    {k === "entregadas" && e.ampliadas > 0 && (
+                      <span className="embudo-nota">
+                        incluye {e.ampliadas} por ampliación
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ol>
+              {e.principal_perdida && (
+                <p className="field-help">
+                  Mayor pérdida: {e.principal_perdida}
+                </p>
+              )}
+              {peor > 0 && SOLUCIONES[etapasEmbudo[peor][0]] && (
+                <p className="embudo-solucion">
+                  <strong>Qué hacer:</strong>{" "}
+                  {SOLUCIONES[etapasEmbudo[peor][0]]}
+                </p>
+              )}
+              {(e.de_su_busqueda ?? 0) + (e.de_la_amplia ?? 0) > 0 && (
+                <p className="field-help">
+                  Origen de las entregadas: {e.de_su_busqueda ?? 0} de su
+                  búsqueda propia (LinkedIn por perfil) · {e.de_la_amplia ?? 0}{" "}
+                  de la búsqueda amplia
+                </p>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    </Plegable>
+  );
+}

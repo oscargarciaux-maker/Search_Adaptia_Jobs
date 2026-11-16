@@ -234,7 +234,7 @@ export function FichaVacante({
                 : "Enlace con comprobación vigente"}
           {v.estado === "lista" && v.tipo !== "post" && (
             <Ayuda etiqueta="comprobación del enlace">
-              El enlace se abrió hace menos de 6 horas y la vacante seguía
+              El enlace se abrió hace menos de 24 horas y la vacante seguía
               publicada. Es la comprobación más reciente, no una garantía: la
               empresa puede cerrarla después sin avisar.
             </Ayuda>
