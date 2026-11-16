@@ -5633,7 +5633,11 @@ function VacancyCard({ v }: { v: Vacante }) {
             title="Publicación de LinkedIn de quien contrata, sin ficha formal. Completa el mínimo de 5 y se contacta por mensaje o correo."
           >
             <Megaphone size={13} />
-            Post
+            {v.post_ubicacion === "deducida"
+              ? "Post · ubicación deducida"
+              : v.post_ubicacion === "sin_confirmar"
+                ? "Post · ubicación sin confirmar"
+                : "Post"}
           </span>
         )}
         {(v.avisos || []).map((a) => (

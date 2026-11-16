@@ -66,7 +66,10 @@ def _linea(i, v):
     titulo, empresa = " ".join(v["titulo"].split()), " ".join(v["empresa"].split())
     if es_post(v):
         correo = (v.get("contacto") or {}).get("correo", "")
-        return (f"{i}. 📣 Post · {titulo} · {empresa}\nEscríbele por mensaje a quien publicó: {v['enlace']}"
+        # Contrato v28: si la ubicación se dedujo o no se pudo confirmar, el mensaje lo dice.
+        nota = {"deducida": " (ubicación deducida, confírmala)",
+                "sin_confirmar": " (no dice dónde es: pregúntalo)"}.get(v.get("post_ubicacion", ""), "")
+        return (f"{i}. 📣 Post · {titulo} · {empresa}{nota}\nEscríbele por mensaje a quien publicó: {v['enlace']}"
                 + (f"\nO al correo: {correo}" if correo else ""))
     modo = MODOS.get(v.get("modalidad", ""), "")
     return f"{i}. {titulo} · {empresa}" + (f" ({modo})" if modo else "") + f"\n{v['enlace']}"

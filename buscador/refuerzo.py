@@ -91,13 +91,14 @@ def rescate_apify(vacantes, entregadas, hoy, cfg_entrega, mapa, buscar_apify, in
 
 
 def rescate_posts(vacantes, entregadas, hoy, cfg_entrega, mapa, buscar_posts, incorporar, iniciales=None,
-                  max_consultas=6):
+                  max_consultas=8):
     """Contrato v11 (segunda parte): para los perfiles que siguen bajo el mínimo tras el rescate formal, busca posts de
     LinkedIn que anuncian su cargo. Una ficha formal enlazada entra como vacante normal; un post sin ficha queda en la
     lista de posts (nunca en el inventario, el cupo ni `ofertas`). `buscar_posts(consultas, familias)` devuelve
     (formales, posts, estadísticas). Devuelve (vacantes, estadísticas solo con conteos, posts aptos)."""
     from buscador import contrato, entrega
-    from buscador.fuentes.publicaciones_apify import consultas_post
+    from buscador import paises
+    from buscador.fuentes.publicaciones_apify import consultas_post, paises_por_empresa
     elegidas, _ = entrega.elegir(vacantes, entregadas, hoy, cfg_entrega, iniciales=iniciales)
     deficit = entrega.deficit_por_perfil(elegidas, cfg_entrega["roles"], hoy)
     if not deficit:
@@ -106,17 +107,25 @@ def rescate_posts(vacantes, entregadas, hoy, cfg_entrega, mapa, buscar_posts, in
     roles = sorted((r for r in cfg_entrega["roles"] if any(p["id"] in deficit for p in r.get("_perfiles") or [])),
                    key=lambda r: -sum(deficit.get(p["id"], 0) for p in r.get("_perfiles") or []))
     consultas, validas = [], set()
+    nombres = {p["codigo"]: p["nombre"] for p in paises.datos()["paises"]}
     for rol in roles:
+        # Contrato v28: también posts que nombran dónde vive quien va corto (o «remoto»), así llegan con ubicación.
+        lugares = []
+        for p in rol.get("_perfiles") or []:
+            if p["id"] in deficit:
+                lugares += [nombres.get(p.get("vive_en"), "")] + (["remoto"] if "remoto" in (p.get("modalidades") or []) else [])
+        lugares = [x for x in dict.fromkeys(lugares) if x][:2]
         for fid in rol["familias"]:
             if fid in por_id:
                 validas.add(fid)
-                consultas += consultas_post(cobertura.consultas(por_id[fid]))
+                consultas += consultas_post(cobertura.consultas(por_id[fid]), lugares=lugares)
     consultas = list(dict.fromkeys(consultas))[:max_consultas]
-    formales, posts, stats = buscar_posts(consultas, validas)
+    formales, posts, stats = buscar_posts(consultas, validas, paises_por_empresa(vacantes))
     if formales:
         vacantes = incorporar(vacantes, formales)
     posts = [p for p in posts if not contrato.entregable_post(p)]
     return vacantes, {"perfiles_con_deficit": len(deficit), "consultas": len(consultas),
                       **{k: v for k, v in stats.items() if k in ("publicaciones", "fichas_formales", "posts", "descartadas",
+                                                                  "ubicacion_deducida", "ubicacion_sin_confirmar",
                                                                   "error", "clave_invalida", "omitida")}}, \
         posts

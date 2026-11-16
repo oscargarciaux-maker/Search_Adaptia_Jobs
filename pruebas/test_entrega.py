@@ -262,8 +262,9 @@ def test_publicaciones_de_apify():
     empresa_autora = dict(buena, author={"name": "Nubank", "type": "company",
                                          "linkedinUrl": "https://www.linkedin.com/company/nubank"})
     assert publicaciones_apify.a_vacante(empresa_autora, validas)[0]["empresa"] == "Nubank"
-    lejos = dict(buena, content="We're hiring a Product Designer in New York, onsite.")
-    assert publicaciones_apify.a_vacante(lejos, validas)[1] == "sin país ni remoto"
+    lejos = dict(buena, content="We're hiring a Product Designer in New York, onsite. Apply by DM.")
+    cruda = publicaciones_apify.a_vacante(lejos, validas)[0]  # contrato v28: un país de fuera es ubicación conocida
+    assert cruda and "United States" in cruda["ubicacion"] and not cruda["ubicacion_sin_confirmar"]
 
 
 def test_entrada_del_actor_y_sin_token():

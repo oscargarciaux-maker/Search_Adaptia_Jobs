@@ -6,7 +6,8 @@ from pathlib import Path
 
 from buscador import bodega, entrega, familias, paises, normalizar
 from buscador import registro
-from panel.afinidad import AMPLIACIONES, MINIMO_POR_PERFIL, evaluar, evaluar_ampliada
+from panel.afinidad import (AMPLIACIONES, MINIMO_POR_PERFIL, TOPE_POSTS_SIN_CONFIRMAR, evaluar, evaluar_ampliada,
+                            evaluar_post, post_ubicacion)
 from panel.modelos import Configuracion
 from pydantic import ValidationError
 from panel.repositorio import RepositorioSupabase, hoy
@@ -267,21 +268,27 @@ def _posts(repo, cfg, fecha, estrictas, filas, fila):
     for f in filas:
         vistas_por_perfil.setdefault(f["perfil_id"], set()).add(f["vacante_id"])
     añadidos = 0
+    # Contrato v28: primero los posts con ubicación clara, después los deducidos y al final los sin confirmar.
+    candidatos.sort(key=lambda row: ("", "deducida", "sin_confirmar").index(post_ubicacion(row["snapshot"])))
     for cargo, p in bajos:
         raw = cargo.model_dump(mode="json")
         vistas = vistas_por_perfil.setdefault(str(p.id), set())
+        sin_confirmar = 0
         for row in candidatos:
             if estrictas.get(p.id, 0) >= MINIMO_POR_PERFIL:
                 break
             afinidad, _ = grado(row["snapshot"]["titulo"], raw, cercanos=True)
             if row["vacante_id"] in vistas or not afinidad:
                 continue
-            match, extra = evaluar(row["snapshot"], p, fecha), [{"tipo": "post"}]
+            marca = post_ubicacion(row["snapshot"])
+            if marca == "sin_confirmar" and sin_confirmar >= TOPE_POSTS_SIN_CONFIRMAR:
+                continue
+            match, extra = evaluar_post(row["snapshot"], p, fecha), [{"tipo": "post"}]
             if not match["compatible"]:
-                match = evaluar_ampliada(row["snapshot"], p, fecha, "sin_dato")
-                extra.append({"ampliacion": "sin_dato"})
-                if not match["compatible"]:
-                    continue
+                continue
+            if marca:
+                extra.append({"post_ubicacion": marca, "pista": row["snapshot"].get("ubicacion_deducida", "")})
+                sin_confirmar += marca == "sin_confirmar"
             vistas.add(row["vacante_id"])
             estrictas[p.id] = estrictas.get(p.id, 0) + 1
             filas.append(fila(dict(row, match_grade=entrega.GRADO_CONTRATO.get(afinidad, "close")), p, str(cargo.id),

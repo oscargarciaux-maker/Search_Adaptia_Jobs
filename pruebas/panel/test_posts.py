@@ -151,7 +151,7 @@ def cfg():
 def test_rescate_de_posts_solo_si_falta_y_con_el_cargo(cfg):
     llamadas = []
 
-    def buscar_posts(consultas, validas):
+    def buscar_posts(consultas, validas, empresas_pais=None):
         llamadas.append((consultas, validas))
         return [], [], {"publicaciones": 0}
     with ejecutor.activar({"configuracion": cfg}, hoy()):
@@ -159,7 +159,7 @@ def test_rescate_de_posts_solo_si_falta_y_con_el_cargo(cfg):
                                                  lambda a, b: a + b)
     assert stats["perfiles_con_deficit"] >= 1 and posts == []
     consultas, validas = llamadas[0]
-    assert len(consultas) <= 6 and all(q.startswith("(hiring OR contratando") for q in consultas)
+    assert len(consultas) <= 8 and all(q.startswith("(hiring OR contratando") for q in consultas)
     assert any("Product Designer".lower() in q.lower() for q in consultas)
 
 

@@ -7,7 +7,7 @@ import time
 
 from buscador import contrato, enlaces, vacante
 from panel.afinidad import (AMPLIACIONES, ETIQUETAS_AMPLIACION, MINIMO_POR_PERFIL, enlace_utilizable, evaluar,
-                            evaluar_ampliada)
+                            evaluar_ampliada, evaluar_post, post_ubicacion)
 from panel.repositorio import ErrorRepositorio, hoy
 from panel.terminos import grado, sugerir
 
@@ -261,7 +261,12 @@ def resultados(repo, cliente_id=None, fecha=None):
                 v = dict(v, status="active")
                 row = dict(row, catalogo_vacantes=v)
         ampliacion = next((e["ampliacion"] for e in row.get("explicacion") or [] if isinstance(e, dict) and e.get("ampliacion")), "")
-        filtros = evaluar_ampliada(actual, row["filtros"], hoy(), ampliacion) if ampliacion else evaluar(actual, row["filtros"], hoy())
+        if ampliacion:
+            filtros = evaluar_ampliada(actual, row["filtros"], hoy(), ampliacion)
+        elif actual.get("tipo") == "post":  # contrato v28: post deducido o sin confirmar
+            filtros = evaluar_post(actual, row["filtros"], hoy())
+        else:
+            filtros = evaluar(actual, row["filtros"], hoy())
         afinidad_cargo, _ = grado(actual["titulo"], row["cargo_configuracion"], cercanos=True)  # v27
         if not afinidad_cargo:
             filtros["compatible"] = False
@@ -282,7 +287,8 @@ def resultados(repo, cliente_id=None, fecha=None):
                       "entregada" if pasada and filtros["compatible"] and not no_apta else "por_confirmar",
             "entregada_el": dia if pasada else "",
             "motivos": filtros["motivos"], "avisos": filtros.get("avisos", []), "ampliacion": ETIQUETAS_AMPLIACION.get(ampliacion, "") if not es_post else "",
-            "tipo": "post" if es_post else "", "contacto": (datos.get("contacto") or {}) if es_post else {}}
+            "tipo": "post" if es_post else "", "contacto": (datos.get("contacto") or {}) if es_post else {},
+            "post_ubicacion": post_ubicacion(actual)}
         if ficha["estado"] == "entregada" and enlaces.sirve(datos.get("enlace") or ""):
             ficha["enlace"] = datos["enlace"]  # para consultarla; no cuenta como lista ni va al WhatsApp
         if clave in vistas:
