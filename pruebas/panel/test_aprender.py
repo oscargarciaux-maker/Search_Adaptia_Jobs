@@ -2,7 +2,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from buscador import alertas, paises
+from buscador import paises
 from panel import aprender, revision
 from panel.api import crear_app
 from panel.repositorio import RepositorioDemo, hoy
@@ -107,9 +107,3 @@ def test_api_de_reglas_y_csv():
     assert api.post("/api/reglas/estado", json={"texto": "granada", "activa": False}, headers=h).json()["activa"] is False
     assert api.get("/api/reglas").json()["reglas"][0]["activa"] is False
 
-
-def test_correo_cuenta_el_aprendizaje():
-    _, _, texto = alertas.contenido("exito", "diario", {"fecha": hoy(), "entrega": {"vacantes": 120, "roles": {}}},
-                                    {"resumen": {"reglas": {"ubicaciones_resueltas_por_reglas": 7, "aprendidas_nuevas": 2,
-                                                            "desactivadas_por_conflicto": 1}}})
-    assert "7 ubicaciones resueltas solas" in texto and "2 reglas nuevas" in texto and "1 desactivadas" in texto

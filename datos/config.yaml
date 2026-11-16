@@ -1,5 +1,4 @@
-# Configuración del buscador. Aquí no van claves: esas son secretos de GitHub (APIFY_TOKEN, BRAVE_API_KEY) y de
-# Cloudflare (GITHUB_TOKEN_FLUJOS). Lo que se cambia aquí lo lee la bodega en su próxima corrida.
+# Configuración del buscador. Aquí no van claves: esas son secretos de GitHub (APIFY_TOKEN, SUPABASE_*). Lo que se cambia aquí lo lee la bodega en su próxima corrida.
 
 # Países que se buscan: LATAM y España (códigos ISO; el detalle de cada uno vive en datos/paises.yaml desde el paso 2)
 paises_activos: [AR, BO, CL, CO, CR, CU, DO, EC, ES, GT, HN, MX, NI, PA, PE, PR, PY, SV, UY, VE]
@@ -61,10 +60,6 @@ apify:
   actor_linkedin_respaldo: ""
   tope_por_corrida_usd: 3
 
-# Brave Search (paso 6): búsquedas por corrida para descubrir empresas con sistema de postulación
-brave:
-  busquedas_por_corrida: 30
-
 # Cuánto trabaja cada fuente por corrida. Más alto = más vacantes, pero más tiempo y más riesgo de bloqueo (LinkedIn).
 # Las fuentes corren en paralelo; cada una se detiene sola al llegar a minutos_por_fuente.
 presupuestos:
@@ -81,5 +76,4 @@ presupuestos:
   apify_busquedas: 60          # solo con APIFY_TOKEN
   remotos_paginas: 250         # páginas de tableros remotos que se abren para encontrar el original
   empresas_por_probar: 80      # empresas nuevas que se prueban en los sistemas de postulación
-  brave_busquedas: 30          # solo con BRAVE_API_KEY
   getonbrd_busquedas: 60

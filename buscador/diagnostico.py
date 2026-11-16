@@ -67,15 +67,6 @@ def revisar():
         return True, supabase.exigir_conexion()
     chequeo("Supabase (entrega diaria)", supabase_)
 
-    def brave_():
-        clave = os.environ.get("BRAVE_API_KEY", "")
-        if not clave:
-            return None, "sin BRAVE_API_KEY: no se descubren empresas nuevas por búsqueda web"
-        r = requests.get("https://api.search.brave.com/res/v1/web/search", params={"q": "site:jobs.lever.co designer", "count": 1},
-                         headers={"X-Subscription-Token": clave, "Accept": "application/json"}, timeout=20)
-        return r.status_code == 200, f"Brave respondió {r.status_code}"
-    chequeo("Brave Search (opcional)", brave_)
-
     def publicado():
         repo = os.environ.get("GITHUB_REPOSITORY", "")
         if not repo:

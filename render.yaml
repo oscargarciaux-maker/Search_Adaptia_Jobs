@@ -18,7 +18,3 @@ services:
         sync: false
       - key: PANEL_OPERATOR_EMAILS
         sync: false
-      - key: RESEND_API_KEY
-        sync: false
-      - key: ALERTAS_REMITENTE
-        sync: false

@@ -131,7 +131,7 @@ En **Actions → Diagnóstico → Run workflow**, rama `main`:
   exige corregir servidor/certificado, conservando su verificación. No cambiar contraseñas sin evidencia del diagnóstico.
 
 - `solo_supabase=true`, `probar_apify=false`: lee conexión/esquema v1, sin crear ofertas. No prueba escritura ni todo v2.
-- Ambos `false`: diagnóstico de configuración/fuentes, consulta de cuenta Apify y, si está, una consulta Brave.
+- Ambos `false`: diagnóstico de configuración/fuentes, consulta de cuenta Apify.
   No ejecuta el actor Apify. Que aparezca una fuente opcional omitida no es un fallo de Supabase.
 - `probar_apify=true`: una ejecución explícita de una oferta con límite USD 0,01, sin guardado Supabase. Sí consume
   crédito de la cuenta; no se incluye como una reserva normal del programa.

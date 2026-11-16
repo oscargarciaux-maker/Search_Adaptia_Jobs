@@ -53,7 +53,6 @@ jobs:
       - name: Buscar
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
-          BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           GITHUB_REPOSITORY: ${{ github.repository }}
