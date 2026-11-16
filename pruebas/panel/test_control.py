@@ -121,15 +121,13 @@ def test_v27_anos_no_descartan_y_dejan_aviso(cfg):
     assert afinidad.faltas(afinidad.evaluar(trabajo(), p, hoy())) == 0
 
 
-def test_v32_ingles_exigido_mayor_descarta_y_el_deseable_no(cfg):
-    """Contrato v32 (decisión de Oscar, 16 nov): el inglés exigido por encima del perfil descarta; deseable, no."""
+def test_v33_ingles_exigido_mayor_ordena_y_deja_etiqueta(cfg):
+    """Contrato v33 (Oscar, 16 nov): el nivel de inglés ordena y deja su etiqueta; nunca descarta."""
     p = cfg["perfiles"][0]  # inglés hasta B2
     exigido = afinidad.evaluar(trabajo(ingles="fluido", _descripcion="English C1 required. " * 20), p, hoy())
-    assert not exigido["compatible"] and "inglés requerido superior al indicado" in exigido["motivos"]
-    deseable = afinidad.evaluar(trabajo(_descripcion="English C1 is a plus. Nice to have. " * 20), p, hoy())
-    assert deseable["compatible"]
+    assert exigido["compatible"] and "Pide inglés C1" in exigido["avisos"] and afinidad.faltas(exigido) == 1
     igual = afinidad.evaluar(trabajo(_descripcion="English B2 required. " * 20), p, hoy())
-    assert igual["compatible"]
+    assert igual["compatible"] and afinidad.faltas(igual) == 0
 
 
 def test_v27_sin_dato_de_anos_no_descarta_ni_avisa(cfg):
