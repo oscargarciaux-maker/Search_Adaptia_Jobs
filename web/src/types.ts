@@ -104,6 +104,7 @@ export type Vacante = {
   avisos?: string[];
   ampliacion?: string;
   tipo?: string;
+  post_ubicacion?: string;
   contacto?: { perfil?: string; correo?: string };
 };
 export type Resultados = {

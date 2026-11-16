@@ -298,7 +298,11 @@ def entregable_post(v, idiomas=("es", "en")):
         return "post demasiado corto"
     if v.get("idioma") not in idiomas:
         return "idioma fuera del contrato"
-    if not v.get("paises") or v.get("confianza_pais") not in {"alta", "media"} or v.get("nota_pais") == "por zona horaria":
+    # Contrato v28: un post sin ninguna pista de ubicación puede mostrarse igual, marcado «ubicación sin confirmar»;
+    # el panel solo lo asigna a perfiles bajo el mínimo y con un tope diario (`panel.ejecutor._posts`).
+    sin_pistas = v.get("ubicacion_sin_confirmar") and v.get("confianza_pais") not in {"alta", "media"}
+    if not sin_pistas and (not v.get("paises") or v.get("confianza_pais") not in {"alta", "media"}
+                           or v.get("nota_pais") == "por zona horaria"):
         return "elegibilidad regional por confirmar"
     if not v.get("fecha_publicacion") or v.get("fecha_estimada"):
         return "fecha de publicación sin confirmar"

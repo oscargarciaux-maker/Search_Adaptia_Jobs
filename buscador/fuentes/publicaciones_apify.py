@@ -50,6 +50,67 @@ CORREO_FALSO = re.compile(r"(?i)(no-?reply|@linkedin\.com$)")
 _EMPRESA_CARGO = re.compile(r"(?:\bat\b|@|\ben\b|\bin\b|\|)\s*([A-Z0-9][\w&.,'’\- ]{1,40}?)(?=\s*(?:\||·|,|-|–|$))")
 
 
+# Contrato v28 (16 nov, pedido de Oscar): un post que no nombra país ni modalidad no se descarta de entrada. Antes se
+# buscan pistas de ubicación con reglas fijas (sin IA), de la más fuerte a la más débil. Prefijos de 1 dígito (+1, +7)
+# y el dominio «.co» (lo usan startups de todo el mundo) no cuentan: son ambiguos.
+PREFIJOS = {"593": "EC", "591": "BO", "595": "PY", "598": "UY", "506": "CR", "507": "PA", "502": "GT", "503": "SV",
+            "504": "HN", "505": "NI", "57": "CO", "52": "MX", "54": "AR", "56": "CL", "51": "PE", "58": "VE", "34": "ES",
+            "53": "CU"}
+MONEDAS = {"COP": "CO", "MXN": "MX", "ARS": "AR", "CLP": "CL", "PEN": "PE", "UYU": "UY", "PYG": "PY", "BOB": "BO",
+           "CRC": "CR", "GTQ": "GT", "DOP": "DO", "VES": "VE", "HNL": "HN", "NIO": "NI"}
+MONEDAS_TEXTO = {"pesos colombianos": "CO", "pesos mexicanos": "MX", "pesos argentinos": "AR", "pesos chilenos": "CL",
+                 "soles": "PE", "colones": "CR", "quetzales": "GT"}
+DOMINIOS = {"com.co": "CO", "gov.co": "CO", "edu.co": "CO", "org.co": "CO", "mx": "MX", "com.ar": "AR", "ar": "AR",
+            "cl": "CL", "pe": "PE", "ec": "EC", "es": "ES", "uy": "UY", "py": "PY", "bo": "BO", "cr": "CR", "pa": "PA",
+            "gt": "GT", "do": "DO", "ve": "VE", "hn": "HN", "ni": "NI", "sv": "SV"}
+_TELEFONO = re.compile(r"(?<![\w+])\+\s?(\d{1,3})(?=[\s\-().]*\d)")
+_DOMINIO = re.compile(r"(?:@|https?://)[\w.-]+?\.((?:com|gov|edu|org)\.[a-z]{2}|[a-z]{2})(?![\w.])", re.I)
+
+
+def pistas_ubicacion(texto, item=None, empresa="", empresas_pais=None):
+    """([países ISO2], de dónde salió) para un post que no nombra país ni modalidad; ([], "") si no hay pista.
+    Orden: ubicación del autor que trae el actor, prefijo telefónico, moneda, dominio de correos o enlaces y el país
+    donde la misma empresa tiene sus otras vacantes confirmadas en el catálogo."""
+    autor = str(_campo(item or {}, "author.location", "author.locationName", "authorLocation", "author.geo.name",
+                       "author.company.location"))
+    if autor:
+        hallados = sorted(paises.paises_en_texto(normalizar.texto(autor)))
+        if len(hallados) == 1:
+            return hallados, "ubicación de quien publicó"
+    for m in _TELEFONO.finditer(texto or ""):
+        digitos = m.group(1)
+        for largo in (3, 2):
+            if digitos[:largo] in PREFIJOS:
+                return [PREFIJOS[digitos[:largo]]], f"prefijo telefónico +{digitos[:largo]}"
+    for codigo, pais in MONEDAS.items():
+        if re.search(rf"\b{codigo}\b", texto or ""):
+            return [pais], f"moneda {codigo}"
+    normal = normalizar.texto(texto or "")
+    for frase, pais in MONEDAS_TEXTO.items():
+        if normalizar.contiene_frase(normal, frase):
+            return [pais], f"moneda ({frase})"
+    for m in _DOMINIO.finditer(texto or ""):
+        sufijo = m.group(1).lower()
+        pais = DOMINIOS.get(sufijo) or (DOMINIOS.get(sufijo.split(".")[-1]) if "." in sufijo else None)
+        if pais:
+            return [pais], f"dominio .{sufijo}"
+    if empresa and empresas_pais:
+        pais = empresas_pais.get(normalizar.empresa(empresa))
+        if pais:
+            return [pais], "país de las otras vacantes de la empresa"
+    return [], ""
+
+
+def paises_por_empresa(vacantes):
+    """{empresa normalizada: país} cuando todas sus vacantes con país confirmado están en un solo país."""
+    vistos = {}
+    for v in vacantes or ():
+        if v.get("tipo") == "post" or v.get("confianza_pais") != "alta" or not v.get("paises"):
+            continue
+        vistos.setdefault(normalizar.empresa(v.get("empresa") or ""), set()).update(v["paises"])
+    return {e: next(iter(c)) for e, c in vistos.items() if e and len(c) == 1}
+
+
 def entrada(actor, consultas, por_consulta, hoy):
     """Cuerpo de la corrida según el actor (cada uno nombra distinto sus campos)."""
     if "lofomachines" in actor:
@@ -114,7 +175,7 @@ def contacto_de(item, texto):
     return {k: v for k, v in (("perfil", perfil), ("correo", correo)) if v}
 
 
-def a_vacante(item, familias_validas, hoy=None, max_dias=30):
+def a_vacante(item, familias_validas, hoy=None, max_dias=30, empresas_pais=None):
     """Vacante cruda (formato de las fuentes) o (None, motivo). Filtro estricto sin IA (contrato v11): anuncia una
     contratación y pide postular o escribir; no es alguien buscando empleo, un curso ni un «banco de talento»; nombra un
     cargo del mapa, un país activo o remoto, la empresa y una fecha dentro del plazo. La forma de contacto se exige
@@ -142,8 +203,14 @@ def a_vacante(item, familias_validas, hoy=None, max_dias=30):
         return None, "sin empresa"
     nombrados = paises._paises_nombrados(t)
     remoto = bool(paises._REMOTO.search(t) or paises._REMOTO_DESC.search(t))
+    deducida, sin_confirmar = "", False
     if not nombrados and not remoto:
-        return None, "sin país ni remoto"
+        # Contrato v28: un país de fuera nombrado («New York», «Madrid») es una ubicación, no una duda. Si no nombra
+        # ninguno, se buscan pistas antes de rendirse.
+        nombrados = sorted(paises.paises_en_texto(t))[:3]
+        if not nombrados:
+            nombrados, deducida = pistas_ubicacion(texto, item, empresa, empresas_pais)
+        sin_confirmar = not nombrados
     if not ACCION.search(t) and not re.search(r"https?://", texto):
         return None, "no pide postular ni escribir"
     fecha = str(_campo(item, "postedAt.date", "postedAt", "publishedAt", "date"))[:10]
@@ -153,9 +220,11 @@ def a_vacante(item, familias_validas, hoy=None, max_dias=30):
         edad = (date.fromisoformat(hoy) - date.fromisoformat(fecha)).days
         if not 0 <= edad <= max_dias:
             return None, "fuera del plazo"
-    nombres = {p["codigo"]: p["nombre"] for p in paises.datos()["paises"]}
+    nombres = {**{p["codigo"]: p["nombre_en"] for p in paises.mundo()["lista"]},
+               **{p["codigo"]: p["nombre"] for p in paises.datos()["paises"]}}
     return {
-        "titulo": titulo, "empresa": empresa, "ubicacion": ", ".join(nombres[c] for c in nombrados[:3]),
+        "titulo": titulo, "empresa": empresa, "ubicacion": ", ".join(nombres.get(c, c) for c in nombrados[:3]),
+        "ubicacion_deducida": deducida, "ubicacion_sin_confirmar": sin_confirmar,
         "descripcion": texto[:15000], "fecha": fecha,
         "enlace": enlace.split("?")[0], "enlace_directo": "", "remoto": True if remoto else None, "fuente": NOMBRE,
         "contacto": contacto_de(item, texto),  # sin contacto puede servir si enlaza una ficha; un post solo no
@@ -238,13 +307,78 @@ def buscar(cliente, actor, consultas, familias_validas, hoy, maximo=60, token=No
                     "descartadas": motivos}
 
 
-def consultas_post(terminos, maximo=2):
-    """Consultas del buscador de posts para un cargo: contratación + el término exacto (máx. 5 operadores)."""
-    return [f'(hiring OR contratando OR vacante OR buscamos) "{t}"' for t in list(dict.fromkeys(terminos))[:maximo]]
+def consultas_post(terminos, maximo=2, lugares=()):
+    """Consultas del buscador de posts para un cargo: contratación + el término exacto (máx. 5 operadores). Contrato
+    v28: con `lugares` (países de los perfiles con déficit o «remoto»), una consulta más por lugar con el primer
+    término, para traer posts que sí nombran dónde es."""
+    terminos = list(dict.fromkeys(terminos))
+    salida = [f'(hiring OR contratando OR vacante OR buscamos) "{t}"' for t in terminos[:maximo]]
+    if terminos:
+        salida += [f'(hiring OR contratando OR buscamos) "{terminos[0]}" {lugar}' for lugar in lugares]
+    return salida
+
+
+MAX_BYTES_FICHA = 1_000_000
+
+
+def _dominio_conocido(url):
+    """Solo sistemas de postulación y portales de la lista fija (`datos/dominios.yaml`): quien escribe el post no
+    elige a qué servidor se conecta el sistema (evita SSRF y descargas de sitios arbitrarios)."""
+    d = enlaces.dominios()
+    h = enlaces.host(url)
+    return bool(h) and not enlaces._en(h, d["agregadores"]) and (enlaces._en(h, d["originales"]) or
+                                                                  enlaces._en(h, d["portales"]))
+
+
+def _leer_acotado(url, sesion, segundos=12):
+    """HTML de una ficha con tope de 1 MB y de tiempo, sin seguir redirecciones fuera de la lista fija."""
+    from urllib.parse import urljoin
+    from buscador.verificar_enlaces import NAVEGADOR, publica
+    plazo = time.monotonic() + segundos
+    destino = url
+    for _ in range(4):
+        if not _dominio_conocido(destino) or not publica(destino) or time.monotonic() >= plazo:
+            return None
+        with sesion.get(destino, headers=NAVEGADOR, allow_redirects=False, stream=True, timeout=(5, 8)) as r:
+            if r.status_code in (301, 302, 303, 307, 308) and r.headers.get("Location"):
+                destino = urljoin(destino, r.headers["Location"])
+                continue
+            if r.status_code != 200:
+                return None
+            partes, total = [], 0
+            for trozo in r.iter_content(65536):
+                total += len(trozo)
+                if total > MAX_BYTES_FICHA or time.monotonic() >= plazo:
+                    return None
+                partes.append(trozo)
+            return b"".join(partes).decode(r.encoding or "utf-8", errors="replace")
+    return None
+
+
+def ubicacion_en_enlaces(texto, titulo, maximo=2, obtener=None):
+    """(ubicación, remoto) del JobPosting de la primera ficha enlazada en un sistema de postulación o portal conocido,
+    o None. Solo GET acotado, sin formularios (reusa la lectura de `confirmar_ubicacion`)."""
+    from buscador import confirmar_ubicacion as cu
+    if obtener is None:
+        import requests
+        sesion = requests.Session()
+        obtener = lambda url: _leer_acotado(url, sesion)  # noqa: E731
+    urls = [u.rstrip(".,;:!?)") for u in re.findall(r"https?://[^\s<>\"']+", texto or "")]
+    for url in [u for u in urls if not enlaces.es_linkedin(u) and _dominio_conocido(u)][:maximo]:
+        try:
+            html = obtener(url)
+        except Exception as e:  # noqa: BLE001 — una ficha caída no impide el post
+            from buscador import registro
+            registro.aviso("publicaciones_apify:ficha", e)
+            continue
+        observada = cu.observacion(html, titulo) if html else None
+        if observada:
+            return observada
+    return None
 
 
 def buscar_posts(cliente, actor, consultas, familias_validas, hoy, maximo=30, token=None, control_gasto=None,
-                 max_dias=30, reloj=time.monotonic):
+                 max_dias=30, reloj=time.monotonic, empresas_pais=None):
     """Contrato v11: posts para perfiles con déficit. Devuelve (fichas formales, posts, estadísticas). Un post que enlaza
     a una ficha formal se entrega como esa ficha; sin ficha, queda como post etiquetado (nunca en el cupo ni en
     `ofertas`). Las estadísticas solo traen conteos."""
@@ -269,7 +403,7 @@ def buscar_posts(cliente, actor, consultas, familias_validas, hoy, maximo=30, to
             break
         if not isinstance(item, dict) or item.get("type") in ("comment", "reaction"):
             continue
-        cruda, motivo = a_vacante(item, familias_validas, hoy, max_dias)
+        cruda, motivo = a_vacante(item, familias_validas, hoy, max_dias, empresas_pais)
         if not cruda:
             motivos[motivo] = motivos.get(motivo, 0) + 1
             continue
@@ -277,8 +411,18 @@ def buscar_posts(cliente, actor, consultas, familias_validas, hoy, maximo=30, to
         if formal:
             formales.append(formal)
             continue
+        if cruda["ubicacion_sin_confirmar"] and reloj() - inicio < 200:
+            ficha = ubicacion_en_enlaces(cruda["descripcion"], cruda["titulo"])
+            if ficha:  # contrato v28: la ficha enlazada (portal de la empresa o ATS) dice dónde es
+                cruda.update(ubicacion=ficha[0], remoto=ficha[1], ubicacion_deducida="ficha enlazada en el post",
+                             ubicacion_sin_confirmar=False)
         post = vacante.crear_post(cruda["titulo"], cruda["empresa"], cruda["enlace"], cruda["ubicacion"],
                                   cruda["descripcion"], cruda["fecha"], cruda["remoto"], cruda["contacto"], hoy)
+        if post:
+            post.update(ubicacion_deducida=cruda["ubicacion_deducida"],
+                        ubicacion_sin_confirmar=cruda["ubicacion_sin_confirmar"])
+            if cruda["ubicacion_sin_confirmar"] and cruda["remoto"] is None:
+                post["modalidad"] = ""  # el post no dice la modalidad: no se supone presencial
         from buscador import contrato
         motivo = "sin cargo del mapa" if not post else contrato.entregable_post(post)
         if motivo or post["id"] in vistos:
@@ -286,6 +430,12 @@ def buscar_posts(cliente, actor, consultas, familias_validas, hoy, maximo=30, to
             continue
         vistos.add(post["id"])
         posts.append(post)
+    deducidas = {}
+    for p in posts:
+        if p.get("ubicacion_deducida"):
+            deducidas[p["ubicacion_deducida"]] = deducidas.get(p["ubicacion_deducida"], 0) + 1
     return formales, posts, {"consultas": len(consultas), "publicaciones": len(items) if isinstance(items, list) else 0,
                              "fichas_formales": len(formales), "posts": len(posts), "descartadas": motivos,
+                             "ubicacion_deducida": deducidas,
+                             "ubicacion_sin_confirmar": sum(1 for p in posts if p.get("ubicacion_sin_confirmar")),
                              "gasto_reservado_usd": cargo}

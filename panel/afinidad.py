@@ -42,6 +42,30 @@ AVISO_RESTRICCION = {"salario menor al aceptado": "Salario menor al que pide",
                      "tipo de contrato no aceptado": "Tipo de contrato que no acepta"}
 
 
+# Contrato v28: a un post con la ubicación deducida o sin confirmar solo se le perdona lo que depende de saber dónde y
+# cómo es (país y modalidad); idioma, fecha y lo demás se exigen igual. Los «sin confirmar», hasta 2 por perfil al día.
+POST_UBICACION_TOLERADA = {"país sin elegibilidad confirmada", "modalidad diferente"}
+TOPE_POSTS_SIN_CONFIRMAR = 2
+ETIQUETA_POST_UBICACION = {"deducida": "Post · ubicación deducida", "sin_confirmar": "Post · ubicación sin confirmar"}
+
+
+def post_ubicacion(v):
+    """'sin_confirmar', 'deducida' o '' según lo que se sabe de la ubicación de un post (contrato v28)."""
+    if v.get("tipo") != "post":
+        return ""
+    if v.get("ubicacion_sin_confirmar") and v.get("confianza_pais") not in {"alta", "media"}:
+        return "sin_confirmar"
+    return "deducida" if v.get("ubicacion_deducida") else ""
+
+
+def evaluar_post(v, perfil, hoy=None):
+    """Como `evaluar`, pero un post deducido o sin confirmar que solo falla por país o modalidad se admite."""
+    r = evaluar(v, perfil, hoy)
+    if not r["compatible"] and post_ubicacion(v) and set(r["motivos"]) <= POST_UBICACION_TOLERADA:
+        r = dict(r, compatible=True, motivos=[], pruebas=[*r["pruebas"], ETIQUETA_POST_UBICACION[post_ubicacion(v)]])
+    return r
+
+
 def faltas(resultado):
     """Contrato v27: cuántas cosas del perfil no cumple una vacante compatible (0 = encaja en todo). Sirve para ordenar."""
     return len(resultado.get("incumple") or ())

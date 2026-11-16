@@ -511,10 +511,11 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
             # Contrato v11: posts de LinkedIn para quien sigue bajo el mínimo, con lo que quede del día de Apify.
             maximo_posts = cfg["apify"].get("posts_rescate", 0)
             if maximo_posts > 0 and not prueba:
-                def buscar_posts(consultas, validas):
+                def buscar_posts(consultas, validas, empresas_pais=None):
                     return publicaciones_apify.buscar_posts(Cliente(), cfg["apify"].get("actor_publicaciones", ""),
                                                             consultas, validas, hoy, maximo=maximo_posts,
-                                                            control_gasto=control, max_dias=cfg["dias_maximos"])
+                                                            control_gasto=control, max_dias=cfg["dias_maximos"],
+                                                            empresas_pais=empresas_pais)
                 try:  # los posts traen el perfil o correo de quien publicó: solo van a Supabase, nunca a `trabajo/`
                     vacantes, salud["LinkedIn (Apify) posts"], posts_nuevos = refuerzo.rescate_posts(
                         vacantes, entregadas, hoy, entrega.config(), familias.mapa(), buscar_posts, incorporar,

@@ -286,4 +286,7 @@ def publica(v):
     salida["ids_agrupados"] = sorted({v["id"], *v.get("_ids_fusionados", [])})
     if v.get("tipo") == "post":  # solo los posts llevan estos campos: el resto del catálogo no cambia de huella
         salida.update(tipo="post", contacto=v.get("contacto") or {})
+        if v.get("ubicacion_deducida") or v.get("ubicacion_sin_confirmar"):  # contrato v28
+            salida.update(ubicacion_deducida=v.get("ubicacion_deducida") or "",
+                          ubicacion_sin_confirmar=bool(v.get("ubicacion_sin_confirmar")))
     return salida
