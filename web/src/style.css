@@ -4616,3 +4616,176 @@ select.margen {
   font-size: 13px;
   line-height: 1.5;
 }
+
+/* Contrato v35 (PR C): formulario del cliente y controles con el mismo estilo en todo el panel. */
+.cliente-cabecera {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end;
+}
+.cliente-cabecera .casilla-comunidad {
+  margin: 0 0 4px;
+}
+.whatsapp-contacto {
+  margin: 4px 0 10px;
+}
+.whatsapp-fila {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 12px;
+}
+.whatsapp-fila .field {
+  margin: 0;
+}
+.etiqueta-ayuda {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.form-grid.tres > .field:last-child > .etiqueta-ayuda {
+  grid-column: 1 / -1;
+}
+.zonas-horarias {
+  display: grid;
+  gap: 6px;
+}
+.zonas-lista {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.chip-zona {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 4px 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--osc-bg-azul-2, #eaf3ff);
+  color: var(--ink);
+  font-size: 12px;
+}
+.chip-zona .icon {
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+}
+.zonas-lista select {
+  max-width: 260px;
+}
+.restriccion-campos input:not([type="checkbox"]) {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Lo escrito se ve fuerte y el texto de ejemplo, apagado e inclinado. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+textarea,
+.field input:not([type="checkbox"]),
+.field select,
+.field textarea {
+  color: var(--ink);
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--placeholder);
+  font-style: italic;
+  opacity: 1;
+}
+/* Sin flechitas al pasar el cursor sobre los números. */
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* Listas desplegables con la misma flecha en claro y en oscuro. */
+:root {
+  --flecha-select: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+:root[data-tema="oscuro"] {
+  --flecha-select: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) {
+    --flecha-select: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
+}
+select:not([multiple]) {
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: var(--flecha-select) !important;
+  background-repeat: no-repeat !important;
+  background-position: right 10px center !important;
+  background-size: 14px !important;
+  padding-right: 32px !important;
+}
+/* Calendario: el ícono con el color del tema y la mano al pasar. */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.65;
+  border-radius: 4px;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+:root[data-tema="oscuro"]
+  input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"])
+    input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.8);
+  }
+}
+/* Barras de desplazamiento finas en todo el panel y dentro de las esquinas redondeadas de los modales. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--osc-line-azul, #c5d3e8) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--osc-line-azul, #c5d3e8);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dialog {
+  overflow-x: hidden;
+}
+.dialog::-webkit-scrollbar-track {
+  margin: 14px 0;
+}
+@media (max-width: 700px) {
+  .whatsapp-fila {
+    grid-template-columns: 1fr;
+  }
+}
+.zonas-lista select {
+  border: 1px solid var(--osc-line-verde, #dfe7d8);
+  border-radius: 6px;
+  background-color: var(--osc-bg-neutro-1, #fcfdfa);
+  padding: 8px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  min-height: 39px;
+  cursor: pointer;
+}
+.etiqueta-ayuda > label,
+.etiqueta-ayuda > .campo-titulo {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--osc-text-neutro-medio, #5e6d52);
+}

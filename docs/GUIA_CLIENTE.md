@@ -42,6 +42,12 @@ en dos paneles: a la izquierda sus últimos 7 días, sus perfiles, lo que más c
 sus vacantes» y «Descargar su CSV de hoy»; a la derecha sus «por confirmar» para decidir ahí mismo («Sí, sirve» usa
 el país sugerido; si no hay sugerencia, «Elegir país en Por confirmar»).
 
+**Formulario del cliente (16 nov, contrato v35).** El WhatsApp se llena en una fila: elige el país en la lista y
+escribe solo el número. En «Otras zonas horarias en las que puede trabajar» añade las zonas que acepta (por ejemplo
+«UTC−5 · Bogotá, Lima, Nueva York»). En «Este perfil NO acepta…», «Otra…» deja escribir cualquier cosa que no esté en
+las opciones; como las demás, no descarta: esas vacantes llegan después, con una etiqueta. La cifra azul dice cuántas
+vacantes cumplieron el perfil en los últimos 30 días y cuántas son al día.
+
 **«Por confirmar» rápido (16 nov, contrato v34).** Cada noche se guarda un resumen corto de cada vacante pendiente y
 la pantalla solo lee eso, así que cambiar de página es inmediato. Cada vacante muestra ubicación, modalidad, salario,
 publicación e idioma, como en «Vacantes», y los países que leyó el sistema como etiquetas. «Para» queda fijo a la

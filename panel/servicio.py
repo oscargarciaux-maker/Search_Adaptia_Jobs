@@ -85,14 +85,22 @@ def vista_previa(repo, cfg, fecha=None):
             raw["terminos_exactos"] = sugerir(c.nombre, consultar_esco=False)["terminos_exactos"]
         # Contrato v27: los cargos cercanos entran directamente, después de exactos y similares.
         del_cargo = _del_cargo(catalogo, raw) + _del_cargo(catalogo, raw, cercanas=True)
+        dadas = {"actualizado": catalogo["actualizado"] + "#entregadas",
+                 "vacantes": catalogo.get("entregadas_vacantes") or []}
+        del_dadas = _del_cargo(dadas, raw) + _del_cargo(dadas, raw, cercanas=True) if dadas["vacantes"] else []
         disponibles = set()
         for p in cfg.perfiles:
             if not p.activo or p.cargo_id != c.id or p.cliente_id not in clientes:
                 continue
             ids, limitantes = _contar(del_cargo, p, fecha)
             disponibles |= ids
+            # Contrato v35: las que cumplieron el perfil en los últimos 30 días, entregadas o no (evaluar ya exige 30
+            # días de publicación), y su promedio diario. Es la cifra que no asusta: un perfil sencillo nunca sale en 0
+            # solo porque hoy ya se entregó lo disponible.
+            mes = len(ids) + sum(1 for v in del_dadas if evaluar(v, p, fecha)["compatible"])
             perfiles[str(p.id)] = {"compatibles": len(ids), "del_cargo": len(del_cargo), "limitantes": limitantes,
-                                   "ampliables": _ampliables(del_cargo, [], p, fecha, ids)}
+                                   "ampliables": _ampliables(del_cargo, [], p, fecha, ids),
+                                   "ultimos_30": mes, "por_dia": round(mes / 30, 1)}
         n = len(disponibles)
         estado = ("sin_cupo" if not c.cupo else "alcanza" if n >= c.cupo else "justo" if n * 2 >= c.cupo
                   else "insuficiente")

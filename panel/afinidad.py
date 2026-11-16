@@ -4,7 +4,7 @@ import re
 from datetime import date
 
 from buscador import contrato, enlaces, normalizar, paises, tasas, tiempos
-from panel.modelos import Perfil
+from panel.modelos import Perfil, horas_de_zona
 
 NIVELES = ["A1", "A2", "B1", "B2", "C1", "C2", "native"]
 CAMPOS_FILTRO = ("id", "titulo", "paises", "confianza_pais", "modalidad", "idioma", "publicada_en",
@@ -175,7 +175,7 @@ def evaluar(v, perfil, hoy=None):
     for r in p.restricciones:
         motivo = restriccion(v, r, titulo, descripcion)
         if motivo:
-            blando(motivo, AVISO_RESTRICCION.get(motivo, motivo))
+            blando(motivo, f"Menciona «{r.texto}»" if r.tipo == "otra" else AVISO_RESTRICCION.get(motivo, motivo))
     return {"compatible": not motivos, "motivos": motivos, "incumple": incumple, "avisos": avisos,
             "pruebas": pruebas}
 
@@ -183,8 +183,9 @@ def evaluar(v, perfil, hoy=None):
 _POR_MES = {"month": 1, "year": 1 / 12}
 MARGEN_SALARIO = 0.10  # contrato v26: redondeos y variación de las tasas no descartan
 
-# Contrato v23: franjas aceptadas por el perfil, en horas UTC (incluye horario de verano).
-HORARIOS = {"us_este": (-5, -4), "us_pacifico": (-8, -7), "europa": (0, 2)}
+# Contrato v35: cada zona aceptada por el perfil cubre ±1 hora (horario de verano incluido). Antes (v23) eran tres franjas
+# fijas; sus claves se leen como UTC-5, UTC-8 y UTC+1.
+MARGEN_ZONA = 1
 
 
 def lugar(v, p):
@@ -231,7 +232,7 @@ def horario_compatible(v, p):
     zona = v.get("zona_utc")
     if not zona:
         return False
-    franjas = [HORARIOS[h] for h in p.acepta_horario]
+    franjas = [(h - MARGEN_ZONA, h + MARGEN_ZONA) for h in map(horas_de_zona, p.acepta_horario) if h is not None]
     utc = paises.datos()["utc"].get(p.vive_en)
     if utc is not None:
         franjas.append((utc - 2, utc + 2))
@@ -339,6 +340,12 @@ def restriccion(v, r, titulo, descripcion):
         palabras = [normalizar.texto(w) for w in r.palabras]
         if any(normalizar.contiene_frase(normalizar.texto(titulo), w) for w in palabras) or \
                 menciones_obligatorias(descripcion, palabras):
+            return "menciona algo que el perfil no acepta"
+        return None
+    if r.tipo == "otra":  # contrato v35: igual que «palabras», con una sola frase libre
+        frase = normalizar.texto(r.texto)
+        if frase and (normalizar.contiene_frase(normalizar.texto(titulo), frase) or
+                      menciones_obligatorias(descripcion, [frase])):
             return "menciona algo que el perfil no acepta"
         return None
     if r.tipo == "contrato":

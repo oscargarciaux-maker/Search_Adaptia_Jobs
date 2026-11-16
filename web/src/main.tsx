@@ -2555,7 +2555,6 @@ function App() {
           cliente={editCliente}
           config={draft}
           contacto={editCliente ? contactos[editCliente.id] : undefined}
-          prefijos={sesion.prefijos}
           onClose={() => setModal(null)}
           onGuardarContacto={guardarContacto}
           onCrearCargo={(nuevo) =>
