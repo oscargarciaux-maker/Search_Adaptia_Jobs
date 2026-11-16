@@ -17,6 +17,7 @@ from buscador import enlaces
 MAX_BYTES_FICHA = 1_000_000
 MAX_DESCRIPCION = 30000  # el mismo tope de `catalogo_vacantes.description_full`
 _VINETA = re.compile(r"^\s*(?:[-•*·▪●◦–]|\d{1,2}[.)])\s+")
+_NEGRITA_ENTERA = re.compile(r"\*\*([^*]+?)\*\*\s*:?")
 _BLOQUES_HTML = ("p", "li", "h1", "h2", "h3", "h4", "h5", "h6", "div", "br")
 
 
@@ -70,12 +71,17 @@ def descripcion_jobposting(html, titulo=""):
 
 
 def a_texto(html):
-    """HTML de una descripción → texto plano con una línea por bloque y «- » delante de cada viñeta."""
+    """HTML de una descripción → texto plano con una línea por bloque, «- » delante de cada viñeta y las negritas entre
+    «**» (contrato v34: el panel las pinta en negrita; la búsqueda las ignora al normalizar)."""
     if "<" not in (html or ""):
         return (html or "").strip()
     sopa = BeautifulSoup(html, "html.parser")
     for oculto in sopa.find_all(("script", "style", "noscript", "template")):
         oculto.decompose()
+    for negrita in sopa.find_all(("strong", "b")):
+        contenido = negrita.get_text()
+        if contenido.strip():
+            negrita.replace_with(contenido.replace(contenido.strip(), "**" + contenido.strip() + "**", 1))
     for li in sopa.find_all("li"):
         li.insert(0, "\n- ")
     for titulo in sopa.find_all(("h1", "h2", "h3", "h4", "h5", "h6")):
@@ -95,7 +101,10 @@ def bloques(texto, maximo=400):
         linea = linea.strip()
         if not linea:
             continue
-        if linea.startswith("#"):
+        entera = _NEGRITA_ENTERA.fullmatch(linea)
+        if entera and len(entera.group(1)) <= 80:  # una línea toda en negrita es un subtítulo
+            salida.append({"tipo": "h", "texto": entera.group(1).strip().rstrip(":")})
+        elif linea.startswith("#"):
             salida.append({"tipo": "h", "texto": linea.lstrip("#").strip().rstrip(":")})
         elif _VINETA.match(linea):
             salida.append({"tipo": "li", "texto": _VINETA.sub("", linea)})

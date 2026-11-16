@@ -2818,8 +2818,14 @@ a.button {
   color: var(--osc-text-neutro-fuerte, #3b4a43);
 }
 .revision-pais select {
-  min-height: 38px;
+  min-height: 39px;
   min-width: 170px;
+  border: 1px solid var(--osc-line-verde, #dfe7d8);
+  border-radius: 6px;
+  background: var(--osc-bg-neutro-1, #fcfdfa);
+  padding: 9px 11px;
+  font-size: 13px;
+  color: var(--osc-text-verde-medio, #536c45);
 }
 .revision-pie {
   display: flex;
@@ -4325,16 +4331,40 @@ select.margen {
 .ficha-descripcion li {
   margin-bottom: 4px;
 }
+/* Contrato v34: «Para» a la izquierda, el conteo en medio y las páginas a la derecha, siempre en el mismo lugar. */
 .revision-barra {
+  display: grid;
+  grid-template-columns: minmax(200px, 280px) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px 16px;
+}
+.revision-barra .revision-ayuda,
+.revision-barra .paginas {
+  margin: 0;
+  min-height: 39px;
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 10px 16px;
+  align-items: center;
+  gap: 4px 8px;
 }
 .revision-filtro {
   margin: 0;
-  min-width: 220px;
+  min-width: 0;
+}
+@media (max-width: 760px) {
+  .revision-barra {
+    grid-template-columns: 1fr;
+  }
+}
+.revision-paises-leidos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+.pais-leido {
+  font-weight: 500;
 }
 .paginas {
   display: flex;

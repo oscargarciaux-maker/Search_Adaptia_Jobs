@@ -145,6 +145,18 @@ class RepositorioSupabase:
                 salida[r["id"]] = r.get("description_full") or ""
         return salida
 
+    def filas_catalogo(self, ids):
+        """Contrato v34: {id: fila del catálogo con descripción} para las filas de la bandeja que aún no tienen
+        resumen (por grupos de 100)."""
+        salida = {}
+        ids = list(ids)
+        for inicio in range(0, len(ids), 100):
+            grupo = ",".join(ids[inicio:inicio + 100])
+            for r in self.pedir("GET", "catalogo_vacantes", params={
+                    "id": f"in.({grupo})", "select": "id,datos,description_full,status,reason"}) or []:
+                salida[r["id"]] = r
+        return salida
+
     def vacante(self, vacante_id):
         """Contrato v29: una fila del catálogo para la ficha del panel, o None."""
         filas = self.pedir("GET", "catalogo_vacantes", params={"id": "eq." + vacante_id,
@@ -169,7 +181,8 @@ class RepositorioSupabase:
         params = {"reason": self.RAZON_POR_CONFIRMAR, "select": "id,datos,description_full"}
         if desde:
             params["observed_at"] = "gte." + desde
-        return self._paginas("catalogo_vacantes", "id", params, 500)
+        # Contrato v34: páginas de 100 (traen descripciones) que se recorren sin guardarlas todas en memoria.
+        return self._paginas("catalogo_vacantes", "id", params, 100)
 
     def base_ofertas(self):
         """Todas las filas de `ofertas` con la razón y la confianza de país de su vacante en el catálogo."""
@@ -220,6 +233,11 @@ class RepositorioSupabase:
         except (requests.RequestException, ValueError):
             return None
 
+    def contar_por_confirmar(self, desde=None):
+        """Contrato v34: cuántas leerá la carga, para mostrar el avance sin traerlas todas antes."""
+        return self.contar("catalogo_vacantes", {"reason": self.RAZON_POR_CONFIRMAR,
+                                                 **({"observed_at": "gte." + desde} if desde else {})})
+
     def conteo_dudosas(self):
         """Solo conteos, para explicar una carga vacía: total del catálogo, por razón y por confianza baja."""
         return {"catalogo": self.contar("catalogo_vacantes", {}),
@@ -240,11 +258,33 @@ class RepositorioSupabase:
                     salida.setdefault(r["perfil_id"], set()).add(r["vacante_id"])
         return salida
 
-    def revisiones(self, estado=None, vacante_id=None, ligera=False):
+    def con_resumen(self):
+        """Contrato v34: si la bandeja ya tiene la columna `resumen` (SQL 018). Se pregunta una vez por instancia."""
+        if getattr(self, "_con_resumen", None) is None:
+            try:
+                self.pedir("GET", "panel_revisiones", params={"select": "resumen", "limit": 1})
+                self._con_resumen = True
+            except ErrorRepositorio:
+                self._con_resumen = False
+        return self._con_resumen
+
+    def resumir_revisiones(self, resumenes):
+        """Contrato v34: guarda el resumen de varias filas de la bandeja (una petición por fila; solo las que faltan)."""
+        for vid, resumen in resumenes.items():
+            self.pedir("PATCH", "panel_revisiones", params={"vacante_id": "eq." + vid},
+                       headers={"Prefer": "return=minimal"}, json={"resumen": resumen})
+
+    def revisiones(self, estado=None, vacante_id=None, ligera=False, sin_descripcion=False):
+        # `sin_descripcion` (contrato v34): con el catálogo pero sin descripciones, para armar la cola sin traer miles
+        # de textos largos a la vez (la carga completa agotaba la memoria del alojamiento gratuito).
         # `ligera` (contrato v29): sin la descripción completa, para ordenar y contar todas las pendientes; la
-        # descripción se pide después solo para la página que se muestra.
-        descripcion = "" if ligera else "description_full,"
+        # descripción se pide después solo para la página que se muestra. Contrato v34: con la columna `resumen`
+        # (SQL 018) la lista ligera ni siquiera lee el catálogo; las filas sin resumen se completan después.
+        descripcion = "" if ligera or sin_descripcion else "description_full,"
         params = {"select": f"*,catalogo_vacantes(id,datos,{descripcion}status,reason)"}
+        if ligera and self.con_resumen():
+            params = {"select": "vacante_id,estado,motivo,pista,ubicacion,sugerencia,paises,perfiles,prioridad,"
+                                "creada_en,resumen"}
         if estado:
             params["estado"] = "eq." + estado
         if vacante_id:
@@ -255,9 +295,11 @@ class RepositorioSupabase:
 
     def guardar_revisiones(self, filas):
         ahora = datetime.now(timezone.utc).isoformat()
-        self.pedir("POST", "panel_revisiones", params={"on_conflict": "vacante_id"},
-                   headers={"Prefer": "resolution=ignore-duplicates,return=minimal"},
-                   json=[{**f, "actualizada_en": ahora} for f in filas])
+        filas = list(filas)
+        for inicio in range(0, len(filas), 200):  # contrato v34: la carga completa puede guardar miles
+            self.pedir("POST", "panel_revisiones", params={"on_conflict": "vacante_id"},
+                       headers={"Prefer": "resolution=ignore-duplicates,return=minimal"},
+                       json=[{**f, "actualizada_en": ahora} for f in filas[inicio:inicio + 200]])
 
     def actualizar_revision(self, vacante_id, cambios):
         self.pedir("PATCH", "panel_revisiones", params={"vacante_id": "eq." + vacante_id},
@@ -585,7 +627,7 @@ class RepositorioDemo:
             self.estado["revisiones"] = filas
         return self.estado["revisiones"]
 
-    def revisiones(self, estado=None, vacante_id=None, ligera=False):
+    def revisiones(self, estado=None, vacante_id=None, ligera=False, sin_descripcion=False):
         with self.lock:
             return deepcopy([r for r in self._revisiones() if (not estado or r["estado"] == estado)
                              and (not vacante_id or r["vacante_id"] == vacante_id)])
@@ -602,6 +644,19 @@ class RepositorioDemo:
                 if r["vacante_id"] == vacante_id:
                     r.update(deepcopy(cambios))
             self._guardar()
+
+    def con_resumen(self):
+        return True
+
+    def resumir_revisiones(self, resumenes):
+        for vid, resumen in resumenes.items():
+            self.actualizar_revision(vid, {"resumen": resumen})
+
+    def filas_catalogo(self, ids):
+        ids = set(ids)
+        with self.lock:
+            return {r["vacante_id"]: deepcopy(r["catalogo_vacantes"]) for r in self._revisiones()
+                    if r["vacante_id"] in ids and r.get("catalogo_vacantes")}
 
     def vencer_revisiones(self, vacante_ids, motivo=""):
         for vid in vacante_ids:

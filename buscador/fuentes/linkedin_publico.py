@@ -11,6 +11,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from buscador import cobertura, enlaces
+from buscador import ficha as ficha_texto
 
 NOMBRE = "LinkedIn"
 BUSQUEDA = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
@@ -53,7 +54,8 @@ def tarjetas(pagina):
 def ficha(pagina):
     """(descripción completa, si ya no recibe postulaciones, enlace externo, remoto) de la página pública del aviso."""
     marca = re.search(r"show-more-less-html__markup[^>]*>([\s\S]*?)</div>", pagina or "")
-    descripcion = texto_html(marca.group(1).replace("<br>", "\n").replace("</li>", "\n")) if marca else ""
+    # Contrato v34: con sus saltos de línea, viñetas y negritas (antes quedaba en un solo párrafo).
+    descripcion = ficha_texto.a_texto("<div>" + marca.group(1) + "</div>") if marca else ""
     # El enlace externo de postulación está detrás del inicio de sesión: el directo sale al juntar con la copia del
     # portal de la empresa. La modalidad remota sale de la búsqueda (filtro remoto) o de la descripción.
     return descripcion, bool(CERRADO.search(pagina or "")), "", None

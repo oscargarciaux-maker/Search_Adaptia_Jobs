@@ -73,6 +73,70 @@ export function etiquetaPost(v: { post_ubicacion?: string }) {
       : "Post";
 }
 
+// Contrato v34: las negritas del aviso llegan entre «**» y se pintan en negrita (texto, nunca HTML).
+export function ConNegritas({ texto }: { texto: string }) {
+  const partes = texto.split(/\*\*([^*]+)\*\*/g);
+  return (
+    <>
+      {partes.map((p, i) =>
+        i % 2 ? <strong key={i}>{p}</strong> : p.replace(/\*\*/g, ""),
+      )}
+    </>
+  );
+}
+
+// Lo que se sabe del aviso, igual en «Vacantes» y en «Por confirmar» (contrato v34).
+export function DatosAviso({
+  ubicacion,
+  modalidad,
+  salario,
+  publicada,
+  idioma,
+  ingles,
+  extra,
+}: {
+  ubicacion?: string;
+  modalidad?: string;
+  salario?: string;
+  publicada?: string;
+  idioma?: string;
+  ingles?: string;
+  extra?: React.ReactNode;
+}) {
+  return (
+    <ul className="ficha-datos">
+      <li>
+        <MapPin size={14} />
+        {ubicacion || "Ubicación no informada"}
+      </li>
+      <li>
+        <Globe2 size={14} />
+        {(modalidad && modos[modalidad]) ||
+          modalidad ||
+          "Modalidad no informada"}
+      </li>
+      {salario && (
+        <li>
+          <Wallet size={14} />
+          {salario}
+        </li>
+      )}
+      <li>
+        <Clock3 size={14} />
+        {publicada ? "Publicada el " + fecha(publicada) : "Fecha por confirmar"}
+      </li>
+      {extra}
+      {idioma && (
+        <li>
+          <Languages size={14} />
+          {idioma === "es" ? "Aviso en español" : "Aviso en inglés"}
+          {ingles ? " · inglés " + ingles : ""}
+        </li>
+      )}
+    </ul>
+  );
+}
+
 // Viñetas seguidas van juntas en una lista.
 function agrupar(bloques: BloqueFicha[]) {
   const grupos: (BloqueFicha | BloqueFicha[])[] = [];
@@ -124,13 +188,17 @@ export function Descripcion({ id, enlace }: { id: string; enlace?: string }) {
         Array.isArray(g) ? (
           <ul key={i}>
             {g.map((b, j) => (
-              <li key={j}>{b.texto}</li>
+              <li key={j}>
+                <ConNegritas texto={b.texto} />
+              </li>
             ))}
           </ul>
         ) : g.tipo === "h" ? (
           <h4 key={i}>{g.texto}</h4>
         ) : (
-          <p key={i}>{g.texto}</p>
+          <p key={i}>
+            <ConNegritas texto={g.texto} />
+          </p>
         ),
       )}
       {ficha.origen === "traida" && (
@@ -162,37 +230,20 @@ export function FichaVacante({
         </div>
         <span className={"pill " + claseEstado(v)}>{etiquetaEstado(v)}</span>
       </header>
-      <ul className="ficha-datos">
-        <li>
-          <MapPin size={14} />
-          {v.ubicacion || "Ubicación no informada"}
-        </li>
-        <li>
-          <Globe2 size={14} />
-          {modos[v.modalidad] || v.modalidad || "Modalidad no informada"}
-        </li>
-        {ficha?.salario && (
+      <DatosAviso
+        ubicacion={v.ubicacion}
+        modalidad={v.modalidad}
+        salario={ficha?.salario}
+        publicada={v.publicada}
+        idioma={v.idioma}
+        ingles={ficha?.ingles}
+        extra={
           <li>
-            <Wallet size={14} />
-            {ficha.salario}
+            <Briefcase size={14} />
+            {textoExperiencia(v.experiencia)}
           </li>
-        )}
-        <li>
-          <Clock3 size={14} />
-          {v.publicada
-            ? "Publicada el " + fecha(v.publicada)
-            : "Fecha por confirmar"}
-        </li>
-        <li>
-          <Briefcase size={14} />
-          {textoExperiencia(v.experiencia)}
-        </li>
-        <li>
-          <Languages size={14} />
-          {v.idioma === "es" ? "Aviso en español" : "Aviso en inglés"}
-          {ficha?.ingles ? " · inglés " + ficha.ingles : ""}
-        </li>
-      </ul>
+        }
+      />
       <div className="vacancy-tags">
         <span>{grados[v.match_grade] || v.match_grade}</span>
         {v.tipo === "post" && (

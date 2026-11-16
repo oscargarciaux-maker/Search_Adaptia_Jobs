@@ -21,11 +21,13 @@ import {
   ETIQUETA_SUGERIDA,
   REGIONES,
   SelectorPaises,
+  fecha,
   iniciales,
+  modos,
   nombrePais,
 } from "../comunes";
 import type { Revision, Revisiones, Sesion } from "../types";
-import { Descripcion } from "./FichaVacante";
+import { DatosAviso, Descripcion } from "./FichaVacante";
 import { teclasLista } from "./Vacantes";
 
 const POR_PAGINA = 25;
@@ -221,7 +223,9 @@ export function PorConfirmar({
           setAvanceCarga(
             e.avance.total
               ? `Cargando… ${e.avance.leidas} de ${e.avance.total}`
-              : "Cargando…",
+              : e.avance.leidas
+                ? `Cargando… ${e.avance.leidas} revisadas`
+                : "Cargando…",
           );
           await new Promise((listo) => setTimeout(listo, 2000));
           continue;
@@ -310,6 +314,28 @@ export function PorConfirmar({
     <section className="revisiones">
       {masiva}
       <div className="revision-barra">
+        {/* Contrato v34: el filtro «Para» va primero y las páginas siempre ocupan su lugar: nada se mueve. */}
+        <div className="field revision-filtro">
+          <label htmlFor="revision-cliente">Para</label>
+          <select
+            id="revision-cliente"
+            value={cliente}
+            onChange={(e) => {
+              setCliente(e.target.value);
+              cargar(1, e.target.value, 0);
+            }}
+          >
+            <option value="">Todos los clientes</option>
+            {clientes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}
+                {datos.por_cliente?.[c.id] !== undefined
+                  ? ` (${datos.por_cliente[c.id]})`
+                  : ""}
+              </option>
+            ))}
+          </select>
+        </div>
         <p className="helper revision-ayuda">
           <strong>
             {datos.total} {datos.total === 1 ? "pendiente" : "pendientes"}
@@ -327,49 +353,29 @@ export function PorConfirmar({
             «Más útil hoy» marca las 10 que más ayudan a tus clientes.
           </Ayuda>
         </p>
-        <div className="field revision-filtro">
-          <label htmlFor="revision-cliente">Para</label>
-          <select
-            id="revision-cliente"
-            value={cliente}
-            onChange={(e) => {
-              setCliente(e.target.value);
-              cargar(1, e.target.value, 0);
-            }}
+        <nav className="paginas" aria-label="Páginas de Por confirmar">
+          <button
+            type="button"
+            className="icon"
+            aria-label="Página anterior"
+            disabled={pagina <= 1}
+            onClick={() => cargar(pagina - 1, cliente, 0)}
           >
-            <option value="">Todos los clientes</option>
-            {clientes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
-        {paginas > 1 && (
-          <nav className="paginas" aria-label="Páginas de Por confirmar">
-            <button
-              type="button"
-              className="icon"
-              aria-label="Página anterior"
-              disabled={pagina <= 1}
-              onClick={() => cargar(pagina - 1, cliente, 0)}
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span>
-              Página {pagina} de {paginas}
-            </span>
-            <button
-              type="button"
-              className="icon"
-              aria-label="Página siguiente"
-              disabled={pagina >= paginas}
-              onClick={() => cargar(pagina + 1, cliente, 0)}
-            >
-              <ChevronRight size={16} />
-            </button>
-          </nav>
-        )}
+            <ChevronLeft size={16} />
+          </button>
+          <span>
+            Página {pagina} de {paginas}
+          </span>
+          <button
+            type="button"
+            className="icon"
+            aria-label="Página siguiente"
+            disabled={pagina >= paginas}
+            onClick={() => cargar(pagina + 1, cliente, 0)}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </nav>
       </div>
       {!r ? (
         <p className="helper">Este cliente no tiene vacantes por confirmar.</p>
@@ -408,9 +414,25 @@ export function PorConfirmar({
                   <span className="item-empresa">{x.empresa}</span>
                   <span className="item-lugar">
                     <MapPin size={12} />
-                    {x.ubicacion || "sin dato"}
+                    {[
+                      x.ubicacion || "Ubicación no informada",
+                      modos[x.modalidad] || x.modalidad,
+                      x.publicada ? fecha(x.publicada) : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </span>
                   <span className="item-etiquetas">
+                    {(x.paises || []).slice(0, 2).map((c) => (
+                      <span key={c} className="pill neutral pais-leido">
+                        {nombre(c)}
+                      </span>
+                    ))}
+                    {(x.paises || []).length > 2 && (
+                      <span className="pill neutral pais-leido">
+                        +{(x.paises || []).length - 2}
+                      </span>
+                    )}
                     {x.mas_util && (
                       <span className="pill green">Más útil hoy</span>
                     )}
@@ -510,11 +532,23 @@ export function PorConfirmar({
                   )}
                 </div>
               )}
-              <p className="revision-lugar">
-                <MapPin size={14} />
-                Ubicación del aviso:{" "}
-                <strong>{r.ubicacion || "sin dato"}</strong>
-              </p>
+              <DatosAviso
+                ubicacion={r.ubicacion}
+                modalidad={r.modalidad}
+                salario={r.salario}
+                publicada={r.publicada}
+                idioma={r.idioma}
+              />
+              {(r.paises || []).length > 0 && (
+                <p className="revision-paises-leidos">
+                  <span className="helper">Países que leyó el sistema:</span>
+                  {(r.paises || []).map((c) => (
+                    <span key={c} className="pill neutral pais-leido">
+                      {nombre(c)}
+                    </span>
+                  ))}
+                </p>
+              )}
               {(r.frase ?? r.pista) && (
                 <blockquote className="revision-pista">
                   {r.frase ?? r.pista}

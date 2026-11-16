@@ -382,11 +382,26 @@ test("bandeja Por confirmar: un clic confirma, atajo 4 aparta y el contador baja
   const primera = page.locator("article.revision");
   await expect(primera.locator(".revision-pista")).toBeVisible();
   await expect(primera.locator(".ficha-descripcion")).toBeVisible();
+  // Contrato v34: los mismos datos del aviso que en «Vacantes» (ubicación, modalidad, publicación, idioma).
+  await expect(primera.locator(".ficha-datos")).toContainText("Publicada el");
+  await expect(primera.locator(".ficha-datos")).toContainText("Aviso en");
+  await expect(
+    page
+      .locator(".item-revision", { hasText: "Experience Lead" })
+      .locator(".pais-leido"),
+  ).toHaveText("Colombia");
   // Filtro por cliente: muestra solo las suyas y vuelve a todas.
   await page
     .locator("#revision-cliente")
-    .selectOption({ label: "Cliente de ejemplo 01" });
+    .selectOption({ label: "Cliente de ejemplo 01 (2)" }); // contrato v34: cuántas tiene cada cliente
   await expect(page.getByText(/de este cliente/)).toBeVisible();
+  // Contrato v34: «Para» y las páginas no se mueven aunque haya una sola página.
+  await expect(page.locator(".revision-barra > *").first()).toHaveClass(
+    /revision-filtro/,
+  );
+  await expect(
+    page.getByRole("navigation", { name: "Páginas de Por confirmar" }),
+  ).toBeVisible();
   await page.locator("#revision-cliente").selectOption({ value: "" });
   await expect(page.locator(".item-revision")).toHaveCount(4);
   // Ampliación v17: cada tarjeta trae la respuesta sugerida y por qué; Enter la acepta.

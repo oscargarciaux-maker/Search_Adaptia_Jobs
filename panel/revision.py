@@ -141,6 +141,22 @@ def _datos(fila_catalogo):
                                publicada=True)
 
 
+def resumen_de(datos, motivo="", s=None):
+    """Contrato v34: lo que la bandeja muestra de una vacante, calculado de noche y guardado en `panel_revisiones.resumen`
+    para que el panel liste sin leer el catálogo ni las descripciones. `datos` lleva `_descripcion` (para la sugerencia)."""
+    from panel.sugerir import sugerir
+    if motivo == FUNCIONES:  # contrato v25: la duda es el cargo, no el país
+        s = {"decision": "sirve", "paises": [], "motivo": "El título es otro, pero las funciones coinciden.", "frase": ""}
+    elif s is None:
+        s = sugerir(datos) if datos.get("titulo") else {"decision": "", "paises": [], "motivo": "", "frase": ""}
+    return {"titulo": datos.get("titulo", ""), "empresa": datos.get("empresa", ""),
+            "ubicacion": datos.get("ubicacion", ""), "modalidad": datos.get("modalidad", ""),
+            "salario": str(datos.get("salario") or ""), "idioma": datos.get("idioma", ""),
+            "publicada": datos.get("fecha_publicacion", ""), "enlace": datos.get("enlace", ""),
+            "paises": list(datos.get("paises_mundo") or datos.get("paises") or [])[:8],
+            "sugerida": s["decision"], "paises_sugeridos": s["paises"], "por_que": s["motivo"], "frase": s["frase"]}
+
+
 def _candidatos_funciones(repo, perfiles, recibidas, estrictas, fecha, desde, motivo_de, ya):
     """Contrato v25: vacantes cuyo título no encaja con un cargo pero la descripción coincide por funciones. Solo para
     los perfiles de ese cargo que cumplen todos sus filtros y nunca la recibieron."""
@@ -168,11 +184,19 @@ def _candidatos_funciones(repo, perfiles, recibidas, estrictas, fecha, desde, mo
                            "pista": "Funciones encontradas: " + ", ".join(halladas[:10]),
                            "ubicacion": clave_ubicacion(datos.get("ubicacion", "")), "sugerencia": [],
                            "perfiles": sirve, "prioridad": sum(100 if s["faltan"] else 10 for s in sirve)
-                           + max(0, 30 - _edad(datos, fecha))})
+                           + max(0, 30 - _edad(datos, fecha)), "resumen": resumen_de(datos, FUNCIONES)})
     return salida
 
 
 APLICAR_SUGERENCIAS = True  # contrato v32: las sugerencias claras se aplican solas en la cola de la noche
+
+
+def _revisiones_sin_texto(repo, estado=None):
+    """Filas de la bandeja con su catálogo pero sin descripciones (contrato v34)."""
+    try:
+        return repo.revisiones(estado=estado, sin_descripcion=True)
+    except TypeError:  # repositorios de prueba antiguos
+        return repo.revisiones(estado=estado)
 
 
 def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, avance=None):
@@ -188,7 +212,13 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, ava
         recibidas.setdefault(f["perfil_id"], set()).add(f["vacante_id"])
     candidatos, leidas, fuera_idioma, ya_claras = [], 0, 0, 0
     automaticas = {}  # vacante_id → sugerencia clara que se aplica sola (contrato v32)
-    filas_catalogo = list(repo.candidatas_por_confirmar(desde))
+    filas_catalogo = repo.candidatas_por_confirmar(desde)  # se recorre por páginas, sin guardarlas (contrato v34)
+    total = len(filas_catalogo) if isinstance(filas_catalogo, list) else 0
+    if avance and not total and hasattr(repo, "contar_por_confirmar"):
+        try:
+            total = repo.contar_por_confirmar(desde) or 0
+        except Exception as e:  # noqa: BLE001 — sin total el avance muestra solo las leídas
+            registro.aviso("revision:contar", e)
     sin_revisar = {}  # vacante_id → motivo: cada vacante se evalúa una sola vez por llamada
 
     def motivo_de(vid, datos):
@@ -198,7 +228,7 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, ava
     for fila in filas_catalogo:
         leidas += 1
         if avance and leidas % 20 == 0:
-            avance(leidas, len(filas_catalogo))
+            avance(leidas, total)
         datos = _datos_ligeros(fila)
         if datos.get("idioma") not in ("es", "en") or not datos.get("titulo"):
             fuera_idioma += 1
@@ -219,20 +249,31 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, ava
             texto = pista(datos.get("_descripcion", ""), datos.get("ubicacion", ""))
             # Contrato v32: si el aviso lo dice claro (países cubiertos sin extranjeros, o solo extranjeros), la
             # sugerencia se aplica sola y no ocupa la bandeja. «Sin evidencia» o mezclas siguen preguntándose.
-            if not completa and APLICAR_SUGERENCIAS:
-                from panel.sugerir import sugerir
-                s_auto = sugerir(datos)
-                if s_auto["decision"] == "otro_pais" or (s_auto["decision"] == "sirve" and s_auto["paises"]):
-                    automaticas[fila["id"]] = s_auto
+            from panel.sugerir import sugerir
+            s_auto = sugerir(datos)
+            if not completa and APLICAR_SUGERENCIAS and (
+                    s_auto["decision"] == "otro_pais" or (s_auto["decision"] == "sirve" and s_auto["paises"])):
+                automaticas[fila["id"]] = s_auto
             # Las cargadas a mano (botón) siempre son «depuración completa»: la búsqueda siguiente no las vence.
             candidatos.append({"vacante_id": fila["id"], "motivo": DEPURACION if completa else MOTIVO, "pista": texto,
                                "ubicacion": clave_ubicacion(datos.get("ubicacion", "")), "sugerencia": sugerencia(texto),
                                "perfiles": sirve, "prioridad": sum(100 if s["faltan"] else 10 for s in sirve)
-                               + max(0, 30 - _edad(datos, fecha))})
+                               + max(0, 30 - _edad(datos, fecha)), "resumen": resumen_de(datos, s=s_auto)})
     if not completa and hasattr(repo, "candidatas_por_funciones"):
         candidatos += _candidatos_funciones(repo, perfiles, recibidas, estrictas, fecha, desde, motivo_de,
                                             {c["vacante_id"] for c in candidatos})
-    existentes = {r["vacante_id"]: r for r in repo.revisiones()}
+    existentes = {r["vacante_id"]: r for r in _revisiones_sin_texto(repo)}
+    # Las pendientes de otras noches que hay que volver a mirar leen su descripción por grupos de 100 y la sueltan.
+    releer = [vid for vid, r in existentes.items() if r.get("estado") == "pendiente" and vid not in sin_revisar
+              and r.get("motivo") != FUNCIONES and ((r.get("catalogo_vacantes") or {}).get("datos") or {}).get("titulo")
+              and (r.get("catalogo_vacantes") or {}).get("reason") == POR_CONFIRMAR]
+    for inicio in range(0, len(releer), 100):
+        grupo = releer[inicio:inicio + 100]
+        sin_texto = [v for v in grupo if "description_full" not in existentes[v]["catalogo_vacantes"]]
+        textos = repo.descripciones(sin_texto) if sin_texto else {}
+        for vid in grupo:
+            cat = existentes[vid]["catalogo_vacantes"]
+            motivo_de(vid, _datos_ligeros({**cat, "description_full": textos.get(vid, cat.get("description_full"))}))
     reglas = {r["texto"]: r for r in repo.reglas() if r.get("activa", True)}
     ids = {c["vacante_id"] for c in candidatos}
     # Las que ya tienen una regla del operador se registran y se deciden al instante (no ocupan lugar en la bandeja).
@@ -279,8 +320,19 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, ava
         nuevas.append(dict(c, estado="pendiente"))
         ya_nuevas.add(c["vacante_id"])
         pendientes += 1
+    con_resumen = getattr(repo, "con_resumen", lambda: False)()
+    if not con_resumen:  # contrato v34: sin SQL 018 la fila se guarda como antes y el panel calcula el resumen
+        nuevas = [{k: v for k, v in n.items() if k != "resumen"} for n in nuevas]
     if nuevas:
         repo.guardar_revisiones(nuevas)
+    if con_resumen:  # las pendientes de noches anteriores sin resumen lo reciben una vez (como mucho GUARDADAS)
+        por_id = {c["vacante_id"]: c["resumen"] for c in candidatos}
+        faltan = {vid: por_id[vid] for vid, r in existentes.items()
+                  if r.get("estado") == "pendiente" and vid in por_id and not r.get("resumen")}
+        try:
+            repo.resumir_revisiones(dict(list(faltan.items())[:GUARDADAS]))
+        except Exception as e:  # noqa: BLE001 — sin resumen el panel lo calcula al mostrarla
+            registro.aviso("revision:resumen", e)
     for c in nuevas:  # las que ya tienen regla del operador se deciden solas
         regla = reglas.get(c["ubicacion"])
         if regla and not es_generica(c["ubicacion"]):
@@ -293,7 +345,7 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, ava
             except Exception as e:  # noqa: BLE001 — una regla que no aplica no impide armar la cola
                 registro.aviso("revision:281", e)
     por_sugerencia = 0
-    pendientes_ids = {r["vacante_id"] for r in repo.revisiones(estado="pendiente")}
+    pendientes_ids = {r["vacante_id"] for r in _revisiones_sin_texto(repo, "pendiente")}
     for vid, s_auto in automaticas.items():
         if vid not in pendientes_ids:
             continue
@@ -305,7 +357,7 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, ava
             por_sugerencia += 1
         except Exception as e:  # noqa: BLE001 — si no se puede aplicar, queda en la bandeja para la persona
             registro.aviso("revision:sugerencia", e)
-    actuales = repo.revisiones(estado="pendiente")
+    actuales = _revisiones_sin_texto(repo, "pendiente")
     diagnostico = {}
     if completa and not leidas and hasattr(repo, "conteo_dudosas"):
         try:  # una carga vacía se explica con conteos (sin datos de clientes)
@@ -340,32 +392,29 @@ def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None):
         pendientes = filtradas[:tope]
     else:
         pendientes = filtradas[(pagina - 1) * por_pagina:pagina * por_pagina]
-    faltan = [r["vacante_id"] for r in pendientes if "description_full" not in (r.get("catalogo_vacantes") or {})]
-    textos = repo.descripciones(faltan) if faltan else {}
-    for r in pendientes:
-        if r["vacante_id"] in textos and r.get("catalogo_vacantes"):
-            r["catalogo_vacantes"] = {**r["catalogo_vacantes"], "description_full": textos[r["vacante_id"]]}
+    # Contrato v34: las filas con resumen (guardado de noche, SQL 018) se muestran tal cual; solo las que no lo tienen
+    # leen el catálogo con su descripción y se calculan aquí, como antes.
+    sin_resumen = [r for r in pendientes if not r.get("resumen")]
+    faltan = [r["vacante_id"] for r in sin_resumen if "description_full" not in (r.get("catalogo_vacantes") or {})]
+    filas = repo.filas_catalogo(faltan) if faltan else {}
+    for r in sin_resumen:
+        if r["vacante_id"] in filas:
+            r["catalogo_vacantes"] = {**(r.get("catalogo_vacantes") or {}), **filas[r["vacante_id"]]}
     version = repo.operativa(fecha) or {}
     clientes = {c["id"]: c["nombre"] for c in (version.get("configuracion") or {}).get("clientes", [])}
     por_ubicacion = {}
     for r in todas:
         if not es_generica(r.get("ubicacion")):
             por_ubicacion[r["ubicacion"]] = por_ubicacion.get(r["ubicacion"], 0) + 1
-    from panel.sugerir import sugerir
     salida = []
     for r in pendientes:
-        datos = _datos(r.get("catalogo_vacantes"))
-        if r.get("motivo") == FUNCIONES:  # contrato v25: la duda es el cargo, no el país
-            s = {"decision": "sirve", "paises": [], "motivo": "El título es otro, pero las funciones coinciden.",
-                 "frase": r.get("pista", "")}
-        else:
-            s = sugerir(datos) if datos.get("titulo") else {"decision": "", "paises": [], "motivo": "", "frase": ""}
-        salida.append({"vacante_id": r["vacante_id"], "titulo": datos.get("titulo", ""), "empresa": datos.get("empresa", ""),
-                       "sugerida": s["decision"], "paises_sugeridos": s["paises"], "por_que": s["motivo"],
-                       "frase": s["frase"],
-                       "ubicacion": datos.get("ubicacion", ""), "modalidad": datos.get("modalidad", ""),
-                       "idioma": datos.get("idioma", ""), "publicada": datos.get("fecha_publicacion", ""),
-                       "enlace": datos.get("enlace", ""), "pista": r.get("pista", ""), "sugerencia": r.get("sugerencia", []),
+        res = r.get("resumen") or resumen_de(_datos(r.get("catalogo_vacantes")), r.get("motivo", ""))
+        frase = r.get("pista", "") if r.get("motivo") == FUNCIONES else res.get("frase", "")
+        salida.append({**{k: res.get(k, "") for k in ("titulo", "empresa", "ubicacion", "modalidad", "salario",
+                                                       "idioma", "publicada", "enlace", "sugerida", "por_que")},
+                       "vacante_id": r["vacante_id"], "paises_sugeridos": res.get("paises_sugeridos") or [],
+                       "paises": res.get("paises") or [], "frase": frase,
+                       "pista": r.get("pista", ""), "sugerencia": r.get("sugerencia", []),
                        "motivo": r.get("motivo", ""), "funciones": r.get("motivo") == FUNCIONES,
                        "clientes": sorted({clientes.get(p["cliente_id"], "") for p in r.get("perfiles") or []} - {""}),
                        "cliente_ids": sorted({p["cliente_id"] for p in r.get("perfiles") or [] if p.get("cliente_id")}),

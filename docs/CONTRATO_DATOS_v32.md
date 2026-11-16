@@ -10,7 +10,7 @@
 **Sin SQL ni IA.**
 
 ## Qué cambia
-1. **El inglés exigido vuelve a descartar** (decisión de Oscar, 16 nov):
+1. **(Corregido por [v33](CONTRATO_DATOS_v33.md): el nivel de inglés ordena, no descarta.)** El inglés exigido vuelve a descartar:
    - si el aviso **exige** un nivel mayor que el del perfil, no llega: «Head of Design» pide C1 y el perfil es B1;
    - si lo pide como deseable o no lo dice, sí llega.
 

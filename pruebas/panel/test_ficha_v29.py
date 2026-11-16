@@ -21,7 +21,7 @@ def test_bloques_con_formato_y_sin_html():
     assert "alert" not in texto
     b = ficha.bloques(texto)
     assert b == [{"tipo": "p", "texto": "Somos un equipo."}, {"tipo": "h", "texto": "Requisitos"},
-                 {"tipo": "li", "texto": "Figma"}, {"tipo": "li", "texto": "Inglés B2"}]
+                 {"tipo": "li", "texto": "Figma"}, {"tipo": "li", "texto": "Inglés **B2**"}]
     plano = ficha.bloques("Responsabilidades:\n- Diseñar\n• Probar\n1. Medir\n\nTexto largo del aviso.")
     assert [x["tipo"] for x in plano] == ["h", "li", "li", "li", "p"]
     assert all("<" not in x["texto"] for x in b + plano)
