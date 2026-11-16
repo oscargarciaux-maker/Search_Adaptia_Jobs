@@ -27,10 +27,20 @@ funciones». Al aprobarlas, el título queda aprendido y desde la búsqueda sigu
 
 **Resumen por cliente.** En el bloque verde «Clientes» cada cliente tiene su tarjeta: recibidas hoy de su meta del
 día (la barra se pone ámbar si no llega a la mitad) y cuántas tiene por confirmar. Los que van peor salen primero y
-«Comunidad» al final. Con 9 clientes o más las tarjetas pasan a dos columnas. Antes de la búsqueda del día muestran la
-anterior y lo dicen. Al pulsar un cliente se abre su detalle: sus últimos 7 días, sus perfiles, lo que más corta en su
-cargo, «Ver sus vacantes», «Descargar su CSV de hoy» y sus «por confirmar» para decidir ahí mismo («Sí, sirve» usa el
-país sugerido; si no hay sugerencia, «Elegir país en Por confirmar»).
+«Comunidad» al final. Con 9 clientes o más el bloque de clientes ocupa más ancho y sus tarjetas van en tres columnas
+(las otras cifras quedan en dos columnas a la derecha). Antes de la búsqueda del día muestran la anterior y lo dicen;
+si la última búsqueda falló, un aviso arriba lo dice con enlace a Actividad. Al pulsar un cliente se abre su detalle
+en dos paneles: a la izquierda sus últimos 7 días, sus perfiles, lo que más corta en su cargo, «Editar perfil», «Ver
+sus vacantes» y «Descargar su CSV de hoy»; a la derecha sus «por confirmar» para decidir ahí mismo («Sí, sirve» usa
+el país sugerido; si no hay sugerencia, «Elegir país en Por confirmar»).
+
+**Cargos y metas (16 nov).** Los cargos activos van en tres columnas, ordenados de mayor a menor meta; cada uno
+muestra «Meta del día», «Llegaron hoy» y «Para mañana» (vacantes guardadas sin entregar). La cuarta columna es
+«Archivados»: se archiva arrastrando un cargo ahí o con su botón, y desde ahí se reactiva. Un cargo archivado también
+aparece al editar un perfil y se reactiva solo al guardarlo. El techo del día se escribe como número (de 1 a 600) y se
+aplica al salir del campo o con Enter. Arriba, junto a los botones, se lee si la configuración está «Lista: se usa
+desde la búsqueda de mañana», «En uso desde el …» o si hay cambios sin guardar o sin programar. «Cerrar sesión» está
+junto al botón de tema.
 
 **Importar clientes.** En «Clientes», «Importar clientes» sube un CSV con una fila por perfil (hay una plantilla con
 todas las columnas). Antes de guardar muestra una vista previa con los errores de cada fila; nada se guarda hasta

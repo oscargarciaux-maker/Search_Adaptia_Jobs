@@ -3951,3 +3951,169 @@ select.margen {
   background: var(--osc-bg-verde-2);
   color: var(--osc-text-azul-medio);
 }
+
+/* Lista grande del 16 nov: con muchos clientes (9 o más) el bloque de clientes ocupa ~2/3 del ancho en 3 columnas y
+   la derecha se compacta en una columna, para que todo quepa en 1366×768 y escale a 15–30 clientes. */
+.resumen-grid.con-muchos .tarjeta-clientes {
+  grid-column: 1 / 9;
+}
+.resumen-grid.con-muchos .resumen-derecha {
+  grid-column: 9 / 13;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.resumen-grid.con-muchos .resumen-derecha > .tarjeta-mensajes {
+  grid-column: 1 / -1;
+}
+.resumen-grid.con-muchos .cupos-leyenda {
+  display: none;
+}
+.resumen-grid.con-muchos .tarjeta-chica,
+.resumen-grid.con-muchos .tarjeta-actividad {
+  padding: 12px 14px;
+}
+.resumen-grid.con-muchos .clientes-lista.en-grilla {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.resumen-grid.con-muchos .en-grilla .cliente-mini {
+  padding: 8px 12px;
+  gap: 4px;
+}
+@media (max-width: 1200px) {
+  .resumen-grid.con-muchos .clientes-lista.en-grilla {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 1000px) {
+  .resumen-grid.con-muchos .tarjeta-clientes,
+  .resumen-grid.con-muchos .resumen-derecha {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 480px) {
+  .resumen-grid.con-muchos .clientes-lista.en-grilla {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Detalle del cliente en dos paneles: datos a la izquierda, sus «por confirmar» a la derecha (con su propio scroll). */
+.detalle-dos-paneles {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 20px;
+  align-items: start;
+}
+.detalle-derecha {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.detalle-seccion .editar-perfil {
+  margin-top: 8px;
+}
+@media (max-width: 860px) {
+  .detalle-dos-paneles {
+    grid-template-columns: 1fr;
+  }
+  .detalle-derecha {
+    max-height: none;
+  }
+}
+
+/* Cargos y metas (lista grande del 16 nov): 3 columnas de cargos activos, ordenados por meta, y una de archivados a la
+   que se arrastra un cargo para archivarlo (también hay botón, para teclado y celular). */
+.cargos-tablero {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.cargos-tablero .role-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.cargos-tablero .role-card[draggable="true"] {
+  cursor: grab;
+}
+.cargos-archivados {
+  min-height: 160px;
+  padding: 16px;
+  border-style: dashed;
+}
+.cargos-archivados h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+.cargos-archivados ul {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.cargos-archivados li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.cargos-archivados li span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cifras-cargo {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 10px 0 0;
+}
+.cifras-cargo div {
+  min-width: 0;
+}
+.cifras-cargo dt {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--osc-text-neutro-medio, #475569);
+}
+.cifras-cargo dd {
+  margin: 2px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 1200px) {
+  .cargos-tablero .role-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 900px) {
+  .cargos-tablero {
+    grid-template-columns: 1fr;
+  }
+  .cargos-tablero .role-list {
+    grid-template-columns: 1fr;
+  }
+}
+/* En el tablero de tres columnas la etiqueta de disponibilidad va debajo del título, a todo el ancho de la tarjeta. */
+.cargos-tablero .role-info {
+  min-width: 0;
+}
+.cargos-tablero .preview-chip {
+  display: flex;
+  align-items: flex-start;
+  border-radius: 8px;
+  padding: 6px 9px;
+  margin-top: 12px;
+  line-height: 1.35;
+}
+.cargos-tablero .preview-chip > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}

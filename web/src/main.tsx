@@ -2436,6 +2436,13 @@ function ClienteDialog({
                         {c.nombre}
                       </option>
                     ))}
+                    {config.cargos
+                      .filter((c) => !c.activo)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre} (archivado: se reactiva al guardar)
+                        </option>
+                      ))}
                     <option value="__nuevo">＋ Añadir cargo nuevo…</option>
                   </select>
                 </div>
@@ -3125,7 +3132,10 @@ function TarjetasResumen({
   const grilla = clientes.length >= CLIENTES_EN_GRILLA;
   const deHoy = diaConteo === hoyBogota();
   return (
-    <section className="resumen-grid" aria-label="Resumen del panel">
+    <section
+      className={"resumen-grid" + (grilla ? " con-muchos" : "")}
+      aria-label="Resumen del panel"
+    >
       <div className="tarjeta-resumen tarjeta-clientes">
         <span className="tarjeta-cabeza">
           <Users size={18} />
@@ -3395,6 +3405,7 @@ function ClienteDetalle({
   onVacantes,
   onRevisar,
   onCsv,
+  onEditar,
   descargando,
 }: {
   cliente: ResumenCliente;
@@ -3408,6 +3419,7 @@ function ClienteDetalle({
   onVacantes: () => void;
   onRevisar: () => void;
   onCsv: () => void;
+  onEditar: () => void;
   descargando: boolean;
 }) {
   const [ocupado, setOcupado] = useState("");
@@ -3457,169 +3469,200 @@ function ClienteDetalle({
       setOcupado("");
     }
   }
-  const visibles = pendientes.slice(0, 5);
+  const visibles = pendientes.slice(0, 8);
   return (
     <Dialog titulo={c.nombre} subtitulo={c.cargo} onClose={onCerrar} ancho>
-      <div className="detalle-cifras">
-        <div>
-          <b>{c.recibidas ?? "—"}</b>
-          <span>
-            {c.recibidas == null
-              ? "Sin búsquedas aún"
-              : `recibidas de ${c.meta}`}
-          </span>
-        </div>
-        <div className={c.porConfirmar ? "ambar" : ""}>
-          <b>{c.porConfirmar}</b>
-          <span>por confirmar</span>
-        </div>
-        <div>
-          <b>{faltan}</b>
-          <span>{faltan === 1 ? "falta" : "faltan"} para su meta</span>
-        </div>
-      </div>
-
-      {serie.length > 0 && (
-        <section className="detalle-seccion">
-          <h3>Últimos {serie.length} días</h3>
-          <div
-            className="dias-barras"
-            role="img"
-            aria-label={
-              "Recibidas por día: " +
-              serie.map((d) => `${fecha(d.fecha)}, ${d.n}`).join("; ")
-            }
-          >
-            {serie.map((d) => (
-              <div key={d.fecha} aria-hidden="true">
-                <b>{d.n}</b>
-                <i
-                  className={"barra" + (d.n < c.meta / 2 ? " bajo" : "")}
-                  style={{ height: Math.max(4, (d.n / tope) * 100) + "%" }}
-                />
-                <span>
-                  {new Date(d.fecha + "T12:00:00")
-                    .toLocaleDateString("es-CO", {
-                      weekday: "short",
-                      day: "numeric",
-                    })
-                    .replace(/[.,]/g, "")}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="detalle-seccion">
-        <h3>Sus perfiles</h3>
-        <ul className="detalle-lista">
-          {c.perfiles.map((p, i) => (
-            <li key={i}>
-              {p.cargo} · meta de {p.meta} al día
-            </li>
-          ))}
-          {!c.perfiles.length && <li>Aún no tiene perfiles activos.</li>}
-        </ul>
-      </section>
-
-      {cortes.length > 0 && (
-        <section className="detalle-seccion">
-          <h3>Lo que más corta en su cargo</h3>
-          <ul className="detalle-lista">
-            {cortes.map((x) => (
-              <li key={x.cargo}>
-                <b>{x.cargo}:</b> {x.texto}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <div className="detalle-acciones">
-        <button type="button" className="button primary" onClick={onVacantes}>
-          <BriefcaseBusiness size={16} />
-          Ver sus vacantes
-        </button>
-        <button
-          type="button"
-          className="button secondary"
-          onClick={onCsv}
-          disabled={descargando}
-        >
-          <Download size={16} />
-          {descargando ? "Descargando…" : "Descargar su CSV de hoy"}
-        </button>
-      </div>
-
-      <section className="detalle-seccion">
-        <h3>Por confirmar ({pendientes.length})</h3>
-        {!pendientes.length && (
-          <p className="field-help">Nada pendiente para este cliente.</p>
-        )}
-        {visibles.map((r) => {
-          const paises = paisesDe(r);
-          return (
-            <article key={r.vacante_id} className="detalle-pendiente">
-              <small>
-                {r.motivo || "País por confirmar"}
-                {paises?.length
-                  ? " · sugerido: " +
-                    paises.slice(0, 3).map(nombreLugar).join(", ") +
-                    (paises.length > 3 ? ` y ${paises.length - 3} más` : "")
-                  : ""}
-              </small>
-              <strong>{r.titulo}</strong>
-              <span className="tarjeta-detalle">
-                {[r.empresa, r.ubicacion].filter(Boolean).join(" · ")}
+      {/* Lista grande del 16 nov: datos a la izquierda y sus «por confirmar» a la derecha, sin salir del detalle. */}
+      <div className="detalle-dos-paneles">
+        <div className="detalle-izquierda">
+          <div className="detalle-cifras">
+            <div>
+              <b>{c.recibidas ?? "—"}</b>
+              <span>
+                {c.recibidas == null
+                  ? "Sin búsquedas aún"
+                  : `recibidas de ${c.meta}`}
               </span>
-              <div className="fila-botones">
-                {paises ? (
-                  <button
-                    type="button"
-                    className="button primary"
-                    disabled={ocupado === r.vacante_id}
-                    onClick={() => decidir(r, "sirve")}
-                  >
-                    Sí, sirve
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="button secondary"
-                    onClick={onRevisar}
-                  >
-                    Elegir país en Por confirmar
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="button secondary"
-                  disabled={ocupado === r.vacante_id}
-                  onClick={() => decidir(r, "no_sirve")}
-                >
-                  No sirve
-                </button>
-                {r.enlace && (
-                  <a
-                    className="button secondary"
-                    href={r.enlace}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Ver aviso
-                  </a>
-                )}
+            </div>
+            <div className={c.porConfirmar ? "ambar" : ""}>
+              <b>{c.porConfirmar}</b>
+              <span>por confirmar</span>
+            </div>
+            <div>
+              <b>{faltan}</b>
+              <span>{faltan === 1 ? "falta" : "faltan"} para su meta</span>
+            </div>
+          </div>
+
+          {serie.length > 0 && (
+            <section className="detalle-seccion">
+              <h3>Últimos {serie.length} días</h3>
+              <div
+                className="dias-barras"
+                role="img"
+                aria-label={
+                  "Recibidas por día: " +
+                  serie.map((d) => `${fecha(d.fecha)}, ${d.n}`).join("; ")
+                }
+              >
+                {serie.map((d) => (
+                  <div key={d.fecha} aria-hidden="true">
+                    <b>{d.n}</b>
+                    <i
+                      className={"barra" + (d.n < c.meta / 2 ? " bajo" : "")}
+                      style={{ height: Math.max(4, (d.n / tope) * 100) + "%" }}
+                    />
+                    <span>
+                      {new Date(d.fecha + "T12:00:00")
+                        .toLocaleDateString("es-CO", {
+                          weekday: "short",
+                          day: "numeric",
+                        })
+                        .replace(/[.,]/g, "")}
+                    </span>
+                  </div>
+                ))}
               </div>
-            </article>
-          );
-        })}
-        {pendientes.length > visibles.length && (
-          <button type="button" className="text-button" onClick={onRevisar}>
-            Ver las {pendientes.length} en Por confirmar
-          </button>
-        )}
-      </section>
+            </section>
+          )}
+
+          <section className="detalle-seccion">
+            <h3>Sus perfiles</h3>
+            <ul className="detalle-lista">
+              {c.perfiles.map((p, i) => (
+                <li key={i}>
+                  {p.cargo} · meta de {p.meta} al día
+                </li>
+              ))}
+              {!c.perfiles.length && <li>Aún no tiene perfiles activos.</li>}
+            </ul>
+          </section>
+
+          {cortes.length > 0 && (
+            <section className="detalle-seccion">
+              <h3>Lo que más corta en su cargo</h3>
+              <ul className="detalle-lista">
+                {cortes.map((x) => (
+                  <li key={x.cargo}>
+                    <b>{x.cargo}:</b> {x.texto}
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                className="button secondary editar-perfil"
+                onClick={onEditar}
+              >
+                <Pencil size={15} />
+                Editar perfil
+              </button>
+              <p className="field-help">
+                En el perfil verás cuántas vacantes cumplen hoy y qué ajuste
+                añadiría más.
+              </p>
+            </section>
+          )}
+
+          <div className="detalle-acciones">
+            <button
+              type="button"
+              className="button primary"
+              onClick={onVacantes}
+            >
+              <BriefcaseBusiness size={16} />
+              Ver sus vacantes
+            </button>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={onCsv}
+              disabled={descargando}
+            >
+              <Download size={16} />
+              {descargando ? "Descargando…" : "Descargar su CSV de hoy"}
+            </button>
+            {!cortes.length && (
+              <button
+                type="button"
+                className="button secondary"
+                onClick={onEditar}
+              >
+                <Pencil size={15} />
+                Editar perfil
+              </button>
+            )}
+          </div>
+        </div>
+
+        <section className="detalle-seccion detalle-derecha">
+          <h3>Por confirmar ({pendientes.length})</h3>
+          {!pendientes.length && (
+            <p className="field-help">Nada pendiente para este cliente.</p>
+          )}
+          {visibles.map((r) => {
+            const paises = paisesDe(r);
+            return (
+              <article key={r.vacante_id} className="detalle-pendiente">
+                <small>
+                  {r.motivo || "País por confirmar"}
+                  {paises?.length
+                    ? " · sugerido: " +
+                      paises.slice(0, 3).map(nombreLugar).join(", ") +
+                      (paises.length > 3 ? ` y ${paises.length - 3} más` : "")
+                    : ""}
+                </small>
+                <strong>{r.titulo}</strong>
+                <span className="tarjeta-detalle">
+                  {[r.empresa, r.ubicacion].filter(Boolean).join(" · ")}
+                </span>
+                <div className="fila-botones">
+                  {paises ? (
+                    <button
+                      type="button"
+                      className="button primary"
+                      disabled={ocupado === r.vacante_id}
+                      onClick={() => decidir(r, "sirve")}
+                    >
+                      Sí, sirve
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="button secondary"
+                      onClick={onRevisar}
+                    >
+                      Elegir país en Por confirmar
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="button secondary"
+                    disabled={ocupado === r.vacante_id}
+                    onClick={() => decidir(r, "no_sirve")}
+                  >
+                    No sirve
+                  </button>
+                  {r.enlace && (
+                    <a
+                      className="button secondary"
+                      href={r.enlace}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Ver aviso
+                    </a>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+          {pendientes.length > visibles.length && (
+            <button type="button" className="text-button" onClick={onRevisar}>
+              Ver las {pendientes.length} en Por confirmar
+            </button>
+          )}
+        </section>
+      </div>
     </Dialog>
   );
 }
@@ -4472,32 +4515,15 @@ function App() {
               </span>
             </div>
           )}
-          {(tab !== "Resumen" || !sesion.demo) && (
+          {tab !== "Resumen" && (
             <div className="page-top">
-              {tab !== "Resumen" ? (
-                <button
-                  className="text-button volver"
-                  onClick={() => go("Resumen")}
-                >
-                  <ArrowLeft size={15} />
-                  Volver al resumen
-                </button>
-              ) : (
-                <span />
-              )}
-              {!sesion.demo && (
-                <button
-                  className="text-button"
-                  onClick={async () => {
-                    await api("/auth/logout", { method: "POST" });
-                    setSesion({ ...sesion, sesion: false });
-                    setEstado(null);
-                  }}
-                >
-                  <LogOut size={15} />
-                  Cerrar sesión
-                </button>
-              )}
+              <button
+                className="text-button volver"
+                onClick={() => go("Resumen")}
+              >
+                <ArrowLeft size={15} />
+                Volver al resumen
+              </button>
             </div>
           )}
           <div className="page-heading">
@@ -4524,16 +4550,17 @@ function App() {
             <div className="heading-actions">
               {["Resumen", "Clientes", "Cargos y metas"].includes(tab) && (
                 <>
-                  <span className={"flow-pill" + (dirty ? " pending" : "")}>
-                    {dirty
-                      ? "Cambios sin guardar"
-                      : estado?.publicada &&
-                          estado.publicada.revision === estado.revision
-                        ? "Programado desde el " +
-                          fecha(estado.publicada.vigente_desde)
-                        : estado?.revision
-                          ? "Borrador guardado, sin programar"
-                          : "Sin configuración programada"}
+                  <span
+                    className={
+                      "flow-pill" +
+                      (dirty ||
+                      (estado?.revision &&
+                        estado.publicada?.revision !== estado.revision)
+                        ? " pending"
+                        : "")
+                    }
+                  >
+                    {textoProgramacion(estado, dirty)}
                   </span>
                   <button
                     className="button secondary"
@@ -4547,10 +4574,10 @@ function App() {
                     <strong>Guardar borrador</strong> conserva tus cambios sin
                     tocar la próxima búsqueda.{" "}
                     <strong>Programar para mañana</strong> los guarda y los usa
-                    desde la búsqueda de las 6:30 a. m. (hora Colombia).
-                    «Programado desde el …» es el día desde el que las búsquedas
-                    usan esta configuración; las que ya empezaron siguen con la
-                    anterior.
+                    desde la búsqueda de las 6:30 a. m. (hora Colombia); en ese
+                    mismo cuadro, <strong>Aplicar hoy</strong> los usa desde la
+                    próxima búsqueda de hoy. Las búsquedas que ya empezaron
+                    siguen con la configuración anterior.
                   </Ayuda>
                   <button
                     className="button primary"
@@ -4563,11 +4590,25 @@ function App() {
                 </>
               )}
               <BotonTema />
+              {!sesion.demo && (
+                <button
+                  className="button secondary boton-tema cerrar-sesion"
+                  aria-label="Cerrar sesión"
+                  title="Cerrar sesión"
+                  onClick={async () => {
+                    await api("/auth/logout", { method: "POST" });
+                    setSesion({ ...sesion, sesion: false });
+                    setEstado(null);
+                  }}
+                >
+                  <LogOut size={17} />
+                </button>
+              )}
             </div>
           </div>
           {tab === "Resumen" && (
             <>
-              <AvisoUltimaBusqueda ultima={runs?.[0]} />
+              <AvisoUltimaBusqueda ultima={runs?.[0]} soloFallo />
               <TarjetasResumen
                 clientes={resumenDeClientes(draft, porCliente, pendientes)}
                 diaConteo={porCliente?.dias.at(-1)?.fecha}
@@ -4616,6 +4657,13 @@ function App() {
                         go("Por confirmar");
                       }}
                       onCsv={() => descargarBase(c.id)}
+                      onEditar={() => {
+                        setDetalle("");
+                        setEditCliente(
+                          draft.clientes.find((x) => x.id === c.id) || null,
+                        );
+                        setModal("cliente");
+                      }}
                       descargando={descargandoBase}
                     />
                   ) : null;
@@ -4760,21 +4808,10 @@ function App() {
               <div className={"allocation card " + (excede ? "invalid" : "")}>
                 <div className="field techo-campo">
                   <label htmlFor="techo-diario">Techo del día</label>
-                  <input
-                    id="techo-diario"
-                    type="number"
-                    min={1}
-                    max={600}
-                    value={metas.techo}
-                    onChange={(e) =>
-                      cambiar({
-                        ...draft,
-                        techo_diario: Math.max(
-                          1,
-                          Math.min(600, Number(e.target.value) || 1),
-                        ),
-                      })
-                    }
+                  <CampoTecho
+                    key={metas.techo}
+                    valor={metas.techo}
+                    onCambio={(n) => cambiar({ ...draft, techo_diario: n })}
                   />
                 </div>
                 <p className="allocation-texto">
@@ -4807,125 +4844,166 @@ function App() {
                   Añadir cargo
                 </button>
               </div>
-              <div className="role-list">
-                {cargos.map((c, i) => (
-                  <section className="role-card card" key={c.id}>
-                    <div className="role-top">
-                      <div
-                        className="role-symbol"
-                        style={{
-                          color: colores[i % 5],
-                          background: `color-mix(in srgb, ${colores[i % 5]} 10%, transparent)`,
+              <div className="cargos-tablero">
+                <div className="role-list">
+                  {[...cargos]
+                    .sort((a, b) => b.cupo - a.cupo)
+                    .map((c, i) => (
+                      <section
+                        className="role-card card"
+                        key={c.id}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("text/plain", c.id);
+                          e.dataTransfer.effectAllowed = "move";
                         }}
                       >
-                        {c.nombre.toLowerCase().includes("front") ? (
-                          <Code2 size={23} />
-                        ) : (
-                          <BriefcaseBusiness size={23} />
-                        )}
-                      </div>
-                      <div className="role-info">
-                        <h3>{c.nombre}</h3>
-                        <span>
-                          <Users size={13} />
-                          {clientCount(c.id)}{" "}
-                          {clientCount(c.id) === 1
-                            ? "cliente compatible"
-                            : "clientes con este cargo"}
-                        </span>
+                        <div className="role-top">
+                          <div
+                            className="role-symbol"
+                            style={{
+                              color: colores[i % 5],
+                              background: `color-mix(in srgb, ${colores[i % 5]} 10%, transparent)`,
+                            }}
+                          >
+                            {c.nombre.toLowerCase().includes("front") ? (
+                              <Code2 size={23} />
+                            ) : (
+                              <BriefcaseBusiness size={23} />
+                            )}
+                          </div>
+                          <div className="role-info">
+                            <h3>{c.nombre}</h3>
+                            <span>
+                              <Users size={13} />
+                              {clientCount(c.id)}{" "}
+                              {clientCount(c.id) === 1
+                                ? "cliente compatible"
+                                : "clientes con este cargo"}
+                            </span>
+                          </div>
+                          <button
+                            className="icon"
+                            aria-label={"Editar " + c.nombre}
+                            onClick={() => {
+                              setEditCargo(c);
+                              setModal("cargo");
+                            }}
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button
+                            className="icon"
+                            aria-label={"Archivar " + c.nombre}
+                            onClick={() => {
+                              setArchive({
+                                tipo: "cargo",
+                                id: c.id,
+                                nombre: c.nombre,
+                              });
+                              setModal("archivo");
+                            }}
+                          >
+                            <Archive size={16} />
+                          </button>
+                        </div>
                         <PreviewCargo
                           info={previaCargos.datos?.cargos?.[c.id]}
                           estado={previaCargos.estado}
                         />
-                      </div>
-                      <button
-                        className="icon"
-                        aria-label={"Editar " + c.nombre}
-                        onClick={() => {
-                          setEditCargo(c);
-                          setModal("cargo");
-                        }}
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      <button
-                        className="icon"
-                        aria-label={"Archivar " + c.nombre}
-                        onClick={() => {
-                          setArchive({
-                            tipo: "cargo",
-                            id: c.id,
-                            nombre: c.nombre,
-                          });
-                          setModal("archivo");
-                        }}
-                      >
-                        <Archive size={16} />
-                      </button>
-                    </div>
-                    <div className="role-terms">
-                      <span>También buscará</span>
-                      {c.terminos_similares.slice(0, 5).map((t) => (
-                        <span className="term readonly" key={t}>
-                          {t}
-                        </span>
+                        <div className="role-terms">
+                          <span>También buscará</span>
+                          {c.terminos_similares.slice(0, 5).map((t) => (
+                            <span className="term readonly" key={t}>
+                              {t}
+                            </span>
+                          ))}
+                          {!c.terminos_similares.length && (
+                            <span className="helper">
+                              Añade o descubre denominaciones afines.
+                            </span>
+                          )}
+                        </div>
+                        <CifrasCargo
+                          meta={c.cupo}
+                          llegaron={llegaronHoy(runs?.[0], c.nombre)}
+                          disponibles={
+                            previaCargos.datos?.cargos?.[c.id]?.disponibles
+                          }
+                        />
+                        {clientCount(c.id) === 0 && (
+                          <p className="role-warning">
+                            Sin perfiles: este cargo no busca hasta que un
+                            cliente lo tenga.{" "}
+                            <button
+                              type="button"
+                              className="text-button"
+                              onClick={() => {
+                                setArchive({
+                                  tipo: "cargo",
+                                  id: c.id,
+                                  nombre: c.nombre,
+                                });
+                                setModal("archivo");
+                              }}
+                            >
+                              Archivarlo
+                            </button>
+                          </p>
+                        )}
+                      </section>
+                    ))}
+                </div>
+                <aside
+                  className="cargos-archivados card"
+                  aria-label="Cargos archivados"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const c = draft.cargos.find(
+                      (x) => x.id === e.dataTransfer.getData("text/plain"),
+                    );
+                    if (c?.activo) {
+                      setArchive({ tipo: "cargo", id: c.id, nombre: c.nombre });
+                      setModal("archivo");
+                    }
+                  }}
+                >
+                  <h3>
+                    <Archive size={16} />
+                    Archivados ({draft.cargos.filter((c) => !c.activo).length})
+                  </h3>
+                  <p className="field-help">
+                    Arrastra un cargo aquí para archivarlo, o usa su botón de
+                    archivar. Vuelve solo si le asignas un perfil.
+                  </p>
+                  <ul>
+                    {draft.cargos
+                      .filter((c) => !c.activo)
+                      .map((c) => (
+                        <li key={c.id}>
+                          <span>{c.nombre}</span>
+                          <button
+                            className="text-button"
+                            onClick={() =>
+                              cambiar({
+                                ...draft,
+                                cargos: draft.cargos.map((x) =>
+                                  x.id === c.id ? { ...x, activo: true } : x,
+                                ),
+                              })
+                            }
+                          >
+                            Reactivar
+                          </button>
+                        </li>
                       ))}
-                      {!c.terminos_similares.length && (
-                        <span className="helper">
-                          Añade o descubre denominaciones afines.
-                        </span>
-                      )}
-                    </div>
-                    <p className="role-quota">
-                      Meta del día: <strong>{c.cupo}</strong>{" "}
-                      {c.cupo === 1 ? "vacante" : "vacantes"}
-                      <span className="helper">
-                        {" "}
-                        · suma de las metas de sus perfiles
-                      </span>
-                    </p>
-                    {clientCount(c.id) === 0 && (
-                      <p className="role-warning">
-                        Sin perfiles: este cargo no busca hasta que un cliente
-                        lo tenga.
-                      </p>
-                    )}
-                  </section>
-                ))}
+                  </ul>
+                </aside>
               </div>
               {previaCargos.datos?.nota && (
                 <p className="helper note">{previaCargos.datos.nota}</p>
               )}
-              <Plegable
-                className="archived"
-                mostrar={
-                  "Ver archivados (" +
-                  draft.cargos.filter((c) => !c.activo).length +
-                  ")"
-                }
-                ocultar="Ocultar archivados"
-              >
-                {draft.cargos
-                  .filter((c) => !c.activo)
-                  .map((c) => (
-                    <div key={c.id}>
-                      {c.nombre}
-                      <button
-                        className="text-button"
-                        onClick={() =>
-                          cambiar({
-                            ...draft,
-                            cargos: draft.cargos.map((x) =>
-                              x.id === c.id ? { ...x, activo: true } : x,
-                            ),
-                          })
-                        }
-                      >
-                        Reactivar
-                      </button>
-                    </div>
-                  ))}
-              </Plegable>
               <div className="info-line bottom-info">
                 <ShieldCheck size={18} />
                 <p>
@@ -5115,6 +5193,7 @@ function App() {
           {tab === "Mensajes" && (
             <Mensajes clientes={draft.clientes} notify={notify} />
           )}
+          {tab === "Actividad" && <AvisoUltimaBusqueda ultima={runs?.[0]} />}
           {tab === "Actividad" && (
             <section className="card activity">
               <div className="section-title">
@@ -5232,8 +5311,15 @@ function App() {
             cambiar({ ...draft, cargos: [...draft.cargos, nuevo] })
           }
           onSave={(c, ps) => {
+            // Lista grande del 16 nov: un cargo archivado vuelve solo cuando se le asigna un perfil.
+            const usados = new Set(
+              ps.filter((p) => p.activo).map((p) => p.cargo_id),
+            );
             cambiar({
               ...draft,
+              cargos: draft.cargos.map((x) =>
+                !x.activo && usados.has(x.id) ? { ...x, activo: true } : x,
+              ),
               clientes: draft.clientes.some((x) => x.id === c.id)
                 ? draft.clientes.map((x) => (x.id === c.id ? c : x))
                 : [...draft.clientes, c],
@@ -5341,6 +5427,16 @@ function App() {
               ? `Desde la próxima búsqueda programada, «${archive.nombre}» deja de recibir vacantes. Las vacantes que ya recibió se conservan y puedes reactivarlo cuando quieras.`
               : `Desde la próxima búsqueda programada se deja de buscar «${archive.nombre}». Las vacantes ya entregadas se conservan.`}
           </p>
+          {archive.tipo === "cargo" && clientCount(archive.id) > 0 && (
+            <p className="role-warning" role="alert">
+              Atención: {clientCount(archive.id)}{" "}
+              {clientCount(archive.id) === 1
+                ? "cliente tiene"
+                : "clientes tienen"}{" "}
+              este cargo. Dejarán de recibir sus vacantes hasta que vuelvas a
+              activarlo o les asignes otro.
+            </p>
+          )}
           <div className="dialog-actions">
             <button className="button secondary" onClick={() => setModal(null)}>
               Cancelar
@@ -5426,8 +5522,15 @@ function App() {
   );
 }
 // Avisos dentro del panel, sin correo ni servicios externos (decisión del operador, 13 nov).
-function AvisoUltimaBusqueda({ ultima }: { ultima?: Ejecucion }) {
-  if (!ultima) return null;
+// Lista grande del 16 nov: en el Resumen el aviso solo aparece si la búsqueda falló; lo demás vive en «Actividad».
+function AvisoUltimaBusqueda({
+  ultima,
+  soloFallo = false,
+}: {
+  ultima?: Ejecucion;
+  soloFallo?: boolean;
+}) {
+  if (!ultima || (soloFallo && ultima.estado !== "fallida")) return null;
   const r = ultima.resumen || {};
   const faltan = Object.entries(r.faltantes || {})
     .filter(([, n]) => n > 0)
@@ -5450,6 +5553,97 @@ function AvisoUltimaBusqueda({ ultima }: { ultima?: Ejecucion }) {
           : ""}
     </div>
   );
+}
+// Lista grande del 16 nov: el techo se puede borrar del todo mientras se escribe; se valida al salir del campo.
+function CampoTecho({
+  valor,
+  onCambio,
+}: {
+  valor: number;
+  onCambio: (n: number) => void;
+}) {
+  // Se reinicia con `key` cuando cambia el valor guardado (sin efecto que copie el estado).
+  const [texto, setTexto] = useState(String(valor));
+  const confirmar = () => {
+    const n = Math.round(Number(texto));
+    if (!texto.trim() || !Number.isFinite(n)) return setTexto(String(valor));
+    const limitado = Math.max(1, Math.min(600, n));
+    setTexto(String(limitado));
+    if (limitado !== valor) onCambio(limitado);
+  };
+  return (
+    <input
+      id="techo-diario"
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      value={texto}
+      onChange={(e) => setTexto(e.target.value.replace(/[^0-9]/g, ""))}
+      onBlur={confirmar}
+      onKeyDown={(e) => e.key === "Enter" && confirmar()}
+    />
+  );
+}
+
+function llegaronHoy(ultima: Ejecucion | undefined, cargo: string) {
+  if (!ultima || ultima.fecha !== hoyBogota()) return undefined;
+  return ultima.resumen?.embudo?.[cargo]?.entregadas;
+}
+
+// Lista grande del 16 nov: tres cifras por cargo, con su explicación a mano.
+function CifrasCargo({
+  meta,
+  llegaron,
+  disponibles,
+}: {
+  meta: number;
+  llegaron?: number;
+  disponibles?: number;
+}) {
+  return (
+    <dl className="cifras-cargo">
+      <div>
+        <dt>
+          Meta del día
+          <Ayuda etiqueta="Meta del día">
+            Suma de las metas diarias de los perfiles de este cargo.
+          </Ayuda>
+        </dt>
+        <dd>{meta}</dd>
+      </div>
+      <div>
+        <dt>
+          Llegaron hoy
+          <Ayuda etiqueta="Llegaron hoy">
+            Vacantes de este cargo que entregó la búsqueda de hoy. Antes de las
+            6:30 a. m. aparece «—».
+          </Ayuda>
+        </dt>
+        <dd>{llegaron ?? "—"}</dd>
+      </div>
+      <div>
+        <dt>
+          Para mañana
+          <Ayuda etiqueta="Disponibles para mañana">
+            Estimación: vacantes ya guardadas, aún no entregadas, que cumplen
+            algún perfil de este cargo. La búsqueda de mañana suma otras nuevas.
+          </Ayuda>
+        </dt>
+        <dd>{disponibles ?? "—"}</dd>
+      </div>
+    </dl>
+  );
+}
+
+// Lista grande del 16 nov: «Programado desde» confundía. Se dice qué pasa con la próxima búsqueda, en palabras.
+function textoProgramacion(estado: EstadoConfig | null, dirty: boolean) {
+  if (dirty) return "Cambios sin guardar";
+  if (!estado?.revision) return "Sin configuración programada";
+  const p = estado.publicada;
+  if (!p || p.revision !== estado.revision) return "Hay cambios sin programar";
+  return p.vigente_desde > hoyBogota()
+    ? "Lista: se usa desde la búsqueda de mañana"
+    : "En uso desde el " + fecha(p.vigente_desde);
 }
 function Empty({
   icon: Icon,
