@@ -3,7 +3,7 @@ pytest==9.0.3
 rapidfuzz==3.10.1
 requests==2.33.0
 python-jobspy==1.4.1
-psycopg[binary]==3.2.13
+psycopg[binary]==3.3.9
 cryptography==50.0.0
 
 fastapi==0.162.0
