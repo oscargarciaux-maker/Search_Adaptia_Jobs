@@ -1,0 +1,38 @@
+# Contrato v32: áreas metropolitanas con el formato de LinkedIn («Roma y alrededores», «Greater Madrid Area»,
+# «Área metropolitana de Guadalajara»). El nombre solo puede repetirse en otros países (hay una «Roma» en México y en
+# EE. UU.), pero el área con ese sufijo es la de la ciudad grande. Solo se usa cuando el nombre lleva uno de esos
+# sufijos; «Roma» o «Granada» solos siguen preguntándose. Clave: nombre sin tildes en minúsculas; valor: código ISO.
+# Para añadir uno: el nombre como lo escribe LinkedIn antes de «y alrededores» y el país de la ciudad grande.
+roma: IT
+rome: IT
+milan: IT
+milano: IT
+napoles: IT
+naples: IT
+turin: IT
+paris: FR
+lyon: FR
+londres: GB
+london: GB
+manchester: GB
+berlin: DE
+munich: DE
+hamburgo: DE
+hamburg: DE
+lisboa: PT
+lisbon: PT
+oporto: PT
+porto: PT
+amsterdam: NL
+bruselas: BE
+brussels: BE
+dublin: IE
+granada: ES
+valencia: ES
+toledo: ES
+guadalajara: MX
+merida: MX
+leon: MX
+santiago: CL
+cordoba: AR
+san jose: CR

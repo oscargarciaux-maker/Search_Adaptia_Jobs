@@ -122,11 +122,15 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
     def f_linkedin():
         t0 = time.monotonic()
         cliente = Cliente(pausa=tuple(p["pausa_linkedin"]))
+        # Contrato v32: la relectura de fichas guardadas sin descripción rinde (sin descripción no se entrega), así que
+        # se le reserva una parte del tiempo de LinkedIn en vez de dejarle solo lo que sobre de la búsqueda.
+        relee = bool(previas and p.get("linkedin_relectura", 0) and not solo_mapa)
         crudas, stats = linkedin_publico.buscar(cliente, mapa, activos, estado["linkedin"],
                                                 p["linkedin_busquedas"], hoy=hoy, max_fichas=p["linkedin_fichas"],
-                                                max_dias=cfg["dias_maximos"], limite_segundos=limite,
+                                                max_dias=cfg["dias_maximos"],
+                                                limite_segundos=limite * (0.65 if relee else 1),
                                                 prioritarias=prioritarias)
-        if previas and p.get("linkedin_relectura", 0) and not solo_mapa:
+        if relee:
             extra, stats["relectura"] = linkedin_publico.completar_descripciones(
                 cliente, previas, p["linkedin_relectura"], hoy=hoy, max_dias=cfg["dias_maximos"],
                 limite_segundos=max(0, limite - (time.monotonic() - t0)), prioritarias=prioritarias)

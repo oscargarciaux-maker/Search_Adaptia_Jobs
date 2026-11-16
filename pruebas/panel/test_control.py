@@ -113,16 +113,23 @@ def test_filtros_independientes_excluyen_antes_de_repartir(cfg, cambio, motivo):
     assert not r["compatible"] and any(motivo in m for m in r["motivos"])
 
 
-@pytest.mark.parametrize("cambio,aviso", [
-    ({"anos_min": 10}, "Pide 10 años de experiencia"),
-    ({"ingles": "fluido", "_descripcion": "English C1 required. " * 20}, "Pide inglés C1"),
-])
-def test_v27_anos_e_ingles_no_descartan_y_dejan_aviso(cfg, cambio, aviso):
-    """Contrato v27: solo la ubicación y el idioma descartan; lo demás ordena y queda como etiqueta."""
+def test_v27_anos_no_descartan_y_dejan_aviso(cfg):
+    """Contrato v27: los años ordenan y quedan como etiqueta."""
     p = cfg["perfiles"][0]
-    r = afinidad.evaluar(trabajo(**cambio), p, hoy())
-    assert r["compatible"] and aviso in r["avisos"] and afinidad.faltas(r) == 1
+    r = afinidad.evaluar(trabajo(anos_min=10), p, hoy())
+    assert r["compatible"] and "Pide 10 años de experiencia" in r["avisos"] and afinidad.faltas(r) == 1
     assert afinidad.faltas(afinidad.evaluar(trabajo(), p, hoy())) == 0
+
+
+def test_v32_ingles_exigido_mayor_descarta_y_el_deseable_no(cfg):
+    """Contrato v32 (decisión de Oscar, 16 nov): el inglés exigido por encima del perfil descarta; deseable, no."""
+    p = cfg["perfiles"][0]  # inglés hasta B2
+    exigido = afinidad.evaluar(trabajo(ingles="fluido", _descripcion="English C1 required. " * 20), p, hoy())
+    assert not exigido["compatible"] and "inglés requerido superior al indicado" in exigido["motivos"]
+    deseable = afinidad.evaluar(trabajo(_descripcion="English C1 is a plus. Nice to have. " * 20), p, hoy())
+    assert deseable["compatible"]
+    igual = afinidad.evaluar(trabajo(_descripcion="English B2 required. " * 20), p, hoy())
+    assert igual["compatible"]
 
 
 def test_v27_sin_dato_de_anos_no_descarta_ni_avisa(cfg):

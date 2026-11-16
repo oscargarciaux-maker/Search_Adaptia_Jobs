@@ -114,7 +114,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
     avisos, vistos = [], set()
     hechas = fallidas = seguidas = 0
     for familia, consultas, codigo, _ in todas:
-        if hechas >= presupuesto or seguidas >= 4 or (limite_segundos and reloj() - inicio > limite_segundos):
+        if hechas >= presupuesto or seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
             break
         consulta = cobertura.rotar(consultas, hoy, 1, desfase=desfase_terminos)[0]
         sitio = SITIOS[codigo]
@@ -141,7 +141,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
     crudas, con_ficha, cerradas = [], 0, 0
     for a in avisos:
         descripcion, fecha, cerrada = "", "", False
-        if con_ficha < max_fichas and seguidas < 4 and not (limite_segundos and reloj() - inicio > limite_segundos):
+        if con_ficha < max_fichas and seguidas < 4 and not (limite_segundos is not None and reloj() - inicio >= limite_segundos):
             r = cliente.get(a["enlace"])
             if r is not None and r.status_code == 200:
                 descripcion, fecha, cerrada = ficha(r.text, hoy)

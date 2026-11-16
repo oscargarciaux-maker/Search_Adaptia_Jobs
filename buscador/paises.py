@@ -19,6 +19,26 @@ from buscador import normalizar
 RUTA = Path(__file__).resolve().parent.parent / "datos" / "paises.yaml"
 RUTA_MUNDO = RUTA.parent / "paises_mundo.yaml"
 RUTA_LUGARES = RUTA.parent / "lugares_mundo.json.gz"  # contrato v19: GeoNames (CC BY 4.0), generado
+RUTA_AREAS = RUTA.parent / "areas_metropolitanas.yaml"  # contrato v32
+_METRO = re.compile(r"^(?:area metropolitana de |region metropolitana de |greater )(.+?)(?: area| metropolitan area)?$|"
+                    r"^(.+?) (?:y alrededores|and surrounding areas|metropolitan area|area metropolitana|area)$")
+
+
+@lru_cache(maxsize=1)
+def areas_metropolitanas():
+    try:
+        crudo = yaml.safe_load(RUTA_AREAS.read_text(encoding="utf-8")) or {}
+    except OSError:
+        return {}
+    return {normalizar.texto(k): str(v).upper() for k, v in crudo.items()}
+
+
+def area_metropolitana(texto):
+    """Contrato v32: el país de un área metropolitana con formato LinkedIn («Roma y alrededores» → IT), o ""."""
+    m = _METRO.match(normalizar.texto(texto or ""))
+    if not m:
+        return ""
+    return areas_metropolitanas().get((m.group(1) or m.group(2) or "").strip(), "")
 
 _REMOTO = re.compile(r"\b(remote|remoto|remota|remotely|teletrabajo|home ?office|work from home|wfh|trabajo a distancia|"
                      r"100% remoto|distributed|fully distributed|anywhere|desde casa|trabajo desde casa|remote work)\b")
@@ -491,6 +511,9 @@ def alcance(titulo, ubicacion, descripcion=""):
     ubicacion_n = normalizar.texto(_expandir_codigos(ubicacion))
     titulo_n = normalizar.texto(titulo)
     hallados = paises_en_texto(ubicacion_n)
+    metro = area_metropolitana(_REMOTO.sub(" ", _HIBRIDO.sub(" ", _PRESENCIAL.sub(" ", ubicacion_n))))
+    if metro:  # contrato v32: «Granada y alrededores» es España, no Granada (el país del Caribe)
+        hallados = {metro}
     remoto_en = re.search(r"\bremote\s+(?:only\s+)?(?:in|from|within)\s+([a-z /.+]{2,80})", titulo_n)
     frases = _restricciones(normalizar.texto(descripcion)[:30000]) + _restricciones(titulo_n) + \
         ([remoto_en.group(1)] if remoto_en else [])
@@ -525,6 +548,11 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
     ciudad_sola = re.sub(r"^(?:area metropolitana de |region metropolitana de |greater )", "", ciudad_sola)
     ciudad_sola = re.sub(r" (?:y alrededores|and surrounding areas|metropolitan area|area)$", "", ciudad_sola)
     ciudades = d["ciudades"].get(ciudad_sola,[])
+    # Contrato v32: «Roma y alrededores», «Greater Madrid Area»: el área de la ciudad grande, aunque el nombre exista en
+    # otros países. Sin el sufijo, un nombre ambiguo sigue sin decidir.
+    metro = "" if nombres_pais else area_metropolitana(_REMOTO.sub(" ", _HIBRIDO.sub(" ", _PRESENCIAL.sub(" ", geografia))))
+    if metro and metro in todos:
+        ciudades = [metro]
     if not nombres_pais and not ciudades and not _nombra(ciudad_sola, d["fuera_lugares"]):
         ciudades = _ciudad_dentro(ciudad_sola, d["ciudades"])
     nombrados = nombres_pais or ciudades
@@ -534,7 +562,7 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
     ambito_sin_propios = ambito
     for frase in d["propios_con_fuera"]:
         ambito_sin_propios = re.sub(r"(?<![a-z0-9])" + re.escape(frase) + r"(?![a-z0-9])", " ", ambito_sin_propios)
-    fuera = _nombra(ambito_sin_propios, d["fuera_lugares"])
+    fuera = _nombra(ambito_sin_propios, d["fuera_lugares"]) or bool(metro and metro not in todos)
     if not nombrados and not fuera and not es_latam and not es_mundo and not es_europa:
         por_lugar = lugar_conocido(ubicacion)  # contrato v19: municipios y ciudades del mundo, solo si nada más decidió
         if por_lugar == "fuera":

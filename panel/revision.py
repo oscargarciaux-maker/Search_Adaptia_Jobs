@@ -172,6 +172,9 @@ def _candidatos_funciones(repo, perfiles, recibidas, estrictas, fecha, desde, mo
     return salida
 
 
+APLICAR_SUGERENCIAS = True  # contrato v32: las sugerencias claras se aplican solas en la cola de la noche
+
+
 def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, avance=None):
     """Arma la cola del día al final de la búsqueda (panel/ejecutor.registrar). Devuelve solo conteos.
     `completa` (contrato v17, botón «Cargar todas las dudosas»): todas las vacantes por confirmar del catálogo, también
@@ -184,6 +187,7 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, ava
     for f in filas_hoy:
         recibidas.setdefault(f["perfil_id"], set()).add(f["vacante_id"])
     candidatos, leidas, fuera_idioma, ya_claras = [], 0, 0, 0
+    automaticas = {}  # vacante_id → sugerencia clara que se aplica sola (contrato v32)
     filas_catalogo = list(repo.candidatas_por_confirmar(desde))
     sin_revisar = {}  # vacante_id → motivo: cada vacante se evalúa una sola vez por llamada
 
@@ -213,6 +217,13 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, ava
                           "faltan": estrictas.get(p.id, 0) < MINIMO_POR_PERFIL})
         if sirve or completa:
             texto = pista(datos.get("_descripcion", ""), datos.get("ubicacion", ""))
+            # Contrato v32: si el aviso lo dice claro (países cubiertos sin extranjeros, o solo extranjeros), la
+            # sugerencia se aplica sola y no ocupa la bandeja. «Sin evidencia» o mezclas siguen preguntándose.
+            if not completa and APLICAR_SUGERENCIAS:
+                from panel.sugerir import sugerir
+                s_auto = sugerir(datos)
+                if s_auto["decision"] == "otro_pais" or (s_auto["decision"] == "sirve" and s_auto["paises"]):
+                    automaticas[fila["id"]] = s_auto
             # Las cargadas a mano (botón) siempre son «depuración completa»: la búsqueda siguiente no las vence.
             candidatos.append({"vacante_id": fila["id"], "motivo": DEPURACION if completa else MOTIVO, "pista": texto,
                                "ubicacion": clave_ubicacion(datos.get("ubicacion", "")), "sugerencia": sugerencia(texto),
@@ -281,6 +292,19 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, ava
                     decidir(repo, c["vacante_id"], "otro_pais", fecha=fecha, por="regla")
             except Exception as e:  # noqa: BLE001 — una regla que no aplica no impide armar la cola
                 registro.aviso("revision:281", e)
+    por_sugerencia = 0
+    pendientes_ids = {r["vacante_id"] for r in repo.revisiones(estado="pendiente")}
+    for vid, s_auto in automaticas.items():
+        if vid not in pendientes_ids:
+            continue
+        try:
+            if s_auto["decision"] == "sirve":
+                decidir(repo, vid, "sirve", s_auto["paises"], fecha=fecha, por="sugerencia")
+            else:
+                decidir(repo, vid, "otro_pais", fecha=fecha, por="sugerencia")
+            por_sugerencia += 1
+        except Exception as e:  # noqa: BLE001 — si no se puede aplicar, queda en la bandeja para la persona
+            registro.aviso("revision:sugerencia", e)
     actuales = repo.revisiones(estado="pendiente")
     diagnostico = {}
     if completa and not leidas and hasattr(repo, "conteo_dudosas"):
@@ -289,6 +313,7 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, ava
         except Exception:  # noqa: BLE001
             diagnostico = {}
     return {"por_confirmar": len(actuales), "resueltas_por_regla": por_regla, "agregadas": len(nuevas) - por_regla,
+            "resueltas_por_sugerencia": por_sugerencia,
             "diagnostico": diagnostico,
             "leidas_del_catalogo": leidas, "fuera_por_idioma": fuera_idioma, "ya_claras": ya_claras,
             "por_confirmar_faltantes": sum(1 for r in actuales if any(p.get("faltan") for p in r.get("perfiles") or []))}
@@ -387,7 +412,8 @@ def decidir(repo, vacante_id, decision, codigos=(), aplicar_a_iguales=False, fec
         cambios = {"estado": "descartada", "paises": []}
     if decision != "saltar":  # contrato v17: quién decidió y qué; el aprendizaje solo usa decisiones de lugar del operador
         from panel.aprender import ETIQUETAS
-        cambios["motivo"] = ETIQUETAS[decision] if por == "operador" else "decidida por regla"
+        cambios["motivo"] = (ETIQUETAS[decision] if por == "operador" else
+                             "decidida por sugerencia clara" if por == "sugerencia" else "decidida por regla")
     repo.actualizar_revision(vacante_id, {**cambios, "decidida_en": datetime.now(timezone.utc).isoformat()})
     if funciones:
         if decision == "sirve":
