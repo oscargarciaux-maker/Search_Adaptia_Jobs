@@ -1,0 +1,32 @@
+# Herramientas de calidad (PR 1.5, 16 nov). Solo configuración: el proyecto se instala con requirements.lock.
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+extend-exclude = ["web", "reportes"]
+
+[tool.ruff.lint]
+# Errores reales: sintaxis, nombres indefinidos o sin uso, y fallos típicos (bugbear). El estilo no se exige.
+select = ["E9", "F", "B"]
+ignore = [
+  "B008",  # FastAPI usa llamadas en los valores por defecto
+  "B905",  # zip() sin strict: las listas se arman juntas
+]
+
+[tool.ruff.lint.per-file-ignores]
+"pruebas/**" = ["B011", "B017"]
+
+[tool.vulture]
+paths = ["buscador", "panel"]
+min_confidence = 80
+ignore_names = ["cls"]
+
+[tool.bandit]
+exclude_dirs = ["pruebas", "web"]
+skips = ["B101"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+check_untyped_defs = false
+warn_unused_ignores = false
+files = ["panel"]

@@ -13,6 +13,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from buscador import entrega, normalizar, paises, vacante
+from buscador import registro
 from panel.afinidad import MINIMO_POR_PERFIL, evaluar
 from panel.terminos import grado
 
@@ -278,8 +279,8 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, ava
                     decidir(repo, c["vacante_id"], "sirve", resultado["paises"], fecha=fecha, por="regla")
                 else:
                     decidir(repo, c["vacante_id"], "otro_pais", fecha=fecha, por="regla")
-            except Exception:  # noqa: BLE001 — una regla que no aplica no impide armar la cola
-                pass
+            except Exception as e:  # noqa: BLE001 — una regla que no aplica no impide armar la cola
+                registro.aviso("revision:281", e)
     actuales = repo.revisiones(estado="pendiente")
     diagnostico = {}
     if completa and not leidas and hasattr(repo, "conteo_dudosas"):
@@ -386,8 +387,8 @@ def decidir(repo, vacante_id, decision, codigos=(), aplicar_a_iguales=False, fec
         try:  # los borradores pendientes y sin editar se rehacen con la vacante confirmada
             from panel import borradores
             borradores.generar(repo, fecha)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as e:  # noqa: BLE001
+            registro.aviso("revision:389", e)
     return {"decision": decision, "asignadas": asignadas, "iguales": iguales, "regla": regla}
 
 
@@ -582,8 +583,8 @@ def _al_catalogo(repo, rev, decision, codigos, por):
                 repo.actualizar_catalogo_datos(rev["vacante_id"], con_paises(datos, codigos, por))
         else:
             repo.archivar_catalogo(rev["vacante_id"], "descartada por el operador")
-    except Exception:  # noqa: BLE001 — la decisión ya quedó guardada; la búsqueda siguiente la aplica igual
-        pass
+    except Exception as e:  # noqa: BLE001 — la decisión ya quedó guardada; la búsqueda siguiente la aplica igual
+        registro.aviso("revision:585", e)
 
 
 def decisiones_para_busqueda(filas):

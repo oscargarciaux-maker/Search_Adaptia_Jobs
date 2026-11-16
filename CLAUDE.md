@@ -85,6 +85,11 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
 - Si algo del plan no está claro o falta una decisión, se pregunta antes de inventar una regla.
 
 ## Cómo se trabaja
+- Calidad (PR 1.5, 16 nov): dependencias con huella en `requirements.lock` (regenerar con el comando de
+  `pruebas/test_dependencias.py`; nunca `pip install` sin `--require-hashes`); job `auditoria` en CI (ruff, pip-audit,
+  bandit alto, eslint, npm audit bloquean; vulture y knip informan); prueba axe; errores tolerados dejan
+  `registro.aviso`; skill `auditoria-codigo`, lista `docs/estandares/LISTA_DE_CONTROL.md` y flujo «Inventario de la
+  base» (solo lectura). JobSpy no se copia al repo: su parte de Indeed trae la clave de la app de Indeed.
 - Completar el alcance autorizado en una rama, con un PR que Oscar revisa y fusiona; no auto-fusionar.
 - Pruebas obligatorias antes de cada push: `python -m pytest -q`; CI también comprueba PostgreSQL. La interfaz nueva requiere Node 24 para compilar; CI verifica formato, compilación y recorridos Playwright.
 - Prueba en vivo corta (unos 5 minutos, con internet): `python -m buscador.bodega --salida /tmp/prueba --prueba`.

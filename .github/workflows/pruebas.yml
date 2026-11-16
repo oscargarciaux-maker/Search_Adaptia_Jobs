@@ -23,7 +23,7 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - run: pip install -r requirements.txt
+      - run: pip install --require-hashes -r requirements.lock
       - run: npm ci
         working-directory: web
       - run: npx playwright install --with-deps chromium
@@ -64,7 +64,7 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-      - run: pip install -r requirements.txt
+      - run: pip install --require-hashes -r requirements.lock
       - name: Probar migración, repetición e integridad sin Supabase
         run: |
           psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -c 'create role anon; create role authenticated; create role service_role bypassrls;'
@@ -86,6 +86,7 @@ jobs:
           python -m pruebas.probar_traspaso
           python -m pruebas.probar_limpieza
           python -m pruebas.probar_revision
+          python -m pruebas.probar_inventario
   pruebas:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -95,5 +96,42 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -r requirements.txt
+      - run: pip install --require-hashes -r requirements.lock
       - run: python -m pytest -q
+  auditoria:
+    # PR 1.5 (16 nov): bloquea lo grave (errores de Python, vulnerabilidades conocidas, seguridad alta); lo demás informa.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: pip install --require-hashes -r requirements-auditoria.lock
+      - name: Errores de Python (ruff)
+        run: ruff check buscador panel pruebas
+      - name: Dependencias de Python con vulnerabilidades conocidas (pip-audit)
+        run: pip-audit -r requirements.lock --disable-pip --no-deps
+      - name: Seguridad del código, severidad alta (bandit)
+        run: bandit -q -c pyproject.toml -r buscador panel -lll
+      - name: Código sin uso (vulture, solo informa)
+        continue-on-error: true
+        run: vulture
+      - run: npm ci
+        working-directory: web
+      - name: Reglas de React y accesibilidad (eslint)
+        run: npm run lint
+        working-directory: web
+      - name: Archivos, exports y dependencias sin uso (knip, solo informa)
+        continue-on-error: true
+        run: npm run sobrante
+        working-directory: web
+      - name: Dependencias web con vulnerabilidades altas (npm audit)
+        run: npm audit --audit-level=high --omit=dev
+        working-directory: web

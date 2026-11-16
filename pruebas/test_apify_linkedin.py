@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from buscador import apify, cobertura, entrega, familias, vacante
+from buscador import apify, entrega, familias, vacante
 from buscador.fuentes import linkedin_apify, linkedin_publico, publicaciones_apify
 
 HOY = "2026-11-04"

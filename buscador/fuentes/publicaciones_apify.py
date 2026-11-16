@@ -178,8 +178,8 @@ def resolver_oferta(cliente, item, familias_validas):
         if respuesta is None or respuesta.status_code != 200:
             continue
         desc, cerrada, _, _ = linkedin_publico.ficha(respuesta.text)
-        def campo(patron):
-            m = re.search(patron, respuesta.text)
+        def campo(patron, texto=respuesta.text):
+            m = re.search(patron, texto)
             return linkedin_publico.texto_html(m.group(1)) if m else ""
         titulo = campo(r'<h1[^>]*>([\s\S]*?)</h1>')
         empresa = campo(r'topcard__org-name-link[^>]*>([\s\S]*?)</a>')

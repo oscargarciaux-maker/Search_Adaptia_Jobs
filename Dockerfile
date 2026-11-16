@@ -10,10 +10,10 @@ RUN npm run build
 FROM python:3.12-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
-COPY requirements.txt ./
+COPY requirements.txt requirements.lock ./
 RUN --mount=type=secret,id=combined_ca \
     if [ -f /run/secrets/combined_ca ]; then export PIP_CERT=/run/secrets/combined_ca; fi; \
-    pip install --no-cache-dir -r requirements.txt && useradd --create-home --uid 10001 operador
+    pip install --no-cache-dir --require-hashes -r requirements.lock && useradd --create-home --uid 10001 operador
 COPY buscador/ ./buscador/
 COPY panel/ ./panel/
 COPY datos/ ./datos/

@@ -1,11 +1,11 @@
 """Adaptador del control privado al motor de captura existente, sin datos de clientes en reportes públicos."""
 import argparse
 from contextlib import contextmanager
-from copy import deepcopy
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from buscador import bodega, entrega, familias, paises, supabase, normalizar
+from buscador import bodega, entrega, familias, paises, normalizar
+from buscador import registro
 from panel.afinidad import AMPLIACIONES, MINIMO_POR_PERFIL, evaluar, evaluar_ampliada
 from panel.modelos import Configuracion
 from pydantic import ValidationError
@@ -327,13 +327,13 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None):
     reutilizadas = posts = 0
     try:
         reutilizadas = _reutilizar(repo, cfg, fecha, estrictas, filas, fila)
-    except Exception:  # noqa: BLE001 — completar con días anteriores nunca impide registrar lo del día
-        pass
+    except Exception as e:  # noqa: BLE001 — completar con días anteriores nunca impide registrar lo del día
+        registro.aviso("ejecutor:329", e)
     bodega.etapa(f"Asignadas {len(filas)}; completar con posts a quien va corto")
     try:
         posts = _posts(repo, cfg, fecha, estrictas, filas, fila)
-    except Exception:  # noqa: BLE001 — los posts son el último recurso; nunca impiden registrar lo del día
-        pass
+    except Exception as e:  # noqa: BLE001 — los posts son el último recurso; nunca impiden registrar lo del día
+        registro.aviso("ejecutor:334", e)
     for inicio in range(0, len(filas), 250):
         repo.pedir("POST", "panel_asignaciones", params={"on_conflict": "ejecucion_id,perfil_id,vacante_id"},
                     json=filas[inicio:inicio + 250], headers={"Prefer":"resolution=ignore-duplicates"})
@@ -391,8 +391,8 @@ def correr(salida, modo="diario", prueba=False, repo=None):
                 try:  # contrato v17: cada decisión de la bandeja vale en esta búsqueda
                     from panel.revision import decisiones_para_busqueda
                     bodega._config_operativa["decisiones_operador"] = decisiones_para_busqueda(repo.decisiones_ubicacion())
-                except Exception:  # noqa: BLE001
-                    pass
+                except Exception as e:  # noqa: BLE001
+                    registro.aviso("ejecutor:393", e)
             previas = bodega._leer_json(Path(salida) / "trabajo/bodega.json.gz", [])
             cargos = version["configuracion"]["cargos"]
             bodega._config_operativa["empresas_objetivo"] = sorted({v["empresa"] for v in previas
@@ -403,15 +403,15 @@ def correr(salida, modo="diario", prueba=False, repo=None):
                 try:
                     from panel import aprender
                     reglas_info["ubicaciones_resueltas_por_reglas"] = aprender.guardar_usos(repo, reglas)
-                except Exception:  # noqa: BLE001
-                    pass
+                except Exception as e:  # noqa: BLE001
+                    registro.aviso("ejecutor:405", e)
             registrar(repo, version, fecha, reporte, reglas_info)
             if modo != "incremental":
                 try:  # borradores de WhatsApp listos para revisar; un fallo aquí nunca tumba la búsqueda
                     from panel import borradores
                     borradores.generar(repo, fecha)
-                except Exception:  # noqa: BLE001
-                    pass
+                except Exception as e:  # noqa: BLE001
+                    registro.aviso("ejecutor:412", e)
             return reporte
     except Exception:
         aviso = "La captura requiere revisión; se conserva su historial y pendientes."
@@ -423,8 +423,8 @@ def correr(salida, modo="diario", prueba=False, repo=None):
             else:
                 cambio = {"estado": "fallida", "resumen": {"error": aviso}}
             repo.pedir("PATCH", "panel_ejecuciones", params={"id": "eq." + ejecucion["id"]}, json=cambio)
-        except Exception:
-            pass
+        except Exception as e:
+            registro.aviso("ejecutor:425", e)
         raise
     finally:
         paises.cargar_reglas()  # las reglas viven solo durante esta búsqueda

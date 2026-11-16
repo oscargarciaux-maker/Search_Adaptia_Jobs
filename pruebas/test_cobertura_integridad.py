@@ -4,7 +4,7 @@ from datetime import date, timedelta
 import pandas as pd
 
 from buscador import cobertura, entrega, familias, paises, supabase, vacante
-from buscador.fuentes import ats, indeed, linkedin_publico
+from buscador.fuentes import ats, indeed
 
 HOY = "2026-11-04"
 TEXTO = "We are hiring a designer to improve our product with user research and prototyping. " * 6

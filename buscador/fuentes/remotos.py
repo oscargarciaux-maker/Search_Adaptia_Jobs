@@ -8,6 +8,7 @@ import re
 from html import unescape
 
 from buscador import enlaces, familias
+from buscador import registro
 
 NOMBRE = "Tableros remotos"
 REMOTIVE_CATEGORIAS = ["design", "software-development", "data", "devops", "product", "marketing", "customer-support",
@@ -115,7 +116,8 @@ def buscar(cliente, consultas_himalayas, cache, max_paginas=300):
                    lambda: wwr(cliente)):
         try:
             solo_nombres.extend(lector())
-        except Exception:  # noqa: BLE001 — un tablero caído no detiene a los demás
+        except Exception as e:  # noqa: BLE001 — un tablero caído no detiene a los demás
+            registro.aviso("remotos:118", e)
             continue
     empresas |= {x["empresa"] for x in solo_nombres if x.get("empresa") and _es_de_alguna_familia(x.get("titulo", ""))}
     stats = {"con_pagina": len(con_pagina), "paginas_abiertas": abiertas, "con_original": len(resueltas),

@@ -32,7 +32,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -r requirements.txt
+      - run: pip install --require-hashes -r requirements.lock
       - name: Traer la bodega publicada
         run: |
           if git ls-remote --exit-code --heads origin publicado; then

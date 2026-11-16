@@ -1,0 +1,30 @@
+name: Inventario de la base
+
+# PR 1.5 (16 nov): qué hay en Supabase, cuánto ocupa y qué parece sobrar. Solo lectura y solo cifras: nunca lee filas
+# ni datos de clientes. Falla (rojo) solo si encuentra una tabla pública sin RLS o con permisos para anon/authenticated.
+# A mano: Actions > Inventario de la base > Run workflow. También el día 1 de cada mes (auditoría mensual).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 14 1 * *"
+
+permissions:
+  contents: read
+
+jobs:
+  inventario:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install --require-hashes -r requirements.lock
+      - name: Inventario en solo lectura
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        run: python -m buscador.inventario
