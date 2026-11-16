@@ -118,7 +118,7 @@ export type Sesion = {
   paises: { codigo: string; nombre: string }[];
   paises_mundo?: { codigo: string; nombre: string }[];
 };
-export type Limitante = {
+type Limitante = {
   motivo: string;
   vacantes: number;
   sugerencia: string;

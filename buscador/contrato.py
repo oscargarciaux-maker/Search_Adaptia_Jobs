@@ -65,7 +65,7 @@ def external_id(url):
         return "lnkdpost-" + m.group(1)
     h = enlaces.host(url)
     etiqueta = next((n for d, n in _PORTALES if _es_dominio(h, d)), h.split(".")[0] if h else "web")
-    return re.sub(r"[^a-z0-9]+", "", etiqueta.lower())[:20] + "-" + hashlib.sha1(url.encode("utf-8")).hexdigest()[:12]
+    return re.sub(r"[^a-z0-9]+", "", etiqueta.lower())[:20] + "-" + hashlib.sha1(url.encode("utf-8"), usedforsecurity=False).hexdigest()[:12]
 
 
 def portal(url):

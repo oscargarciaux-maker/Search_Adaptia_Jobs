@@ -277,6 +277,8 @@ def test_api_autoriza_solo_operador_confirmado_y_no_confia_en_cookie():
         assert c.get("/api/config").status_code == 401
         c.cookies.set("adaptia_session", "token-ficticio")
         assert c.get("/api/config").status_code == 200
+        cabeceras = c.get("/api/config").headers  # PR 1.5: HTTPS obligatorio y cabeceras de seguridad
+        assert cabeceras["strict-transport-security"].startswith("max-age=") and cabeceras["x-frame-options"] == "DENY"
         Repo.sesion = SimpleNamespace(get=lambda *a, **k: SimpleNamespace(status_code=401, json=lambda: {}))
         assert c.get("/api/config").status_code == 401
 

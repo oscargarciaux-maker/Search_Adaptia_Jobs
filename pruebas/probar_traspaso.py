@@ -1,6 +1,5 @@
 """Traspaso real entre dos bases nuevas de un PostgreSQL local aislado (nunca Supabase)."""
 from contextlib import contextmanager
-import json
 import os
 from pathlib import Path
 import secrets

@@ -54,7 +54,7 @@ def roles_de(v, roles):
     grados = {f["familia"]: f["coincidencia"] for f in v.get("familias", []) if f["coincidencia"] in GRADOS}
     titulo = normalizar.texto(v.get("titulo", ""))
     mejor = None
-    for orden, rol in enumerate(roles):
+    for rol in roles:
         en_rol = [grados[f] for f in rol["familias"] if f in grados]
         if not en_rol:
             continue

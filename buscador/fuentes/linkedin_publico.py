@@ -34,7 +34,7 @@ def tarjetas(pagina):
         if not aviso:
             continue
 
-        def campo(patron):
+        def campo(patron, tarjeta=tarjeta):
             m = re.search(patron, tarjeta)
             return texto_html(m.group(1)) if m else ""
 

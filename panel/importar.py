@@ -15,7 +15,7 @@ from pydantic import ValidationError
 
 from buscador import normalizar, paises
 from panel import modelos
-from panel.modelos import META_POR_DEFECTO, Cargo, Cliente, Configuracion, Contacto, Perfil
+from panel.modelos import META_POR_DEFECTO, Configuracion, Contacto, Perfil
 from panel.repositorio import ErrorRepositorio
 
 COLUMNAS = ["nombre", "comunidad", "whatsapp", "nombre_saludo", "acepto_whatsapp", "cargo", "meta_diaria", "vive_en",

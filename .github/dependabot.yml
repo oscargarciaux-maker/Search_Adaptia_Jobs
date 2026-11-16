@@ -1,0 +1,19 @@
+# PR 1.5 (16 nov): GitHub propone cada semana las actualizaciones de librerías y de acciones, como PR que pasan por
+# todas las pruebas antes de que Oscar los fusione. Nada se actualiza solo.
+# Python: tras un PR de Dependabot hay que regenerar requirements.lock (la prueba test_dependencias dice el comando).
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /web
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    groups:
+      desarrollo:
+        dependency-type: development
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }

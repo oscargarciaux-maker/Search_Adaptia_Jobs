@@ -16,19 +16,14 @@ import {
   Check,
   CheckCheck,
   ChevronDown,
-  ChevronRight,
-  Clipboard,
   Clock3,
   Code2,
   Compass,
   Copy,
-  Ellipsis,
   ExternalLink,
   Globe2,
-  ListFilter,
   Loader2,
   LogOut,
-  Mail,
   MapPin,
   Megaphone,
   MessageCircle,
@@ -37,7 +32,6 @@ import {
   RefreshCw,
   Save,
   Search,
-  Settings2,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -326,9 +320,10 @@ function Dialog({
   useEffect(() => {
     // Al cerrar, el foco vuelve al botón que abrió la ventana (WCAG 2.4.3).
     const origen = document.activeElement as HTMLElement | null;
-    ref.current?.showModal();
+    const dialogo = ref.current;
+    dialogo?.showModal();
     return () => {
-      ref.current?.close();
+      dialogo?.close();
       if (origen && document.contains(origen)) origen.focus();
     };
   }, []);
@@ -1355,9 +1350,12 @@ function PorConfirmar({
       {datos.pendientes.map((r) => {
         const pais = elegido[r.vacante_id] ?? r.sugerencia[0] ?? "";
         return (
+          // Atajos de teclado de la bandeja (1–4, Enter): la tarjeta recibe el foco a propósito.
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
           <article
             className="card revision"
             key={r.vacante_id}
+            // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
             tabIndex={0}
             aria-label={`${r.titulo} en ${r.empresa}`}
             onKeyDown={(e) => {
@@ -1764,17 +1762,6 @@ function Mensajes({
     </section>
   );
 }
-
-type AjustesAlertas = {
-  destinatarios: string[];
-  tipos: string[];
-  envio_configurado?: boolean;
-};
-const tiposAlerta: [string, string][] = [
-  ["exito", "Búsqueda completa"],
-  ["pocas_vacantes", "Pocas vacantes"],
-  ["fallo", "Fallos"],
-];
 
 // Contrato v17: reglas de ubicación. Las «aprendidas» las crea el código solo a partir de tus decisiones.
 function ReglasAprendidas({
@@ -2433,8 +2420,9 @@ function ClienteDialog({
               </div>
               <div className="form-grid">
                 <div className="field">
-                  <label>Cargo</label>
+                  <label htmlFor={"cargo-" + p.id}>Cargo</label>
                   <select
+                    id={"cargo-" + p.id}
                     aria-label={"Cargo del perfil " + (i + 1)}
                     value={p.cargo_id}
                     onChange={(e) =>
@@ -2718,8 +2706,11 @@ function ClienteDialog({
               </Plegable>
               <div className="form-grid">
                 <div className="field">
-                  <label>Antigüedad máxima de publicación</label>
+                  <label htmlFor={"antiguedad-" + p.id}>
+                    Antigüedad máxima de publicación
+                  </label>
                   <select
+                    id={"antiguedad-" + p.id}
                     aria-label={"Antigüedad del perfil " + (i + 1)}
                     value={p.antiguedad_dias}
                     onChange={(e) =>
@@ -2733,8 +2724,14 @@ function ClienteDialog({
                     ))}
                   </select>
                 </div>
-                <div className="field">
-                  <label>Idioma del aviso</label>
+                <div
+                  className="field"
+                  role="group"
+                  aria-labelledby={"idioma-" + p.id}
+                >
+                  <span className="campo-titulo" id={"idioma-" + p.id}>
+                    Idioma del aviso
+                  </span>
                   <div className="check-line">
                     {[
                       ["es", "Español"],
@@ -2824,8 +2821,11 @@ function ClienteDialog({
                   </p>
                 </div>
                 <div className="field">
-                  <label>Inglés requerido: hasta</label>
+                  <label htmlFor={"ingles-" + p.id}>
+                    Inglés requerido: hasta
+                  </label>
                   <select
+                    id={"ingles-" + p.id}
                     aria-label={"Inglés del perfil " + (i + 1)}
                     value={p.ingles_maximo}
                     onChange={(e) =>

@@ -1155,3 +1155,43 @@ test("contrato v27: aplicar hoy, etiquetas de lo que no cumple y distintivo de C
   ).toBeVisible();
   expect(await page.evaluate(revisarContraste)).toEqual([]);
 });
+
+// PR 1.5 (16 nov): accesibilidad automática con axe (WCAG 2.1 A y AA) en cada pantalla y en el formulario de cliente.
+// Bloquea lo «serio» y lo «crítico»; el contraste lo mide también `revisarContraste`, en claro y en oscuro.
+test("auditoría axe: sin fallos serios de accesibilidad en ninguna pantalla", async ({
+  page,
+}) => {
+  const { default: AxeBuilder } = await import("@axe-core/playwright");
+  await page.emulateMedia({ reducedMotion: "reduce" }); // sin animaciones: axe mide los colores finales
+  const graves = async (donde: string) => {
+    const r = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    const fallos = r.violations
+      .filter((v) => v.impact === "serious" || v.impact === "critical")
+      .map((v) => `${v.id} (${v.nodes.length}): ${v.nodes[0]?.target}`);
+    expect(fallos, donde).toEqual([]);
+  };
+  for (const h of [
+    "",
+    "#clientes",
+    "#cargos",
+    "#vacantes",
+    "#por-confirmar",
+    "#mensajes",
+    "#actividad",
+  ]) {
+    await page.goto("/" + h);
+    await page.getByRole("heading", { level: 1 }).waitFor();
+    await page.waitForTimeout(300);
+    await graves(h || "#resumen");
+  }
+  await page.goto("/#clientes");
+  // El estado de la demostración lo comparten las pruebas: se abre el primer cliente que haya.
+  await page
+    .getByRole("button", { name: /^Editar / })
+    .first()
+    .click();
+  await page.getByRole("dialog").waitFor();
+  await graves("formulario de cliente");
+});

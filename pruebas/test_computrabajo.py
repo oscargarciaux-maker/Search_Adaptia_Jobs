@@ -1,5 +1,5 @@
 """Computrabajo: lectura sin red de la búsqueda y la ficha, fechas sin confundir actualización con publicación."""
-from buscador import bodega, vacante
+from buscador import bodega
 from buscador.fuentes import computrabajo as ct
 
 LISTADO = """

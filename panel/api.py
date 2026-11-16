@@ -15,6 +15,7 @@ from pydantic import ValidationError
 import requests
 
 from buscador import paises
+from buscador import registro
 from panel import servicio
 from panel.modelos import AjustesAlertas, BorrarCliente, ImportarClientes, CambioBorrador, Configuracion, Contacto, DecisionRevision, EstadoRegla, SubirRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia, explicar, parcial, solo_perfil
 from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase, hoy
@@ -47,8 +48,8 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         def precargar():
             try:
                 repo.catalogo_vigente()
-            except Exception:
-                pass
+            except Exception as e:
+                registro.aviso("api:50", e)
         import threading
         threading.Thread(target=precargar, daemon=True).start()
     app.state.repo, app.state.demo = repo, demo
@@ -82,6 +83,8 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         response.headers.update({"X-Content-Type-Options": "nosniff", "Referrer-Policy": "same-origin",
             "X-Frame-Options": "DENY", "Cache-Control": "no-store" if request.url.path.startswith("/api/") else "no-cache",
             "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"})
+        if not demo:  # OWASP ASVS 14.4.5 (PR 1.5): el navegador usa siempre HTTPS con el panel real
+            response.headers["Strict-Transport-Security"] = "max-age=31536000"
         return response
 
     @app.exception_handler(ErrorRepositorio)

@@ -29,7 +29,7 @@ export function delSistema(): Tema {
   }
 }
 
-export function aplicarTema(t: Tema | "") {
+function aplicarTema(t: Tema | "") {
   if (t) document.documentElement.dataset.tema = t;
   else delete document.documentElement.dataset.tema;
 }

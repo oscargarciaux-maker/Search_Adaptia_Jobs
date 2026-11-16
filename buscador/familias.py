@@ -149,13 +149,6 @@ def _por_descripcion_panel(palabras, descripcion, excluidas):
     return salida
 
 
-def funciones_halladas(descripcion, familia_id):
-    """Términos de la huella del cargo que aparecen en la descripción (para mostrarlos en la bandeja)."""
-    fam = next((f for f in mapa() if f["id"] == familia_id), None)
-    desc = normalizar.texto(descripcion)[:12000]
-    return [t for t in (fam or {}).get("_funciones", []) if normalizar.contiene_frase(desc, t)]
-
-
 def clasificar(titulo, descripcion=""):
     """Lista de {"familia": id, "coincidencia": grado}, de la mejor coincidencia a la peor."""
     base = normalizar.titulo_base(titulo)

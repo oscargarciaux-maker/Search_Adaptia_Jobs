@@ -15,7 +15,7 @@ CAMPOS_PUBLICOS = ["id", "titulo", "empresa", "ubicacion", "familias", "paises",
 def huella(empresa, titulo, enlace=""):
     from buscador.contrato import url_limpia
     clave = normalizar.empresa(empresa) + "|" + (url_limpia(enlace) if enlace else normalizar.texto(titulo))
-    return hashlib.sha1(clave.encode("utf-8")).hexdigest()[:16]
+    return hashlib.sha1(clave.encode("utf-8"), usedforsecurity=False).hexdigest()[:16]
 
 
 def crear(titulo, empresa, enlace, fuente, ubicacion="", descripcion="", fecha="", remoto=None, enlace_directo="",
@@ -164,10 +164,6 @@ def _origen_fecha(v):
     if origen is None and "greenhouse" not in v.get("fuente", "").lower():
         return ""
     return origen
-
-
-def _rango_enlace(v):
-    return enlaces.TIPOS.index(v["tipo_enlace"]) if v["tipo_enlace"] in enlaces.TIPOS else 9
 
 
 def unir(a, b):

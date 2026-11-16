@@ -331,7 +331,7 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
         revisadas_n += auditar(historicas, cache, maximo=maximo // 3 if incremental else maximo,
                                segundos=max(0, plazo - time.monotonic()), vigencia=VIGENCIA_COMPARTIR)
     revisadas = set()
-    for ronda in range(4):
+    for _ronda in range(4):
         if revisadas_n >= maximo or time.monotonic() >= plazo:
             break
         disponibles = [v for v in vacantes if v["id"] not in revisadas or v["verificacion"]["estado"] == "verificada"]

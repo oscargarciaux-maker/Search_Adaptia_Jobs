@@ -11,6 +11,7 @@ import time
 from uuid import NAMESPACE_DNS, uuid5
 
 from buscador import normalizar
+from buscador import registro
 from zoneinfo import ZoneInfo
 
 import requests
@@ -282,7 +283,6 @@ class RepositorioSupabase:
         return filas[0] if filas else None
 
     def conteo_asignaciones(self, ejecucion_id, perfil_ids):
-        from collections import Counter
         if not perfil_ids:
             return Counter()
         filas = self._paginas("panel_asignaciones", "id", {"ejecucion_id": "eq." + ejecucion_id,
@@ -295,7 +295,6 @@ class RepositorioSupabase:
 
     def asignaciones_por_cliente(self, ejecucion_ids):
         """Paso 8 (Resumen por cliente): cuántas vacantes recibió cada cliente en cada búsqueda."""
-        from collections import Counter
         if not ejecucion_ids:
             return Counter()
         filas = self._paginas("panel_asignaciones", "id", {"ejecucion_id": "in.(" + ",".join(ejecucion_ids) + ")",
@@ -390,8 +389,8 @@ class RepositorioSupabase:
     def _refrescar_silencioso(self):
         try:
             self._refrescar()
-        except Exception:  # se conserva la copia anterior; el siguiente uso lo reintenta
-            pass
+        except Exception as e:  # se conserva la copia anterior; el siguiente uso lo reintenta
+            registro.aviso("repositorio:391", e)
 
     def resultados(self, cliente_id, fecha=None):
         ejecuciones = self.pedir("GET", "panel_ejecuciones",
@@ -622,7 +621,6 @@ class RepositorioDemo:
             return salida
 
     def conteo_asignaciones(self, ejecucion_id, perfil_ids):
-        from collections import Counter
         return Counter()
 
     def historial_ejecuciones(self, dias=7):
@@ -635,7 +633,6 @@ class RepositorioDemo:
     _RITMO_DEMO = (1.0, 0.18, 0.75, 1.0, 0.9)
 
     def asignaciones_por_cliente(self, ejecucion_ids):
-        from collections import Counter
         cfg = Configuracion.model_validate(configuracion_demo())
         metas = Counter()
         for p in cfg.perfiles:

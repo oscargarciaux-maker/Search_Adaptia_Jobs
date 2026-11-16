@@ -1403,7 +1403,8 @@ h1 {
   margin-bottom: 18px;
   min-width: 0;
 }
-.field > label {
+.field > label,
+.field > .campo-titulo {
   font-size: 12px;
   font-weight: 550;
   color: var(--osc-text-neutro-medio, #5e6d52);
@@ -2201,7 +2202,8 @@ h1 {
     font-size: 12px !important;
     padding: 5px;
   }
-  .field > label {
+  .field > label,
+  .field > .campo-titulo {
     font-size: 12px;
     line-height: 1.6;
   }

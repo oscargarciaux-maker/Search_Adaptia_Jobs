@@ -29,3 +29,15 @@ def test_la_captura_horaria_no_pisa_el_informe_de_la_busqueda_completa(tmp_path)
     publicar.publicar(tmp_path, [], {"modo": "incremental", "nuevas_hoy": 3}, Counter())
     assert json.loads((tmp_path / "datos" / "salud.json").read_text())["nuevas_hoy"] == 3
     assert json.loads((tmp_path / "datos" / "salud_bodega.json").read_text())["nuevas_hoy"] == 50
+
+
+def test_publicar_retira_la_carpeta_vieja_de_cloudflare_sin_tocar_trabajo(tmp_path):
+    """PR 1.5: el resto `functions/api/.gitkeep` de la web retirada sale de la rama publicado; trabajo/ se conserva."""
+    from collections import Counter
+    from buscador import publicar
+    (tmp_path / "functions" / "api").mkdir(parents=True)
+    (tmp_path / "functions" / "api" / ".gitkeep").write_text("")
+    (tmp_path / "trabajo").mkdir()
+    (tmp_path / "trabajo" / "estado.json").write_text("{}")
+    publicar.publicar(tmp_path, [], {"modo": "diario"}, Counter())
+    assert not (tmp_path / "functions").exists() and (tmp_path / "trabajo" / "estado.json").exists()
