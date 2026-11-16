@@ -26,7 +26,7 @@ def test_lee_columnas_listas_paises_y_restricciones():
     pd, writer = [p for p in cfg["perfiles"] if p["cliente_id"] == ana["id"]]
     assert pd["vive_en"] == "CO" and pd["modalidades"] == ["remoto", "hibrido"]
     assert pd["paises_presenciales_extra"] == ["ES", "DE"] and pd["puede_trabajar_en"] == ["US"]
-    assert pd["acepta_horario"] == ["us_este"] and pd["ciudades"] == ["Bogotá"]
+    assert pd["acepta_horario"] == ["UTC-5"] and pd["ciudades"] == ["Bogotá"]
     assert pd["experiencia_anos"] == 6 and (pd["experiencia_min"], pd["experiencia_max"]) == (2, 10)
     assert pd["ingles_maximo"] == "B2" and pd["meta_diaria"] == 12 and pd["sectores_preferidos"] == ["fintech", "salud"]
     assert {"tipo": "salario_minimo", "monto": 2500.0, "moneda": "USD", "periodo": "month"} in pd["restricciones"]
@@ -190,7 +190,7 @@ def test_regiones_en_listas_de_paises_para_perfiles_moviles():
     assert movil["vive_en"] == "AE" and movil["puede_trabajar_en"][0] == "AE"
     assert {"DE", "FR", "ES", "GB", "CH"} <= set(movil["puede_trabajar_en"])
     assert set(importar.UE) == set(movil["paises_presenciales_extra"]) and "GB" not in movil["paises_presenciales_extra"]
-    assert movil["acepta_horario"] == ["europa"]
+    assert movil["acepta_horario"] == ["UTC+1"]
     assert {"US", "CA", "MX", "AR"} <= set(america["puede_trabajar_en"])
 
 

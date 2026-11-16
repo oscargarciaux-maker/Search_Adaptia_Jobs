@@ -154,6 +154,22 @@ def _mapa(valor, tabla, errores, campo, permitidos):
     return salida
 
 
+def _zonas(valor, errores):
+    """Contrato v35: «UTC-5», «UTC+5:30» o los nombres antiguos (EE. UU. Este, EE. UU. Pacífico, Europa)."""
+    from panel.modelos import horas_de_zona
+    salida = []
+    for v in _lista(valor):
+        zona = v.strip().upper().replace(" ", "").replace("−", "-").replace("GMT", "UTC")
+        if horas_de_zona(zona) is None:
+            zona = _HORARIOS.get(_norm(v).replace(".", " ").replace("  ", " ").strip())
+        if zona is None:
+            errores.append(f"acepta_horario: «{v}» no es válido (usa UTC-5, UTC+1… o EE. UU. Este, EE. UU. Pacífico, "
+                           "Europa).")
+        elif zona not in salida:
+            salida.append(zona)
+    return salida
+
+
 def _si_no(valor, errores, campo):
     v = _norm(valor)
     if v in _SI:
@@ -231,8 +247,7 @@ def _perfil(datos, errores, avisos):
     p["ciudades"] = _lista(datos.get("ciudades"))
     p["paises_presenciales_extra"] = _paises(datos.get("se_mudaria_a"), errores, "se_mudaria_a")
     p["puede_trabajar_en"] = _paises(datos.get("puede_trabajar_en"), errores, "puede_trabajar_en")
-    p["acepta_horario"] = _mapa(datos.get("acepta_horario"), _HORARIOS, errores, "acepta_horario",
-                                "EE. UU. Este, EE. UU. Pacífico o Europa")
+    p["acepta_horario"] = _zonas(datos.get("acepta_horario"), errores)
     if datos.get("idiomas"):
         p["idiomas"] = _mapa(datos["idiomas"], _IDIOMAS, errores, "idiomas", "español o inglés")
     for campo, clave in (("antiguedad_dias", "antiguedad_dias"), ("experiencia_anos", "experiencia_anos"),

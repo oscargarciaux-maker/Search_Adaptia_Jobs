@@ -60,10 +60,11 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await expect(
     dialog.getByRole("button", { name: "Añadir otro perfil" }),
   ).toBeVisible();
-  // WhatsApp: el número aparece solo al marcar la casilla.
-  await expect(dialog.getByLabel("Número con código de país")).toHaveCount(0);
+  // WhatsApp: el número aparece solo al marcar la casilla (contrato v35: país en una lista y solo el número).
+  await expect(dialog.getByLabel("Número", { exact: true })).toHaveCount(0);
   await dialog.getByLabel("Aceptó recibir vacantes por WhatsApp").check();
-  await expect(dialog.getByLabel("Número con código de país")).toBeVisible();
+  await expect(dialog.getByLabel("Número", { exact: true })).toBeVisible();
+  await expect(dialog.getByLabel("País", { exact: true })).toHaveValue("CO");
   await dialog.getByLabel("Aceptó recibir vacantes por WhatsApp").uncheck();
   // Sección 8: crear un cargo sin salir del cliente; el formulario conserva lo escrito.
   await dialog
@@ -90,8 +91,12 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await dialog.getByLabel("Antigüedad del perfil 1").selectOption("7");
   // Contrato v20: un solo campo de años; busca de 3 menos a 3 más.
   await dialog.getByLabel("Años de experiencia del perfil 1").fill("4");
+  await dialog
+    .getByRole("button", { name: "Más información: años de experiencia" })
+    .first()
+    .focus();
   await expect(
-    dialog.getByText("Busca vacantes que pidan de 1 a 7 años."),
+    dialog.getByText(/Busca vacantes que pidan de 1 a 7 años\./),
   ).toBeVisible();
   // Contrato v30: dónde trabajaría, en filas «Ciudades · Países · modalidades»; la primera es donde vive.
   await dialog.getByRole("button", { name: "Quitar Colombia" }).click();
@@ -134,9 +139,11 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await expect(dialog.getByText(/Es una muestra/)).toBeVisible();
   // Vista previa: la cifra se actualiza sola mientras se edita, con el catálogo guardado.
   // La estimación en vivo también dice «cumple(n) este perfil»: buscar la frase propia de la vista previa.
+  // Contrato v35: la cifra principal son los últimos 30 días, con las que siguen sin entregar al lado.
   await expect(
-    dialog.getByText(/guardadas? aún no entregadas? cumplen? este perfil/),
+    dialog.getByText(/cumplieron? este perfil en los últimos 30 días/),
   ).toBeVisible();
+  await expect(dialog.getByText(/aún sin entregar/)).toBeVisible();
   await dialog
     .getByRole("button", { name: "Añadir cliente", exact: true })
     .click();
@@ -694,8 +701,13 @@ test("contrato v22: restricciones, prioridades y margen de años en el perfil", 
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Años de experiencia del perfil 1").fill("6");
   await dialog.getByLabel("Margen de años del perfil 1").selectOption("4");
+  // Contrato v35: la explicación de los años está en el «ⓘ» junto al título.
+  await dialog
+    .getByRole("button", { name: "Más información: años de experiencia" })
+    .first()
+    .focus();
   await expect(
-    dialog.getByText(/de 2 a 10 años\. No recibe vacantes junior/),
+    dialog.getByText(/de 2 a 10 años\. Las junior o de prácticas van al final/),
   ).toBeVisible();
   await dialog.getByRole("button", { name: "Prioridades (opcional)" }).click();
   const sectores = dialog.getByLabel("Sectores preferidos del perfil 1");
@@ -759,10 +771,26 @@ test("contrato v23 y v30: ubicaciones en filas, permiso de trabajo, horario y ci
   await expect(
     dialog.getByRole("button", { name: "Quitar Estados Unidos" }),
   ).toBeVisible();
+  // Contrato v35: zonas horarias en una lista, con sus ciudades.
   await dialog
-    .getByRole("button", { name: "Horario aceptado (opcional)" })
-    .click();
-  await dialog.getByLabel("Horario EE. UU. Este en el perfil 1").check();
+    .getByLabel("Añadir zona horaria al perfil 1")
+    .selectOption("UTC-5");
+  await expect(
+    dialog.getByRole("button", {
+      name: "Quitar UTC−5 · Bogotá, Lima, Nueva York del perfil 1",
+    }),
+  ).toBeVisible();
+  // «Otra…» restricción en texto libre (solo ordena) y la cifra de 30 días que no asusta.
+  await dialog
+    .getByLabel("Añadir restricción al perfil 1")
+    .selectOption("otra");
+  await dialog
+    .getByLabel("Otra restricción del perfil 1")
+    .fill("agencias de reclutamiento");
+  await expect(
+    dialog.getByText(/cumplieron este perfil en los últimos 30 días/).first(),
+  ).toBeVisible();
+  await expect(dialog.getByText(/al día/).first()).toBeVisible();
   await dialog.getByRole("button", { name: "Aplicar cambios" }).click();
   await expect(
     page.locator(".client-card", { hasText: "Cliente de ejemplo 01" }),
@@ -780,7 +808,7 @@ test("contrato v23 y v30: ubicaciones en filas, permiso de trabajo, horario y ci
   expect(perfil.vive_en).toBe("DE");
   expect(perfil.ciudades).toEqual(["Berlín"]);
   expect(perfil.puede_trabajar_en).toEqual(["US"]);
-  expect(perfil.acepta_horario).toEqual(["us_este"]);
+  expect(perfil.acepta_horario).toEqual(["UTC-5"]);
   expect(perfil.ubicaciones).toEqual([
     {
       paises: ["DE"],
@@ -1370,21 +1398,21 @@ test("contrato v30: bandera del WhatsApp, contacto precargado y guardado sin esp
     "Aceptó recibir vacantes por WhatsApp",
   );
   if (!(await consentimiento.isChecked())) await consentimiento.check();
-  const telefono = dialog.getByLabel("Número con código de país");
-  await telefono.fill("+34 600 111 222");
-  await expect(dialog.getByRole("img", { name: "País: España" })).toBeVisible();
-  await telefono.fill("+57 300 111 2233");
-  await expect(
-    dialog.getByRole("img", { name: "País: Colombia" }),
-  ).toBeVisible();
+  // Contrato v35: el país del número se elige en la lista y se escribe solo el número.
+  const telefono = dialog.getByLabel("Número", { exact: true });
+  await dialog.getByLabel("País", { exact: true }).selectOption("ES");
+  await telefono.fill("600 111 222");
+  await dialog.getByLabel("País", { exact: true }).selectOption("CO");
+  await telefono.fill("300 111 2233");
   await dialog.getByRole("button", { name: "Aplicar cambios" }).click();
   await expect(dialog).toHaveCount(0, { timeout: 1500 });
   // Al volver a abrirlo, el número ya está (sin esperar a que el servidor responda).
   await editar.click();
-  await expect(dialog.getByLabel("Número con código de país")).toHaveValue(
-    "+57 300 111 2233",
+  await expect(dialog.getByLabel("Número", { exact: true })).toHaveValue(
+    "300 111 2233",
     { timeout: 1000 },
   );
+  await expect(dialog.getByLabel("País", { exact: true })).toHaveValue("CO");
   await expect.poll(() => guardado, { timeout: 5000 }).toBe("+57 300 111 2233");
   expect(await page.evaluate(revisarContraste)).toEqual([]);
   expect(errores).toEqual([]);

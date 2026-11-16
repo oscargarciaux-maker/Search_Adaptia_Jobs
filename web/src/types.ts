@@ -51,7 +51,9 @@ export type Ubicacion = {
 export type Restriccion =
   | { tipo: "salario_minimo"; monto: number; moneda: string; periodo: string }
   | { tipo: "palabras"; palabras: string[] }
-  | { tipo: "contrato"; tipos: string[] };
+  | { tipo: "contrato"; tipos: string[] }
+  // Contrato v35: texto libre cuando no está entre las opciones (solo ordena y deja etiqueta).
+  | { tipo: "otra"; texto: string };
 export type Configuracion = {
   clientes: Cliente[];
   cargos: Cargo[];
@@ -138,6 +140,9 @@ export type EstimacionPerfil = {
   del_cargo: number;
   limitantes: Limitante[];
   ampliables?: number;
+  // Contrato v35: las que cumplieron el perfil en los últimos 30 días (entregadas o no) y su promedio diario.
+  ultimos_30?: number;
+  por_dia?: number;
 };
 export type EstimacionCargo = {
   disponibles: number;

@@ -1,4 +1,5 @@
 """Validación del mismo contrato para API, demostración y ejecutor."""
+import re
 from typing import Literal
 from uuid import UUID
 
@@ -89,6 +90,36 @@ class RestriccionPalabras(BaseModel):
         return _terminos(vs)
 
 
+class RestriccionOtra(BaseModel):
+    """Contrato v35: «Otra…», texto libre cuando no está entre las opciones. Como las demás desde v27, solo ordena y
+    deja la etiqueta «Menciona «…»» si el título o un requisito del aviso lo nombra."""
+    model_config = ConfigDict(extra="forbid")
+    tipo: Literal["otra"]
+    texto: str = Field(min_length=2, max_length=80)
+
+    @field_validator("texto")
+    @classmethod
+    def limpio(cls, v):
+        v = " ".join(v.split())
+        if len(v) < 2 or "@" in v or "://" in v:
+            raise ValueError("Escribe una palabra o frase corta, sin correos ni enlaces.")
+        return v
+
+
+# Contrato v35: zonas horarias como «UTC-5» o «UTC+5:30». Las claves antiguas se leen como su zona equivalente.
+ZONA_UTC = re.compile(r"^UTC([+-])(\d{1,2})(?::(30|45))?$")
+HORARIOS_ANTIGUOS = {"us_este": "UTC-5", "us_pacifico": "UTC-8", "europa": "UTC+1"}
+
+
+def horas_de_zona(zona):
+    """«UTC-5» → -5.0; «UTC+5:30» → 5.5; None si no es una zona válida."""
+    m = ZONA_UTC.match(HORARIOS_ANTIGUOS.get(zona, zona) if isinstance(zona, str) else "")
+    if not m:
+        return None
+    horas = int(m.group(2)) + int(m.group(3) or 0) / 60
+    return -horas if m.group(1) == "-" else horas
+
+
 class RestriccionContrato(BaseModel):
     model_config = ConfigDict(extra="forbid")
     tipo: Literal["contrato"]
@@ -170,14 +201,15 @@ class Perfil(Modelo):
     meta_diaria: int | None = Field(default=None, ge=0, le=120)
     # Contrato v22: margen de años, restricciones que descartan con evidencia y prioridades que solo ordenan.
     margen_experiencia: Literal[3, 4] = RANGO_EXPERIENCIA
-    restricciones: list[RestriccionSalario | RestriccionPalabras | RestriccionContrato] = Field(
+    restricciones: list[RestriccionSalario | RestriccionPalabras | RestriccionContrato | RestriccionOtra] = Field(
         default_factory=list, max_length=10)
     sectores_preferidos: list[str] = Field(default_factory=list, max_length=30)
     palabras_preferidas: list[str] = Field(default_factory=list, max_length=30)
     # Contrato v23: ciudades para presencial/híbrida, permiso legal para trabajar en otros países y horarios aceptados.
     ciudades: list[str] = Field(default_factory=list, max_length=10)
     puede_trabajar_en: list[str] = Field(default_factory=list, max_length=60)  # v26: perfiles muy móviles
-    acepta_horario: list[Literal["us_este", "us_pacifico", "europa"]] = Field(default_factory=list, max_length=3)
+    # Contrato v35: zonas UTC en las que puede trabajar («UTC-5», «UTC+1»…); las antiguas se convierten al leerlas.
+    acepta_horario: list[str] = Field(default_factory=list, max_length=12)
     # Contrato v30: dónde trabajaría, en filas. Si viene, manda: los campos de arriba (vive_en, modalidades, ciudades,
     # paises_presenciales_extra, puede_trabajar_en) se calculan desde las filas para quien aún los lee (búsqueda por
     # lugares, admisión). Si no viene (perfiles anteriores, importador), `filas` las arma con esos campos.
@@ -223,7 +255,14 @@ class Perfil(Modelo):
     @field_validator("acepta_horario")
     @classmethod
     def horarios_sin_repetir(cls, vs):
-        return list(dict.fromkeys(vs))
+        salida = []
+        for v in vs:
+            zona = HORARIOS_ANTIGUOS.get(v, v)
+            h = horas_de_zona(zona)
+            if h is None or not -12 <= h <= 14:
+                raise ValueError("Elige zonas horarias de la lista (por ejemplo UTC-5).")
+            salida.append(zona)
+        return list(dict.fromkeys(salida))
 
     @field_validator("modalidades")
     @classmethod

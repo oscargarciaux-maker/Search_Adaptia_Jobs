@@ -410,14 +410,15 @@ class RepositorioSupabase:
         from panel.afinidad import ligera
         entregadas = {f["vacante_id"] for f in self._paginas("entregas_diarias", "vacante_id",
                                                              {"select": "vacante_id"}, 1000)}
-        vacantes = []
+        vacantes, ya_dadas = [], []
         for d in self._paginas("catalogo_vacantes", "id", {"status": "eq.active", "select": self.CAMPOS_ESTIMACION}, 1000):
             if d.get("duplicada_de") or d.get("verificacion") == "rechazada" or d.get("tipo") == "post":
                 continue  # un post (contrato v11) no es una vacante formal: no cuenta para estimar
             if {d["id"], *(d.get("ids_agrupados") or [])} & entregadas:
+                ya_dadas.append(ligera(d))  # contrato v35: cuentan para «últimos 30 días», no para «sin entregar»
                 continue
             vacantes.append(ligera(d))
-        return {"vacantes": vacantes, "entregadas": entregadas,
+        return {"vacantes": vacantes, "entregadas": entregadas, "entregadas_vacantes": ya_dadas,
                 "actualizado": datetime.now(timezone.utc).isoformat(timespec="minutes")}
 
     def _refrescar(self):
@@ -862,8 +863,8 @@ class RepositorioDemo:
                    "Backend Engineer", "Product Manager", "Editor de video", "Community Manager", "DevOps Engineer"]
         grupos = [["CO"], ["MX"], ["ES"], ["AR", "CL", "CO", "MX", "PE"], ["CO", "ES", "MX"], ["BR"]]
         base = datetime.fromisoformat(hoy())
-        vacantes = []
-        for n in range(900):
+        vacantes, ya_dadas = [], []
+        for n in range(1200):  # contrato v35: las 300 últimas cuentan como ya entregadas (solo «últimos 30 días»)
             anos = azar.choice([1, 2, 3, 4, 5, 6, 8]) if azar.random() < 0.26 else None
             nivel = azar.choice(["B1", "B2", "C1"]) if azar.random() < 0.12 else ""
             texto = (f"English {nivel} " + ("is a plus." if azar.random() < 0.3 else "required.")) if nivel else ""
@@ -874,8 +875,9 @@ class RepositorioDemo:
                      "idioma": azar.choice(["es", "en", "en"]), "fecha_estimada": azar.random() < 0.1,
                      "fecha_publicacion": (base - timedelta(days=azar.randint(0, 29))).date().isoformat(),
                      "anos_min": anos, "ingles": ""}
-            vacantes.append(ligera(datos, texto))
-        self._catalogo = {"vacantes": vacantes, "actualizado": self.creada.isoformat(timespec="minutes")}
+            (vacantes if n < 900 else ya_dadas).append(ligera(datos, texto))
+        self._catalogo = {"vacantes": vacantes, "entregadas_vacantes": ya_dadas,
+                          "actualizado": self.creada.isoformat(timespec="minutes")}
         return self._catalogo
 
     def fuentes_en_vivo(self, cargo, perfil, limite_segundos):

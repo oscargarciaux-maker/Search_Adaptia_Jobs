@@ -25,6 +25,25 @@ import type {
 import { conFilas, conMetas, filasDe, perfilNuevo, uid } from "../perfiles";
 import { useVistaPrevia, type EstadoPrevia } from "../vistaPrevia";
 import { CargoDialog } from "./CargoDialog";
+import {
+  CODIGOS,
+  FRECUENTES,
+  codigoDe,
+  separarTelefono,
+  unirTelefono,
+} from "../telefonos";
+
+const todosLosCodigos = [...new Set(CODIGOS.map((x) => x.pais))]
+  .filter((x) => !FRECUENTES.includes(x))
+  .sort((a, b) => nombrePais(a).localeCompare(nombrePais(b), "es"));
+
+function OpcionCodigo({ pais }: { pais: string }) {
+  return (
+    <option value={pais}>
+      {bandera(pais)} {nombrePais(pais)} +{codigoDe(pais)}
+    </option>
+  );
+}
 
 // Desde v27 solo descartan la ubicación y el idioma; el único ajuste que se aplica con un clic es el idioma.
 export const ajustesSinDato: Record<string, Partial<Perfil>> = {
@@ -71,27 +90,29 @@ export function PreviewPerfil({
         )}
       </p>
     );
+  const mes = info.ultimos_30 ?? info.compatibles;
+  const porDia = info.por_dia ?? Math.round((mes / 30) * 10) / 10;
   return (
     <div
       className={
         "preview" +
-        (info.compatibles === 0 ? " warn" : "") +
+        (mes === 0 ? " warn" : "") +
         (estado === "cargando" ? " stale" : "")
       }
       role="status"
       aria-live="polite"
     >
+      {/* Contrato v35: la cifra principal son las que cumplieron el perfil en 30 días, con su promedio diario. */}
       <p className="preview-main">
         <Target size={15} />
         <span>
-          <strong>≈ {info.compatibles}</strong>{" "}
-          {info.compatibles === 1
-            ? "vacante guardada aún no entregada"
-            : "vacantes guardadas aún no entregadas"}{" "}
-          cumple{info.compatibles === 1 ? "" : "n"} este perfil
+          <strong>{mes}</strong>{" "}
+          {mes === 1 ? "vacante cumplió" : "vacantes cumplieron"} este perfil en
+          los últimos 30 días{" "}
+          <strong>· ≈ {String(porDia).replace(".", ",")} al día</strong>
           <span className="preview-sub">
             {" "}
-            · {info.del_cargo} del cargo en el catálogo
+            · {info.compatibles} aún sin entregar
             {info.compatibles < 5 && !!info.ampliables && (
               <> · +{info.ampliables} con ampliación hasta llegar a 5</>
             )}
@@ -208,7 +229,14 @@ export function EnVivo({
           {error}
         </p>
       )}
-      {r && !cargando && (
+      {r && !cargando && r.compatibles === 0 && (
+        <p className="live-note" role="status">
+          La búsqueda rápida revisó {r.avisos} avisos de hoy y ninguno nuevo
+          cumple todo. Es solo una muestra: la cifra de los últimos 30 días, de
+          arriba, es la que dice cuántas llegan.
+        </p>
+      )}
+      {r && !cargando && (r.compatibles ?? 0) > 0 && (
         <div className="live-result" role="status" aria-live="polite">
           <p className="preview-main">
             <Target size={15} />
@@ -300,7 +328,9 @@ export function FiltrosPerfil({
       ? { tipo, monto: 0, moneda: "USD", periodo: "month" }
       : tipo === "palabras"
         ? { tipo, palabras: [] }
-        : { tipo: "contrato", tipos: [] };
+        : tipo === "otra"
+          ? { tipo, texto: "" }
+          : { tipo: "contrato", tipos: [] };
   return (
     <div className="filtros-perfil">
       <Plegable
@@ -374,6 +404,18 @@ export function FiltrosPerfil({
                 onChange={(v) => cambiar(n, { ...r, palabras: v })}
               />
             )}
+            {r.tipo === "otra" && (
+              <div className="restriccion-campos">
+                <span>Otra:</span>
+                <input
+                  aria-label={`Otra restricción del perfil ${i + 1}`}
+                  maxLength={80}
+                  placeholder="Ej.: agencias de reclutamiento"
+                  value={r.texto}
+                  onChange={(e) => cambiar(n, { ...r, texto: e.target.value })}
+                />
+              </div>
+            )}
             {r.tipo === "contrato" && (
               <div className="restriccion-campos">
                 <span>Contratos de tipo</span>
@@ -422,11 +464,13 @@ export function FiltrosPerfil({
             <option value="salario_minimo">Salario menor a…</option>
             <option value="palabras">Vacantes que mencionan…</option>
             <option value="contrato">Tipo de contrato…</option>
+            <option value="otra">Otra…</option>
           </select>
         )}
         <p className="field-help">
-          Cada regla descarta solo si el aviso lo dice claramente. El salario se
-          compara también en otras monedas, con un margen del 10 %.
+          Nada de esto descarta: si el aviso lo dice claramente, la vacante
+          llega después, con una etiqueta. El salario se compara también en
+          otras monedas, con un margen del 10 %.
         </p>
       </fieldset>
     </div>
@@ -465,7 +509,6 @@ export function ClienteDialog({
   cliente,
   config,
   contacto,
-  prefijos = {},
   onClose,
   onSave,
   onGuardarContacto,
@@ -475,7 +518,6 @@ export function ClienteDialog({
   config: Configuracion;
   // Contrato v30: el WhatsApp llega precargado (sin esperar al abrir) y se guarda sin hacer esperar al cerrar.
   contacto?: Contacto;
-  prefijos?: Record<string, string>;
   onClose: () => void;
   onSave: (c: Cliente, p: Perfil[]) => void;
   onGuardarContacto: (id: string, ct: Contacto, tenia: boolean) => void;
@@ -494,6 +536,13 @@ export function ClienteDialog({
   };
   const contactoInicial = contacto || vacioContacto;
   const [ct, setCt] = useState<Contacto>(contactoInicial);
+  // Contrato v35: el código del país se elige en una lista y se escribe solo el número.
+  const [telPais, setTelPais] = useState(
+    () =>
+      separarTelefono(contactoInicial.telefono).pais ||
+      (contactoInicial.telefono ? "" : "CO"),
+  );
+  const numero = separarTelefono(ct.telefono, telPais).numero;
   const [ps, setPs] = useState<Perfil[]>(() => {
     if (cliente)
       return structuredClone(
@@ -582,7 +631,7 @@ export function ClienteDialog({
               return;
             }
             if (ct.telefono.trim() && !ct.telefono.trim().startsWith("+")) {
-              setError("Escribe el WhatsApp con el código de país (+57…).");
+              setError("Elige el país del número de WhatsApp.");
               return;
             }
             if (JSON.stringify(ct) !== JSON.stringify(contactoInicial))
@@ -598,7 +647,9 @@ export function ClienteDialog({
                     ? r.monto > 0
                     : r.tipo === "palabras"
                       ? r.palabras.length > 0
-                      : r.tipos.length > 0,
+                      : r.tipo === "otra"
+                        ? r.texto.trim().length >= 2
+                        : r.tipos.length > 0,
                 ),
               })),
             );
@@ -635,68 +686,89 @@ export function ClienteDialog({
               </div>
             </div>
           )}
-          {/* Contrato v30: nombre a la izquierda y WhatsApp a la derecha, sin ensanchar el formulario. */}
+          {/* Contrato v35: el nombre ocupa media fila; el WhatsApp va debajo en una sola fila horizontal. */}
           <div className="cliente-cabecera">
-            <div>
-              <div className="field">
-                <label htmlFor="cliente-nombre">
-                  Nombre o referencia del cliente
-                </label>
-                <input
-                  id="cliente-nombre"
-                  autoFocus
-                  required
-                  maxLength={100}
-                  value={c.nombre}
-                  placeholder="Ej.: Ana Gómez · Diseño"
-                  onChange={(e) => setC({ ...c, nombre: e.target.value })}
-                />
-              </div>
-              <label className="casilla-comunidad">
-                <input
-                  type="checkbox"
-                  checked={!!c.comunidad}
-                  onChange={(e) => setC({ ...c, comunidad: e.target.checked })}
-                />
-                Es «Comunidad» (grupo de WhatsApp): recibe después de los
-                clientes reales, con lo que sobra del techo del día
+            <div className="field">
+              <label htmlFor="cliente-nombre">
+                Nombre o referencia del cliente
               </label>
+              <input
+                id="cliente-nombre"
+                autoFocus
+                required
+                maxLength={100}
+                value={c.nombre}
+                placeholder="Ej.: Ana Gómez · Diseño"
+                onChange={(e) => setC({ ...c, nombre: e.target.value })}
+              />
             </div>
-            <fieldset className="whatsapp-contacto">
-              <legend>WhatsApp (opcional)</legend>
-              <label className="check-line">
-                <input
-                  type="checkbox"
-                  checked={ct.consentimiento}
-                  onChange={(e) =>
-                    setCt({ ...ct, consentimiento: e.target.checked })
-                  }
-                />
-                Aceptó recibir vacantes por WhatsApp
-              </label>
-              {ct.consentimiento && (
-                <div className="whatsapp-datos">
+            <label className="casilla-comunidad">
+              <input
+                type="checkbox"
+                checked={!!c.comunidad}
+                onChange={(e) => setC({ ...c, comunidad: e.target.checked })}
+              />
+              Es «Comunidad» (grupo de WhatsApp): recibe después de los clientes
+              reales, con lo que sobra del techo del día
+            </label>
+          </div>
+          <fieldset className="whatsapp-contacto">
+            <legend>WhatsApp (opcional)</legend>
+            <label className="check-line">
+              <input
+                type="checkbox"
+                checked={ct.consentimiento}
+                onChange={(e) =>
+                  setCt({ ...ct, consentimiento: e.target.checked })
+                }
+              />
+              Aceptó recibir vacantes por WhatsApp
+            </label>
+            {ct.consentimiento && (
+              <>
+                <div className="whatsapp-fila">
                   <div className="field">
-                    <label htmlFor="cliente-telefono">
-                      Número con código de país
-                    </label>
-                    <div className="telefono">
-                      <BanderaTelefono
-                        telefono={ct.telefono}
-                        prefijos={prefijos}
-                      />
-                      <input
-                        id="cliente-telefono"
-                        type="tel"
-                        inputMode="tel"
-                        autoComplete="off"
-                        placeholder="+57 300 123 4567"
-                        value={ct.telefono}
-                        onChange={(e) =>
-                          setCt({ ...ct, telefono: e.target.value })
-                        }
-                      />
-                    </div>
+                    <label htmlFor="cliente-codigo">País</label>
+                    <select
+                      id="cliente-codigo"
+                      value={telPais}
+                      onChange={(e) => {
+                        setTelPais(e.target.value);
+                        setCt({
+                          ...ct,
+                          telefono: unirTelefono(e.target.value, numero),
+                        });
+                      }}
+                    >
+                      <option value="">Elige…</option>
+                      <optgroup label="Frecuentes">
+                        {FRECUENTES.map((x) => (
+                          <OpcionCodigo key={x} pais={x} />
+                        ))}
+                      </optgroup>
+                      <optgroup label="Todos los países">
+                        {todosLosCodigos.map((x) => (
+                          <OpcionCodigo key={x} pais={x} />
+                        ))}
+                      </optgroup>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="cliente-telefono">Número</label>
+                    <input
+                      id="cliente-telefono"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="off"
+                      placeholder="300 123 4567"
+                      value={numero}
+                      onChange={(e) =>
+                        setCt({
+                          ...ct,
+                          telefono: unirTelefono(telPais, e.target.value),
+                        })
+                      }
+                    />
                   </div>
                   <div className="field">
                     <label htmlFor="cliente-saludo">Nombre para saludar</label>
@@ -710,14 +782,14 @@ export function ClienteDialog({
                       }
                     />
                   </div>
-                  <p className="field-help">
-                    Cada mañana tendrás su mensaje listo en «Mensajes». Nada se
-                    envía solo.
-                  </p>
                 </div>
-              )}
-            </fieldset>
-          </div>
+                <p className="field-help">
+                  Cada mañana tendrás su mensaje listo en «Mensajes». Nada se
+                  envía solo.
+                </p>
+              </>
+            )}
+          </fieldset>
           <div className="section-title">
             <h3>Perfiles de búsqueda</h3>
             <span className="muted">
@@ -782,9 +854,6 @@ export function ClienteDialog({
                       })
                     }
                   />
-                  <p className="field-help">
-                    Vacantes al día para este perfil.
-                  </p>
                 </div>
               </div>
               <UbicacionesPerfil p={p} i={i} patch={patch} />
@@ -809,7 +878,24 @@ export function ClienteDialog({
                   </select>
                 </div>
                 <div className="field">
-                  <label htmlFor={"anos-" + p.id}>Años de experiencia</label>
+                  <span className="etiqueta-ayuda">
+                    <label htmlFor={"anos-" + p.id}>Años de experiencia</label>
+                    <Ayuda etiqueta="años de experiencia">
+                      {p.experiencia_anos != null
+                        ? p.experiencia_anos <= 2
+                          ? "Con 2 años o menos no se filtra por experiencia: entra cualquier vacante de entrada."
+                          : `Busca vacantes que pidan de ${p.experiencia_min} a ${p.experiencia_max} años.` +
+                            (p.experiencia_anos >= 5
+                              ? " Las junior o de prácticas van al final, con su etiqueta."
+                              : "")
+                        : p.experiencia_min !== null ||
+                            p.experiencia_max !== null
+                          ? `Hoy busca de ${p.experiencia_min ?? 0} a ${p.experiencia_max ?? 40} años. Si escribes sus años, buscará de 3 menos a 3 más.`
+                          : "Vacío: sin filtro de experiencia. Con un valor, busca de 3 años menos a 3 más."}{" "}
+                      Los años solo ordenan: las que piden otros años llegan
+                      después, con su etiqueta.
+                    </Ayuda>
+                  </span>
                   <input
                     id={"anos-" + p.id}
                     aria-label={"Años de experiencia del perfil " + (i + 1)}
@@ -859,18 +945,6 @@ export function ClienteDialog({
                     <option value={3}>Margen ±3 años</option>
                     <option value={4}>Margen ±4 años</option>
                   </select>
-                  <p className="field-help">
-                    {p.experiencia_anos != null
-                      ? p.experiencia_anos <= 2
-                        ? "Con 2 años o menos no se filtra por experiencia: entra cualquier vacante de entrada."
-                        : `Busca vacantes que pidan de ${p.experiencia_min} a ${p.experiencia_max} años.` +
-                          (p.experiencia_anos >= 5
-                            ? " No recibe vacantes junior ni de prácticas."
-                            : "")
-                      : p.experiencia_min !== null || p.experiencia_max !== null
-                        ? `Hoy filtra de ${p.experiencia_min ?? 0} a ${p.experiencia_max ?? 40} años. Si escribes sus años, buscará de 3 menos a 3 más.`
-                        : "Vacío: sin filtro de experiencia. Con un valor, busca de 3 años menos a 3 más."}
-                  </p>
                 </div>
               </div>
               <div className="form-grid dos">
@@ -906,9 +980,16 @@ export function ClienteDialog({
                 </div>
                 {p.idiomas.includes("en") && (
                   <div className="field">
-                    <label htmlFor={"ingles-" + p.id}>
-                      Inglés requerido: hasta
-                    </label>
+                    <span className="etiqueta-ayuda">
+                      <label htmlFor={"ingles-" + p.id}>
+                        Inglés requerido: hasta
+                      </label>
+                      <Ayuda etiqueta="nivel de inglés">
+                        Es el nivel que pide el aviso, aparte del idioma en que
+                        está escrito. Solo ordena: las que piden más nivel
+                        llegan después, con la etiqueta «Pide inglés C1».
+                      </Ayuda>
+                    </span>
                     <select
                       id={"ingles-" + p.id}
                       aria-label={"Inglés del perfil " + (i + 1)}
@@ -926,10 +1007,6 @@ export function ClienteDialog({
                         ),
                       )}
                     </select>
-                    <p className="field-help">
-                      Es el nivel que pide el aviso, aparte del idioma en que
-                      está escrito.
-                    </p>
                   </div>
                 )}
               </div>
@@ -1026,46 +1103,114 @@ export function ClienteDialog({
   );
 }
 
-// Contrato v30: la bandera del país según el prefijo del número (solo se muestra; el número se guarda tal cual).
+// La bandera de un país a partir de su código ISO (solo se muestra).
 function bandera(codigo: string) {
   return String.fromCodePoint(
     ...[...codigo.toUpperCase()].map((l) => 0x1f1e6 + l.charCodeAt(0) - 65),
   );
 }
-export function BanderaTelefono({
-  telefono,
-  prefijos,
-}: {
-  telefono: string;
-  prefijos: Record<string, string>;
-}) {
-  const digitos = telefono.trim().startsWith("+")
-    ? telefono.replace(/\D/g, "")
-    : "";
-  const largo = [4, 3, 2, 1].find((n) => prefijos[digitos.slice(0, n)]);
-  const codigo = largo ? prefijos[digitos.slice(0, largo)] : "";
-  return (
-    <span
-      className="bandera"
-      role="img"
-      aria-label={codigo ? "País: " + nombrePais(codigo) : "País sin reconocer"}
-      title={codigo ? nombrePais(codigo) : "Escribe el número con +código"}
-    >
-      {codigo ? bandera(codigo) : "🌐"}
-    </span>
-  );
-}
-
 const MODALIDADES: [string, string][] = [
   ["remoto", "Remoto"],
   ["hibrido", "Híbrido"],
   ["presencial", "Presencial"],
 ];
-const HORARIOS: [string, string][] = [
-  ["us_este", "EE. UU. Este"],
-  ["us_pacifico", "EE. UU. Pacífico"],
-  ["europa", "Europa"],
+// Contrato v35: zonas horarias en las que puede trabajar, con ciudades de referencia. Las antiguas se leen así.
+const ZONAS: [string, string][] = [
+  ["UTC-10", "Honolulu"],
+  ["UTC-9", "Anchorage"],
+  ["UTC-8", "Los Ángeles, Vancouver"],
+  ["UTC-7", "Denver, Phoenix"],
+  ["UTC-6", "Ciudad de México, Chicago, San José"],
+  ["UTC-5", "Bogotá, Lima, Nueva York"],
+  ["UTC-4", "Santiago, Caracas, Santo Domingo"],
+  ["UTC-3", "Buenos Aires, Montevideo, São Paulo"],
+  ["UTC-1", "Azores"],
+  ["UTC+0", "Londres, Lisboa"],
+  ["UTC+1", "Madrid, París, Berlín"],
+  ["UTC+2", "Atenas, Helsinki, El Cairo"],
+  ["UTC+3", "Estambul, Moscú, Nairobi"],
+  ["UTC+4", "Dubái"],
+  ["UTC+5", "Karachi"],
+  ["UTC+5:30", "India"],
+  ["UTC+7", "Bangkok, Yakarta"],
+  ["UTC+8", "Singapur, Manila, Pekín"],
+  ["UTC+9", "Tokio, Seúl"],
+  ["UTC+10", "Sídney"],
+  ["UTC+12", "Auckland"],
 ];
+const ANTIGUAS: Record<string, string> = {
+  us_este: "UTC-5",
+  us_pacifico: "UTC-8",
+  europa: "UTC+1",
+};
+const nombreZona = (z: string) => {
+  const c = ZONAS.find(([v]) => v === z)?.[1];
+  return c ? `${z.replace("-", "−")} · ${c}` : z.replace("-", "−");
+};
+
+function ZonasHorarias({
+  p,
+  i,
+  patch,
+}: {
+  p: Perfil;
+  i: number;
+  patch: (id: string, v: Partial<Perfil>) => void;
+}) {
+  const zonas = [
+    ...new Set((p.acepta_horario || []).map((z) => ANTIGUAS[z] || z)),
+  ];
+  const guardar = (v: string[]) => patch(p.id, { acepta_horario: v });
+  return (
+    <div className="zonas-horarias">
+      <span className="etiqueta-ayuda">
+        <span className="campo-titulo" id={"zonas-" + p.id}>
+          Otras zonas horarias en las que puede trabajar (opcional)
+        </span>
+        <Ayuda etiqueta="zonas horarias">
+          La zona de donde vive siempre cuenta. Una remota que solo pide un
+          horario (por ejemplo «horario de Nueva York») le llega si cruza alguna
+          de estas zonas, con una hora de margen.
+        </Ayuda>
+      </span>
+      <div
+        className="zonas-lista"
+        role="group"
+        aria-labelledby={"zonas-" + p.id}
+      >
+        {zonas.map((z) => (
+          <span className="chip-zona" key={z}>
+            {nombreZona(z)}
+            <button
+              type="button"
+              className="icon"
+              aria-label={`Quitar ${nombreZona(z)} del perfil ${i + 1}`}
+              onClick={() => guardar(zonas.filter((x) => x !== z))}
+            >
+              <X size={13} />
+            </button>
+          </span>
+        ))}
+        {zonas.length < 12 && (
+          <select
+            aria-label={`Añadir zona horaria al perfil ${i + 1}`}
+            value=""
+            onChange={(e) =>
+              e.target.value && guardar([...zonas, e.target.value])
+            }
+          >
+            <option value="">＋ Añadir zona…</option>
+            {ZONAS.filter(([v]) => !zonas.includes(v)).map(([v]) => (
+              <option key={v} value={v}>
+                {nombreZona(v)}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // Contrato v30: dónde trabajaría, en filas «Ciudades · Países · modalidades». La primera es donde vive. Reemplaza a
 // «se mudaría a», las casillas de países y «puede trabajar legalmente en».
@@ -1099,7 +1244,7 @@ function UbicacionesPerfil({
       {filas.map((f, n) => (
         <div className="ubicacion-fila" key={n}>
           <span className="ubicacion-titulo">
-            {n === 0 ? "Donde vive" : "Ubicación " + (n + 1)}
+            {n === 0 ? "¿Dónde vive?" : "Ubicación " + (n + 1)}
           </span>
           <TagInput
             visible="Ciudades"
@@ -1167,38 +1312,7 @@ function UbicacionesPerfil({
             Añadir otra ubicación
           </button>
         )}
-        <Plegable
-          inicial={!!p.acepta_horario?.length}
-          mostrar={
-            "Horario aceptado (opcional)" +
-            (p.acepta_horario?.length ? ` · ${p.acepta_horario.length}` : "")
-          }
-          ocultar="Ocultar horario"
-        >
-          <div className="check-line">
-            {HORARIOS.map(([v, t]) => (
-              <label key={v}>
-                <input
-                  type="checkbox"
-                  aria-label={`Horario ${t} en el perfil ${i + 1}`}
-                  checked={(p.acepta_horario || []).includes(v)}
-                  onChange={(e) =>
-                    patch(p.id, {
-                      acepta_horario: e.target.checked
-                        ? [...(p.acepta_horario || []), v]
-                        : (p.acepta_horario || []).filter((x) => x !== v),
-                    })
-                  }
-                />
-                {t}
-              </label>
-            ))}
-          </div>
-          <p className="field-help">
-            La zona de su país siempre cuenta. Una remota que solo pide horario
-            le llega si cruza alguna de estas zonas.
-          </p>
-        </Plegable>
+        <ZonasHorarias p={p} i={i} patch={patch} />
       </div>
     </fieldset>
   );
