@@ -61,7 +61,16 @@ def consultar(conn):
     with conn.transaction():
         conn.execute("set transaction read only")
         conn.execute("set local statement_timeout = '30s'")
-        return {nombre: conn.execute(sql).fetchall() for nombre, sql in CONSULTAS.items()}
+        filas = {nombre: conn.execute(sql).fetchall() for nombre, sql in CONSULTAS.items()}
+        # La estimación del planificador vale 0 en tablas pequeñas nunca analizadas: ahí se cuenta de verdad (rápido).
+        exactas = []
+        for fila in filas["tablas"]:
+            if fila[1] < 50_000:
+                total = conn.execute(f'select count(*) from public."{fila[0]}"').fetchone()[0]  # nosec B608 — nombre del catálogo
+                fila = (fila[0], total, *fila[2:])
+            exactas.append(fila)
+        filas["tablas"] = exactas
+        return filas
 
 
 def usados_en_codigo(raiz="."):
