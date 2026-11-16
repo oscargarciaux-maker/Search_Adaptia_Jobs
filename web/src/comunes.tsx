@@ -167,12 +167,17 @@ export function SelectorPaises({
   onChange,
   excluir = [],
   extra = [],
+  visible,
+  placeholder = "Escribe un país y pulsa Enter",
 }: {
   etiqueta: string;
   valores: string[];
   onChange: (v: string[]) => void;
   excluir?: string[];
   extra?: { codigo: string; nombre: string }[];
+  // Texto corto a la vista; `etiqueta` queda para lectores de pantalla (contrato v30, filas de ubicación).
+  visible?: string;
+  placeholder?: string;
 }) {
   const [texto, setTexto] = useState("");
   const id = useId();
@@ -194,7 +199,16 @@ export function SelectorPaises({
   }
   return (
     <div className="field">
-      <label htmlFor={id}>{etiqueta}</label>
+      <label htmlFor={id}>
+        {visible ? (
+          <>
+            <span aria-hidden="true">{visible}</span>
+            <span className="visually-hidden">{etiqueta}</span>
+          </>
+        ) : (
+          etiqueta
+        )}
+      </label>
       <div className="tagbox">
         {valores.map((c) => (
           <span className="term" key={c}>
@@ -211,7 +225,7 @@ export function SelectorPaises({
         <input
           id={id}
           list={id + "-lista"}
-          placeholder="Escribe un país y pulsa Enter"
+          placeholder={placeholder}
           value={texto}
           onChange={(e) => {
             // Elegir de la lista desplegable lo añade al momento.
@@ -281,6 +295,78 @@ export function Empty({
           {label}
         </button>
       )}
+    </div>
+  );
+}
+
+export const SEPARADORES = /[,;\n]/;
+export function TagInput({
+  label,
+  values,
+  onChange,
+  visible,
+  placeholder = "Añade un término y pulsa Enter",
+}: {
+  label: string;
+  values: string[];
+  onChange: (v: string[]) => void;
+  visible?: string;
+  placeholder?: string;
+}) {
+  const id = useId();
+  const [text, setText] = useState("");
+  // Reunión del 14 nov: escribir o pegar «A, B; C» guardaba una sola cadena. Ahora cada parte es un término.
+  function sumar(partes: string[]) {
+    const salida = [...values];
+    for (const bruto of partes) {
+      const t = bruto.trim();
+      if (t && !salida.some((x) => x.toLowerCase() === t.toLowerCase()))
+        salida.push(t);
+    }
+    if (salida.length !== values.length) onChange(salida);
+  }
+  function add() {
+    sumar(text.split(SEPARADORES));
+    setText("");
+  }
+  return (
+    <div className="field">
+      <label htmlFor={id}>{visible || label}</label>
+      <div className="tagbox">
+        {values.map((t) => (
+          <span className="term" key={t}>
+            {t}
+            <button
+              type="button"
+              aria-label={"Quitar " + t}
+              onClick={() => onChange(values.filter((x) => x !== t))}
+            >
+              <X size={12} />
+            </button>
+          </span>
+        ))}
+        <input
+          id={id}
+          aria-label={label}
+          placeholder={placeholder}
+          value={text}
+          onChange={(e) => {
+            const partes = e.target.value.split(SEPARADORES);
+            if (partes.length > 1) {
+              // Lo que va antes de la última coma ya es un término; lo último sigue escribiéndose.
+              sumar(partes.slice(0, -1));
+              setText(partes[partes.length - 1].trimStart());
+            } else setText(e.target.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          onBlur={add}
+        />
+      </div>
     </div>
   );
 }

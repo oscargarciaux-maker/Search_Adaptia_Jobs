@@ -15,6 +15,7 @@ from pydantic import ValidationError
 import requests
 
 from buscador import paises
+from buscador.fuentes.publicaciones_apify import PREFIJOS
 from buscador import registro
 from panel import servicio
 from panel.modelos import BorrarCliente, ImportarClientes, CambioBorrador, Configuracion, Contacto, DecisionRevision, EstadoRegla, SubirRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia, explicar, parcial, solo_perfil
@@ -22,6 +23,8 @@ from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupa
 from panel.terminos import sugerir
 
 RAIZ = Path(__file__).resolve().parent.parent
+PREFIJOS_MOSTRAR = {"1": "US", "44": "GB", "49": "DE", "33": "FR", "39": "IT", "351": "PT", "55": "BR", "31": "NL",
+                    "41": "CH", "353": "IE", "61": "AU", "1809": "DO", "1829": "DO", "1849": "DO", "1787": "PR"}
 
 
 def a_v8(estado):
@@ -29,7 +32,10 @@ def a_v8(estado):
     for cfg in (estado.get("borrador"), (estado.get("publicada") or {}).get("configuracion")):
         if isinstance(cfg, dict) and cfg.get("perfiles"):
             try:
-                cfg["perfiles"] = [Perfil.model_validate(p).model_dump(mode="json") for p in cfg["perfiles"]]
+                # Contrato v30: el formulario edita filas; las de un perfil anterior se le entregan ya armadas.
+                validados = [Perfil.model_validate(p) for p in cfg["perfiles"]]
+                cfg["perfiles"] = [dict(p.model_dump(mode="json"), ubicaciones=[f.model_dump(mode="json") for f in p.filas])
+                                   for p in validados]
             except ValueError:
                 pass  # se devuelve tal cual: el panel lo marcará como incompleto
     return estado
@@ -119,7 +125,9 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         return {"demo": demo, "sesion": demo or bool(request.cookies.get("adaptia_session")),
                 "paises": [{"codigo": p["codigo"], "nombre": p["nombre"]} for p in paises.datos()["cubiertos"]],
                 # Contrato v23: todos los países, para residencia, mudanza y permiso legal.
-                "paises_mundo": [{"codigo": x["codigo"], "nombre": x["nombre"]} for x in paises.mundo()["lista"]]}
+                "paises_mundo": [{"codigo": x["codigo"], "nombre": x["nombre"]} for x in paises.mundo()["lista"]],
+                # Contrato v30: la bandera junto al WhatsApp (solo para mostrar; +1 se muestra como EE. UU.).
+                "prefijos": {**PREFIJOS, **PREFIJOS_MOSTRAR}}
 
     @app.post("/api/auth/login")
     async def login(request: Request, body: Credenciales):

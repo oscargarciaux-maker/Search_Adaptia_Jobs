@@ -12,21 +12,15 @@ from panel.repositorio import ErrorRepositorio, hoy
 from panel.terminos import grado, sugerir
 
 # Qué puede hacer el operador cuando un filtro, por sí solo, deja fuera vacantes. Sin sugerencia si no depende de él.
+# Desde v27 solo descartan la ubicación, el idioma y las reglas del sistema: años, inglés y restricciones solo ordenan.
 SUGERENCIAS = {
-    "experiencia no informada": "Admitir experiencia no informada",
-    "inglés requerido sin confirmar": "Admitir inglés no informado",
     "publicación fuera del plazo": "Ampliar la antigüedad de publicación",
-    "oficina en otro país": "Añadir países a los que se mudaría",
+    "oficina en otro país": "Añadir una ubicación donde trabajaría",
+    "oficina en otra ciudad": "Añadir la ciudad a sus ubicaciones",
+    "no admite postular desde su país": "Añadir un país donde puede trabajar en remoto",
     "modalidad diferente": "Aceptar otra modalidad",
     "idioma del aviso diferente": "Aceptar avisos en español e inglés",
-    "experiencia fuera del rango": "Revisar los años de experiencia",
-    "inglés requerido superior al indicado": "Subir el nivel de inglés admitido",
-    "nivel inferior al del perfil": "Revisar los años de experiencia",
-    "salario menor al aceptado": "Revisar las restricciones del perfil",
-    "menciona algo que el perfil no acepta": "Revisar las restricciones del perfil",
-    "tipo de contrato no aceptado": "Revisar las restricciones del perfil",
 }
-SIN_DATO = {"experiencia no informada", "inglés requerido sin confirmar"}
 _POR_CARGO = {}
 _log = logging.getLogger(__name__)
 
@@ -54,7 +48,7 @@ def _ampliables(del_cargo, cercanas, p, fecha, ya):
         return 0
     extra = set()
     for nivel in AMPLIACIONES:
-        for v in (del_cargo if nivel == "sin_dato" else del_cargo + cercanas):
+        for v in del_cargo + cercanas:
             if v["id"] not in ya and v["id"] not in extra and evaluar_ampliada(v, p, fecha, nivel)["compatible"]:
                 extra.add(v["id"])
                 if len(ya) + len(extra) >= MINIMO_POR_PERFIL:
@@ -71,13 +65,7 @@ def _contar(vacantes, p, fecha):
             ids.add(v["id"])
         elif len(r["motivos"]) == 1:
             solo[r["motivos"][0]] += 1
-        elif set(r["motivos"]) == SIN_DATO:  # muchos avisos no dicen ni años ni nivel de inglés
-            solo["ambos sin dato"] += 1
     limitantes = [{"motivo": m, "vacantes": n, "sugerencia": SUGERENCIAS[m]} for m, n in solo.items() if m in SUGERENCIAS]
-    if solo["ambos sin dato"]:
-        limitantes.append({"motivo": "experiencia e inglés no informados",
-                           "vacantes": sum(solo[m] for m in (*SIN_DATO, "ambos sin dato")),
-                           "sugerencia": "Admitir experiencia e inglés no informados"})
     return ids, sorted(limitantes, key=lambda x: -x["vacantes"])[:3]
 
 

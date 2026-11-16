@@ -10,18 +10,26 @@ Cada perfil tiene su «Meta diaria» (cuántas vacantes al día busca; 10 por de
 «Techo del día» (120 por defecto), el máximo para cuidar los consumos. El cupo de cada cargo es la suma de las metas de
 sus perfiles. Se puede programar cuando las metas de los clientes caben en el techo. Un cliente marcado «Comunidad»
 (grupo de WhatsApp) recibe después de los clientes reales, con lo que sobre del techo. Los filtros pertenecen a cada perfil y pueden producir cantidades diferentes por cliente.
-Mientras se edita un perfil, el panel estima cuántas vacantes ya guardadas y aún no entregadas lo cumplirían hoy y
-qué ajuste añadiría más (por ejemplo, admitir experiencia o inglés no informados: solo ~1 de cada 4 avisos dice los
-años exigidos y ~1 de cada 8 el nivel de inglés). En «Cargos y metas» cada cargo indica si alcanza para su meta. En cada perfil se puede elegir el margen de años (±3 o ±4;
+Mientras se edita un perfil, el panel estima (la cifra se actualiza sola en uno o dos segundos) cuántas vacantes ya
+guardadas y aún no entregadas lo cumplirían hoy y qué ajuste de ubicación o idioma añadiría más; «Buscar en internet
+ahora» lo comprueba en LinkedIn público y Get on Board. En «Cargos y metas» cada cargo indica si alcanza para su meta. En cada perfil se puede elegir el margen de años (±3 o ±4;
 con 5 años o más no llegan vacantes junior ni de prácticas, y con 2 o menos no se filtra la experiencia), añadir
 «Prioridades» (sectores y palabras preferidas que solo ordenan) y reglas en «Este perfil NO acepta…» (salario menor
 en cualquier moneda, con un margen del 10 %; palabras o tipo de contrato). **Desde el 16 nov solo la ubicación y el
 idioma del aviso descartan.** Años, inglés, restricciones y antigüedad ordenan: primero llegan las que encajan en todo, y
-las demás después, con una etiqueta gris de lo que no cumplen («Pide 7 años de experiencia», «Salario menor al que pide»). El país de residencia puede ser cualquiera; «También se mudaría a…» admite países de
-fuera de LATAM; con presencial o híbrida se pueden limitar ciudades; en «Permiso de trabajo y horario» se indican los
-países donde puede trabajar legalmente y los horarios que acepta (una remota que solo pide horario le llega si cruza
-esa zona). En «Por confirmar» se pueden añadir varias etiquetas a una vacante. Las «Ciudades donde trabajaría» incluyen aquellas a las que se mudaría: una vacante en una
-de ellas sirve aunque su país no esté elegido, y la búsqueda nocturna también busca en esas ciudades. En cada cargo, «Funciones del cargo» (con «Proponer funciones») permite reconocer vacantes
+las demás después, con una etiqueta gris de lo que no cumplen («Pide 7 años de experiencia», «Salario menor al que pide»).
+
+**¿Dónde trabajaría? (16 nov, contrato v30).** Cada perfil tiene filas «Ciudades · Países · modalidades»; la primera es
+donde vive (cualquier país). «Añadir otra ubicación» suma, por ejemplo, Chicago en híbrido o presencial, o EE. UU. en
+remoto para quien tiene permiso de trabajo allí. Una vacante sirve si alguna fila la acepta: remota abierta a uno de
+sus países, o híbrida o presencial con oficina en uno de sus países o ciudades (la ciudad basta aunque el país no esté
+en la fila). Las filas reemplazan «También se mudaría a…», las casillas de países y «Puede trabajar legalmente en…».
+Los perfiles anteriores se muestran ya convertidos en filas y reciben lo mismo que antes. El horario aceptado va
+plegado debajo de las filas (una remota que solo pide horario le llega si cruza esa zona). El formulario pone el
+nombre y el WhatsApp lado a lado (con la bandera del país según el prefijo), «Inglés requerido» solo aparece si acepta
+avisos en inglés y ya no hay casillas de «admitir no informado» (desde el 16 nov esos datos no descartan). El
+WhatsApp se guarda sin hacer esperar: si falla, el panel lo avisa. En «Por confirmar» se pueden añadir varias
+etiquetas a una vacante. La búsqueda nocturna también busca en las ciudades de las filas. En cada cargo, «Funciones del cargo» (con «Proponer funciones») permite reconocer vacantes
 con otro título: si su descripción menciona varias de esas funciones, aparecen en «Por confirmar» como «Coincide por
 funciones». Al aprobarlas, el título queda aprendido y desde la búsqueda siguiente entra solo.
 
