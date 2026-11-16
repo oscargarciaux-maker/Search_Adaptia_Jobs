@@ -510,7 +510,19 @@ def alcance(titulo, ubicacion, descripcion=""):
     d = datos()
     ubicacion_n = normalizar.texto(_expandir_codigos(ubicacion))
     titulo_n = normalizar.texto(titulo)
-    hallados = paises_en_texto(ubicacion_n)
+    # «Baja California» (México) no es California (EE. UU.): los lugares propios que contienen uno extranjero se quitan.
+    sin_propios = ubicacion_n
+    for frase in d["propios_con_fuera"]:
+        sin_propios = re.sub(r"(?<![a-z0-9])" + re.escape(frase) + r"(?![a-z0-9])", " ", sin_propios)
+    hallados = paises_en_texto(sin_propios) | (paises_en_texto(ubicacion_n) & set(d["reconocidos"]))
+    # Contrato v32: LinkedIn muestra muchas de EE. UU. como «Chicago, IL», «Austin, TX» o «Remote, US». Sin esto no
+    # tenían país y se descartaban al entrar, aunque un perfil viva en EE. UU. AR, CO y PA también son países cubiertos:
+    # esos tres siguen por la regla de v15.
+    estado = re.search(r",\s*([A-Z]{2})\s*(?:\(|$)", ubicacion or "")
+    if estado and estado.group(1) in _ESTADOS_EEUU and estado.group(1) not in {"AR", "CO", "PA"}:
+        hallados.add("US")
+    if re.search(r"(?:^|[,\s(])(?:US|USA|U\.S\.A?\.?)(?:$|[,\s)])", ubicacion or ""):
+        hallados.add("US")
     metro = area_metropolitana(_REMOTO.sub(" ", _HIBRIDO.sub(" ", _PRESENCIAL.sub(" ", ubicacion_n))))
     if metro:  # contrato v32: «Granada y alrededores» es España, no Granada (el país del Caribe)
         hallados = {metro}

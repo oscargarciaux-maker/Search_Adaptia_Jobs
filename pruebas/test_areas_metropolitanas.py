@@ -28,3 +28,18 @@ def test_area_cubierta_queda_en_su_pais(ubicacion, pais):
 def test_nombre_ambiguo_sin_sufijo_sigue_por_confirmar():
     assert _v("Granada")["confianza_pais"] == "baja"
     assert paises.area_metropolitana("Granada") == "" and paises.area_metropolitana("Roma y alrededores") == "IT"
+
+
+@pytest.mark.parametrize("ubicacion", ["Chicago, IL", "Chicago, IL (Hybrid)", "Greater Chicago Area", "Austin, TX",
+                                       "Remote, US", "San Francisco Bay Area", "Nueva York y alrededores"])
+def test_ubicaciones_de_eeuu_como_las_muestra_linkedin(ubicacion):
+    """Danna (16 nov): LinkedIn muestra «Chicago, IL»; sin país, el aviso se descartaba al entrar."""
+    paises.areas_metropolitanas.cache_clear()
+    assert paises.alcance("", ubicacion)["paises_mundo"] == ["US"]
+
+
+@pytest.mark.parametrize("ubicacion,esperado", [("Denver, CO", []), ("Bogotá, CO", ["CO"]),
+                                                ("Zona Centro, Baja California, México", ["MX"])])
+def test_sin_falsos_eeuu(ubicacion, esperado):
+    """CO/AR/PA también son países cubiertos (v15) y «Baja California» es México."""
+    assert paises.alcance("", ubicacion)["paises_mundo"] == esperado
