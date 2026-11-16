@@ -39,6 +39,40 @@ def lugares_perfil(p, nombres=None):
     return lugares
 
 
+# PR 1b (16 nov): palabras con que empiezan los títulos en español. Sirven para elegir, entre los nombres del cargo y los
+# del mapa, los que se buscan para perfiles que solo aceptan avisos en español. Sin IA: lista editable.
+INICIO_ES = ("diseñador", "diseñadora", "desarrollador", "desarrolladora", "analista", "ingeniero", "ingeniera",
+             "gerente", "jefe", "jefa", "lider", "líder", "coordinador", "coordinadora", "especialista", "gestor",
+             "gestora", "consultor", "consultora", "programador", "programadora", "probador", "redactor", "redactora",
+             "responsable", "director", "directora", "encargado", "encargada", "asistente", "auxiliar", "tester de",
+             "dueño", "administrador", "administradora", "arquitecto", "arquitecta", "experto", "experta")
+
+
+PALABRAS_ES = ("ia", "inteligencia artificial", "de", "del", "y", "con", "para", "datos", "pruebas", "calidad",
+               "producto", "proyectos", "ventas", "mercadeo")
+
+
+def en_espanol(titulo):
+    """Título en español: empieza como uno («Diseñador…») o trae palabras propias («Product Manager IA»)."""
+    t = normalizar.texto(titulo)
+    return any(t == normalizar.texto(x) or t.startswith(normalizar.texto(x) + " ") for x in INICIO_ES) or \
+        any(normalizar.contiene_frase(t, normalizar.texto(x)) for x in PALABRAS_ES)
+
+
+def consultas_espanol(cargo, raw, maximo=12):
+    """Títulos en español del cargo: los suyos y, si faltan, los del mapa de cargos (`sugerir`)."""
+    propios = [cargo.nombre, *raw["terminos_exactos"], *raw["terminos_similares"]]
+    sugeridos = sugerir(cargo.nombre, consultar_esco=False)
+    candidatos = propios + sugeridos["terminos_exactos"] + sugeridos["terminos_similares"]
+    vistos, salida = set(), []
+    for t in candidatos:
+        clave = normalizar.texto(t)
+        if clave and clave not in vistos and en_espanol(t):
+            vistos.add(clave)
+            salida.append(t)
+    return salida[:maximo]
+
+
 def objetivo_mundo(cfg):
     """Contrato v24: países (de cualquier parte) que necesitan los perfiles activos: residencia, mudanza, permiso
     legal y el país de sus ciudades cuando se reconoce. Y si algún perfil acepta horario de otras zonas."""
@@ -72,6 +106,12 @@ def preparar(version, fecha, aprendidos=None):
         for p in perfiles:
             lugares.update(lugares_perfil(p, nombres))
         rid = "cargo:" + str(c.id)
+        # PR 1b: para quien solo acepta avisos en español, LinkedIn busca además los títulos en español en sus lugares.
+        solo_es = [p for p in perfiles if set(p.idiomas) == {"es"}]
+        consultas_es = consultas_espanol(c, raw) if solo_es else []
+        lugares_es = {}
+        for p in solo_es:
+            lugares_es.update({k: v for k, v in lugares_perfil(p, nombres).items() if k != "REMOTO_MUNDO"})
         # Contrato v25: títulos aprobados desde «Coincide por funciones» cuentan como similares del cargo.
         similares = list(dict.fromkeys(raw["terminos_similares"] + list(aprendidos.get(str(c.id)) or [])))
         raw["terminos_similares"] = similares
@@ -80,6 +120,7 @@ def preparar(version, fecha, aprendidos=None):
             "funciones": raw.get("funciones", []),
             "excluir": raw["terminos_excluidos"], "herramientas": [], "lugares": list(lugares.items()),
             "_control_cargo": raw,
+            "consultas_es": consultas_es, "lugares_es": list(lugares_es.items()) if consultas_es else [],
             "paises_objetivo": sorted({x for p in perfiles for x in p.paises_oficina}),
             "solo_remoto": all(p.modalidades == ["remoto"] for p in perfiles)})
         roles.append({"id": rid, "nombre": c.nombre, "familias": [rid], "cupo": c.cupo,
@@ -89,12 +130,15 @@ def preparar(version, fecha, aprendidos=None):
                      "dias_frescura": 30, "idiomas": ["es", "en"], "techo": cfg.techo_diario}
     motor = bodega.config()
     motor["paises_activos"] = sorted({p for x in mapa for p in x["paises_objetivo"]})
-    motor["dias_maximos"] = max(p.antiguedad_dias for p in cfg.perfiles_activos())
+    # Contrato v27: la antigüedad del perfil solo ordena; la captura trae hasta el límite del sistema.
+    from panel.afinidad import ANTIGUEDAD_SISTEMA
+    motor["dias_maximos"] = ANTIGUEDAD_SISTEMA
     motor["control_dirigido"] = True
     motor["paises_objetivo_mundo"], motor["acepta_horario"] = objetivo_mundo(cfg)
     motor["presupuestos"].update(linkedin_busquedas=min(300, max(24, len(roles) * 24)),
         indeed_busquedas=min(72, max(6, len(roles) * 8)), getonbrd_busquedas=min(30, len(roles) * 4),
         computrabajo_busquedas=min(90, max(12, len(roles) * 12)),
+        elempleo_busquedas=min(30, max(6, len(roles) * 3)),
         apify_busquedas=0,  # contrato v11: Apify solo para perfiles bajo el mínimo (rescate dirigido)
         empresas_por_probar=20, remotos_paginas=24)
     return mapa, configuracion, motor

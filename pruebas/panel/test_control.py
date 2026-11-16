@@ -1390,3 +1390,35 @@ def test_demo_aplicar_hoy_rige_desde_hoy(tmp_path):
     assert r.publicar_hoy(r.config()["revision"])["vigente_desde"] == hoy()
     with pytest.raises(ErrorRepositorio):
         r.publicar_hoy(r.config()["revision"] + 1)
+
+
+# ── PR 1b (16 nov): más vacantes para quien solo acepta avisos en español ─────────────────────────────────────────
+
+def test_pr1b_perfil_solo_espanol_busca_titulos_en_espanol_en_sus_lugares(cfg):
+    from buscador.fuentes import computrabajo, linkedin_publico
+    cfg["perfiles"][0]["idiomas"] = ["es"]
+    mapa, _, motor = ejecutor.preparar({"configuracion": cfg}, hoy())
+    f = next(x for x in mapa if x["id"] == "cargo:" + cfg["perfiles"][0]["cargo_id"])
+    assert f["consultas_es"] and all(ejecutor.en_espanol(t) for t in f["consultas_es"])
+    assert "diseñador ux/ui" in f["consultas_es"]
+    assert f["lugares_es"] and all(k != "REMOTO_MUNDO" for k, _ in f["lugares_es"])
+    combos = linkedin_publico.combinaciones(mapa, [])
+    espanol = [c for c in combos if c[2].endswith(":ES")]
+    assert espanol and all(c[1] == f["consultas_es"] for c in espanol)
+    assert computrabajo._primero_es(f)[:len(f["consultas_es"])] == f["consultas_es"]
+    assert motor["dias_maximos"] == afinidad.ANTIGUEDAD_SISTEMA  # v27: la antigüedad del perfil solo ordena
+
+
+def test_pr1b_sin_perfiles_solo_espanol_no_cambia_la_busqueda(cfg):
+    for p in cfg["perfiles"]:
+        p["idiomas"] = ["es", "en"]
+    mapa, _, _ = ejecutor.preparar({"configuracion": cfg}, hoy())
+    assert all(not f["consultas_es"] and not f["lugares_es"] for f in mapa)
+    from buscador.fuentes import linkedin_publico
+    assert not [c for c in linkedin_publico.combinaciones(mapa, []) if c[2].endswith(":ES")]
+
+
+@pytest.mark.parametrize("titulo,es", [("Product Manager IA", True), ("Jefe de QA", True), ("Diseñadora UX", True),
+                                       ("Product Designer", False), ("QA Lead", False)])
+def test_pr1b_reconoce_titulos_en_espanol(titulo, es):
+    assert ejecutor.en_espanol(titulo) is es

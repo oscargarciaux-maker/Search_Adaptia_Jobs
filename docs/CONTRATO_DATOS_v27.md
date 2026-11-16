@@ -82,6 +82,20 @@ Junto a «Programar para mañana», el panel ofrece **«Aplicar hoy»**:
 - Sin la migración instalada, el panel explica que hay que correr «Preparar Supabase». «Programar para mañana» sigue
   funcionando.
 
+## Búsqueda para perfiles solo en español (PR 1b, 16 nov)
+- **Captura:** trae avisos de hasta 30 días (`dias_maximos` del sistema), no la antigüedad mayor de los perfiles, porque
+  esa ya solo ordena.
+- **LinkedIn:** si un cargo tiene perfiles que solo aceptan avisos en español, busca además sus títulos en español
+  (`consultas_es`: los del cargo y los del mapa que empiezan como un título en español o traen palabras propias como
+  «IA» o «de») en los lugares de esos perfiles. La lista de palabras es editable en `panel/ejecutor.py`; sin IA.
+- **Computrabajo:** pone primero esos títulos.
+- **Elempleo** (Colombia) es una fuente nueva:
+  - lee el `ItemList` de la búsqueda y el `JobPosting` de cada ficha: publicación real, cierre, empresa, ciudad,
+    remota y salario;
+  - lo que la ficha no dice queda vacío.
+- **Portales descartados:** OCC (México) e InfoJobs (España) bloquean el acceso sin cuenta. Bumeran y sus portales
+  hermanos responden, pero quedan para después: hoy ningún cliente que solo acepta español vive en sus países.
+
 ## Pruebas
 - `pruebas/panel/test_control.py`:
   - años, inglés y restricciones dejan aviso sin descartar;

@@ -94,6 +94,11 @@ def modalidad(texto):
     return None, ""
 
 
+def _primero_es(f):
+    es = list(f.get("consultas_es") or [])
+    return es + [c for c in cobertura.consultas(f) if c not in es] if es else cobertura.consultas(f)
+
+
 def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fichas=120, reloj=time.monotonic,
            limite_segundos=None, prioritarias=(), max_paginas=2, desfase_terminos=0):
     """Recorre (familia, país) menos recientes hasta gastar el presupuesto de páginas y lee las fichas.
@@ -101,7 +106,9 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
     hoy = hoy or datetime.now(timezone.utc).date().isoformat()
     inicio = reloj()
     nombres = dict(paises_activos)
-    todas = [(f["id"], cobertura.consultas(f), codigo, {}) for f in mapa
+    # PR 1b: Computrabajo es en español; si el cargo tiene títulos en español (perfiles solo en español), van primero
+    # y se alternan con el resto día a día.
+    todas = [(f["id"], _primero_es(f), codigo, {}) for f in mapa
              for codigo in f.get("paises_objetivo", list(nombres)) if codigo in SITIOS]
     todas = cobertura.repartir(todas, estado, hoy, prioritarias)
     avisos, vistos = [], set()
