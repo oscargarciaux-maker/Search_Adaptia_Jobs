@@ -105,7 +105,7 @@ def buscar(cliente, mapa, estado, presupuesto, hoy=None, max_fichas=80, reloj=ti
     avisos, vistos = [], set()
     hechas = fallidas = seguidas = 0
     for familia, consultas, _, _ in todas:
-        if hechas >= presupuesto or seguidas >= 4 or (limite_segundos and reloj() - inicio > limite_segundos):
+        if hechas >= presupuesto or seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
             break
         consulta = cobertura.rotar(consultas, hoy, 1)[0]
         r = cliente.get(f"{BASE}/co/ofertas-empleo/trabajo-{slug(consulta)}")
@@ -123,7 +123,7 @@ def buscar(cliente, mapa, estado, presupuesto, hoy=None, max_fichas=80, reloj=ti
     avisos.sort(key=lambda a: a["familia"] not in prioritarias)
     crudas, con_ficha, cerradas = [], 0, 0
     for a in avisos[:max_fichas]:
-        if seguidas >= 4 or (limite_segundos and reloj() - inicio > limite_segundos):
+        if seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
             break
         r = cliente.get(a["enlace"])
         if r is None or r.status_code != 200:

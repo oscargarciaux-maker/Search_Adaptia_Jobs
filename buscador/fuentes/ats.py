@@ -274,7 +274,7 @@ def buscar(cliente, filas, max_tableros=None, limite_segundos=None, max_detalles
     for fila in filas:
         pendientes_por_empresa[fila["empresa"]] = pendientes_por_empresa.get(fila["empresa"], 0) + 1
     for fila in filas[:max_tableros] if max_tableros else filas:
-        if limite_segundos and time.monotonic() - inicio >= limite_segundos:
+        if limite_segundos is not None and time.monotonic() - inicio >= limite_segundos:
             break
         try:
             datos = _tablero_completo(cliente, fila["sistema"], fila["slug"],
@@ -293,7 +293,7 @@ def buscar(cliente, filas, max_tableros=None, limite_segundos=None, max_detalles
     candidatas.sort(key=lambda v: (not bool(prioritarias & {f["familia"] for f in familias.clasificar(v["titulo"])}),
                                     v.get("remoto") is not True))
     for v in candidatas:
-        if detalles >= max_detalles or (limite_segundos and time.monotonic() - inicio >= limite_segundos):
+        if detalles >= max_detalles or (limite_segundos is not None and time.monotonic() - inicio >= limite_segundos):
             break
         # Detalles solo para cargos del mapa; la lista general se conserva para descubrir otros títulos.
         if not familias.clasificar(v["titulo"]):

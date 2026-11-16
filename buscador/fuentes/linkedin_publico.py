@@ -88,7 +88,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
     hechas = fallidas = seguidas = 0
     por_familia, por_lugar = {}, {}
     for familia, consultas, lugar, params in todas:
-        if hechas >= presupuesto or seguidas >= 4 or (limite_segundos and reloj() - inicio > limite_segundos):
+        if hechas >= presupuesto or seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
             break
         clave = f"{familia}@{lugar}"
         terminos = cobertura.rotar(consultas, hoy, 4, desfase=desfase_terminos)
@@ -96,7 +96,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
         ultima = estado.get(clave_terminos)
         dias = max_dias if not ultima else min(max_dias, max(1, (datetime.fromisoformat(hoy) - datetime.fromisoformat(ultima)).days + 1))
         for pagina in range(max_paginas):
-            if hechas >= presupuesto:
+            if hechas >= presupuesto or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
                 break
             r = cliente.get(BUSQUEDA, params=dict(params, keywords=consulta_or(terminos), f_TPR=f"r{dias * 86400}",
                                                   start=str(pagina * 10)))
@@ -127,7 +127,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
     crudas, con_ficha, cerradas = [], 0, 0
     for a in avisos:
         descripcion, cerrado, externo, remoto = "", False, "", None
-        if con_ficha < max_fichas and seguidas < 4 and not (limite_segundos and reloj() - inicio > limite_segundos):
+        if con_ficha < max_fichas and seguidas < 4 and not (limite_segundos is not None and reloj() - inicio >= limite_segundos):
             r = cliente.get(AVISO + a["id"])
             if r is not None and r.status_code == 200:
                 descripcion, cerrado, externo, remoto = ficha(r.text)
@@ -169,7 +169,7 @@ def completar_descripciones(cliente, previas, max_fichas, hoy=None, max_dias=21,
     candidatas.sort(key=lambda v: not any(f["familia"] in prioritarias for f in v.get("familias", [])))  # estable
     crudas, leidas, cerradas, seguidas, peticiones = [], 0, 0, 0, 0
     for v in candidatas:
-        if peticiones >= max_fichas or seguidas >= 4 or (limite_segundos and reloj() - inicio > limite_segundos):
+        if peticiones >= max_fichas or seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
             break
         r = cliente.get(AVISO + aviso_id(v))
         peticiones += 1

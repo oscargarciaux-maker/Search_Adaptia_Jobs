@@ -41,7 +41,7 @@ def buscar(mapa, paises_activos, estado, presupuesto, hoy=None, max_dias=30, por
     crudas, hechas, fallidas, seguidas = [], 0, 0, 0
     por_familia, por_pais = {}, {}
     for familia, consulta, pais in combinaciones:
-        if hechas >= presupuesto or seguidas >= 3 or (limite_segundos and reloj() - inicio > limite_segundos):
+        if hechas >= presupuesto or seguidas >= 3 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
             break
         lugar = pais
         pais = lugar.split(":")[0]
