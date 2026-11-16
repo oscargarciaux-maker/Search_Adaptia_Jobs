@@ -58,7 +58,7 @@ jobs:
         run: python -m buscador.traspaso --fase traspaso --salida salida --privado privado ${{ inputs.ensayo && '--ensayo' || '' }}
       - name: Conservar la copia cifrada del traspaso
         if: ${{ always() && hashFiles('privado/respaldos/*.enc') != '' }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: respaldo-traspaso-${{ github.run_id }}
           path: privado/respaldos/*.enc

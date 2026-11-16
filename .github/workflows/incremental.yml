@@ -58,7 +58,7 @@ jobs:
         run: python -m panel.ejecutor --salida salida --modo incremental ${{ inputs.prueba && '--prueba' || '' }}
       - name: Conservar estado de recuperación
         if: ${{ always() && !inputs.prueba && steps.preparar.outputs.ejecutar == 'true' && hashFiles('salida/trabajo/estado.json') != '' }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: estado-captura-${{ github.run_id }}
           path: salida/trabajo/

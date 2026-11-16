@@ -99,7 +99,7 @@ jobs:
           git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" publicado
       - name: Conservar estado para diagnóstico y recuperación
         if: ${{ steps.decidir.outputs.ejecutar == 'true' && always() && !inputs.prueba && hashFiles('salida/trabajo/estado.json') != '' }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: estado-bodega-${{ github.run_id }}
           path: salida/trabajo/

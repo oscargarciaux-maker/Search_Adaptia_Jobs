@@ -75,7 +75,7 @@ jobs:
         run: python -m buscador.traspaso --fase respaldo --salida salida --privado privado
       - name: Conservar la copia 90 días
         if: inputs.aplicar
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: respaldo-antes-de-limpiar-${{ github.run_id }}
           path: privado/respaldos/*.enc
@@ -100,7 +100,7 @@ jobs:
           fi
       - name: Guardar el listado para revisar (30 días)
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: listado-para-revisar
           path: revision/

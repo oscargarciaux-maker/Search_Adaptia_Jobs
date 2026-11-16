@@ -43,7 +43,7 @@ jobs:
           SUPABASE_BACKUP_KEY: ${{ secrets.SUPABASE_BACKUP_KEY }}
         run: python -m buscador.traspaso --fase respaldo --salida salida --privado privado
       - name: Conservar la copia 90 días
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: respaldo-semanal-${{ github.run_id }}
           path: privado/respaldos/*.enc

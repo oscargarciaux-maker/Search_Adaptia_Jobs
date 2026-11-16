@@ -62,7 +62,7 @@ jobs:
         run: python -m buscador.bodega --salida salida --consulta "$CONSULTA" --pais "$PAIS"
       - name: Conservar estado de recuperación
         if: ${{ always() && hashFiles('salida/trabajo/estado.json') != '' }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: estado-profunda-${{ github.run_id }}
           path: salida/trabajo/
