@@ -4117,3 +4117,245 @@ select.margen {
   flex-shrink: 0;
   margin-top: 2px;
 }
+
+/* Contrato v29 (lista grande, PR 3): Vacantes y «Por confirmar» en vista dividida, como LinkedIn. */
+.vacantes-cabecera {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 14px;
+  align-items: stretch;
+  margin-bottom: 14px;
+}
+.vacantes-cabecera .results-control,
+.vacantes-cabecera .csv-descarga {
+  margin: 0;
+}
+.vacantes-cabecera .results-control {
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  padding: 16px 18px;
+}
+.vacantes-cabecera .results-control .field {
+  flex: 1 1 180px;
+}
+.dividida {
+  display: grid;
+  grid-template-columns: minmax(260px, 2fr) minmax(0, 3fr);
+  gap: 14px;
+  align-items: start;
+}
+.dividida-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  position: sticky;
+  top: 16px;
+  padding-right: 4px;
+}
+.item-vacante {
+  width: 100%;
+  display: grid;
+  gap: 3px;
+  text-align: left;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-left: 4px solid transparent;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.item-vacante:hover {
+  border-color: var(--osc-line-azul, #bcd3f5);
+}
+.item-vacante.elegida {
+  border-color: var(--osc-line-azul, #9cbff0);
+  border-left-color: var(--cargo-1);
+  background: var(--osc-bg-azul-2, #eaf3ff);
+}
+.item-vacante.no-disponible .item-titulo {
+  color: var(--muted);
+}
+.item-titulo {
+  font-weight: 650;
+  font-size: 14px;
+  line-height: 1.35;
+}
+.item-empresa,
+.item-lugar {
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.item-etiquetas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.item-etiquetas > span {
+  font-size: 12px;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+.item-etiquetas .post-tag,
+.item-etiquetas .no-cumple {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.item-sugerencia {
+  color: var(--muted);
+}
+.dividida-detalle {
+  min-width: 0;
+}
+.ficha {
+  padding: 20px 22px;
+  min-width: 0;
+}
+.ficha-cabecera {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.ficha-cabecera > div {
+  flex: 1;
+  min-width: 0;
+}
+.ficha h2 {
+  font-size: 19px;
+  line-height: 1.3;
+  margin-top: 3px;
+}
+.ficha-datos {
+  list-style: none;
+  margin: 14px 0 6px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.ficha-datos li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ficha-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.ficha-comprobacion {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.ficha-seccion {
+  margin-top: 16px;
+}
+.ficha-seccion h3 {
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+.ficha-coincide {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.ficha-coincide li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ficha-descripcion {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.ficha-descripcion p {
+  margin: 0 0 10px;
+}
+.ficha-descripcion h4 {
+  font-size: 14px;
+  margin: 14px 0 6px;
+}
+.ficha-descripcion ul {
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+.ficha-descripcion li {
+  margin-bottom: 4px;
+}
+.revision-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+.revision-filtro {
+  margin: 0;
+  min-width: 220px;
+}
+.paginas {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.revision.ficha h2 {
+  font-size: 17px;
+}
+.solo-movil {
+  display: none;
+}
+@media (max-width: 1100px) {
+  .vacantes-cabecera {
+    grid-template-columns: 1fr;
+  }
+}
+/* En el celular: primero la lista; al tocar una vacante, su ficha a pantalla completa con «Volver a la lista». */
+@media (max-width: 900px) {
+  .dividida {
+    grid-template-columns: 1fr;
+  }
+  .dividida-lista {
+    max-height: none;
+    position: static;
+    overflow: visible;
+    padding-right: 0;
+  }
+  .dividida.ver-ficha .dividida-lista,
+  .dividida:not(.ver-ficha) .dividida-detalle {
+    display: none;
+  }
+  .solo-movil {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 40px;
+    margin-bottom: 8px;
+  }
+}

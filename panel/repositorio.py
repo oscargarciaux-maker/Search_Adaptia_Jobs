@@ -145,6 +145,18 @@ class RepositorioSupabase:
                 salida[r["id"]] = r.get("description_full") or ""
         return salida
 
+    def vacante(self, vacante_id):
+        """Contrato v29: una fila del catálogo para la ficha del panel, o None."""
+        filas = self.pedir("GET", "catalogo_vacantes", params={"id": "eq." + vacante_id,
+                                                               "select": "id,datos,description_full,status,reason"})
+        return filas[0] if filas else None
+
+    def guardar_descripcion(self, vacante_id, texto):
+        """Contrato v29: la descripción traída de la ficha original, solo si el catálogo no tenía ninguna."""
+        self.pedir("PATCH", "catalogo_vacantes",
+                   params={"id": "eq." + vacante_id, "or": "(description_full.is.null,description_full.eq.)"},
+                   headers={"Prefer": "return=minimal"}, json={"description_full": texto[:30000]})
+
     def candidatas_por_funciones(self, desde=None):
         """Contrato v25: vacantes activas que coinciden con un cargo solo por funciones."""
         params = {"status": "eq.active", "datos->familias": 'cs.[{"coincidencia":"funciones"}]',
@@ -228,8 +240,11 @@ class RepositorioSupabase:
                     salida.setdefault(r["perfil_id"], set()).add(r["vacante_id"])
         return salida
 
-    def revisiones(self, estado=None, vacante_id=None):
-        params = {"select": "*,catalogo_vacantes(id,datos,description_full,status,reason)"}
+    def revisiones(self, estado=None, vacante_id=None, ligera=False):
+        # `ligera` (contrato v29): sin la descripción completa, para ordenar y contar todas las pendientes; la
+        # descripción se pide después solo para la página que se muestra.
+        descripcion = "" if ligera else "description_full,"
+        params = {"select": f"*,catalogo_vacantes(id,datos,{descripcion}status,reason)"}
         if estado:
             params["estado"] = "eq." + estado
         if vacante_id:
@@ -406,12 +421,18 @@ class RepositorioSupabase:
         if cliente_id:
             for inicio in range(0, 30000, 500):
                 lote = self.pedir("GET", "panel_asignaciones", params={"ejecucion_id": "eq." + e["id"],
-                    "cliente_id": "eq." + cliente_id, "select": "*,catalogo_vacantes(*)",
+                    "cliente_id": "eq." + cliente_id, "select": "*,catalogo_vacantes(id,datos,description_full,status,reason)",
                     "order": "creada_en,id", "offset": inicio, "limit": 500})
                 filas.extend(lote)
                 if len(lote) < 500:
                     break
         return {"ejecucion": e, "filas": filas, "clientes": cfg["clientes"]}
+
+
+# Contrato v29: secciones con viñetas para ver la ficha con su formato en la demostración.
+DEMO_SECCIONES = ("\n\nResponsibilities:\n- Work with product and engineering on new features.\n"
+                  "- Keep quality and consistency across the product.\n\nRequirements:\n"
+                  "- Recent work samples or portfolio.\n- Clear written communication.")
 
 
 def id_demo(nombre):
@@ -564,7 +585,7 @@ class RepositorioDemo:
             self.estado["revisiones"] = filas
         return self.estado["revisiones"]
 
-    def revisiones(self, estado=None, vacante_id=None):
+    def revisiones(self, estado=None, vacante_id=None, ligera=False):
         with self.lock:
             return deepcopy([r for r in self._revisiones() if (not estado or r["estado"] == estado)
                              and (not vacante_id or r["vacante_id"] == vacante_id)])
@@ -670,6 +691,20 @@ class RepositorioDemo:
 
     def candidatas_por_funciones(self, desde=None):
         return []
+
+    def vacante(self, vacante_id):
+        """Demostración: busca la vacante en los resultados de cada cliente y en la bandeja."""
+        for r in self.revisiones():
+            if r["vacante_id"] == vacante_id and r.get("catalogo_vacantes"):
+                return deepcopy(r["catalogo_vacantes"])
+        for c in configuracion_demo()["clientes"]:
+            for fila in self.resultados(c["id"])["filas"]:
+                if fila["vacante_id"] == vacante_id:
+                    return deepcopy(fila["catalogo_vacantes"])
+        return None
+
+    def guardar_descripcion(self, vacante_id, texto):
+        return None  # la demostración no lee sitios externos
 
     def descripciones(self, ids):
         """Demostración: descripciones ficticias según el título, para proponer funciones."""
@@ -838,7 +873,7 @@ class RepositorioDemo:
                      "ubicacion": "Remote - Worldwide", "paises": ["CO", "ES"], "confianza_pais": "alta",
                      "modalidad": "remoto", "idioma": "en" if n % 2 else "es", "fecha_publicacion": publicada,
                      "fecha_estimada": False, "anos_min": anos, "ingles": "intermedio",
-                     "_descripcion": (f"English B2 required. We require {anos} years of experience. We build digital products with a collaborative team. " * 5),
+                     "_descripcion": (f"English B2 required. We require {anos} years of experience. We build digital products with a collaborative team. " * 5) + DEMO_SECCIONES,
                      "enlace": url, "enlace_directo": "", "enlaces_alternativos": [url],
                      "verificacion": {"estado": "verificada", "enlaces": [{"url": url, "estado": "verificada",
                         "comprobada_en": self.creada.isoformat()}]}}

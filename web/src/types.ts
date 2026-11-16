@@ -220,12 +220,39 @@ export type Revision = {
   iguales: number;
   motivo?: string;
   funciones?: boolean;
+  // Contrato v29: entre las 10 más útiles de hoy.
+  mas_util?: boolean;
 };
 export type Revisiones = {
   pendientes: Revision[];
   total: number;
   en_espera?: number;
   ayudan_faltantes: number;
+  // Contrato v29: todas las pendientes por páginas.
+  pagina?: number;
+  paginas?: number;
+  por_pagina?: number;
+  por_cliente?: Record<string, number>;
+};
+// Contrato v29: ficha de una vacante, con la descripción en bloques de texto (sin HTML).
+export type BloqueFicha = { tipo: "p" | "li" | "h"; texto: string };
+export type FichaVacante = {
+  id: string;
+  titulo: string;
+  empresa: string;
+  ubicacion: string;
+  modalidad: string;
+  salario: string;
+  publicada: string;
+  anos_min: number | null;
+  ingles: string;
+  nivel: string;
+  enlace: string;
+  enlace_directo: string;
+  tipo: string;
+  activa: boolean;
+  bloques: BloqueFicha[];
+  origen: "guardada" | "traida" | "sin_descripcion";
 };
 // Contrato v17: reglas de ubicación (del operador o aprendidas por código).
 export type Regla = {

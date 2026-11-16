@@ -1,8 +1,7 @@
-import React, { useEffect, useId, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   ArrowDownToLine,
-  Info,
   Upload,
   ArrowLeft,
   ArrowRight,
@@ -15,17 +14,14 @@ import {
   CalendarClock,
   Check,
   CheckCheck,
-  ChevronDown,
   Clock3,
   Code2,
   Compass,
   Copy,
-  ExternalLink,
   Globe2,
   Loader2,
   LogOut,
   MapPin,
-  Megaphone,
   MessageCircle,
   Pencil,
   Plus,
@@ -53,7 +49,6 @@ import type {
   Resultados,
   Sesion,
   Ejecucion,
-  Vacante,
   EstimacionCargo,
   Borrador,
   Contacto,
@@ -67,36 +62,27 @@ import type {
   ResumenClientes,
   PreviaImportacion,
 } from "./types";
+import {
+  Ayuda,
+  Dialog,
+  Empty,
+  Plegable,
+  REGIONES,
+  SelectorPaises,
+  fecha,
+  fijarMundo,
+  modos,
+  nombrePais,
+  paisesMundo,
+} from "./comunes";
+import { PorConfirmar } from "./vistas/PorConfirmar";
+import { ListaVacantes } from "./vistas/Vacantes";
 import "./style.css";
 
 const uid = () => crypto.randomUUID();
 // Sistema de Adaptia: un color por cargo, con su valor en claro y en oscuro (≥4,5:1 sobre su fondo tenue).
 const colores = [1, 2, 3, 4, 5].map((n) => `var(--cargo-${n})`);
-const fecha = (v: string) =>
-  new Date(v + "T12:00:00").toLocaleDateString("es-CO", {
-    day: "numeric",
-    month: "long",
-  });
-const modos: Record<string, string> = {
-  remoto: "Remoto",
-  hibrido: "Híbrido",
-  presencial: "Presencial",
-};
-const grados: Record<string, string> = {
-  exact: "Cargo exacto",
-  similar: "Cargo afín",
-  close: "Cargo cercano",
-};
 const vacio: Configuracion = { clientes: [], cargos: [], perfiles: [] };
-function iniciales(nombre: string) {
-  return nombre
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((x) => x[0])
-    .join("")
-    .toUpperCase();
-}
 // Nombre de archivo sin tildes ni espacios: el CSV solo queda en el equipo del operador.
 function slug(texto: string) {
   return (
@@ -232,123 +218,6 @@ function conMetas(cfg: Configuracion) {
   };
 }
 
-// Sección 6 (13 nov): explicación a demanda (ⓘ). Se ve al pasar el ratón, al enfocar con teclado o al tocar; Escape la
-// cierra. Así las explicaciones no ocupan pantalla todo el tiempo.
-function Ayuda({
-  etiqueta,
-  children,
-}: {
-  etiqueta: string;
-  children: React.ReactNode;
-}) {
-  const id = useId();
-  return (
-    <span className="ayuda">
-      <button
-        type="button"
-        className="ayuda-boton"
-        aria-label={"Más información: " + etiqueta}
-        aria-describedby={id}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            e.preventDefault(); // cierra la ayuda, no el diálogo
-            e.stopPropagation();
-            e.currentTarget.blur();
-          }
-        }}
-      >
-        <Info size={15} aria-hidden="true" />
-      </button>
-      <span role="tooltip" id={id} className="ayuda-texto">
-        {children}
-      </span>
-    </span>
-  );
-}
-
-// Sección 7a (13 nov): en vez de los desplegables con triángulo, un botón que dice qué muestra y qué oculta.
-function Plegable({
-  mostrar,
-  ocultar,
-  className,
-  inicial = false,
-  children,
-}: {
-  mostrar: string;
-  ocultar: string;
-  className?: string;
-  inicial?: boolean;
-  children: React.ReactNode;
-}) {
-  const [abierto, setAbierto] = useState(inicial);
-  const id = useId();
-  return (
-    <div className={"plegable " + (className || "")}>
-      <button
-        type="button"
-        className="plegable-boton"
-        aria-expanded={abierto}
-        aria-controls={id}
-        onClick={() => setAbierto(!abierto)}
-      >
-        <ChevronDown size={16} className={abierto ? "girado" : ""} />
-        {abierto ? ocultar : mostrar}
-      </button>
-      {abierto && (
-        <div id={id} className="plegable-contenido">
-          {children}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Dialog({
-  titulo,
-  subtitulo,
-  onClose,
-  children,
-  ancho = false,
-}: {
-  titulo: string;
-  subtitulo?: string;
-  onClose: () => void;
-  children: React.ReactNode;
-  ancho?: boolean;
-}) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    // Al cerrar, el foco vuelve al botón que abrió la ventana (WCAG 2.4.3).
-    const origen = document.activeElement as HTMLElement | null;
-    const dialogo = ref.current;
-    dialogo?.showModal();
-    return () => {
-      dialogo?.close();
-      if (origen && document.contains(origen)) origen.focus();
-    };
-  }, []);
-  return (
-    <dialog
-      ref={ref}
-      className={ancho ? "dialog ancho" : "dialog"}
-      onCancel={(e) => {
-        e.preventDefault();
-        onClose();
-      }}
-    >
-      <div className="dialog-head">
-        <div>
-          <h2>{titulo}</h2>
-          {subtitulo && <p>{subtitulo}</p>}
-        </div>
-        <button className="icon" aria-label="Cerrar" onClick={onClose}>
-          <X size={20} />
-        </button>
-      </div>
-      {children}
-    </dialog>
-  );
-}
 const SEPARADORES = /[,;\n]/;
 function TagInput({
   label,
@@ -983,576 +852,6 @@ const estadosMensaje: Record<Borrador["estado"], string> = {
   enviado: "Enviado",
   descartado: "Descartado",
 };
-
-// Contrato v19: regiones que se eligen de una vez (el servidor las convierte en sus países).
-// Contrato v23: todos los países (llegan con la sesión). Se guardan aquí para no pasarlos por cada componente.
-let MUNDO: { codigo: string; nombre: string }[] = [];
-const nombrePais = (codigo: string) =>
-  MUNDO.find((p) => p.codigo === codigo)?.nombre || codigo;
-const sinTildes = (t: string) =>
-  t
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-function SelectorPaises({
-  etiqueta,
-  valores,
-  onChange,
-  excluir = [],
-  extra = [],
-}: {
-  etiqueta: string;
-  valores: string[];
-  onChange: (v: string[]) => void;
-  excluir?: string[];
-  extra?: { codigo: string; nombre: string }[];
-}) {
-  const [texto, setTexto] = useState("");
-  const id = useId();
-  const opciones = [...extra, ...MUNDO].filter(
-    (o) => !valores.includes(o.codigo) && !excluir.includes(o.codigo),
-  );
-  const nombre = (c: string) =>
-    extra.find((o) => o.codigo === c)?.nombre || nombrePais(c);
-  function agregar(valor: string) {
-    const t = sinTildes(valor);
-    if (!t) return false;
-    const o =
-      opciones.find((x) => sinTildes(x.nombre) === t) ||
-      opciones.find((x) => sinTildes(x.nombre).startsWith(t));
-    if (!o) return false;
-    onChange([...valores, o.codigo]);
-    setTexto("");
-    return true;
-  }
-  return (
-    <div className="field">
-      <label htmlFor={id}>{etiqueta}</label>
-      <div className="tagbox">
-        {valores.map((c) => (
-          <span className="term" key={c}>
-            {nombre(c)}
-            <button
-              type="button"
-              aria-label={"Quitar " + nombre(c)}
-              onClick={() => onChange(valores.filter((x) => x !== c))}
-            >
-              <X size={12} />
-            </button>
-          </span>
-        ))}
-        <input
-          id={id}
-          list={id + "-lista"}
-          placeholder="Escribe un país y pulsa Enter"
-          value={texto}
-          onChange={(e) => {
-            // Elegir de la lista desplegable lo añade al momento.
-            if (
-              opciones.some(
-                (o) => sinTildes(o.nombre) === sinTildes(e.target.value),
-              )
-            )
-              agregar(e.target.value);
-            else setTexto(e.target.value);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              agregar(texto);
-            }
-          }}
-        />
-        <datalist id={id + "-lista"}>
-          {opciones.map((o) => (
-            <option key={o.codigo} value={o.nombre} />
-          ))}
-        </datalist>
-      </div>
-    </div>
-  );
-}
-const REGIONES: { codigo: string; nombre: string }[] = [
-  { codigo: "LATAM", nombre: "LATAM (todos los países)" },
-  { codigo: "SUD_CENTRO_MX", nombre: "Sudamérica, Centroamérica y México" },
-  { codigo: "SUDAMERICA", nombre: "Sudamérica" },
-  { codigo: "CENTROAMERICA", nombre: "Centroamérica" },
-  { codigo: "LATAM_ES", nombre: "LATAM y España" },
-  { codigo: "MUNDO", nombre: "Mundo (remoto en cualquier lugar)" },
-];
-const ETIQUETA_SUGERIDA: Record<string, string> = {
-  sirve: "sirve",
-  otro_pais: "solo para otro país",
-  no_sirve: "no sirve",
-};
-// Contrato v16: vacantes que le servirían a un cliente pero cuyo país no se pudo confirmar solo. Un clic por vacante.
-function PorConfirmar({
-  paises,
-  notify,
-  onCambio,
-}: {
-  paises: Sesion["paises"];
-  notify: (s: string, error?: boolean) => void;
-  onCambio: (total: number) => void;
-}) {
-  const [datos, setDatos] = useState<Revisiones | null>(null);
-  const [elegido, setElegido] = useState<Record<string, string>>({});
-  const [extras, setExtras] = useState<Record<string, string[]>>({});
-  const [iguales, setIguales] = useState<Record<string, boolean>>({});
-  const [ocupado, setOcupado] = useState("");
-  async function cargar() {
-    try {
-      const r = await api<Revisiones>("/revisiones");
-      setDatos(r);
-      onCambio(r.total);
-    } catch (e) {
-      notify((e as Error).message, true);
-      setDatos({ pendientes: [], total: 0, ayudan_faltantes: 0 });
-    }
-  }
-  useEffect(() => {
-    cargar();
-  }, []);
-  const nombre = (codigo: string) =>
-    paises.find((p) => p.codigo === codigo)?.nombre ||
-    REGIONES.find((r) => r.codigo === codigo)?.nombre ||
-    nombrePais(codigo);
-  async function decidir(r: Revision, decision: string, codigos?: string[]) {
-    const pais = elegido[r.vacante_id] ?? r.sugerencia[0] ?? "";
-    // Contrato v23: etiquetas adicionales (por ejemplo LATAM y Estados Unidos a la vez).
-    const mas = extras[r.vacante_id] || [];
-    if (decision === "sirve" && !codigos?.length && mas.length)
-      codigos = [...(pais ? [pais] : []), ...mas];
-    if (decision === "sirve" && !pais && !codigos?.length && !r.funciones) {
-      notify("Elige el país antes de confirmar.", true);
-      return;
-    }
-    setOcupado(r.vacante_id);
-    try {
-      const res = await api<{ asignadas: number; iguales: number }>(
-        "/revisiones/" + encodeURIComponent(r.vacante_id),
-        {
-          method: "POST",
-          body: JSON.stringify({
-            decision,
-            paises:
-              decision === "sirve" && r.funciones
-                ? []
-                : decision === "sirve"
-                  ? codigos?.length
-                    ? codigos
-                    : [pais]
-                  : [],
-            aplicar_a_iguales: Boolean(iguales[r.vacante_id]),
-          }),
-        },
-      );
-      const extra = res.iguales
-        ? ` También se decidieron ${res.iguales} con la misma ubicación.`
-        : "";
-      notify(
-        decision === "sirve"
-          ? `Confirmada: se asignó a ${res.asignadas} cliente(s).${extra}`
-          : decision === "saltar"
-            ? "Apartada por ahora."
-            : `Descartada.${extra}`,
-      );
-      await cargar();
-    } catch (e) {
-      notify((e as Error).message, true);
-    } finally {
-      setOcupado("");
-    }
-  }
-  async function subir(archivo: File) {
-    setOcupado("csv");
-    try {
-      const contenido = await archivo.text();
-      const r = await api<{
-        aplicadas: number;
-        omitidas: number;
-        errores: { fila: number; motivo: string }[];
-      }>("/revisiones/csv", {
-        method: "POST",
-        body: JSON.stringify({ contenido }),
-      });
-      notify(
-        `Revisión aplicada: ${r.aplicadas} decididas, ${r.omitidas} sin llenar` +
-          (r.errores.length
-            ? `. Revisar fila ${r.errores
-                .slice(0, 3)
-                .map((e) => e.fila)
-                .join(", ")}: ${r.errores[0].motivo}`
-            : "."),
-        r.errores.length > 0,
-      );
-      await cargar();
-    } catch (e) {
-      notify((e as Error).message, true);
-    } finally {
-      setOcupado("");
-    }
-  }
-  type ResultadoCarga = {
-    por_confirmar: number;
-    agregadas?: number;
-    resueltas_por_regla?: number;
-    leidas_del_catalogo?: number;
-    fuera_por_idioma?: number;
-    ya_claras?: number;
-    diagnostico?: {
-      catalogo?: number | null;
-      por_confirmar?: number | null;
-      confianza_baja?: number | null;
-    };
-  };
-  type EstadoCarga = {
-    estado: "inactivo" | "en_curso" | "listo" | "error";
-    avance: { leidas: number; total: number };
-    resultado: ResultadoCarga | null;
-    error: string;
-  };
-  const [avanceCarga, setAvanceCarga] = useState("");
-  function avisarResultado(r: ResultadoCarga) {
-    if (!r.por_confirmar) {
-      notify(
-        `No hay dudosas para revisar: el catálogo tiene ${r.leidas_del_catalogo ?? 0} vacantes con país por confirmar` +
-          (r.ya_claras ? `, ${r.ya_claras} ya resueltas o cerradas` : "") +
-          (r.fuera_por_idioma
-            ? ` y ${r.fuera_por_idioma} quedan fuera por idioma`
-            : "") +
-          "." +
-          (r.diagnostico && Object.keys(r.diagnostico).length
-            ? ` Conteo directo en la base: ${r.diagnostico.catalogo ?? "?"} vacantes en total, ${r.diagnostico.por_confirmar ?? "?"} por confirmar, ${r.diagnostico.confianza_baja ?? "?"} con país dudoso.`
-            : ""),
-        true,
-      );
-    } else {
-      notify(
-        `Bandeja lista: ${r.por_confirmar} por confirmar` +
-          (r.agregadas ? ` (${r.agregadas} nuevas)` : "") +
-          (r.resueltas_por_regla
-            ? `, ${r.resueltas_por_regla} resueltas solas por reglas`
-            : "") +
-          ".",
-      );
-    }
-  }
-  // Contrato v19: la carga corre en segundo plano en el servidor; aquí solo se consulta su avance.
-  async function esperarCarga() {
-    setOcupado("todas");
-    try {
-      for (;;) {
-        const e = await api<EstadoCarga>("/revisiones/cargar");
-        if (e.estado === "en_curso") {
-          setAvanceCarga(
-            e.avance.total
-              ? `Cargando… ${e.avance.leidas} de ${e.avance.total}`
-              : "Cargando…",
-          );
-          await new Promise((listo) => setTimeout(listo, 2000));
-          continue;
-        }
-        if (e.estado === "error") notify(e.error, true);
-        if (e.estado === "listo" && e.resultado) avisarResultado(e.resultado);
-        break;
-      }
-      await cargar();
-    } catch (e) {
-      notify((e as Error).message, true);
-    } finally {
-      setOcupado("");
-      setAvanceCarga("");
-    }
-  }
-  async function cargarTodas() {
-    setOcupado("todas");
-    try {
-      await api<EstadoCarga>("/revisiones/cargar", { method: "POST" });
-    } catch (e) {
-      notify((e as Error).message, true);
-      setOcupado("");
-      return;
-    }
-    await esperarCarga();
-  }
-  useEffect(() => {
-    // Si una carga sigue corriendo (por ejemplo, tras recargar la página), retomar su avance.
-    api<EstadoCarga>("/revisiones/cargar")
-      .then((e) => {
-        if (e.estado === "en_curso") esperarCarga();
-      })
-      .catch(() => undefined);
-  }, []);
-  const masiva = (
-    <div className="revision-masiva">
-      <button
-        className="button secondary"
-        onClick={cargarTodas}
-        disabled={ocupado === "todas"}
-      >
-        <RefreshCw size={15} />
-        {ocupado === "todas"
-          ? avanceCarga || "Cargando…"
-          : "Cargar todas las dudosas de la base"}
-      </button>
-      <a className="button secondary" href="/api/revisiones.csv" download>
-        <ArrowDownToLine size={15} />
-        Descargar todas (CSV)
-      </a>
-      <label className="button secondary">
-        <Upload size={15} />
-        Subir revisión
-        <input
-          type="file"
-          accept=".csv,text/csv"
-          className="visually-hidden"
-          disabled={ocupado === "csv"}
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) subir(f);
-            e.target.value = "";
-          }}
-        />
-      </label>
-    </div>
-  );
-  if (!datos) return <div className="card loading-card">Cargando…</div>;
-  if (!datos.pendientes.length)
-    return (
-      <Empty
-        icon={CheckCheck}
-        title="Todo al día"
-        texto="No hay vacantes por confirmar en la bandeja. La búsqueda diaria trae las que ayudan a tus clientes; para depurar toda la base ahora, carga todas las dudosas."
-        action={ocupado === "todas" ? undefined : cargarTodas}
-        label="Cargar todas las dudosas de la base"
-      />
-    );
-  return (
-    <section className="revisiones">
-      {masiva}
-      <p className="helper revision-ayuda">
-        {datos.en_espera && datos.en_espera > datos.total
-          ? `Mostrando las ${datos.total} más útiles de ${datos.en_espera}. Para revisar muchas de una vez, descarga el CSV, llena «decision» y «pais», y súbelo.`
-          : `${datos.total} por confirmar`}
-        {datos.ayudan_faltantes
-          ? ` · ${datos.ayudan_faltantes} ayudan a clientes con menos de 5 vacantes`
-          : ""}{" "}
-        <Ayuda etiqueta="cómo decidir">
-          <strong>Una sola pregunta:</strong> ¿puede postularse alguien que vive
-          en LATAM o en España? Cada tarjeta trae la respuesta sugerida y por
-          qué; corrige solo si la ves mal. Atajos con la tarjeta seleccionada:
-          Enter acepta la sugerencia · 1 Sirve · 2 Otro país · 3 No sirve · 4
-          Saltar.
-        </Ayuda>
-      </p>
-      {datos.pendientes.map((r) => {
-        const pais = elegido[r.vacante_id] ?? r.sugerencia[0] ?? "";
-        return (
-          // Atajos de teclado de la bandeja (1–4, Enter): la tarjeta recibe el foco a propósito.
-          // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
-          <article
-            className="card revision"
-            key={r.vacante_id}
-            // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
-            tabIndex={0}
-            aria-label={`${r.titulo} en ${r.empresa}`}
-            onKeyDown={(e) => {
-              if ((e.target as HTMLElement).tagName === "SELECT") return;
-              if (
-                e.key === "Enter" &&
-                e.target === e.currentTarget &&
-                r.sugerida &&
-                !ocupado
-              ) {
-                e.preventDefault();
-                decidir(r, r.sugerida, r.paises_sugeridos);
-                return;
-              }
-              const accion = {
-                "1": "sirve",
-                "2": "otro_pais",
-                "3": "no_sirve",
-                "4": "saltar",
-              }[e.key];
-              if (accion && !ocupado) {
-                e.preventDefault();
-                decidir(r, accion);
-              }
-            }}
-          >
-            <div className="vacancy-top">
-              <span className="company-avatar">{iniciales(r.empresa)}</span>
-              <div>
-                <span className="company-name">{r.empresa}</span>
-                <h3>{r.titulo}</h3>
-              </div>
-              {r.ayuda_faltantes && (
-                <span className="pill amber">
-                  Ayuda a clientes con faltantes
-                </span>
-              )}
-            </div>
-            {r.por_que && (
-              <div className={"revision-sugerencia " + (r.sugerida || "leer")}>
-                <p>
-                  <strong>
-                    {r.sugerida
-                      ? `Sugerencia: ${ETIQUETA_SUGERIDA[r.sugerida]}`
-                      : "Para leer"}
-                  </strong>{" "}
-                  — {r.por_que}
-                </p>
-                {r.sugerida && (
-                  <button
-                    type="button"
-                    className="button primary"
-                    disabled={ocupado === r.vacante_id}
-                    onClick={() =>
-                      decidir(r, r.sugerida as string, r.paises_sugeridos)
-                    }
-                  >
-                    <CheckCheck size={15} />
-                    Aceptar sugerencia
-                  </button>
-                )}
-              </div>
-            )}
-            <p className="revision-lugar">
-              <MapPin size={14} />
-              Ubicación del aviso: <strong>{r.ubicacion || "sin dato"}</strong>
-            </p>
-            {(r.frase ?? r.pista) && (
-              <blockquote className="revision-pista">
-                {r.frase ?? r.pista}
-              </blockquote>
-            )}
-            <p className="helper">
-              Le serviría a: {r.clientes.join(", ") || "—"}
-            </p>
-            {r.funciones && (
-              <p className="revision-funciones">
-                <span className="pill">Coincide por funciones</span> El título
-                es otro, pero la descripción coincide con las funciones del
-                cargo. Si sirve, desde mañana este título entra solo.
-              </p>
-            )}
-            <div className="revision-acciones">
-              {!r.funciones && (
-                <>
-                  <label className="revision-pais">
-                    País
-                    <select
-                      aria-label={`País de ${r.titulo} en ${r.empresa}`}
-                      value={pais}
-                      onChange={(e) =>
-                        setElegido({
-                          ...elegido,
-                          [r.vacante_id]: e.target.value,
-                        })
-                      }
-                    >
-                      <option value="">Elige…</option>
-                      <optgroup label="Regiones">
-                        {REGIONES.map((g) => (
-                          <option key={g.codigo} value={g.codigo}>
-                            {g.nombre}
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Países">
-                        {paises.map((p) => (
-                          <option key={p.codigo} value={p.codigo}>
-                            {p.nombre}
-                          </option>
-                        ))}
-                      </optgroup>
-                    </select>
-                  </label>
-                  <div className="revision-extras">
-                    <SelectorPaises
-                      etiqueta={`Otras etiquetas de ${r.titulo}`}
-                      valores={extras[r.vacante_id] || []}
-                      onChange={(v) =>
-                        setExtras({ ...extras, [r.vacante_id]: v })
-                      }
-                      excluir={[pais]}
-                      extra={REGIONES}
-                    />
-                  </div>
-                </>
-              )}
-              <button
-                type="button"
-                className={r.sugerida ? "button secondary" : "button primary"}
-                disabled={ocupado === r.vacante_id}
-                onClick={() => decidir(r, "sirve")}
-              >
-                <Check size={15} />
-                {pais ? `Sirve para ${nombre(pais)}` : "Sirve"}
-              </button>
-              {!r.funciones && (
-                <button
-                  type="button"
-                  className="button secondary"
-                  disabled={ocupado === r.vacante_id}
-                  onClick={() => decidir(r, "otro_pais")}
-                >
-                  Solo para otro país
-                </button>
-              )}
-              <button
-                type="button"
-                className="button secondary"
-                disabled={ocupado === r.vacante_id}
-                onClick={() => decidir(r, "no_sirve")}
-              >
-                No sirve
-              </button>
-              <button
-                type="button"
-                className="text-button"
-                disabled={ocupado === r.vacante_id}
-                onClick={() => decidir(r, "saltar")}
-              >
-                Saltar
-              </button>
-            </div>
-            <div className="revision-pie">
-              {r.iguales > 0 && (
-                <label className="check-line">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(iguales[r.vacante_id])}
-                    onChange={(e) =>
-                      setIguales({
-                        ...iguales,
-                        [r.vacante_id]: e.target.checked,
-                      })
-                    }
-                  />
-                  Aplicar a las {r.iguales} con esta misma ubicación
-                </label>
-              )}
-              {r.enlace.startsWith("http") && (
-                <a
-                  href={r.enlace}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-button"
-                >
-                  Abrir aviso
-                  <ExternalLink size={14} />
-                </a>
-              )}
-            </div>
-          </article>
-        );
-      })}
-    </section>
-  );
-}
 
 function Mensajes({
   clientes,
@@ -2492,13 +1791,15 @@ function ClienteDialog({
                       ))}
                     </optgroup>
                     <optgroup label="Resto del mundo">
-                      {MUNDO.filter(
-                        (x) => !paises.some((c) => c.codigo === x.codigo),
-                      ).map((pais) => (
-                        <option key={pais.codigo} value={pais.codigo}>
-                          {pais.nombre}
-                        </option>
-                      ))}
+                      {paisesMundo()
+                        .filter(
+                          (x) => !paises.some((c) => c.codigo === x.codigo),
+                        )
+                        .map((pais) => (
+                          <option key={pais.codigo} value={pais.codigo}>
+                            {pais.nombre}
+                          </option>
+                        ))}
                     </optgroup>
                   </select>
                 </div>
@@ -2979,7 +2280,10 @@ const secciones: Record<string, string> = {
   Actividad: "actividad",
 };
 function seccionDeHash() {
-  const h = decodeURIComponent(location.hash.replace(/^#\/?/, ""));
+  // Contrato v29: «#vacantes/<id>» recuerda la vacante abierta; la sección es lo que va antes de la barra.
+  const h = decodeURIComponent(location.hash.replace(/^#\/?/, "")).split(
+    "/",
+  )[0];
   return Object.keys(secciones).find((t) => secciones[t] === h) || "Resumen";
 }
 const estadosEjecucion: Record<string, string> = {
@@ -3021,7 +2325,7 @@ type ResumenCliente = {
 function resumenDeClientes(
   cfg: Configuracion,
   conteo: ResumenClientes | null,
-  pendientes: Revision[],
+  pendientes: Record<string, number>,
 ): ResumenCliente[] {
   const m = conMetas(cfg);
   const cargosActivos = new Map(
@@ -3050,9 +2354,7 @@ function resumenDeClientes(
           : "Sin perfil",
         meta: perfiles.reduce((s, p) => s + p.meta, 0),
         recibidas: ultimo ? ultimo.clientes[c.id] || 0 : null,
-        porConfirmar: pendientes.filter((r) =>
-          (r.cliente_ids || []).includes(c.id),
-        ).length,
+        porConfirmar: pendientes[c.id] || 0,
         comunidad: !!c.comunidad,
         perfiles,
       };
@@ -3067,6 +2369,8 @@ function resumenDeClientes(
       a.nombre.localeCompare(b.nombre, "es"),
   );
 }
+// Contrato v29: el Resumen pide una página corta; el total y el conteo por cliente cubren todas las pendientes.
+const PENDIENTES_RESUMEN = "/revisiones?pagina=1&por_pagina=1";
 const bajoMeta = (c: ResumenCliente) =>
   c.recibidas != null && c.meta > 0 && c.recibidas < c.meta / 2;
 // Desde 9 clientes las tarjetas pasan a dos columnas (decisión de Oscar, 14 nov).
@@ -3397,7 +2701,6 @@ function TarjetasResumen({
 function ClienteDetalle({
   cliente: c,
   dias,
-  pendientes,
   ultima,
   notify,
   onCerrar,
@@ -3411,7 +2714,6 @@ function ClienteDetalle({
   cliente: ResumenCliente;
   cfg: Configuracion;
   dias: ResumenClientes["dias"];
-  pendientes: Revision[];
   ultima?: Ejecucion;
   notify: (s: string, error?: boolean) => void;
   onCerrar: () => void;
@@ -3423,6 +2725,19 @@ function ClienteDetalle({
   descargando: boolean;
 }) {
   const [ocupado, setOcupado] = useState("");
+  // Contrato v29: sus «por confirmar» se piden al servidor, con su total real.
+  const [pendientes, setPendientes] = useState<Revisiones | null>(null);
+  function cargarPendientes() {
+    api<Revisiones>(
+      "/revisiones?pagina=1&por_pagina=8&cliente_id=" +
+        encodeURIComponent(c.id),
+    )
+      .then(setPendientes)
+      .catch(() =>
+        setPendientes({ pendientes: [], total: 0, ayudan_faltantes: 0 }),
+      );
+  }
+  useEffect(cargarPendientes, [c.id]);
   const serie = dias.map((d) => ({ fecha: d.fecha, n: d.clientes[c.id] || 0 }));
   const tope = Math.max(c.meta, 1, ...serie.map((d) => d.n));
   const faltan =
@@ -3463,13 +2778,15 @@ function ClienteDetalle({
           : "Descartada.",
       );
       onCambio();
+      cargarPendientes();
     } catch (e) {
       notify((e as Error).message, true);
     } finally {
       setOcupado("");
     }
   }
-  const visibles = pendientes.slice(0, 8);
+  const visibles = pendientes?.pendientes || [];
+  const totalPendientes = pendientes?.total ?? c.porConfirmar;
   return (
     <Dialog titulo={c.nombre} subtitulo={c.cargo} onClose={onCerrar} ancho>
       {/* Lista grande del 16 nov: datos a la izquierda y sus «por confirmar» a la derecha, sin salir del detalle. */}
@@ -3595,8 +2912,8 @@ function ClienteDetalle({
         </div>
 
         <section className="detalle-seccion detalle-derecha">
-          <h3>Por confirmar ({pendientes.length})</h3>
-          {!pendientes.length && (
+          <h3>Por confirmar ({totalPendientes})</h3>
+          {pendientes && !totalPendientes && (
             <p className="field-help">Nada pendiente para este cliente.</p>
           )}
           {visibles.map((r) => {
@@ -3656,9 +2973,9 @@ function ClienteDetalle({
               </article>
             );
           })}
-          {pendientes.length > visibles.length && (
+          {totalPendientes > visibles.length && (
             <button type="button" className="text-button" onClick={onRevisar}>
-              Ver las {pendientes.length} en Por confirmar
+              Ver las {totalPendientes} en Por confirmar
             </button>
           )}
         </section>
@@ -4099,7 +3416,9 @@ function App() {
   const [loadingResults, setLoadingResults] = useState(false);
   const [errorResultados, setErrorResultados] = useState(false);
   const [porConfirmar, setPorConfirmar] = useState(0);
-  const [pendientes, setPendientes] = useState<Revision[]>([]);
+  const [pendientesPorCliente, setPendientesPorCliente] = useState<
+    Record<string, number>
+  >({});
   const [porCliente, setPorCliente] = useState<ResumenClientes | null>(null);
   const [detalle, setDetalle] = useState("");
   const [importando, setImportando] = useState(false);
@@ -4135,13 +3454,13 @@ function App() {
     setError("");
     try {
       const s = await api<Sesion>("/session");
-      MUNDO = s.paises_mundo || [];
+      fijarMundo(s.paises_mundo || []);
       setSesion(s);
       if (s.sesion) {
-        api<Revisiones>("/revisiones")
+        api<Revisiones>(PENDIENTES_RESUMEN)
           .then((r) => {
-            setPorConfirmar(r.total);
-            setPendientes(r.pendientes);
+            setPorConfirmar(r.en_espera ?? r.total);
+            setPendientesPorCliente(r.por_cliente || {});
           })
           .catch(() => setPorConfirmar(0));
         const [c, e] = await Promise.all([
@@ -4182,10 +3501,10 @@ function App() {
   }, [tab, sesion?.sesion]);
   // Paso 8: recibidas de cada cliente en sus últimos 7 días y sus «por confirmar».
   function recargarResumen() {
-    api<Revisiones>("/revisiones")
+    api<Revisiones>(PENDIENTES_RESUMEN)
       .then((r) => {
-        setPorConfirmar(r.total);
-        setPendientes(r.pendientes);
+        setPorConfirmar(r.en_espera ?? r.total);
+        setPendientesPorCliente(r.por_cliente || {});
       })
       .catch(() => undefined);
     api<ResumenClientes>("/resumen-clientes")
@@ -4383,7 +3702,7 @@ function App() {
     setTab(t);
     // La sección va en la URL (#clientes…): el botón atrás del navegador vuelve al resumen (sección 5, 13 nov).
     const h = secciones[t] ?? "";
-    if (location.hash.replace(/^#/, "") !== h) {
+    if (location.hash.replace(/^#/, "").split("/")[0] !== h) {
       if (h) location.hash = h;
       else history.pushState(null, "", location.pathname + location.search);
     }
@@ -4610,7 +3929,11 @@ function App() {
             <>
               <AvisoUltimaBusqueda ultima={runs?.[0]} soloFallo />
               <TarjetasResumen
-                clientes={resumenDeClientes(draft, porCliente, pendientes)}
+                clientes={resumenDeClientes(
+                  draft,
+                  porCliente,
+                  pendientesPorCliente,
+                )}
                 diaConteo={porCliente?.dias.at(-1)?.fecha}
                 onCliente={setDetalle}
                 perfiles={
@@ -4633,16 +3956,13 @@ function App() {
                   const c = resumenDeClientes(
                     draft,
                     porCliente,
-                    pendientes,
+                    pendientesPorCliente,
                   ).find((x) => x.id === detalle);
                   return c ? (
                     <ClienteDetalle
                       cliente={c}
                       cfg={draft}
                       dias={porCliente?.dias || []}
-                      pendientes={pendientes.filter((r) =>
-                        (r.cliente_ids || []).includes(c.id),
-                      )}
                       ultima={runs?.[0]}
                       notify={notify}
                       onCerrar={() => setDetalle("")}
@@ -5016,99 +4336,103 @@ function App() {
           )}
           {tab === "Vacantes" && (
             <>
-              <div className="results-control card">
-                <div className="field">
-                  <label htmlFor="result-cliente">
-                    MOSTRAR OPORTUNIDADES PARA
+              {/* Lista grande, PR 3: «Oportunidades para» más angosto y el CSV arriba a la derecha. */}
+              <div className="vacantes-cabecera">
+                <div className="results-control card">
+                  <div className="field">
+                    <label htmlFor="result-cliente">
+                      MOSTRAR OPORTUNIDADES PARA
+                    </label>
+                    <select
+                      id="result-cliente"
+                      value={selectedClient}
+                      onChange={(e) => setSelectedClient(e.target.value)}
+                    >
+                      {Array.from(
+                        new Map(
+                          [...clientes, ...(results?.clientes || [])].map(
+                            (c) => [c.id, c],
+                          ),
+                        ).values(),
+                      ).map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="results-count">
+                    <strong>{results?.listas || 0}</strong>
+                    <span>listas para compartir</span>
+                  </div>
+                  <button
+                    className="button whatsapp"
+                    disabled={
+                      !selectedClient ||
+                      !results?.listas ||
+                      busy ||
+                      loadingResults
+                    }
+                    onClick={abrirWhatsApp}
+                  >
+                    <MessageCircle size={18} />
+                    Copiar WhatsApp
+                  </button>
+                </div>
+                <div className="csv-descarga card">
+                  <div className="csv-titulo">
+                    <strong>Descargar CSV</strong>
+                    <Ayuda etiqueta="Descargar CSV">
+                      Usa las columnas del contrato, listas para subir a la
+                      plataforma de los candidatos. Una fila por vacante; no
+                      incluye las que tienen el país sin confirmar.
+                    </Ayuda>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="csv-fecha">Fecha</label>
+                    <input
+                      id="csv-fecha"
+                      type="date"
+                      value={csvFecha}
+                      max={hoyBogota()}
+                      disabled={csvTodo}
+                      onChange={(e) =>
+                        setCsvFecha(e.target.value || hoyBogota())
+                      }
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="csv-cliente">Clientes</label>
+                    <select
+                      id="csv-cliente"
+                      value={csvCliente}
+                      onChange={(e) => setCsvCliente(e.target.value)}
+                    >
+                      <option value="">Todos los clientes</option>
+                      {clientes.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <label className="csv-todo">
+                    <input
+                      type="checkbox"
+                      checked={csvTodo}
+                      onChange={(e) => setCsvTodo(e.target.checked)}
+                    />
+                    Toda la base
                   </label>
-                  <select
-                    id="result-cliente"
-                    value={selectedClient}
-                    onChange={(e) => setSelectedClient(e.target.value)}
+                  <button
+                    className="button secondary"
+                    onClick={() => descargarBase()}
+                    disabled={descargandoBase}
                   >
-                    {Array.from(
-                      new Map(
-                        [...clientes, ...(results?.clientes || [])].map((c) => [
-                          c.id,
-                          c,
-                        ]),
-                      ).values(),
-                    ).map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nombre}
-                      </option>
-                    ))}
-                  </select>
+                    <ArrowDownToLine size={16} />
+                    {descargandoBase ? "Descargando…" : "Descargar CSV"}
+                  </button>
                 </div>
-                <div className="results-count">
-                  <strong>{results?.listas || 0}</strong>
-                  <span>listas para compartir</span>
-                </div>
-                <button
-                  className="button whatsapp"
-                  disabled={
-                    !selectedClient ||
-                    !results?.listas ||
-                    busy ||
-                    loadingResults
-                  }
-                  onClick={abrirWhatsApp}
-                >
-                  <MessageCircle size={18} />
-                  Copiar WhatsApp
-                </button>
-              </div>
-              <div className="csv-descarga card">
-                <div className="csv-titulo">
-                  <strong>Descargar CSV</strong>
-                  <Ayuda etiqueta="Descargar CSV">
-                    Usa las columnas del contrato, listas para subir a la
-                    plataforma de los candidatos. Una fila por vacante; no
-                    incluye las que tienen el país sin confirmar.
-                  </Ayuda>
-                </div>
-                <div className="field">
-                  <label htmlFor="csv-fecha">Fecha</label>
-                  <input
-                    id="csv-fecha"
-                    type="date"
-                    value={csvFecha}
-                    max={hoyBogota()}
-                    disabled={csvTodo}
-                    onChange={(e) => setCsvFecha(e.target.value || hoyBogota())}
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor="csv-cliente">Clientes</label>
-                  <select
-                    id="csv-cliente"
-                    value={csvCliente}
-                    onChange={(e) => setCsvCliente(e.target.value)}
-                  >
-                    <option value="">Todos los clientes</option>
-                    {clientes.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <label className="csv-todo">
-                  <input
-                    type="checkbox"
-                    checked={csvTodo}
-                    onChange={(e) => setCsvTodo(e.target.checked)}
-                  />
-                  Toda la base
-                </label>
-                <button
-                  className="button secondary"
-                  onClick={() => descargarBase()}
-                  disabled={descargandoBase}
-                >
-                  <ArrowDownToLine size={16} />
-                  {descargandoBase ? "Descargando…" : "Descargar CSV"}
-                </button>
               </div>
               <div className="toolbar">
                 <div className="search-input">
@@ -5154,11 +4478,9 @@ function App() {
                   <span>·</span>Solo se copian enlaces con comprobación vigente
                 </div>
               )}
-              <div className="vacancy-grid">
-                {shown.map((v) => (
-                  <VacancyCard key={v.id} v={v} />
-                ))}
-              </div>
+              {!loadingResults && !errorResultados && shown.length > 0 && (
+                <ListaVacantes vacantes={shown} />
+              )}
               {loadingResults && (
                 <p role="status" className="helper">
                   Consultando vacantes…
@@ -5186,6 +4508,7 @@ function App() {
           {tab === "Por confirmar" && (
             <PorConfirmar
               paises={sesion.paises}
+              clientes={draft.clientes.filter((c) => c.activo)}
               notify={notify}
               onCambio={setPorConfirmar}
             />
@@ -5645,37 +4968,6 @@ function textoProgramacion(estado: EstadoConfig | null, dirty: boolean) {
     ? "Lista: se usa desde la búsqueda de mañana"
     : "En uso desde el " + fecha(p.vigente_desde);
 }
-function Empty({
-  icon: Icon,
-  title,
-  texto,
-  action,
-  label,
-  actionIcon: ActionIcon = Plus,
-}: {
-  icon: React.ComponentType<{ size: number }>;
-  title: string;
-  texto: string;
-  action?: () => void;
-  label?: string;
-  actionIcon?: React.ComponentType<{ size: number }>;
-}) {
-  return (
-    <div className="empty">
-      <span>
-        <Icon size={27} />
-      </span>
-      <h3>{title}</h3>
-      <p>{texto}</p>
-      {action && (
-        <button className="button primary" onClick={action}>
-          <ActionIcon size={16} />
-          {label}
-        </button>
-      )}
-    </div>
-  );
-}
 function ClientCard({
   c,
   perfiles,
@@ -5782,153 +5074,6 @@ function ClientCard({
     </article>
   );
 }
-function VacancyCard({ v }: { v: Vacante }) {
-  return (
-    <article
-      className={"vacancy card " + (v.estado !== "lista" ? "unavailable" : "")}
-    >
-      <div className="vacancy-top">
-        <span className="company-avatar">{iniciales(v.empresa)}</span>
-        <div>
-          <span className="company-name">{v.empresa}</span>
-          <h3>{v.titulo}</h3>
-        </div>
-        <span
-          className={
-            "pill " +
-            (v.estado === "lista"
-              ? "green"
-              : v.estado === "entregada"
-                ? "neutral"
-                : "amber")
-          }
-        >
-          {v.estado === "lista"
-            ? v.tipo === "post"
-              ? "Vigente"
-              : "Verificada"
-            : v.estado === "retirada"
-              ? "Retirada"
-              : v.estado === "entregada"
-                ? `Entregada el ${fecha(v.entregada_el || "")}`
-                : "Por confirmar"}
-        </span>
-      </div>
-      <div className="vacancy-tags">
-        <span>
-          <Globe2 size={13} />
-          {modos[v.modalidad] || v.modalidad}
-        </span>
-        <span>{v.idioma === "es" ? "Español" : "Inglés"}</span>
-        <span>{grados[v.match_grade] || v.match_grade}</span>
-        {v.tipo === "post" && (
-          <span
-            className="post-tag"
-            title="Publicación de LinkedIn de quien contrata, sin ficha formal. Completa el mínimo de 5 y se contacta por mensaje o correo."
-          >
-            <Megaphone size={13} />
-            {v.post_ubicacion === "deducida"
-              ? "Post · ubicación deducida"
-              : v.post_ubicacion === "sin_confirmar"
-                ? "Post · ubicación sin confirmar"
-                : "Post"}
-          </span>
-        )}
-        {(v.avisos || []).map((a) => (
-          <span
-            key={a}
-            className="no-cumple"
-            title="No cumple esto del perfil. Llega igual porque solo la ubicación y el idioma descartan; va después de las que encajan en todo."
-          >
-            {a}
-          </span>
-        ))}
-        {v.ampliacion && (
-          <span
-            className="amplified"
-            title="Entró para completar el mínimo de 5 vacantes de este perfil. No aparece en el mensaje de WhatsApp."
-          >
-            Ampliada: {v.ampliacion}
-          </span>
-        )}
-      </div>
-      <div className="vacancy-meta">
-        <span>
-          <Clock3 size={14} />
-          {v.publicada ? fecha(v.publicada) : "Fecha por confirmar"}
-        </span>
-        <span>
-          {v.experiencia === null
-            ? "Experiencia no informada"
-            : v.experiencia === 0
-              ? "Sin años exigidos"
-              : v.experiencia === 1
-                ? "1 año exigido"
-                : v.experiencia + " años exigidos"}
-        </span>
-      </div>
-      <details>
-        <summary>
-          Por qué coincide
-          <ChevronDown size={13} />
-        </summary>
-        <ul>
-          {v.explicacion
-            .filter(
-              (e) => typeof e === "string" || Boolean(e.termino || e.regla),
-            )
-            .map((e, i) => (
-              <li key={i}>
-                <Check size={12} />
-                {typeof e === "string"
-                  ? e
-                  : e.termino
-                    ? "Cargo: " + e.termino
-                    : e.regla}
-              </li>
-            ))}
-        </ul>
-        {v.motivos.length > 0 && (
-          <p className="helper">Revisar: {v.motivos.join(" · ")}</p>
-        )}
-        {v.tipo === "post" && v.contacto?.correo && (
-          <p className="helper">Correo en el post: {v.contacto.correo}</p>
-        )}
-      </details>
-      <div className="vacancy-bottom">
-        <span>
-          <ShieldCheck size={13} />
-          {v.estado === "entregada"
-            ? "Ya entregada ese día; no se vuelve a compartir"
-            : v.estado !== "lista"
-              ? "No se incluirá en el mensaje"
-              : v.tipo === "post"
-                ? "Post leído en las últimas 24 h"
-                : "Enlace con comprobación vigente"}
-          {v.estado === "lista" && v.tipo !== "post" && (
-            <Ayuda etiqueta="comprobación del enlace">
-              El enlace se abrió hace menos de 6 horas y la vacante seguía
-              publicada. Es la comprobación más reciente, no una garantía: la
-              empresa puede cerrarla después sin avisar.
-            </Ayuda>
-          )}
-        </span>
-        {v.enlace && (
-          <a
-            href={v.enlace}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-button"
-          >
-            {v.tipo === "post" ? "Contactar a quien publicó" : "Ver vacante"}
-            <ExternalLink size={14} />
-          </a>
-        )}
-      </div>
-    </article>
-  );
-}
-
 // Reunión del 14 nov: un fallo al pintar dejaba la pantalla en blanco y se perdía lo escrito. Ahora se muestra qué
 // pasó; el borrador del cliente sigue en este navegador y se ofrece al volver a abrir el formulario.
 class Protector extends React.Component<

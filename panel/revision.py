@@ -301,12 +301,25 @@ def _edad(datos, fecha):
         return 30
 
 
-def listar(repo, fecha):
+def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None):
     """Lo que ve el panel: pendientes ordenadas, con nombres de clientes (panel privado) y cuántas tienen la misma
-    ubicación (para «aplicar a las iguales»)."""
-    todas = sorted(repo.revisiones(estado="pendiente"), key=lambda r: -r.get("prioridad", 0))
+    ubicación (para «aplicar a las iguales»).
+    Contrato v29: con `pagina`, todas las pendientes por páginas, con el total real y el filtro por cliente. Se leen sin
+    descripción (ligeras) y la descripción se pide solo para la página. Sin `pagina`, la cola de hoy (`tope`)."""
+    todas = sorted(repo.revisiones(estado="pendiente", ligera=True), key=lambda r: -r.get("prioridad", 0))
     tope = int((repo.ajuste("revision", {}) or {}).get("tope", TOPE))
-    pendientes = todas[:tope]
+    utiles = {r["vacante_id"] for r in todas[:tope]}
+    filtradas = [r for r in todas if not cliente_id or any(p.get("cliente_id") == cliente_id
+                                                           for p in r.get("perfiles") or [])]
+    if pagina is None:
+        pendientes = filtradas[:tope]
+    else:
+        pendientes = filtradas[(pagina - 1) * por_pagina:pagina * por_pagina]
+    faltan = [r["vacante_id"] for r in pendientes if "description_full" not in (r.get("catalogo_vacantes") or {})]
+    textos = repo.descripciones(faltan) if faltan else {}
+    for r in pendientes:
+        if r["vacante_id"] in textos and r.get("catalogo_vacantes"):
+            r["catalogo_vacantes"] = {**r["catalogo_vacantes"], "description_full": textos[r["vacante_id"]]}
     version = repo.operativa(fecha) or {}
     clientes = {c["id"]: c["nombre"] for c in (version.get("configuracion") or {}).get("clientes", [])}
     por_ubicacion = {}
@@ -332,9 +345,19 @@ def listar(repo, fecha):
                        "clientes": sorted({clientes.get(p["cliente_id"], "") for p in r.get("perfiles") or []} - {""}),
                        "cliente_ids": sorted({p["cliente_id"] for p in r.get("perfiles") or [] if p.get("cliente_id")}),
                        "ayuda_faltantes": any(p.get("faltan") for p in r.get("perfiles") or []),
-                       "iguales": max(0, por_ubicacion.get(r.get("ubicacion"), 0) - 1)})
-    return {"pendientes": salida, "total": len(salida), "en_espera": len(todas),
-            "ayudan_faltantes": sum(1 for s in salida if s["ayuda_faltantes"])}
+                       "iguales": max(0, por_ubicacion.get(r.get("ubicacion"), 0) - 1),
+                       "mas_util": r["vacante_id"] in utiles})
+    if pagina is None:
+        return {"pendientes": salida, "total": len(salida), "en_espera": len(todas),
+                "ayudan_faltantes": sum(1 for s in salida if s["ayuda_faltantes"])}
+    por_cliente = {}
+    for r in todas:
+        for c in {p.get("cliente_id") for p in r.get("perfiles") or []} - {None, ""}:
+            por_cliente[c] = por_cliente.get(c, 0) + 1
+    return {"pendientes": salida, "total": len(filtradas), "en_espera": len(todas), "pagina": pagina,
+            "por_cliente": por_cliente,
+            "paginas": max(1, -(-len(filtradas) // por_pagina)), "por_pagina": por_pagina,
+            "ayudan_faltantes": sum(1 for r in filtradas if any(p.get("faltan") for p in r.get("perfiles") or []))}
 
 
 def decidir(repo, vacante_id, decision, codigos=(), aplicar_a_iguales=False, fecha=None, por="operador", comprobar=None):

@@ -34,6 +34,13 @@ en dos paneles: a la izquierda sus últimos 7 días, sus perfiles, lo que más c
 sus vacantes» y «Descargar su CSV de hoy»; a la derecha sus «por confirmar» para decidir ahí mismo («Sí, sirve» usa
 el país sugerido; si no hay sugerencia, «Elegir país en Por confirmar»).
 
+**Vacantes y «Por confirmar» (16 nov, contrato v29).** Las dos pantallas muestran la lista a la izquierda y el aviso
+completo a la derecha (datos, etiquetas, por qué coincide y la descripción con su formato), como en LinkedIn. Con ↑/↓
+se cambia de vacante; la dirección recuerda la que estaba abierta. En el celular se toca una vacante y su ficha ocupa
+la pantalla, con «Volver a la lista». En Vacantes, «Oportunidades para» y el CSV van arriba, lado a lado. «Por
+confirmar» muestra todas las pendientes por páginas de 25, con el total real, el filtro «Para» por cliente y la marca
+«Más útil hoy» en las 10 que más ayudan; después de decidir pasa sola a la siguiente.
+
 **Cargos y metas (16 nov).** Los cargos activos van en tres columnas, ordenados de mayor a menor meta; cada uno
 muestra «Meta del día», «Llegaron hoy» y «Para mañana» (vacantes guardadas sin entregar). La cuarta columna es
 «Archivados»: se archiva arrastrando un cargo ahí o con su botón, y desde ahí se reactiva. Un cargo archivado también

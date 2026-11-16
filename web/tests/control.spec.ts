@@ -255,15 +255,13 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   ).toBe(130);
   expect(cfg.publicada.configuracion.techo_diario).toBe(130);
   await ir(page, "Vacantes");
-  await expect(page.locator(".vacancy")).toHaveCount(50);
-  // Sección 9: al menos 3 vacantes por fila a 1366 px; «Recargar lista» y las ayudas explican qué hace cada cosa.
+  await expect(page.locator(".item-vacante")).toHaveCount(50);
+  // Contrato v29: a 1366 px, la lista y la ficha de la vacante elegida, lado a lado; «Recargar lista» y las ayudas
+  // explican qué hace cada cosa.
   await page.setViewportSize({ width: 1366, height: 900 });
-  const arriba = await page
-    .locator(".vacancy")
-    .evaluateAll((els) =>
-      els.slice(0, 3).map((e) => Math.round(e.getBoundingClientRect().top)),
-    );
-  expect(new Set(arriba).size).toBe(1);
+  const lista = await page.locator(".dividida-lista").boundingBox();
+  const ficha = await page.locator(".dividida-detalle").boundingBox();
+  expect(ficha!.x).toBeGreaterThan(lista!.x + lista!.width - 1);
   await expect(
     page.getByRole("button", { name: "Recargar lista", exact: true }),
   ).toBeVisible();
@@ -376,9 +374,19 @@ test("bandeja Por confirmar: un clic confirma, atajo 4 aparta y el contador baja
   await page.goto("/");
   await expect(tarjeta(page, "Por confirmar")).toContainText("4"); // 3 de ubicación + 1 por funciones (v25)
   await ir(page, "Por confirmar");
-  await expect(page.locator(".revision")).toHaveCount(4);
-  const primera = page.locator(".revision").first();
+  // Contrato v29: la lista con el total real a la izquierda y la decisión con el aviso completo a la derecha.
+  await expect(page.locator(".item-revision")).toHaveCount(4);
+  await expect(page.getByText("4 pendientes", { exact: true })).toBeVisible();
+  const primera = page.locator("article.revision");
   await expect(primera.locator(".revision-pista")).toBeVisible();
+  await expect(primera.locator(".ficha-descripcion")).toBeVisible();
+  // Filtro por cliente: muestra solo las suyas y vuelve a todas.
+  await page
+    .locator("#revision-cliente")
+    .selectOption({ label: "Cliente de ejemplo 01" });
+  await expect(page.getByText(/de este cliente/)).toBeVisible();
+  await page.locator("#revision-cliente").selectOption({ value: "" });
+  await expect(page.locator(".item-revision")).toHaveCount(4);
   // Ampliación v17: cada tarjeta trae la respuesta sugerida y por qué; Enter la acepta.
   await expect(primera.locator(".revision-sugerencia")).toContainText(
     "Sugerencia: sirve",
@@ -391,12 +399,16 @@ test("bandeja Por confirmar: un clic confirma, atajo 4 aparta y el contador baja
   await expect(
     page.getByText(/Confirmada: se asignó a \d+ cliente/),
   ).toBeVisible();
-  await expect(page.locator(".revision")).toHaveCount(3);
-  const otra = page.locator(".revision").first();
-  await otra.focus();
+  await expect(page.locator(".item-revision")).toHaveCount(3);
+  // Pasa sola a la siguiente y conserva el foco: el atajo sigue funcionando sin volver a hacer clic.
+  await expect(page.locator(".item-revision").first()).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await expect(primera).toBeFocused();
   await page.keyboard.press("4");
   await expect(page.getByText("Apartada por ahora.")).toBeVisible();
-  await expect(page.locator(".revision")).toHaveCount(2);
+  await expect(page.locator(".item-revision")).toHaveCount(2);
   const pequenos = await page.evaluate(
     () =>
       [...document.querySelectorAll("main *")].filter(
@@ -540,7 +552,7 @@ test("arreglos de la auditoría: error de carga, textos, título y botones táct
   ).toHaveCount(0);
   await page.unroute(/\/api\/resultados/);
   await page.getByRole("button", { name: "Reintentar" }).click();
-  await expect(page.locator(".vacancy").first()).toBeVisible();
+  await expect(page.locator(".item-vacante").first()).toBeVisible();
   // H6: «1 año», nunca «1 años».
   await expect(page.getByText("1 años exigidos")).toHaveCount(0);
   // H8: la pestaña dice en qué sección estás.
@@ -793,10 +805,13 @@ test("paso 8: una tarjeta por cliente, detalle con 7 días y dos columnas desde 
     (c: { nombre: string }) => c.nombre === "Cliente de ejemplo 02",
   ).id;
   let decidida = "";
-  await page.route("**/api/revisiones", async (route) => {
+  // Contrato v29: el Resumen y el detalle piden páginas (`?pagina=…`); el total y el conteo por cliente vienen aparte.
+  await page.route(/\/api\/revisiones(\?.*)?$/, async (route) => {
     const r = await route.fetch();
     const j = await r.json();
-    if (!decidida) {
+    const deOtro =
+      new URL(route.request().url()).searchParams.get("cliente_id") || id02;
+    if (!decidida && deOtro === id02) {
       j.pendientes.unshift({
         vacante_id: "prueba-paso-8",
         titulo: "Diseñador de producto (prueba)",
@@ -816,6 +831,11 @@ test("paso 8: una tarjeta por cliente, detalle con 7 días y dos columnas desde 
         iguales: 0,
       });
       j.total += 1;
+      j.en_espera = (j.en_espera ?? 0) + 1;
+      j.por_cliente = {
+        ...j.por_cliente,
+        [id02]: (j.por_cliente?.[id02] ?? 0) + 1,
+      };
     }
     await route.fulfill({ response: r, json: j });
   });
@@ -883,7 +903,7 @@ test("paso 8: una tarjeta por cliente, detalle con 7 días y dos columnas desde 
   expect(decidida).toBe("no_sirve");
   await page.unrouteAll({ behavior: "ignoreErrors" });
   await detalle.getByRole("button", { name: "Ver sus vacantes" }).click();
-  await expect(page).toHaveURL(/#vacantes$/);
+  await expect(page).toHaveURL(/#vacantes(\/[^/]+)?$/);
   await expect(page.locator("#result-cliente")).toHaveValue(
     await page
       .locator("#result-cliente option", { hasText: nombre })
@@ -1249,4 +1269,49 @@ test("lista grande 16 nov: detalle en dos paneles, editar perfil y archivar carg
     page.locator(".role-card h3", { hasText: nombre }),
   ).toBeVisible();
   expect(await page.evaluate(revisarContraste)).toEqual([]);
+});
+
+test("contrato v29: vacantes en vista dividida, ficha completa, teclado y celular", async ({
+  page,
+}) => {
+  const errores: string[] = [];
+  page.on("pageerror", (e) => errores.push(e.message));
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.goto("/#vacantes");
+  const items = page.locator(".item-vacante");
+  const ficha = page.locator(".dividida-detalle .ficha");
+  await expect(items.first()).toHaveAttribute("aria-current", "true");
+  await expect(ficha.getByRole("heading", { level: 2 })).toHaveText(
+    (await items.first().locator(".item-titulo").textContent())!,
+  );
+  // La descripción llega con su formato (subtítulos y viñetas), sin HTML del sitio.
+  await expect(ficha.locator(".ficha-descripcion h4").first()).toBeVisible();
+  await expect(ficha.locator(".ficha-descripcion li").first()).toBeVisible();
+  await expect(ficha.getByText("Descripción del aviso")).toBeVisible();
+  // ↓ elige la siguiente, la dirección la recuerda y sobrevive a recargar.
+  await items.first().focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(items.nth(1)).toHaveAttribute("aria-current", "true");
+  await expect(items.nth(1)).toBeFocused();
+  const segunda = (await items.nth(1).getAttribute("data-id"))!;
+  await expect(page).toHaveURL(new RegExp("#vacantes/" + segunda + "$"));
+  await page.reload();
+  await expect(
+    page.locator(`.item-vacante[data-id="${segunda}"]`),
+  ).toHaveAttribute("aria-current", "true");
+  expect(await page.evaluate(revisarContraste)).toEqual([]);
+  // Celular: primero la lista; al tocar, la ficha a pantalla completa con «Volver a la lista».
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(ficha).toBeHidden();
+  await items.nth(2).click();
+  await expect(ficha).toBeVisible();
+  await expect(items.first()).toBeHidden();
+  await page.getByRole("button", { name: "Volver a la lista" }).click();
+  await expect(items.first()).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  expect(errores).toEqual([]);
 });
