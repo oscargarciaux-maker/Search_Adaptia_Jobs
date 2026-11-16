@@ -34,7 +34,7 @@ jobs:
         run: |
           echo "::error::Escribe TRASPASAR (en mayúsculas) para confirmar el traspaso."
           exit 1
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
