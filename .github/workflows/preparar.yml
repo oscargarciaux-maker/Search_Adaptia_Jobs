@@ -10,8 +10,8 @@ on:
       - 'buscador/respaldo.py'
       - '.github/actions/preparar-supabase/**'
       - '.github/workflows/preparar.yml'
+      - 'requirements.in'
       - 'requirements.txt'
-      - 'requirements.lock'
   workflow_dispatch:
     inputs:
       instancia_nueva:
@@ -37,7 +37,7 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-      - run: pip install --require-hashes -r requirements.lock
+      - run: pip install --require-hashes -r requirements.txt
       - name: Recuperar el corte publicado
         run: |
           if git ls-remote --exit-code --heads origin publicado; then

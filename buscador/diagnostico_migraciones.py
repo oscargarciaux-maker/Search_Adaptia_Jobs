@@ -54,7 +54,7 @@ def identidades(conn):
 # 012 y 013 solo crean tablas privadas del panel (ajustes, contactos y borradores); 015 solo reemplaza las
 # comprobaciones de guardar y programar (metas por perfil, contrato v21) y 016 solo añade «Aplicar hoy» (contrato v27):
 # se pueden ensayar igual.
-ENSAYABLES = {"006", "007", "008", "009", "010", "011", "012", "013", "014", "015", "016"}
+ENSAYABLES = {"006", "007", "008", "009", "010", "011", "012", "013", "014", "015", "016", "017"}
 
 
 def ensayar(conn):

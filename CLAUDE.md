@@ -85,7 +85,7 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
 - Si algo del plan no está claro o falta una decisión, se pregunta antes de inventar una regla.
 
 ## Cómo se trabaja
-- Calidad (PR 1.5, 16 nov): dependencias con huella en `requirements.lock` (regenerar con el comando de
+- Calidad (PR 1.5, 16 nov): dependencias en `requirements.in` compiladas con huella en `requirements.txt` (pip-compile; regenerar con el comando de
   `pruebas/test_dependencias.py`; nunca `pip install` sin `--require-hashes`); job `auditoria` en CI (ruff, pip-audit,
   bandit alto, eslint, npm audit bloquean; vulture y knip informan); prueba axe; errores tolerados dejan
   `registro.aviso`; skill `auditoria-codigo`, lista `docs/estandares/LISTA_DE_CONTROL.md` y flujo «Inventario de la

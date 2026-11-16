@@ -15,16 +15,16 @@ informe va a Oscar en español sencillo: qué se revisó, qué está bien, qué 
   se borran en un PR aparte, después de que Oscar los marque. Nunca `ofertas`, el archivo de enlaces ni los
   snapshots (CLAUDE.md).
 - **Sin datos de clientes.** El inventario de la base solo da cifras y nombres de objetos.
-- **Herramientas con versión fija:** `requirements-auditoria.lock` (Python) y `web/package-lock.json` (web).
+- **Herramientas con versión fija:** `requirements-auditoria.txt` (Python) y `web/package-lock.json` (web).
 
 ## 1. Python (motor y servidor)
 
 ```bash
-pip install --require-hashes -r requirements-auditoria.lock
+pip install --require-hashes -r requirements-auditoria.txt
 ruff check buscador panel pruebas                  # errores reales: nombres, imports, bugbear
 bandit -q -c pyproject.toml -r buscador panel -ll  # seguridad (alta y media)
 vulture                                           # código sin uso (confirmar con grep antes de proponer)
-pip-audit -r requirements.lock --disable-pip --no-deps   # vulnerabilidades conocidas en dependencias
+pip-audit -r requirements.txt --disable-pip --no-deps   # vulnerabilidades conocidas en dependencias
 python -m pytest -q                               # incluye test_dependencias y test_repositorio
 ```
 
