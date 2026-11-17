@@ -121,6 +121,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
             hechas += 1
             por_familia[familia] = por_familia.get(familia, 0) + 1
             por_lugar[lugar] = por_lugar.get(lugar, 0) + 1
+            cobertura.anotar_busqueda("linkedin", familia, lugar)
             if r is None or r.status_code != 200:
                 fallidas += 1
                 seguidas += 1
@@ -171,6 +172,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
             "titulo": a["titulo"], "empresa": a["empresa"], "ubicacion": a["ubicacion"], "descripcion": descripcion,
             "fecha": a["fecha"], "enlace": a["enlace"], "enlace_directo": externo if enlaces.sirve(externo) else "",
             "remoto": remoto, "fuente": NOMBRE,
+            "_busqueda": f"{a['familia']}@{a['lugar_busqueda']}",  # contrato v40: de qué búsqueda salió
         })
     stats = {"busquedas": hechas, "fallidas": fallidas, "avisos": len(avisos), "con_descripcion": con_ficha,
              "cerradas": cerradas, "combinaciones_revisadas": sum(1 for c in todas if estado.get(f"{c[0]}@{c[2]}") == hoy),
@@ -194,6 +196,7 @@ def completar_descripciones(cliente, previas, max_fichas, hoy=None, max_dias=21,
                   and (v.get("fecha_publicacion") or v.get("visto_ultima_vez") or "") >= desde]
     candidatas.sort(key=lambda v: v.get("fecha_publicacion") or v.get("visto_primera_vez") or "", reverse=True)
     candidatas.sort(key=lambda v: not any(f["familia"] in prioritarias for f in v.get("familias", [])))  # estable
+    candidatas.sort(key=lambda v: not cobertura.sirve_a_corta(v))  # contrato v40: primero lo de quien va corto
     crudas, leidas, cerradas, seguidas, peticiones = [], 0, 0, 0, 0
     for v in candidatas:
         if peticiones >= max_fichas or seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):

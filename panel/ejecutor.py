@@ -1,9 +1,12 @@
 """Adaptador del control privado al motor de captura existente, sin datos de clientes en reportes públicos."""
 import argparse
 from contextlib import contextmanager
+from functools import lru_cache
 from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
+
+import yaml
 
 from buscador import bodega, entrega, familias, paises, normalizar
 from buscador import registro
@@ -22,23 +25,111 @@ def validar_version(version):
         raise RuntimeError("La configuración privada no es válida; revísala en el panel. No se muestran datos de clientes.") from None
 
 
+MAX_PAISES_POR_FILA = 10  # contrato v40: países sueltos que se buscan por fila (las regiones cuentan como uno)
+
+
+@lru_cache(maxsize=1)
+def regiones_busqueda():
+    """Contrato v40: `datos/regiones_busqueda.yaml` con los miembros de LATAM desde paises.yaml."""
+    ruta = Path(__file__).resolve().parent.parent / "datos" / "regiones_busqueda.yaml"
+    try:
+        crudo = yaml.safe_load(ruta.read_text(encoding="utf-8")) or {}
+    except OSError:
+        return {}
+    for clave, r in crudo.items():
+        r.setdefault("miembros", list(paises.datos()["latam"]) if clave == "latam" else [])
+    return crudo
+
+
+def _region_de(codigos):
+    """(clave, región, países cubiertos) de la región que una fila abarca, o None."""
+    for clave, r in regiones_busqueda().items():
+        miembros = set(r.get("miembros") or [])
+        dentro = set(codigos) & miembros
+        if miembros and len(dentro) >= 6 and len(dentro) >= 0.6 * len(miembros):
+            return clave, r, dentro
+    return None
+
+
+def _clave_ciudad(ciudad):
+    return "CIUDAD_" + normalizar.texto(ciudad).replace(" ", "_").upper()
+
+
 def lugares_perfil(p, nombres=None):
-    """Contrato v8: su país (remoto si lo acepta), las remotas regionales y, con híbrido/presencial, sus oficinas.
-    Contrato v24: los países de fuera de la tabla propia van por su nombre en inglés (LinkedIn) y cada ciudad del perfil
-    es un lugar más."""
+    """Lugares de búsqueda de un perfil. Contrato v40: salen de TODAS sus filas de «¿Dónde trabajaría?» (antes solo de
+    donde vive y sus oficinas):
+    - remoto en un país → «remoto en ese país»; híbrido o presencial → ese país y las ciudades de la fila;
+    - una fila que abarca una región (Europa, LATAM…) → la región, más sus países principales que la fila incluye;
+    - «remoto en LATAM» solo para quien vive en LATAM; «remoto en cualquier parte» para todo el que acepta remoto.
+    Vale para cualquier país del mundo y cualquier cargo. Los países de fuera van por su nombre en inglés (v24)."""
     nombres = nombres or {x["codigo"]: x["nombre"] for x in paises.datos()["paises"]}
     nombres = {**{x["codigo"]: x["nombre_en"] for x in paises.mundo()["lista"]}, **nombres}
+    latam = set(paises.datos()["latam"])
     lugares = {}
+    for fila in p.filas:
+        remoto = "remoto" in fila.modalidades
+        oficina = bool({"hibrido", "presencial"} & set(fila.modalidades))
+        codigos = [c for c in fila.paises if c in nombres]
+        region = _region_de(codigos)
+        sueltos = codigos
+        if region:
+            clave, r, dentro = region
+            if remoto:
+                lugares["REMOTO" if clave == "latam" else "REMOTO_REGION_" + clave.upper()] = \
+                    {"location": r["linkedin"], "f_WT": "2"}
+            if oficina:
+                lugares["REGION_" + clave.upper()] = {"location": r["linkedin"]}
+            principales = [c for c in r.get("principales", []) if c in dentro]
+            sueltos = principales + [c for c in codigos if c not in dentro]
+        for codigo in sueltos[:MAX_PAISES_POR_FILA]:
+            if remoto:
+                lugares["REMOTO_" + codigo] = {"location": nombres[codigo], "f_WT": "2"}
+            if oficina:
+                lugares[codigo] = {"location": nombres[codigo]}
+        if oficina:
+            for ciudad in fila.ciudades:
+                lugares[_clave_ciudad(ciudad)] = {"location": ciudad}
     if "remoto" in p.modalidades:
-        lugares["REMOTO_" + p.vive_en] = {"location": nombres[p.vive_en], "f_WT": "2"}
-        lugares["REMOTO"] = {"location": "Latin America", "f_WT": "2"}
+        if p.vive_en in latam:
+            lugares["REMOTO"] = {"location": "Latin America", "f_WT": "2"}
         lugares["REMOTO_MUNDO"] = {"location": "Worldwide", "f_WT": "2"}
-    if {"hibrido", "presencial"} & set(p.modalidades):
-        for codigo in p.paises_oficina:
-            lugares[codigo] = {"location": nombres[codigo]}
-        for ciudad in p.ciudades:
-            lugares["CIUDAD_" + normalizar.texto(ciudad).replace(" ", "_").upper()] = {"location": ciudad}
     return lugares
+
+
+def paises_de_lugares(lugares):
+    """Códigos de país de unos lugares de búsqueda («REMOTO_AE» → AE, «US» → US); las regiones y ciudades no cuentan."""
+    salida = []
+    for clave in lugares:
+        codigo = clave[7:] if clave.startswith("REMOTO_") else clave
+        if len(codigo) == 2 and codigo.isalpha() and codigo.isupper() and codigo not in salida:
+            salida.append(codigo)
+    return salida
+
+
+# Países con fuentes propias además de LinkedIn e Indeed (Computrabajo, Elempleo, Get on Board): fuera de ellos una
+# persona depende solo de LinkedIn e Indeed y recibe el doble de turnos (contrato v40).
+def _con_fuentes_propias():
+    from buscador.fuentes import computrabajo
+    return set(computrabajo.SITIOS) | {"ES"}
+
+
+PESO_CORTO = 2
+PESO_POCAS_FUENTES = 2
+
+
+def persona_de_busqueda(p, rid, nombres=None, corto=False):
+    """Contrato v40: {familia, perfil, lugares, peso} de una persona para repartir las búsquedas. Peso = meta del día,
+    ×2 si quedó bajo el mínimo (o es nueva) y ×2 si ninguno de sus países tiene fuentes propias. Sus lugares incluyen
+    sus países, para casar también con Indeed y Computrabajo («CO», «CO:REMOTO»)."""
+    lugares = lugares_perfil(p, nombres)
+    codigos = paises_de_lugares(lugares) or [p.vive_en]
+    peso = float(p.meta_diaria or 0)
+    if corto:
+        peso *= PESO_CORTO
+    if not set(codigos) & _con_fuentes_propias():
+        peso *= PESO_POCAS_FUENTES
+    return {"familia": rid, "perfil": str(p.id), "lugares": sorted(set(lugares) | set(codigos)), "peso": peso,
+            "corto": bool(corto)}
 
 
 # PR 1b (16 nov): palabras con que empiezan los títulos en español. Sirven para elegir, entre los nombres del cargo y los
@@ -93,7 +184,7 @@ def preparar(version, fecha, aprendidos=None, cortos=()):
     nada, como los nuevos). Sus lugares van primero en cada fuente y sus avisos reciben ficha primero."""
     cfg = validar_version(version)
     cortos = {str(x) for x in cortos}
-    primero = {}
+    primero, personas = {}, []
     aprendidos = aprendidos or {}
     mapa, roles = [], []
     nombres = {**{p["codigo"]: p["nombre"] for p in paises.mundo()["lista"]},
@@ -112,6 +203,8 @@ def preparar(version, fecha, aprendidos=None, cortos=()):
         for p in perfiles:
             lugares.update(lugares_perfil(p, nombres))
         rid = "cargo:" + str(c.id)
+        for p in perfiles:  # contrato v40: cada persona con sus lugares y su peso
+            personas.append(persona_de_busqueda(p, rid, nombres, str(p.id) in cortos))
         for p in perfiles:
             if str(p.id) in cortos:
                 primero.setdefault(rid, set()).update(lugares_perfil(p, nombres))
@@ -136,6 +229,8 @@ def preparar(version, fecha, aprendidos=None, cortos=()):
             "paises_objetivo": sorted({x for p in perfiles for x in p.paises_oficina} |
                                       {f for p in perfiles for fila in p.filas if "remoto" in fila.modalidades
                                        for f in fila.paises}),
+            # Contrato v40: países donde se busca (Indeed, Computrabajo): los de sus lugares, no los 30 de «Europa».
+            "paises_busqueda": sorted({x for p in perfiles for x in paises_de_lugares(lugares_perfil(p, nombres))}),
             "solo_remoto": all(p.modalidades == ["remoto"] for p in perfiles)})
         roles.append({"id": rid, "nombre": c.nombre, "familias": [rid], "cupo": c.cupo,
                       "_perfiles": [p.model_dump(mode="json") for p in perfiles], "_hoy": fecha,
@@ -150,6 +245,7 @@ def preparar(version, fecha, aprendidos=None, cortos=()):
     motor["control_dirigido"] = True
     motor["paises_objetivo_mundo"], motor["acepta_horario"] = objetivo_mundo(cfg)
     motor["lugares_primero"] = {k: sorted(v) for k, v in primero.items()}
+    motor["personas_busqueda"] = personas
     motor["presupuestos"].update(linkedin_busquedas=min(300, max(24, len(roles) * 24)),
         indeed_busquedas=min(72, max(6, len(roles) * 8)), getonbrd_busquedas=min(30, len(roles) * 4),
         computrabajo_busquedas=min(90, max(12, len(roles) * 12)),
@@ -164,6 +260,7 @@ def activar(version, fecha, aprendidos=None, cortos=()):
     mapa, cfg, motor = preparar(version, fecha, aprendidos, cortos)
     from buscador import cobertura, contrato
     cobertura.configurar_primero(motor.get("lugares_primero"))
+    cobertura.configurar_personas(motor.get("personas_busqueda"))
     anterior_e, anterior_b, anterior_c = entrega._config_operativa, bodega._config_operativa, contrato._PANEL
     familias.configurar(mapa)
     entrega._config_operativa, bodega._config_operativa, contrato._PANEL = cfg, motor, True
@@ -172,6 +269,7 @@ def activar(version, fecha, aprendidos=None, cortos=()):
     finally:
         familias.configurar()
         cobertura.configurar_primero()
+        cobertura.configurar_personas()
         entrega._config_operativa, bodega._config_operativa, contrato._PANEL = anterior_e, anterior_b, anterior_c
 
 
@@ -505,6 +603,8 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
                           "asignaciones": len(filas),
                           "ampliadas": sum(any(isinstance(e, dict) and e.get("ampliacion") for e in f["explicacion"]) for f in filas),
                           "reutilizadas": reutilizadas, "rescatadas": rescatadas, "posts": posts, **por_confirmar,
+                          **({"busquedas_por_perfil": reporte["busquedas_por_perfil"]}
+                             if (reporte or {}).get("busquedas_por_perfil") else {}),
                           **({"reglas": reglas_info} if reglas_info else {}),
                           "perfiles_bajo_minimo": sum(1 for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id))
                                                       if estrictas.get(p.id, 0) < MINIMO_POR_PERFIL),
@@ -548,6 +648,8 @@ def correr(salida, modo="diario", prueba=False, repo=None):
             bodega._config_operativa["empresas_objetivo"] = sorted({v["empresa"] for v in previas
                 if any(c["activo"] and grado(v["titulo"],c)[0] for c in cargos)})[:120]
             reporte = bodega.correr(salida, modo=modo, hoy=fecha)
+            from buscador import cobertura
+            busquedas = cobertura.busquedas_por_persona()  # contrato v40, solo en el resumen privado de Supabase
             bodega.etapa("Registrar asignaciones por perfil")
             if reglas:
                 try:
@@ -557,7 +659,7 @@ def correr(salida, modo="diario", prueba=False, repo=None):
                     registro.aviso("ejecutor:405", e)
             # Contrato v36: la bodega completa de la noche, para completar el mínimo de cada persona.
             trabajo = Path(salida) / "trabajo"
-            registrar(repo, version, fecha, reporte, reglas_info,
+            registrar(repo, version, fecha, dict(reporte or {}, busquedas_por_perfil=busquedas), reglas_info,
                       vacantes=bodega._leer_json(trabajo / "bodega.json.gz", []),
                       cache_enlaces=bodega._leer_json(trabajo / "verificacion_enlaces.json", {}),
                       limites_rescate=(30, 60) if modo == "incremental" else (MAX_COMPROBAR_RESCATE, SEGUNDOS_RESCATE))

@@ -52,6 +52,11 @@ sirvan, o «Añadir todas».
 resaltado. «Cupo diario» es el máximo de vacantes al día entre todos (antes «Techo del día») e «Historial» es lo que
 antes se llamaba «Actividad».
 
+**Búsqueda por persona (17 nov, contrato v40).** El sistema lee las filas de «¿Dónde trabajaría?» de cada perfil y
+busca en esos países, ciudades y regiones, para cualquier cargo. Quien va corto, o vive donde solo hay LinkedIn e
+Indeed, recibe más búsquedas. En Historial → «Cobertura por persona», la columna «Búsquedas hoy» dice cuántas se
+hicieron para cada una. Las regiones se editan en `datos/regiones_busqueda.yaml`.
+
 **Ciudades de todo el mundo (17 nov, contrato v38).** Una vacante en «Chicago», «Toronto» o «New York, NY 10001»
 cuenta como de EE. UU. o Canadá aunque el aviso no lo diga. Si en «¿Dónde trabajaría?» pones una ciudad, también
 llegan las de sus alrededores (hasta 50 km). Los nombres que existen en varios países sin una ciudad claramente más

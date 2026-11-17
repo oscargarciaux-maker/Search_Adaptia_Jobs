@@ -1,0 +1,63 @@
+# Contrato de datos v40: la búsqueda se arma leyendo a cada persona
+
+**Fecha:** 17 de noviembre de 2026. **Sin SQL ni IA.** Pedido de Oscar: «un plan que sirva para cualquier cargo… que
+cualquier persona el sistema lo lea».
+
+## Por qué
+- El 17 nov, a las personas que viven fuera de LATAM les llegaba muy poco. Por ejemplo, quien vive en Emiratos y
+  trabajaría en remoto para Europa: LinkedIn hizo 3 búsquedas para Emiratos y Europa nunca se buscó.
+- Los lugares de búsqueda salían solo de donde vive la persona y de sus oficinas. Cada combinación de cargo y lugar
+  recibía los mismos turnos, sin mirar cuántas personas la necesitaban ni cuántas fuentes tiene ese país.
+
+## 1. Lugares desde todas las filas del perfil (`panel.ejecutor.lugares_perfil`)
+- Cada fila de «¿Dónde trabajaría?» se vuelve lugares de búsqueda:
+  - remoto en un país → `REMOTO_<país>`;
+  - híbrido o presencial → `<país>` y las ciudades de esa fila (`CIUDAD_…`).
+- **Regiones** (`datos/regiones_busqueda.yaml`, editable: Europa, LATAM, Norteamérica, Asia-Pacífico y Medio
+  Oriente):
+  - si una fila abarca 6 países o más y al menos el 60 % de una región, LinkedIn la busca con el nombre de la región
+    («European Union», «Middle East»…) y, aparte, en sus países principales que la fila incluya;
+  - los demás países sueltos de la fila se buscan uno a uno, hasta 10 por fila.
+- «Remoto en LATAM» solo se busca para quien vive en LATAM. «Remoto en cualquier parte», para todo el que acepta
+  remoto.
+- Vale para cualquier país del mundo y cualquier cargo, también los creados hoy. Los países de fuera van por su
+  nombre en inglés (v24).
+
+## 2. Cuota de búsquedas por persona (`buscador.cobertura`)
+- Cada persona activa pesa su meta del día, ×2 si quedó con menos de 5 (o es nueva) y ×2 si ninguno de sus países
+  tiene fuentes propias. Fuentes propias: Computrabajo, Elempleo y Get on Board; fuera de ellas solo quedan LinkedIn e
+  Indeed.
+- Las fuentes que reparten por combinación (LinkedIn, Indeed, Computrabajo, Elempleo, Apify) dan turnos ponderados
+  por persona:
+  - avanza la persona con menos búsquedas para su peso;
+  - toma su combinación menos reciente;
+  - una búsqueda compartida sirve a todas sus personas y cuenta como turno para cada una.
+- Lo que no es de ninguna persona sigue después, con el reparto de siempre. Sin personas (modo heredado), el reparto
+  no cambia.
+- Con los 21 perfiles reales del CSV v6 y las 46 combinaciones que LinkedIn alcanza a revisar en un día, la persona
+  con menos búsquedas pasa de 1 a 2, y varias de Product Designer pasan de 1 o 2 a 4.
+
+## 3. Rendimiento medido (`cobertura.medir`, `estado["rendimiento"]`)
+- Cada aviso de LinkedIn e Indeed guarda de qué búsqueda salió (`_busqueda` = cargo@lugar).
+- Al limpiar se cuenta cuántas vacantes nuevas de un cargo trajo cada combinación buscada hoy.
+- Una combinación con 3 búsquedas seguidas sin nada útil pasa al final de los turnos de su persona; vuelve a subir
+  apenas trae algo.
+- Lo de más de 30 días se olvida.
+
+## 4. Fuentes según el país
+- **Indeed:** los 62 países que admite JobSpy (antes 26), Emiratos, Japón, India y Singapur incluidos. Solo busca en
+  los países de los lugares de las personas (`paises_busqueda`), no en los 30 de una fila «Europa».
+- **Relectura de fichas de LinkedIn:** empieza por los avisos de un cargo y un país de alguien que va corto
+  (`cobertura.sirve_a_corta`). Sin descripción no se sabe el idioma y no se entrega; el 17 nov eran el 20 % de las
+  vacantes nuevas.
+
+## 5. En el panel
+- «Cobertura por persona» suma la columna «Búsquedas hoy» (páginas de LinkedIn e Indeed hechas para esa persona).
+- Si su país solo tiene LinkedIn e Indeed, la explicación lo dice.
+- El conteo se guarda solo en el resumen privado de la corrida (`panel_ejecuciones.resumen.busquedas_por_perfil`),
+  nunca en archivos públicos.
+
+## Lo que no cambia
+- Admisión, afinidad, filtros por persona, comprobación de enlaces (v39) y reglas de entrega.
+- LinkedIn sigue sin sesión ni cookies.
+- El presupuesto total de búsquedas por noche no sube. Lo que cambia es a quién se le dedica cada búsqueda.

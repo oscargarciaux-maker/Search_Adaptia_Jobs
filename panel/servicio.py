@@ -363,6 +363,7 @@ def cobertura(repo, fecha=None):
     cfg = validar_version(version)
     ejecuciones = [e for e in repo.ejecuciones() or [] if str(e.get("fecha", "")) <= fecha][:DIAS_COBERTURA]
     conteo = repo.asignaciones_por_perfil([str(e["id"]) for e in ejecuciones])
+    busquedas_ultima = ((ejecuciones[0].get("resumen") or {}).get("busquedas_por_perfil") or {}) if ejecuciones else {}
     configs = repo.versiones([e["revision"] for e in ejecuciones if e.get("revision") is not None])
     presentes = {r: {str(p["id"]) for p in (c or {}).get("perfiles", []) if p.get("activo", True)}
                  for r, c in configs.items()}
@@ -405,6 +406,8 @@ def cobertura(repo, fecha=None):
         else:
             estado = "pendiente"
         causa = ""
+        from panel.ejecutor import _con_fuentes_propias, lugares_perfil, paises_de_lugares
+        pocas_fuentes = not set(paises_de_lugares(lugares_perfil(p)) or [p.vive_en]) & _con_fuentes_propias()
         if estado != "cubierto" and hoy_n < MINIMO_POR_PERFIL:
             if not del_cargo:
                 causa = "Aún no hay vacantes de este cargo en lo buscado: la próxima búsqueda lo incluye."
@@ -419,6 +422,9 @@ def cobertura(repo, fecha=None):
                 causa = f"{pendientes} le servirían pero aún no tienen el enlace comprobado; se comprueban en la próxima búsqueda."
             else:
                 causa = "Pocas vacantes nuevas en las fuentes revisadas para su ubicación e idioma."
+            if pocas_fuentes and not listas:
+                causa += (" Donde vive o trabajaría solo buscan LinkedIn e Indeed (no hay Computrabajo, Elempleo ni Get on "
+                          "Board): tiene el doble de turnos en la búsqueda.")
         seguidos = 0
         for e in dias:
             if conteo.get((str(e["id"]), pid), 0) >= MINIMO_POR_PERFIL:
@@ -428,7 +434,9 @@ def cobertura(repo, fecha=None):
                       "cargo": cargo.nombre, "vive_en": p.vive_en, "idiomas": list(p.idiomas), "estado": estado,
                       "hoy": hoy_n, "dias_con_minimo": con_minimo, "dias_medidos": len(dias),
                       "dias_seguidos_bajo": seguidos if len(dias) >= DIAS_PARA_MEDIR else 0,
-                      "listas": listas, "por_comprobar": pendientes, "causa": causa})
+                      "listas": listas, "por_comprobar": pendientes, "causa": causa,
+                      # Contrato v40: páginas buscadas para esta persona en la última búsqueda, por fuente.
+                      "busquedas_hoy": busquedas_ultima.get(pid, {}), "pocas_fuentes": pocas_fuentes})
     orden = {"pendiente": 0, "sin_datos": 1, "cubierto": 2}
     filas.sort(key=lambda f: (orden[f["estado"]], f["hoy"], f["cliente"]))
 
