@@ -66,7 +66,11 @@ import {
 } from "./comunes";
 import { PorConfirmar } from "./vistas/PorConfirmar";
 import { Mensajes } from "./vistas/Mensajes";
-import { EmbudoCargos, ReglasAprendidas } from "./vistas/Actividad";
+import {
+  CoberturaPersonas,
+  EmbudoCargos,
+  ReglasAprendidas,
+} from "./vistas/Actividad";
 import { CargoDialog } from "./vistas/CargoDialog";
 import { ClienteDialog } from "./vistas/ClienteFormulario";
 import { conMetas } from "./perfiles";
@@ -2258,8 +2262,10 @@ function App() {
                             </span>
                           )}
                           {!c.terminos_similares.length && (
-                            <span className="helper">
-                              Añade o descubre denominaciones afines.
+                            <span className="solo-nombre">
+                              Solo busca «{c.nombre}». En «Editar», pulsa
+                              «Buscar denominaciones afines» para sumar nombres
+                              en inglés y parecidos.
                             </span>
                           )}
                         </div>
@@ -2612,6 +2618,14 @@ function App() {
                 ))
               )}
             </section>
+          )}
+          {tab === "Actividad" && sesion?.sesion && (
+            <CoberturaPersonas
+              nombrePais={(c) =>
+                sesion.paises.find((x) => x.codigo === c)?.nombre ||
+                nombrePais(c)
+              }
+            />
           )}
           {tab === "Actividad" && <ReglasAprendidas notify={notify} />}
         </main>

@@ -18,6 +18,9 @@ def ligera(datos, descripcion=None):
     texto; el inglés exigido viene calculado en el catálogo (contrato v7). Si falta y no hay descripción, se usa el
     nivel guardado tratándolo como obligatorio: la estimación puede quedar corta, nunca inflada."""
     v = {k: datos.get(k) for k in CAMPOS_FILTRO}
+    # Contrato v37: el estado del enlace, para contar «listas» en la cobertura (no interviene en `evaluar`).
+    estado = datos.get("verificacion")
+    v["_verificacion"] = estado.get("estado", "") if isinstance(estado, dict) else (estado or "")
     v["_anos_minimos"] = contrato.anos("", datos.get("anos_min"))[0]
     if descripcion is None and datos.get("requisito_ingles") is not None:
         v["_requisito_ingles"] = datos["requisito_ingles"]

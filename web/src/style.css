@@ -5006,3 +5006,89 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .resumen-b .tarjeta-cupos .cupos-fila .tarjeta-detalle {
   margin: 0;
 }
+
+/* Contrato v37: cobertura por persona en Actividad. */
+.cobertura-alerta {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--osc-bg-ambar-3, #faf2e1);
+  color: var(--osc-text-ambar-fuerte, #6b4d12);
+  font-size: 13px;
+}
+.cobertura-grupos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.cobertura-grupos h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+.cobertura-grupos ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.cobertura-grupos li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 13px;
+}
+.cobertura-grupos li span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cobertura-grupos li b {
+  font-variant-numeric: tabular-nums;
+}
+.cobertura-grupos li small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.tabla-cobertura {
+  overflow-x: auto;
+}
+.tabla-cobertura table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.tabla-cobertura th,
+.tabla-cobertura td {
+  text-align: left;
+  padding: 8px 10px;
+  border-top: 1px solid var(--line);
+  vertical-align: top;
+}
+.tabla-cobertura thead th {
+  border-top: 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tabla-cobertura .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tabla-cobertura .causa {
+  min-width: 260px;
+  color: var(--osc-text-neutro-fuerte, #334);
+}
+/* Contrato v37: un cargo que solo busca por su nombre (sin nombres en inglés ni parecidos) lo dice en su tarjeta. */
+.solo-nombre {
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--osc-bg-ambar-3, #faf2e1);
+  color: var(--osc-text-ambar-fuerte, #6b4d12);
+}

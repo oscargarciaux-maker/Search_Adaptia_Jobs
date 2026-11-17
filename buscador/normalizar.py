@@ -29,7 +29,15 @@ _QUITAR_SIN_CARGO_RE = re.compile(r"\b(" + "|".join(re.escape(k) for k in sorted
 _GENERO = [(re.compile(r"\b(\w+)dora\b"), r"\1dor"), (re.compile(r"\bingeniera\b"), "ingeniero"),
            (re.compile(r"\barquitecta\b"), "arquitecto"), (re.compile(r"\btecnica\b"), "tecnico"),
            (re.compile(r"\bexperta\b"), "experto"), (re.compile(r"\bcientifica\b"), "cientifico"),
-           (re.compile(r"\bdesenvolvedora\b"), "desenvolvedor")]
+           (re.compile(r"\bdesenvolvedora\b"), "desenvolvedor"),
+           # Contrato v37 (oficios nuevos): reglas generales, iguales para el cargo y para el aviso.
+           (re.compile(r"\b(\w+)(t|s|f)ora\b"), r"\1\2or"),   # directora, asesora, profesora
+           (re.compile(r"\b(\w{3,})era\b"), r"\1ero"),         # enfermera, cajera, bodeguera
+           (re.compile(r"\b(\w{3,})iva\b"), r"\1ivo"),         # ejecutiva, administrativa
+           (re.compile(r"\b(\w{3,})ica\b"), r"\1ico"),         # logística, médica, química
+           (re.compile(r"\b(\w{3,})ada\b"), r"\1ado"),         # abogada, encargada
+           (re.compile(r"\b(\w+)stra\b"), r"\1stro"),          # maestra
+           (re.compile(r"\bjefa\b"), "jefe")]
 _NIVEL_RE = re.compile(r"\b(" + "|".join(sorted((re.escape(k) for k in NIVELES), key=len, reverse=True)) + r")\b\.?")
 _RUIDO = re.compile(r"\b(remote|remoto|remota|hybrid|hibrido|hibrida|presencial|on ?site|full ?time|part ?time|"
                     r"tiempo completo|medio tiempo|m/f|f/m|m/f/d|h/m|m/h|a/o|o/a|\(a\)|ref\s*#?\s*\w+)\b", re.I)

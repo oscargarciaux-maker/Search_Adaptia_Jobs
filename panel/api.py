@@ -266,6 +266,11 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
     def aplicar_hoy(body: Publicar):
         return repo.publicar_hoy(body.revision)
 
+    @app.get("/api/cobertura")
+    def ver_cobertura():
+        """Contrato v37: cobertura por persona (panel privado)."""
+        return servicio.cobertura(repo, hoy())
+
     @app.post("/api/cargos/expandir")
     def expandir(body: Expansion):
         return sugerir(body.cargo)

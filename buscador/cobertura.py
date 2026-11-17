@@ -28,6 +28,22 @@ def clave_consulta(clave, frases):
     return clave + "#" + hashlib.sha256("|".join(frases).encode()).hexdigest()[:12]
 
 
+# Contrato v37: lugares que van primero en cada familia (los de perfiles que quedaron bajo el mínimo o son nuevos).
+# Lo fija el panel durante una búsqueda (`panel.ejecutor.activar`); vacío, todo sigue como antes.
+_PRIMERO = {}
+
+
+def configurar_primero(lugares=None):
+    global _PRIMERO
+    _PRIMERO = {f: set(v) for f, v in (lugares or {}).items()}
+
+
+def va_primero(familia, lugar):
+    """True si el lugar (o su país, antes de «:») es de un perfil que va corto en esa familia."""
+    lugares = _PRIMERO.get(familia) or ()
+    return bool(lugares) and (lugar in lugares or str(lugar).split(":")[0] in lugares)
+
+
 def repartir(combinaciones, estado, hoy, prioritarias=()):
     """Una consulta por familia en cada vuelta; las menos recientes primero dentro de cada familia.
 
@@ -44,7 +60,7 @@ def repartir(combinaciones, estado, hoy, prioritarias=()):
         return hashlib.sha256(f"{hoy}|{clave}".encode()).hexdigest()
 
     for familia, lista in grupos.items():
-        lista.sort(key=lambda c: (estado.get(f"{c[0]}@{c[2]}", ""),
+        lista.sort(key=lambda c: (not va_primero(c[0], c[2]), estado.get(f"{c[0]}@{c[2]}", ""),
                                   0 if "REMOTO" in c[2] else 1, azar(c[2])))
         grupos[familia] = deque(lista)
     tandas = []

@@ -42,6 +42,11 @@ en dos paneles: a la izquierda sus últimos 7 días, sus perfiles, lo que más c
 sus vacantes» y «Descargar su CSV de hoy»; a la derecha sus «por confirmar» para decidir ahí mismo («Sí, sirve» usa
 el país sugerido; si no hay sugerencia, «Elegir país en Por confirmar»).
 
+**Cobertura por persona (17 nov, contrato v37).** En Actividad verás, para cada persona, si hoy llegó a 5, en
+cuántos de sus últimos días lo logró, cuántas vacantes tiene listas y por qué le faltan. «Aún sin datos» quiere decir
+que todavía hay pocas búsquedas con ese perfil. Quien queda corto tiene turno primero en la búsqueda siguiente. Si un
+cargo dice «Solo busca …», ábrelo y pulsa «Buscar denominaciones afines» para sumar nombres en inglés y parecidos.
+
 **Panel (17 nov).** El Resumen muestra arriba el techo del día (dona), vacantes, «por confirmar» y mensajes, después
 Actividad y al final a todos los clientes a lo ancho; toca un cliente para ver su detalle. En Cargos y metas cada cargo
 dice para cuántos días alcanza lo guardado, y los archivados se reactivan desde sus fichas. En Clientes, toca cualquier

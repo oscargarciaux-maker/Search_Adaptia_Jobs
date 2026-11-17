@@ -346,6 +346,114 @@ def resumen_clientes(repo, fecha=None, dias=7):
     return {"fecha": fecha, "busqueda_de_hoy": any(d["fecha"] == fecha for d in por_dia), "dias": por_dia}
 
 
+# ── Contrato v37: cobertura por persona ──────────────────────────────────────────────────────────────────────────────
+DIAS_COBERTURA = 14
+DIAS_PARA_MEDIR = 3  # con menos búsquedas medidas, «aún sin datos»
+
+
+def cobertura(repo, fecha=None):
+    """Por cada perfil activo: si hoy llegó al mínimo, cuántos de sus últimos días lo logró (con su denominador), cuántas
+    vacantes tiene listas para mañana (comprobadas y que nunca recibió) y cuántas esperan comprobación, por qué le
+    faltan y totales por cargo, país e idioma. Solo cuenta lo medido: nunca reparte el inventario en días."""
+    from panel.ejecutor import validar_version
+    fecha = fecha or hoy()
+    version = repo.operativa(fecha)
+    if not version:
+        return {"fecha": fecha, "perfiles": [], "grupos": {}, "alertas": [], "sin_configuracion": True}
+    cfg = validar_version(version)
+    ejecuciones = [e for e in repo.ejecuciones() or [] if str(e.get("fecha", "")) <= fecha][:DIAS_COBERTURA]
+    conteo = repo.asignaciones_por_perfil([str(e["id"]) for e in ejecuciones])
+    configs = repo.versiones([e["revision"] for e in ejecuciones if e.get("revision") is not None])
+    presentes = {r: {str(p["id"]) for p in (c or {}).get("perfiles", []) if p.get("activo", True)}
+                 for r, c in configs.items()}
+    catalogo = repo.catalogo_vigente()
+    todas = list(catalogo["vacantes"]) + list(catalogo.get("entregadas_vacantes") or [])
+    clientes = {c.id: c for c in cfg.clientes if c.activo}
+    perfiles = [(c, p) for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id))
+                if p.cliente_id in clientes]
+    recibidas = repo.recibidas([str(p.id) for _, p in perfiles]) if perfiles else {}
+    filas = []
+    for cargo, p in perfiles:
+        pid = str(p.id)
+        dias = [e for e in ejecuciones if pid in presentes.get(e.get("revision"), set())]
+        con_minimo = sum(1 for e in dias if conteo.get((str(e["id"]), pid), 0) >= MINIMO_POR_PERFIL)
+        hoy_n = conteo.get((str(ejecuciones[0]["id"]), pid), 0) if ejecuciones else 0
+        raw = cargo.model_dump(mode="json")
+        if not raw["terminos_exactos"]:
+            raw["terminos_exactos"] = sugerir(cargo.nombre, consultar_esco=False)["terminos_exactos"]
+        base = {"actualizado": catalogo["actualizado"] + "#todas", "vacantes": todas}
+        del_cargo = _del_cargo(base, raw) + _del_cargo(base, raw, cercanas=True)
+        ya = recibidas.get(pid, set())
+        listas = pendientes = 0
+        motivos = Counter()
+        for v in del_cargo:
+            if v["id"] in ya:
+                continue
+            r = evaluar(v, p, fecha)
+            if not r["compatible"]:
+                if len(r["motivos"]) == 1:
+                    motivos[r["motivos"][0]] += 1
+                continue
+            if v.get("_verificacion") == "verificada":
+                listas += 1
+            else:
+                pendientes += 1
+        if hoy_n >= MINIMO_POR_PERFIL:
+            estado = "cubierto"
+        elif len(dias) < DIAS_PARA_MEDIR:
+            estado = "sin_datos"
+        else:
+            estado = "pendiente"
+        causa = ""
+        if estado != "cubierto" and hoy_n < MINIMO_POR_PERFIL:
+            if not del_cargo:
+                causa = "Aún no hay vacantes de este cargo en lo buscado: la próxima búsqueda lo incluye."
+            elif listas:
+                causa = (f"Hay {listas} {'lista' if listas == 1 else 'listas'} que aún no recibió: la próxima búsqueda "
+                         "completa su mínimo con ellas.")
+            elif listas + pendientes == 0 and motivos:
+                m, n = motivos.most_common(1)[0]
+                causa = f"{n} vacantes del cargo no le sirven por «{m}»" + (
+                    f": {SUGERENCIAS[m].lower()} daría más." if m in SUGERENCIAS else ".")
+            elif pendientes:
+                causa = f"{pendientes} le servirían pero aún no tienen el enlace comprobado; se comprueban en la próxima búsqueda."
+            else:
+                causa = "Pocas vacantes nuevas en las fuentes revisadas para su ubicación e idioma."
+        seguidos = 0
+        for e in dias:
+            if conteo.get((str(e["id"]), pid), 0) >= MINIMO_POR_PERFIL:
+                break
+            seguidos += 1
+        filas.append({"perfil_id": pid, "cliente_id": str(p.cliente_id), "cliente": clientes[p.cliente_id].nombre,
+                      "cargo": cargo.nombre, "vive_en": p.vive_en, "idiomas": list(p.idiomas), "estado": estado,
+                      "hoy": hoy_n, "dias_con_minimo": con_minimo, "dias_medidos": len(dias),
+                      "dias_seguidos_bajo": seguidos if len(dias) >= DIAS_PARA_MEDIR else 0,
+                      "listas": listas, "por_comprobar": pendientes, "causa": causa})
+    orden = {"pendiente": 0, "sin_datos": 1, "cubierto": 2}
+    filas.sort(key=lambda f: (orden[f["estado"]], f["hoy"], f["cliente"]))
+
+    def agrupar(clave):
+        grupos = {}
+        for f in filas:
+            for k in (f[clave] if isinstance(f[clave], list) else [f[clave]]):
+                g = grupos.setdefault(k, {"perfiles": 0, "dias_con_minimo": 0, "dias_medidos": 0})
+                g["perfiles"] += 1
+                g["dias_con_minimo"] += f["dias_con_minimo"]
+                g["dias_medidos"] += f["dias_medidos"]
+        return grupos
+    # (Las metas nunca pasan el cupo diario: el panel no deja programarlo.)
+    alertas = []
+    largos = [f for f in filas if f["dias_seguidos_bajo"] >= 3]
+    if largos:
+        alertas.append(f"{len(largos)} {'persona lleva' if len(largos) == 1 else 'personas llevan'} 3 o más días "
+                       "seguidos con menos de 5: revisa su cargo y su ubicación.")
+    return {"fecha": fecha, "minimo": MINIMO_POR_PERFIL, "dias_ventana": DIAS_COBERTURA, "perfiles": filas,
+            "grupos": {"cargo": agrupar("cargo"), "pais": agrupar("vive_en"), "idioma": agrupar("idiomas")},
+            "alertas": alertas,
+            "nota": "Cuenta solo lo medido en las búsquedas de cada día. «Listas» son vacantes guardadas, con enlace "
+                    "comprobado, que esa persona nunca recibió; no es una promesa para los próximos días."}
+
+
 def whatsapp(repo, cliente_id, fecha=None):
     r = resultados(repo, cliente_id, fecha)
     from panel import borradores
