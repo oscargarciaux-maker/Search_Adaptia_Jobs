@@ -185,3 +185,15 @@ def test_la_limpieza_conserva_las_vacantes_de_los_paises_de_los_perfiles(monkeyp
     monkeypatch.setattr(bodega, "_config_operativa", motor)
     vacantes, _, _ = bodega.limpiar([], [cruda], "2026-11-17", 30, set(), set())
     assert len(vacantes) == 1 and vacantes[0]["paises"] == [] and vacantes[0]["paises_mundo"] == ["US"]
+
+
+def test_si_la_vez_anterior_no_dejo_nada_util_se_piden_los_30_dias():
+    """17 nov, caso Danna: lo que trajo Chicago se borraba en la limpieza; al repetir, solo se pedía el último día."""
+    assert cobertura.dias_busqueda("cargo:x@CIUDAD_CHICAGO", "", "2026-11-18", 30) == 30
+    assert cobertura.dias_busqueda("cargo:x@CIUDAD_CHICAGO", "2026-11-17", "2026-11-18", 30) == 2
+    cobertura.configurar_rendimiento({"cargo:x@CIUDAD_CHICAGO": {"utiles": 0, "ceros": 1, "fecha": "2026-11-17"}})
+    try:
+        assert cobertura.dias_busqueda("cargo:x@CIUDAD_CHICAGO", "2026-11-17", "2026-11-18", 30) == 30
+        assert cobertura.dias_busqueda("cargo:x@REMOTO_CO", "2026-11-17", "2026-11-18", 30) == 2
+    finally:
+        cobertura.configurar_rendimiento()
