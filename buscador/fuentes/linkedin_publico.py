@@ -79,19 +79,23 @@ def consulta_or(consultas, maximo=4):
 
 
 def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fichas=250, max_dias=30,
-           reloj=time.monotonic, limite_segundos=None, prioritarias=(), desfase_terminos=0, max_paginas=3):
+           reloj=time.monotonic, limite_segundos=None, prioritarias=(), desfase_terminos=0, max_paginas=3,
+           fraccion_busqueda=0.5):
     """Recorre las combinaciones menos recientes hasta gastar el presupuesto de búsquedas.
     estado: dict {clave_combinacion: fecha ISO de la última revisión}; se actualiza aquí.
     Devuelve (vacantes crudas, estadísticas)."""
     hoy = hoy or datetime.now(timezone.utc).date().isoformat()
     inicio = reloj()
+    # Contrato v37: buscar páginas solo hasta la mitad del tiempo; el resto es para leer fichas (sin descripción no se
+    # entrega). El 16 nov se revisaron los 55 lugares pero solo se leyeron 40 fichas de 765 avisos.
+    limite_busqueda = None if limite_segundos is None else limite_segundos * fraccion_busqueda
     todas = combinaciones(mapa, paises_activos)
     todas = cobertura.repartir(todas, estado, hoy, prioritarias)
     vistos, avisos = set(), []
     hechas = fallidas = seguidas = 0
     por_familia, por_lugar = {}, {}
     for familia, consultas, lugar, params in todas:
-        if hechas >= presupuesto or seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
+        if hechas >= presupuesto or seguidas >= 4 or (limite_busqueda is not None and reloj() - inicio >= limite_busqueda):
             break
         clave = f"{familia}@{lugar}"
         terminos = cobertura.rotar(consultas, hoy, 4, desfase=desfase_terminos)
@@ -99,7 +103,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
         ultima = estado.get(clave_terminos)
         dias = max_dias if not ultima else min(max_dias, max(1, (datetime.fromisoformat(hoy) - datetime.fromisoformat(ultima)).days + 1))
         for pagina in range(max_paginas):
-            if hechas >= presupuesto or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
+            if hechas >= presupuesto or (limite_busqueda is not None and reloj() - inicio >= limite_busqueda):
                 break
             r = cliente.get(BUSQUEDA, params=dict(params, keywords=consulta_or(terminos), f_TPR=f"r{dias * 86400}",
                                                   start=str(pagina * 10)))
@@ -131,7 +135,9 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
     for a in avisos:
         turno[id(a)] = vistos_lugar[a["lugar_busqueda"]]
         vistos_lugar[a["lugar_busqueda"]] += 1
-    avisos.sort(key=lambda a: (a["familia"] not in prioritarias, turno[id(a)], "REMOTO" not in a["lugar_busqueda"],
+    # Contrato v37: primero los avisos de los lugares de quien va corto.
+    avisos.sort(key=lambda a: (a["familia"] not in prioritarias, not cobertura.va_primero(a["familia"], a["lugar_busqueda"]),
+                               turno[id(a)], "REMOTO" not in a["lugar_busqueda"],
                                -(int((a["fecha"] or "0000-00-00").replace("-", "")))))
     crudas, con_ficha, cerradas = [], 0, 0
     for a in avisos:

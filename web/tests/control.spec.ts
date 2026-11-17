@@ -547,6 +547,14 @@ test("resumen: tablero de una pantalla, sin menú propio, con dirección por sec
   await expect(
     page.getByRole("heading", { level: 1, name: "Actividad" }),
   ).toBeVisible();
+  // Contrato v37: cobertura por persona, con su estado y por qué le faltan.
+  await expect(
+    page.getByRole("heading", { name: /Cobertura por persona/ }),
+  ).toBeVisible();
+  await expect(page.locator(".tabla-cobertura tbody tr").first()).toBeVisible();
+  await expect(page.locator(".tabla-cobertura")).toContainText(
+    /Mínimo cubierto|Aún sin datos|Mínimo pendiente/,
+  );
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await expect(page.locator(".tarjeta-resumen")).toHaveCount(6);

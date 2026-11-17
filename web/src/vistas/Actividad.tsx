@@ -204,3 +204,162 @@ export function EmbudoCargos({
     </Plegable>
   );
 }
+
+// Contrato v37: cobertura por persona. Si hoy llegó al mínimo, cuántos de sus días lo logró (con el denominador),
+// cuántas tiene listas y por qué le faltan. Solo lo medido; nunca una promesa.
+type FilaCobertura = {
+  perfil_id: string;
+  cliente: string;
+  cargo: string;
+  vive_en: string;
+  idiomas: string[];
+  estado: "cubierto" | "pendiente" | "sin_datos";
+  hoy: number;
+  dias_con_minimo: number;
+  dias_medidos: number;
+  dias_seguidos_bajo: number;
+  listas: number;
+  por_comprobar: number;
+  causa: string;
+};
+type Grupo = {
+  perfiles: number;
+  dias_con_minimo: number;
+  dias_medidos: number;
+};
+type Cobertura = {
+  minimo: number;
+  dias_ventana: number;
+  perfiles: FilaCobertura[];
+  grupos: Record<"cargo" | "pais" | "idioma", Record<string, Grupo>>;
+  alertas: string[];
+  nota: string;
+};
+const ESTADO_COBERTURA: Record<FilaCobertura["estado"], [string, string]> = {
+  cubierto: ["Mínimo cubierto", "green"],
+  pendiente: ["Mínimo pendiente", "amber"],
+  sin_datos: ["Aún sin datos", "neutral"],
+};
+const NOMBRE_GRUPO = {
+  cargo: "Por cargo",
+  pais: "Por país",
+  idioma: "Por idioma",
+};
+
+export function CoberturaPersonas({
+  nombrePais,
+}: {
+  nombrePais: (codigo: string) => string;
+}) {
+  const [datos, setDatos] = useState<Cobertura | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    api<Cobertura>("/cobertura")
+      .then(setDatos)
+      .catch((e) => setError((e as Error).message));
+  }, []);
+  const pct = (g: { dias_con_minimo: number; dias_medidos: number }) =>
+    g.dias_medidos
+      ? Math.round((100 * g.dias_con_minimo) / g.dias_medidos) + " %"
+      : "—";
+  return (
+    <section className="card activity cobertura" aria-labelledby="cob-titulo">
+      <div className="section-title">
+        <h2 id="cob-titulo">
+          Cobertura por persona{" "}
+          <Ayuda etiqueta="cobertura por persona">
+            Para cada persona: cuántas vacantes recibió hoy, en cuántos de sus
+            últimos días llegó a {datos?.minimo ?? 5} y cuántas hay listas para
+            ella (con enlace comprobado y que nunca recibió). «Aún sin datos»:
+            menos de 3 búsquedas con ese perfil.
+          </Ayuda>
+        </h2>
+      </div>
+      {error && (
+        <p className="helper" role="alert">
+          No se pudo leer la cobertura: {error}
+        </p>
+      )}
+      {!datos && !error && <p className="helper">Cargando…</p>}
+      {datos && (
+        <>
+          {datos.alertas.map((a) => (
+            <p className="cobertura-alerta" role="status" key={a}>
+              {a}
+            </p>
+          ))}
+          <div className="cobertura-grupos">
+            {(["cargo", "pais", "idioma"] as const).map((k) => (
+              <div key={k}>
+                <h3>{NOMBRE_GRUPO[k]}</h3>
+                <ul>
+                  {Object.entries(datos.grupos[k] || {}).map(([n, g]) => (
+                    <li key={n}>
+                      <span>
+                        {k === "pais"
+                          ? nombrePais(n)
+                          : k === "idioma"
+                            ? n === "es"
+                              ? "Español"
+                              : "Inglés"
+                            : n}
+                      </span>
+                      <b>{pct(g)}</b>
+                      <small>
+                        {g.dias_con_minimo} de {g.dias_medidos}{" "}
+                        {g.dias_medidos === 1 ? "día" : "días"}
+                      </small>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+          <div className="tabla-cobertura">
+            <table>
+              <caption className="sr-only">
+                Cobertura de cada persona en los últimos {datos.dias_ventana}{" "}
+                días
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Persona</th>
+                  <th scope="col">Cargo</th>
+                  <th scope="col">Estado</th>
+                  <th scope="col">Hoy</th>
+                  <th scope="col">Días con {datos.minimo}</th>
+                  <th scope="col">Listas</th>
+                  <th scope="col">Por comprobar</th>
+                  <th scope="col">Por qué le faltan</th>
+                </tr>
+              </thead>
+              <tbody>
+                {datos.perfiles.map((f) => (
+                  <tr key={f.perfil_id}>
+                    <th scope="row">{f.cliente}</th>
+                    <td>{f.cargo}</td>
+                    <td>
+                      <span className={"pill " + ESTADO_COBERTURA[f.estado][1]}>
+                        {ESTADO_COBERTURA[f.estado][0]}
+                      </span>
+                    </td>
+                    <td className="num">{f.hoy}</td>
+                    <td className="num">
+                      {f.dias_medidos
+                        ? `${f.dias_con_minimo} de ${f.dias_medidos}`
+                        : "—"}
+                    </td>
+                    <td className="num">{f.listas}</td>
+                    <td className="num">{f.por_comprobar}</td>
+                    <td className="causa">{f.causa || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="helper">{datos.nota}</p>
+        </>
+      )}
+    </section>
+  );
+}

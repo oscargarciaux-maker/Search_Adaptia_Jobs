@@ -358,6 +358,23 @@ class RepositorioSupabase:
                               "select": "id,ejecucion_id,cliente_id"}, 1000)
         return Counter((r["ejecucion_id"], r["cliente_id"]) for r in filas)
 
+    def asignaciones_por_perfil(self, ejecucion_ids):
+        """Contrato v37: cuántas vacantes recibió cada perfil en cada búsqueda (solo conteos)."""
+        if not ejecucion_ids:
+            return Counter()
+        filas = self._paginas("panel_asignaciones", "id", {"ejecucion_id": "in.(" + ",".join(ejecucion_ids) + ")",
+                              "select": "id,ejecucion_id,perfil_id"}, 1000)
+        return Counter((r["ejecucion_id"], r["perfil_id"]) for r in filas)
+
+    def versiones(self, revisiones):
+        """Contrato v37: {revisión: configuración} de las versiones usadas por esas búsquedas."""
+        revisiones = sorted({int(r) for r in revisiones})
+        if not revisiones:
+            return {}
+        filas = self.pedir("GET", "panel_versiones", params={
+            "revision": "in.(" + ",".join(map(str, revisiones)) + ")", "select": "revision,configuracion"}) or []
+        return {int(f["revision"]): f["configuracion"] for f in filas}
+
     def crear_asignaciones(self, filas):
         self.pedir("POST", "panel_asignaciones", params={"on_conflict": "ejecucion_id,perfil_id,vacante_id"},
                    headers={"Prefer": "resolution=ignore-duplicates"}, json=filas)
@@ -706,6 +723,20 @@ class RepositorioDemo:
         return [actual] + [{"id": id_demo("ejecucion-" + str(n)), "fecha": (base - timedelta(days=n)).isoformat(),
                             "revision": 1, "estado": "completa", "resumen": {}} for n in range(1, dias)]
 
+    def asignaciones_por_perfil(self, ejecucion_ids):
+        """Demostración: lo de cada cliente repartido entre sus perfiles (números fijos)."""
+        cfg = Configuracion.model_validate(configuracion_demo())
+        por_cliente = self.asignaciones_por_cliente(ejecucion_ids)
+        salida = Counter()
+        for (e, cliente), n in por_cliente.items():
+            perfiles = [p for p in cfg.perfiles if str(p.cliente_id) == cliente]
+            for i, p in enumerate(perfiles):
+                salida[(e, str(p.id))] = n // len(perfiles) + (1 if i < n % len(perfiles) else 0)
+        return salida
+
+    def versiones(self, revisiones):
+        return {int(r): configuracion_demo() for r in revisiones}
+
     # Recibidas de cada cliente de ejemplo: uno bajo su meta, otro cerca y el resto completos (números fijos).
     _RITMO_DEMO = (1.0, 0.18, 0.75, 1.0, 0.9)
 
@@ -874,7 +905,8 @@ class RepositorioDemo:
                      "modalidad": azar.choice(["remoto", "remoto", "hibrido", "presencial"]),
                      "idioma": azar.choice(["es", "en", "en"]), "fecha_estimada": azar.random() < 0.1,
                      "fecha_publicacion": (base - timedelta(days=azar.randint(0, 29))).date().isoformat(),
-                     "anos_min": anos, "ingles": ""}
+                     "anos_min": anos, "ingles": "",
+                     "verificacion": {"estado": "verificada" if n % 10 < 7 else "pendiente"}}
             (vacantes if n < 900 else ya_dadas).append(ligera(datos, texto))
         self._catalogo = {"vacantes": vacantes, "entregadas_vacantes": ya_dadas,
                           "actualizado": self.creada.isoformat(timespec="minutes")}

@@ -88,8 +88,12 @@ def objetivo_mundo(cfg):
     return sorted(salida), acepta
 
 
-def preparar(version, fecha, aprendidos=None):
+def preparar(version, fecha, aprendidos=None, cortos=()):
+    """`cortos` (contrato v37): ids de perfiles que en la última búsqueda quedaron bajo el mínimo (o no recibieron
+    nada, como los nuevos). Sus lugares van primero en cada fuente y sus avisos reciben ficha primero."""
     cfg = validar_version(version)
+    cortos = {str(x) for x in cortos}
+    primero = {}
     aprendidos = aprendidos or {}
     mapa, roles = [], []
     nombres = {**{p["codigo"]: p["nombre"] for p in paises.mundo()["lista"]},
@@ -108,6 +112,11 @@ def preparar(version, fecha, aprendidos=None):
         for p in perfiles:
             lugares.update(lugares_perfil(p, nombres))
         rid = "cargo:" + str(c.id)
+        for p in perfiles:
+            if str(p.id) in cortos:
+                primero.setdefault(rid, set()).update(lugares_perfil(p, nombres))
+                primero[rid].update(p.paises_oficina)
+                primero[rid].update(x for fila in p.filas if "remoto" in fila.modalidades for x in fila.paises)
         # PR 1b: para quien solo acepta avisos en español, LinkedIn busca además los títulos en español en sus lugares.
         solo_es = [p for p in perfiles if set(p.idiomas) == {"es"}]
         consultas_es = consultas_espanol(c, raw) if solo_es else []
@@ -140,6 +149,7 @@ def preparar(version, fecha, aprendidos=None):
     motor["dias_maximos"] = ANTIGUEDAD_SISTEMA
     motor["control_dirigido"] = True
     motor["paises_objetivo_mundo"], motor["acepta_horario"] = objetivo_mundo(cfg)
+    motor["lugares_primero"] = {k: sorted(v) for k, v in primero.items()}
     motor["presupuestos"].update(linkedin_busquedas=min(300, max(24, len(roles) * 24)),
         indeed_busquedas=min(72, max(6, len(roles) * 8)), getonbrd_busquedas=min(30, len(roles) * 4),
         computrabajo_busquedas=min(90, max(12, len(roles) * 12)),
@@ -150,9 +160,10 @@ def preparar(version, fecha, aprendidos=None):
 
 
 @contextmanager
-def activar(version, fecha, aprendidos=None):
-    mapa, cfg, motor = preparar(version, fecha, aprendidos)
-    from buscador import contrato
+def activar(version, fecha, aprendidos=None, cortos=()):
+    mapa, cfg, motor = preparar(version, fecha, aprendidos, cortos)
+    from buscador import cobertura, contrato
+    cobertura.configurar_primero(motor.get("lugares_primero"))
     anterior_e, anterior_b, anterior_c = entrega._config_operativa, bodega._config_operativa, contrato._PANEL
     familias.configurar(mapa)
     entrega._config_operativa, bodega._config_operativa, contrato._PANEL = cfg, motor, True
@@ -160,7 +171,22 @@ def activar(version, fecha, aprendidos=None):
         yield cfg
     finally:
         familias.configurar()
+        cobertura.configurar_primero()
         entrega._config_operativa, bodega._config_operativa, contrato._PANEL = anterior_e, anterior_b, anterior_c
+
+
+def perfiles_cortos(repo, version, fecha):
+    """Contrato v37: perfiles activos que en la última búsqueda registrada (hoy o antes) quedaron bajo el mínimo.
+    Un perfil nuevo no tiene asignaciones y cuenta como corto. Si no se puede leer, ninguno (todo como antes)."""
+    try:
+        cfg = validar_version(version)
+        ids = [str(p.id) for p in cfg.perfiles if p.activo]
+        ultimas = [e for e in (repo.ejecuciones() or []) if str(e.get("fecha", "")) <= fecha]
+        conteo = repo.conteo_asignaciones(ultimas[0]["id"], ids) if ultimas else Counter()
+        return {i for i in ids if conteo.get(i, 0) < MINIMO_POR_PERFIL}
+    except Exception as e:  # noqa: BLE001 — sin este dato la búsqueda reparte como siempre
+        registro.aviso("ejecutor:cortos", e)
+        return set()
 
 
 def iniciar(repo, version, fecha):
@@ -510,7 +536,7 @@ def correr(salida, modo="diario", prueba=False, repo=None):
                 aprendidos = repo.ajuste("titulos_aprendidos", {}) or {}
             except Exception:  # noqa: BLE001 — sin ellos la búsqueda sigue igual
                 aprendidos = {}
-        with activar(version, fecha, aprendidos):
+        with activar(version, fecha, aprendidos, perfiles_cortos(repo, version, fecha)):
             if hasattr(repo, "decisiones_ubicacion"):
                 try:  # contrato v17: cada decisión de la bandeja vale en esta búsqueda
                     from panel.revision import decisiones_para_busqueda
