@@ -85,7 +85,6 @@ def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=20, pres
     token = token or os.environ.get("APIFY_TOKEN", "")
     if not token or not actor:
         return [], {"omitida": "sin APIFY_TOKEN o sin actor en datos/config.yaml"}
-    from datetime import datetime
     inicio = reloj()
     control_gasto = control_gasto or Presupuesto({}, hoy)
     # `ordenar=False`: el rescate ya las trae en orden de urgencia (perfiles con más déficit primero).
@@ -99,7 +98,7 @@ def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=20, pres
         terminos = cobertura.rotar(consultas, hoy, 4)
         clave = f"{familia}@{lugar}"
         ultima = estado.get(cobertura.clave_consulta(clave, terminos))
-        dias = max_dias if not ultima else min(max_dias, max(1, (datetime.fromisoformat(hoy) - datetime.fromisoformat(ultima)).days + 1))
+        dias = cobertura.dias_busqueda(clave, ultima, hoy, max_dias)  # completo si la vez anterior no dejó nada útil
         # Validar el adaptador antes de reservar dinero.
         cuerpo = entrada(actor, terminos, params, dias, max_por_busqueda)
         cargo = control_gasto.reservar(tope_consulta_usd)

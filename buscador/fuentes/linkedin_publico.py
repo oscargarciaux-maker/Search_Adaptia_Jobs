@@ -112,7 +112,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
         terminos = cobertura.rotar(consultas, hoy, 4, desfase=desfase_terminos)
         clave_terminos = cobertura.clave_consulta(clave, terminos)
         ultima = estado.get(clave_terminos)
-        dias = max_dias if not ultima else min(max_dias, max(1, (datetime.fromisoformat(hoy) - datetime.fromisoformat(ultima)).days + 1))
+        dias = cobertura.dias_busqueda(clave, ultima, hoy, max_dias)  # completo si la vez anterior no dejó nada útil
         for pagina in range(max_paginas):
             if hechas >= presupuesto or (limite_busqueda is not None and reloj() - inicio >= limite_busqueda):
                 break

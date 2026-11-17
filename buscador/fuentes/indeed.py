@@ -82,7 +82,7 @@ def buscar(mapa, paises_activos, estado, presupuesto, hoy=None, max_dias=30, por
         clave = f"{familia}@{lugar}"
         clave_terminos = cobertura.clave_consulta(clave, [consulta])
         ultima = estado.get(clave_terminos)
-        dias = max_dias if not ultima else min(max_dias, max(1, (datetime.fromisoformat(hoy) - datetime.fromisoformat(ultima)).days + 1))
+        dias = cobertura.dias_busqueda(clave, ultima, hoy, max_dias)  # completo si la vez anterior no dejó nada útil
         hechas += 1
         por_familia[familia] = por_familia.get(familia, 0) + 1
         por_pais[lugar] = por_pais.get(lugar, 0) + 1

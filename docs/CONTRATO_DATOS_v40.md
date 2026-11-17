@@ -73,6 +73,11 @@ cualquier persona el sistema lo lea».
 - En modo panel ahora se conservan si sirven a algún perfil (`_sirve_a_perfiles`); en modo heredado se archivan como
   siempre. La entrega ya las aceptaba desde v24 (`contrato.entregable` con `paises_mundo`).
 
+- **Ventana de días al repetir una búsqueda** (`cobertura.dias_busqueda`, en LinkedIn, Indeed y Apify): una búsqueda
+  repetida pide solo lo publicado desde la vez anterior; pero si esa vez no dejó nada útil (`ceros` en el rendimiento),
+  pide los 30 días completos.
+  - **Por qué:** lo que se perdió por la regla anterior vuelve a entrar. Si no, Chicago solo pedía el último día.
+
 ## 6. Comprobación final (`buscador/validacion.py`, 17 nov)
 - Una vacante elegida hoy que después cerró, o salió del inventario, ya no se comparte (su enlace queda rechazado).
   Ahora es un **aviso**, no una falla; antes salía como «fuera del perfil».
