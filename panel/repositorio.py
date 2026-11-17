@@ -45,6 +45,9 @@ def _mensaje_sql(mensaje):
     return mensaje[:240] or "No se pudo confirmar la operación. Vuelve a intentarlo."
 
 
+INACTIVIDAD_MAXIMA = 120  # segundos; la red de GitHub corta en silencio las conexiones quietas unos minutos
+
+
 class RepositorioSupabase:
     def __init__(self, sesion=None):
         self.url, clave = supabase.credenciales()
@@ -55,10 +58,29 @@ class RepositorioSupabase:
         if clave.startswith("eyJ"):
             self.cabeceras["Authorization"] = "Bearer " + clave
         self._catalogo, self._lock_catalogo, self._lock_carga, self._refrescando = None, Lock(), Lock(), False
+        self._ultimo_uso = time.monotonic()
+
+    def _conexion_fresca(self):
+        """17 nov: la búsqueda deja la conexión quieta casi una hora y la red la corta sin avisar; la siguiente consulta
+        se quedaba colgada hasta el límite. Tras más de INACTIVIDAD_MAXIMA s quieta, se abre una conexión nueva."""
+        if time.monotonic() - getattr(self, "_ultimo_uso", time.monotonic()) > INACTIVIDAD_MAXIMA and \
+                hasattr(self.sesion, "close"):
+            self.sesion.close()  # vacía las conexiones guardadas; la sesión sigue sirviendo
+        self._ultimo_uso = time.monotonic()
 
     def pedir(self, metodo, ruta, **op):
+        cabeceras = {**self.cabeceras, **(op.pop("headers", None) or {})}
+        self._conexion_fresca()
         try:
-            r = self.sesion.request(metodo, self.url + "/rest/v1/" + ruta, headers={**self.cabeceras, **(op.pop("headers", None) or {})}, timeout=45, **op)
+            try:
+                r = self.sesion.request(metodo, self.url + "/rest/v1/" + ruta, headers=cabeceras, timeout=(10, 45), **op)
+            except (requests.ConnectionError, requests.Timeout) as e:
+                if metodo != "GET":
+                    raise  # una escritura no se repite sola: podría duplicarse
+                registro.aviso("repositorio:reintento", e)
+                if hasattr(self.sesion, "close"):
+                    self.sesion.close()
+                r = self.sesion.request(metodo, self.url + "/rest/v1/" + ruta, headers=cabeceras, timeout=(10, 45), **op)
             if r.status_code == 409 or r.status_code == 500 and r.json().get("code") == "40001":
                 raise ErrorRepositorio("La configuración cambió en otra ventana. Recarga antes de guardar.", 409)
             if not 200 <= r.status_code < 300:
@@ -225,6 +247,7 @@ class RepositorioSupabase:
 
     def contar(self, tabla, params):
         """Cuántas filas cumplen el filtro (cabecera Content-Range con count=exact); None si no se pudo contar."""
+        self._conexion_fresca()
         try:
             r = self.sesion.get(self.url + "/rest/v1/" + tabla, params={**params, "select": "id", "limit": 1},
                                 headers={**self.cabeceras, "Prefer": "count=exact"}, timeout=45)
