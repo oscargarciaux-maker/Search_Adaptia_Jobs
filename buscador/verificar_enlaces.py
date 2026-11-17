@@ -74,7 +74,9 @@ def sin_comprobacion_directa(url):
 
 def incorporar(vacantes, cache, fichas):
     """Contrato v39: las fichas de LinkedIn que la búsqueda ya leyó hoy valen como comprobación (abierta o cerrada) del
-    enlace, sin volver a preguntar. Solo reemplaza una comprobación más antigua. Devuelve cuántas incorporó."""
+    enlace, sin volver a preguntar. Contrato v41: también los avisos que la búsqueda de Indeed mostró hoy (Indeed solo
+    lista avisos activos y responde 401 a cualquier comprobación directa). Solo reemplaza una comprobación más
+    antigua. Devuelve cuántas incorporó."""
     n = 0
     for v in vacantes:
         for u in urls(v):
@@ -84,7 +86,7 @@ def incorporar(vacantes, cache, fichas):
             anterior = cache.get(u) or {}
             if anterior.get("_titulo") == v["titulo"] and (anterior.get("comprobada_en") or "") >= leida["comprobada_en"]:
                 continue
-            cache[u] = {"url": u, "destino": LINKEDIN_FICHA + aviso_linkedin(u), "estado": leida["estado"],
+            cache[u] = {"url": u, "destino": leida.get("destino") or LINKEDIN_FICHA + aviso_linkedin(u), "estado": leida["estado"],
                         "motivo": leida["motivo"], "comprobada_en": leida["comprobada_en"], "http": 200, "saltos": 0,
                         "ruta": [u], "_titulo": v["titulo"]}
             n += 1
@@ -302,11 +304,16 @@ def auditar(vacantes, cache, *, maximo=240, segundos=240, hilos=6, comprobar_url
     comprobar_url = comprobar_url or comprobar
     plazo = time.monotonic() + segundos
     escogidas, peticiones = [], {}
+    # Contrato v41: LinkedIn va de una en una con pausa; no se le asignan más enlaces de los que alcanza en el tiempo, y
+    # el resto del cupo queda para los demás sitios (antes Computrabajo y Get on Board casi nunca tenían turno).
+    cupo_linkedin, de_linkedin = int(segundos / max(PAUSA_LINKEDIN, 0.5)) + 1, 0
     for v in vacantes:
         pendientes = [u for u in urls(v) if not vigente(cache.get(u, {}), v["titulo"], ahora, vigencia)
                       and not sin_comprobacion_directa(u)]
-        if pendientes and len(escogidas) < maximo:
+        es_linkedin = bool(pendientes) and all(aviso_linkedin(u) for u in pendientes)
+        if pendientes and len(escogidas) < maximo and not (es_linkedin and de_linkedin >= cupo_linkedin):
             escogidas.append(v)
+            de_linkedin += es_linkedin
             for u in pendientes:
                 peticiones.setdefault((u, v["titulo"]), None)
     # Contrato v39: LinkedIn de una en una y con pausa; tras varios bloqueos seguidos deja el tiempo a los demás sitios.
@@ -334,8 +341,10 @@ def auditar(vacantes, cache, *, maximo=240, segundos=240, hilos=6, comprobar_url
             return r
         finally:
             semaforo.release()
-    with ThreadPoolExecutor(hilos) as ex:
-        futuros = {ex.submit(tarea, clave): clave for clave in peticiones}
+    # Contrato v41: LinkedIn en su propia fila (un hilo) y los demás sitios con todos los hilos; antes las de LinkedIn
+    # ocupaban los hilos esperando su turno y los demás sitios casi no avanzaban.
+    with ThreadPoolExecutor(1) as solo_linkedin, ThreadPoolExecutor(hilos) as ex:
+        futuros = {(solo_linkedin if aviso_linkedin(clave[0]) else ex).submit(tarea, clave): clave for clave in peticiones}
         for futuro in as_completed(futuros):
             u, titulo = futuros[futuro]
             try:
@@ -421,6 +430,8 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
             inicio = hora * maximo % len(recientes) if recientes else 0
             candidatas += recientes[:maximo // 2] + recientes[inicio:] + recientes[:inicio]
         grupo = list({v["id"]: v for v in candidatas if v["id"] not in revisadas}.values())
+        from buscador import cobertura  # contrato v41: primero lo que le sirve a quien va corto (o es nuevo)
+        grupo.sort(key=lambda v: not cobertura.sirve_a_corta(v))
         if not grupo:
             break
         n = auditar(grupo, cache, maximo=maximo - revisadas_n, segundos=max(0, plazo - time.monotonic()))

@@ -418,6 +418,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     # Contrato v39: las fichas de LinkedIn leídas en esta búsqueda ya comprueban sus enlaces (abiertas o cerradas).
     from buscador.fuentes import linkedin_publico
     fichas_incorporadas = verificar_enlaces.incorporar(vacantes, cache_enlaces, linkedin_publico.FICHAS)
+    indeed_incorporadas = verificar_enlaces.incorporar(vacantes, cache_enlaces, indeed.VISTAS)  # contrato v41
     entregadas_revision = _leer_json(trabajo / "entregadas.json", {})
     entregadas_revision.update(memoria_db)
     cfg_revision = dict(cfg.get("verificacion_enlaces", {}))
@@ -619,6 +620,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         resumen_revision["seleccion_del_dia"] = verificar_enlaces.resumen(actuales)
     resumen_revision["rechazos_en_corrida"] = {m: n for m, n in descartes.items() if m in verificar_enlaces.RECHAZOS}
     resumen_revision["fichas_linkedin_incorporadas"] = fichas_incorporadas
+    resumen_revision["vistas_indeed_incorporadas"] = indeed_incorporadas
     seleccion_actual = {"fecha": lote_actual.get("fecha"), "roles": {}}
     por_id_vigente = {v["id"]: v for v in vacantes}
     estados_catalogo = {v["id"]: estado for v, estado, _ in retiradas}
