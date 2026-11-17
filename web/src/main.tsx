@@ -60,6 +60,7 @@ import {
   Plegable,
   REGIONES,
   fecha,
+  fijarLugares,
   fijarMundo,
   modos,
   nombrePais,
@@ -1509,6 +1510,7 @@ function App() {
     try {
       const s = await api<Sesion>("/session");
       fijarMundo(s.paises_mundo || []);
+      fijarLugares(s.ciudades_por_pais, s.utc_paises);
       setSesion(s);
       if (s.sesion) {
         cargarContactos();

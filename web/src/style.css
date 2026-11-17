@@ -5268,3 +5268,38 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* PR 3 de la sesión de prueba: el «0» explicado. */
+.preview-cero {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+/* Nombres afines sugeridos: fichas que se añaden con un clic. */
+.sugeridos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+.sugeridos-titulo {
+  font-size: 12px;
+  color: var(--muted);
+}
+.chip-sugerido {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px dashed var(--osc-line-azul, #c5d3e8);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.chip-sugerido:hover {
+  border-style: solid;
+  border-color: var(--marca, #0b6bcb);
+}

@@ -10,6 +10,8 @@ import {
   nombrePais,
   SelectorPaises,
   TagInput,
+  ciudadesDe,
+  utcDe,
 } from "../comunes";
 import type {
   Restriccion,
@@ -119,6 +121,18 @@ export function PreviewPerfil({
           </span>
         </span>
       </p>
+      {mes === 0 && (
+        // Sesión de prueba (17 nov): un 0 asustaba («¿escribí mal Bogotá?»). Se dice por qué y qué hacer.
+        <p className="preview-cero">
+          No es un error de escritura: las tildes y las mayúsculas no importan.{" "}
+          {info.del_cargo === 0
+            ? "Aún no hay vacantes guardadas de este cargo: o es nuevo y la próxima búsqueda lo incluye, o se busca con pocos nombres (en «Cargos y metas», «Buscar denominaciones afines» suma más)."
+            : `Hay ${info.del_cargo} vacantes del cargo, pero ninguna acepta su ubicación o su idioma.` +
+              (info.limitantes.length
+                ? " Abajo, lo que más sumaría:"
+                : " Prueba con otra modalidad u otra ciudad.")}
+        </p>
+      )}
       {info.limitantes.length > 0 && (
         <ul className="preview-tips">
           {info.limitantes.slice(0, 2).map((l) => (
@@ -901,18 +915,10 @@ export function ClienteDialog({
                       después, con su etiqueta.
                     </Ayuda>
                   </span>
-                  <input
+                  {/* Sesión de prueba (17 nov): una lista con sus límites, en vez de escribir el número. */}
+                  <select
                     id={"anos-" + p.id}
                     aria-label={"Años de experiencia del perfil " + (i + 1)}
-                    type="number"
-                    min={0}
-                    max={40}
-                    placeholder={
-                      p.experiencia_anos == null &&
-                      (p.experiencia_min !== null || p.experiencia_max !== null)
-                        ? `Hoy: ${p.experiencia_min ?? 0}–${p.experiencia_max ?? 40} años`
-                        : "Sin filtro"
-                    }
                     value={p.experiencia_anos ?? ""}
                     onChange={(e) => {
                       // Contratos v20 y v22: de N años menos a N más (el servidor hace la misma cuenta).
@@ -928,7 +934,23 @@ export function ClienteDialog({
                           n === null ? null : Math.min(40, n + m),
                       });
                     }}
-                  />
+                  >
+                    <option value="">
+                      {p.experiencia_anos == null &&
+                      (p.experiencia_min !== null || p.experiencia_max !== null)
+                        ? `Como hoy: ${p.experiencia_min ?? 0}–${p.experiencia_max ?? 40} años`
+                        : "Sin filtro"}
+                    </option>
+                    <option value={0}>Sin experiencia</option>
+                    {Array.from(
+                      { length: Math.max(20, p.experiencia_anos ?? 0) },
+                      (_, k) => k + 1,
+                    ).map((n) => (
+                      <option key={n} value={n}>
+                        {n} {n === 1 ? "año" : "años"}
+                      </option>
+                    ))}
+                  </select>
                   <select
                     className="margen"
                     aria-label={"Margen de años del perfil " + (i + 1)}
@@ -1148,10 +1170,27 @@ const ANTIGUAS: Record<string, string> = {
   us_pacifico: "UTC-8",
   europa: "UTC+1",
 };
-const nombreZona = (z: string) => {
+const nombreZona = (z: string, vive?: number | null) => {
   const c = ZONAS.find(([v]) => v === z)?.[1];
-  return c ? `${z.replace("-", "−")} · ${c}` : z.replace("-", "−");
+  const base = c ? `${z.replace("-", "−")} · ${c}` : z.replace("-", "−");
+  return vive == null ? base : `${base} (${diferencia(z, vive)})`;
 };
+// Sesión de prueba (17 nov): la zona dicha respecto a donde vive («2 h menos que donde vive»).
+function horasDe(z: string) {
+  const m = /^UTC([+-])(\d{1,2})(?::(\d{2}))?$/.exec(z);
+  if (!m) return 0;
+  const h = Number(m[2]) + Number(m[3] || 0) / 60;
+  return m[1] === "-" ? -h : h;
+}
+function diferencia(z: string, vive: number) {
+  const d = horasDe(z) - vive;
+  if (d === 0) return "misma hora que donde vive";
+  const n = Math.abs(d);
+  const t = Number.isInteger(n)
+    ? `${n} h`
+    : `${Math.floor(n)} h ${Math.round((n % 1) * 60)} min`;
+  return `${t} ${d > 0 ? "más" : "menos"} que donde vive`;
+}
 
 function ZonasHorarias({
   p,
@@ -1166,6 +1205,7 @@ function ZonasHorarias({
     ...new Set((p.acepta_horario || []).map((z) => ANTIGUAS[z] || z)),
   ];
   const guardar = (v: string[]) => patch(p.id, { acepta_horario: v });
+  const vive = utcDe(p.vive_en);
   return (
     <div className="zonas-horarias">
       <span className="etiqueta-ayuda">
@@ -1185,7 +1225,7 @@ function ZonasHorarias({
       >
         {zonas.map((z) => (
           <span className="chip-zona" key={z}>
-            {nombreZona(z)}
+            {nombreZona(z, vive)}
             <button
               type="button"
               className="icon"
@@ -1207,7 +1247,7 @@ function ZonasHorarias({
             <option value="">＋ Añadir zona…</option>
             {ZONAS.filter(([v]) => !zonas.includes(v)).map(([v]) => (
               <option key={v} value={v}>
-                {nombreZona(v)}
+                {nombreZona(v, vive)}
               </option>
             ))}
           </select>
@@ -1251,13 +1291,7 @@ function UbicacionesPerfil({
           <span className="ubicacion-titulo">
             {n === 0 ? "¿Dónde vive?" : "Ubicación " + (n + 1)}
           </span>
-          <TagInput
-            visible="Ciudades"
-            label={`Ciudades de la ubicación ${n + 1}, perfil ${i + 1}`}
-            placeholder="Ej.: Bogotá (opcional)"
-            values={f.ciudades}
-            onChange={(v) => cambiar(n, { ciudades: v })}
-          />
+          {/* Sesión de prueba (17 nov): primero el país; después la ciudad, con sugerencias de ese país. */}
           <SelectorPaises
             visible="Países"
             etiqueta={`Países de la ubicación ${n + 1}, perfil ${i + 1}`}
@@ -1265,6 +1299,18 @@ function UbicacionesPerfil({
             valores={f.paises}
             onChange={(v) => cambiar(n, { paises: v })}
             extra={n === 0 ? [] : REGIONES}
+          />
+          <TagInput
+            visible="Ciudades"
+            label={`Ciudades de la ubicación ${n + 1}, perfil ${i + 1}`}
+            placeholder={
+              f.paises.length
+                ? "Elige o escribe una ciudad (opcional)"
+                : "Primero elige el país (opcional)"
+            }
+            values={f.ciudades}
+            onChange={(v) => cambiar(n, { ciudades: v })}
+            sugerencias={ciudadesDe(f.paises)}
           />
           <div
             className="ubicacion-modos"

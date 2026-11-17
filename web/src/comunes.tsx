@@ -153,6 +153,20 @@ export function fijarMundo(lista: { codigo: string; nombre: string }[]) {
   MUNDO = lista;
 }
 export const paisesMundo = () => MUNDO;
+// PR 3 de la sesión de prueba (17 nov): ciudades principales por país y la hora de cada país (llegan con la sesión).
+let CIUDADES: Record<string, string[]> = {};
+let UTC: Record<string, number> = {};
+export function fijarLugares(
+  ciudades: Record<string, string[]> = {},
+  utc: Record<string, number> = {},
+) {
+  CIUDADES = ciudades;
+  UTC = utc;
+}
+export const ciudadesDe = (paises: string[]) =>
+  Array.from(new Set(paises.flatMap((p) => CIUDADES[p] || [])));
+export const utcDe = (pais: string) =>
+  pais in UTC ? UTC[pais] : (null as number | null);
 export const nombrePais = (codigo: string) =>
   MUNDO.find((p) => p.codigo === codigo)?.nombre || codigo;
 export const sinTildes = (t: string) =>
@@ -306,12 +320,15 @@ export function TagInput({
   onChange,
   visible,
   placeholder = "Añade un término y pulsa Enter",
+  sugerencias = [],
 }: {
   label: string;
   values: string[];
   onChange: (v: string[]) => void;
   visible?: string;
   placeholder?: string;
+  // Opciones que aparecen al escribir; elegir una la añade sin pulsar Enter.
+  sugerencias?: string[];
 }) {
   const id = useId();
   const [text, setText] = useState("");
@@ -350,7 +367,22 @@ export function TagInput({
           aria-label={label}
           placeholder={placeholder}
           value={text}
+          list={sugerencias.length ? id + "-sugerencias" : undefined}
           onChange={(e) => {
+            const elegida = sugerencias.find(
+              (x) => x.toLowerCase() === e.target.value.trim().toLowerCase(),
+            );
+            // Elegir de la lista (no escribir letra a letra) la añade de una vez.
+            const ev = e.nativeEvent as InputEvent;
+            if (
+              elegida &&
+              (!(ev instanceof InputEvent) ||
+                ev.inputType === "insertReplacementText")
+            ) {
+              sumar([elegida]);
+              setText("");
+              return;
+            }
             const partes = e.target.value.split(SEPARADORES);
             if (partes.length > 1) {
               // Lo que va antes de la última coma ya es un término; lo último sigue escribiéndose.
@@ -366,6 +398,17 @@ export function TagInput({
           }}
           onBlur={add}
         />
+        {sugerencias.length > 0 && (
+          <datalist id={id + "-sugerencias"}>
+            {sugerencias
+              .filter(
+                (x) => !values.some((v) => v.toLowerCase() === x.toLowerCase()),
+              )
+              .map((x) => (
+                <option key={x} value={x} />
+              ))}
+          </datalist>
+        )}
       </div>
     </div>
   );

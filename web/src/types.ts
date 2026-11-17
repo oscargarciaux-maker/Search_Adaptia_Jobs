@@ -127,6 +127,8 @@ export type Sesion = {
   sesion: boolean;
   paises: { codigo: string; nombre: string }[];
   paises_mundo?: { codigo: string; nombre: string }[];
+  ciudades_por_pais?: Record<string, string[]>;
+  utc_paises?: Record<string, number>;
   // Contrato v30: prefijo telefónico → país, para mostrar la bandera del WhatsApp.
   prefijos?: Record<string, string>;
 };

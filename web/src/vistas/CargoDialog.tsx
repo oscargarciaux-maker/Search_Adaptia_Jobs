@@ -1,6 +1,13 @@
 // Crear o editar un cargo (nombres, funciones y opciones avanzadas).
 import React, { useState } from "react";
-import { Check, Compass, Loader2, Sparkles, Workflow } from "lucide-react";
+import {
+  Check,
+  Compass,
+  Loader2,
+  Plus,
+  Sparkles,
+  Workflow,
+} from "lucide-react";
 import { api } from "../api";
 import { Ayuda, Plegable, Dialog, TagInput } from "../comunes";
 import type { Cargo } from "../types";
@@ -32,6 +39,16 @@ export function CargoDialog({
         },
   );
   const [busy, setBusy] = useState(false);
+  const [sugeridos, setSugeridos] = useState<string[]>([]);
+  function anadir(terminos: string[]) {
+    setC((v) => ({
+      ...v,
+      terminos_similares: Array.from(
+        new Set([...v.terminos_similares, ...terminos]),
+      ),
+    }));
+    setSugeridos((s) => s.filter((x) => !terminos.includes(x)));
+  }
   const [nota, setNota] = useState("");
   async function expandir() {
     setBusy(true);
@@ -46,14 +63,25 @@ export function CargoDialog({
         method: "POST",
         body: JSON.stringify({ cargo: c.nombre }),
       });
+      // Sesión de prueba (17 nov): los nombres principales entran solos; los afines quedan como fichas para
+      // añadir con un clic (antes entraban todos y había que quitar los que no servían).
+      const ya = new Set(
+        [...c.terminos_exactos, ...c.terminos_similares].map((x) =>
+          x.toLowerCase(),
+        ),
+      );
       setC((v) => ({
         ...v,
-        terminos_exactos: r.terminos_exactos,
-        terminos_similares: r.terminos_similares,
+        terminos_exactos: Array.from(
+          new Set([...v.terminos_exactos, ...r.terminos_exactos]),
+        ),
         terminos_cercanos: r.terminos_cercanos?.length
           ? r.terminos_cercanos
           : v.terminos_cercanos || [],
       }));
+      setSugeridos(
+        r.terminos_similares.filter((x) => !ya.has(x.toLowerCase())),
+      );
       setNota(
         r.fuentes.join(" · ") +
           (r.requiere_revision
@@ -173,6 +201,36 @@ export function CargoDialog({
               });
             }}
           />
+          {sugeridos.length > 0 && (
+            <div
+              className="sugeridos"
+              role="group"
+              aria-label="Nombres sugeridos"
+            >
+              <span className="sugeridos-titulo">
+                Sugeridos (toca para añadir):
+              </span>
+              {sugeridos.map((t) => (
+                <button
+                  type="button"
+                  className="chip-sugerido"
+                  key={t}
+                  aria-label={"Añadir " + t}
+                  onClick={() => anadir([t])}
+                >
+                  <Plus size={12} />
+                  {t}
+                </button>
+              ))}
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => anadir(sugeridos)}
+              >
+                Añadir todas
+              </button>
+            </div>
+          )}
           <p className="helper">
             Todas las formas en que las empresas llaman a este cargo, en español
             o inglés. Escríbelas una a una con Enter o pégalas separadas por

@@ -42,6 +42,11 @@ en dos paneles: a la izquierda sus últimos 7 días, sus perfiles, lo que más c
 sus vacantes» y «Descargar su CSV de hoy»; a la derecha sus «por confirmar» para decidir ahí mismo («Sí, sirve» usa
 el país sugerido; si no hay sugerencia, «Elegir país en Por confirmar»).
 
+**Formulario más fácil (17 nov).** En «¿Dónde trabajaría?» elige primero el país; al escribir la ciudad verás
+sugerencias de ese país. Las zonas horarias dicen cuántas horas de diferencia hay con donde vive. Los años de
+experiencia se eligen de una lista. Al crear un cargo, «Buscar denominaciones afines» muestra fichas: toca las que
+sirvan, o «Añadir todas».
+
 **Tu día en el Resumen (17 nov).** Arriba están los 3 pasos de cada mañana: 1) revisa las dudosas en «Por confirmar»,
 2) envía los mensajes y 3) ajusta clientes y cargos solo cuando haga falta. El paso que tiene algo pendiente se ve
 resaltado. «Cupo diario» es el máximo de vacantes al día entre todos (antes «Techo del día») e «Historial» es lo que
