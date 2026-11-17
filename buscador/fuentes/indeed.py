@@ -30,8 +30,10 @@ VISTAS = {}
 
 def _anotar_vista(*enlaces_aviso):
     hora = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    from buscador import verificar_enlaces
     for enlace in enlaces_aviso:
-        if enlace:
+        # Solo páginas de Indeed (por el dominio real, no por el texto): el enlace de la empresa se comprueba como siempre.
+        if enlace and verificar_enlaces.sin_comprobacion_directa(enlace):
             VISTAS[enlace] = {"estado": "verificada", "motivo": "vista hoy en la búsqueda de Indeed",
                               "comprobada_en": hora, "destino": enlace}
 
@@ -115,8 +117,7 @@ def buscar(mapa, paises_activos, estado, presupuesto, hoy=None, max_dias=30, por
         estado[clave_terminos] = hoy
         for r in df.to_dict("records"):
             fecha = r.get("date_posted")
-            _anotar_vista(_limpio(r.get("job_url")),
-                          *([_limpio(r.get("job_url_direct"))] if "indeed." in _limpio(r.get("job_url_direct")) else []))
+            _anotar_vista(_limpio(r.get("job_url")), _limpio(r.get("job_url_direct")))
             crudas.append({
                 "titulo": _limpio(r.get("title")), "empresa": _limpio(r.get("company")),
                 "ubicacion": ubicacion(r.get("location"), pais),

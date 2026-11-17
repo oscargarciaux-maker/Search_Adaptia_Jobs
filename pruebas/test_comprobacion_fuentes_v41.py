@@ -29,6 +29,15 @@ def test_indeed_visto_hoy_en_su_busqueda_cuenta_como_comprobado():
     indeed.VISTAS.clear()
 
 
+def test_solo_cuenta_el_dominio_real_de_indeed():
+    indeed.VISTAS.clear()
+    indeed._anotar_vista("https://co.indeed.com/viewjob?jk=1", "https://indeed.empresa-falsa.com/x",
+                         "https://notindeed.com/x", "https://jobs.lever.co/acme/1")
+    assert list(indeed.VISTAS) == ["https://co.indeed.com/viewjob?jk=1"]
+    assert ve.sin_comprobacion_directa("https://indeed.com/x") and not ve.sin_comprobacion_directa("https://notindeed.com/x")
+    indeed.VISTAS.clear()
+
+
 def test_las_otras_fuentes_avanzan_aunque_linkedin_vaya_lento(monkeypatch):
     monkeypatch.setattr(ve, "PAUSA_LINKEDIN", 0)
     lentas = [_v(f"https://www.linkedin.com/jobs/view/{n}") for n in range(20)]

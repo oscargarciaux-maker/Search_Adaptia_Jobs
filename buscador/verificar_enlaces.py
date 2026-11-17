@@ -69,7 +69,10 @@ def ficha_linkedin(html, titulo):
 
 
 def sin_comprobacion_directa(url):
-    return enlaces.host(url).endswith(SIN_COMPROBACION_DIRECTA)
+    """Dominio de Indeed o un subdominio suyo («co.indeed.com»); nunca un dominio que solo lo contiene o termina igual
+    («notindeed.com», «indeed.com.otro.net»)."""
+    h = enlaces.host(url)
+    return any(h == d or h.endswith("." + d) for d in SIN_COMPROBACION_DIRECTA)
 
 
 def incorporar(vacantes, cache, fichas):
