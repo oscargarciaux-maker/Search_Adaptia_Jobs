@@ -38,7 +38,8 @@ def test_ubicaciones_de_eeuu_como_las_muestra_linkedin(ubicacion):
     assert paises.alcance("", ubicacion)["paises_mundo"] == ["US"]
 
 
-@pytest.mark.parametrize("ubicacion,esperado", [("Denver, CO", []), ("Bogotá, CO", ["CO"]),
+# Contrato v38: «Denver, CO» es Colorado: Denver es una ciudad de EE. UU. (antes quedaba sin país).
+@pytest.mark.parametrize("ubicacion,esperado", [("Denver, CO", ["US"]), ("Bogotá, CO", ["CO"]),
                                                 ("Zona Centro, Baja California, México", ["MX"])])
 def test_sin_falsos_eeuu(ubicacion, esperado):
     """CO/AR/PA también son países cubiertos (v15) y «Baja California» es México."""

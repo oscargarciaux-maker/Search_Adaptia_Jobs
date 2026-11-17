@@ -243,9 +243,30 @@ def horario_compatible(v, p):
 
 
 def en_sus_ciudades(v, ciudades):
-    """Contrato v24: la ubicación del aviso nombra una de las ciudades donde trabajaría (la ciudad implica el país)."""
+    """Contrato v24: la ubicación del aviso nombra una de las ciudades donde trabajaría (la ciudad implica el país).
+    Contrato v38: o queda a 50 km o menos de una de ellas («Brooklyn, NY» para quien trabajaría en New York)."""
     ubicacion = normalizar.texto(v.get("ubicacion") or "")
-    return bool(ubicacion) and any(normalizar.contiene_frase(ubicacion, normalizar.texto(c)) for c in ciudades)
+    if not ubicacion:
+        return False
+    return any(normalizar.contiene_frase(ubicacion, normalizar.texto(c)) for c in ciudades) or _cerca(v, ciudades)
+
+
+def _cerca(v, ciudades):
+    """Contrato v38: la ciudad del aviso está en los alrededores de alguna ciudad del perfil (GeoNames, sin IA)."""
+    limpia = re.sub(r"\s*\(.*?\)", "", v.get("ubicacion") or "")
+    codigos = tuple(sorted(set(v.get("paises") or []) | set(v.get("paises_mundo") or [])))
+    ciudad = contrato._ciudad(limpia, codigos[0] if len(codigos) == 1 else "")
+    if not ciudad:
+        return False
+    estado = paises.estado_eeuu(limpia)
+    for c in ciudades:
+        # La ciudad del perfil se ubica primero en su país («Madrid» es España, no el Madrid de Cundinamarca).
+        suyo = paises.pais_de_lugar(c)
+        if suyo and codigos and suyo not in codigos:
+            continue
+        if paises.cerca(ciudad, c, (suyo,) if suyo else codigos, estado):
+            return True
+    return False
 
 
 def otra_ciudad(v, ciudades):
@@ -253,8 +274,8 @@ def otra_ciudad(v, ciudades):
     ubicacion = normalizar.texto(v.get("ubicacion") or "")
     if not ubicacion:
         return False
-    if any(normalizar.contiene_frase(ubicacion, normalizar.texto(c)) for c in ciudades):
-        return False
+    if any(normalizar.contiene_frase(ubicacion, normalizar.texto(c)) for c in ciudades) or _cerca(v, ciudades):
+        return False  # contrato v38: los alrededores de su ciudad («Jersey City» para New York) no son otra ciudad
     limpia = re.sub(r"\s*\(.*?\)", "", v.get("ubicacion") or "")
     codigo = next(iter(v.get("paises") or v.get("paises_mundo") or []), "")
     ciudad = normalizar.texto(contrato._ciudad(limpia, codigo) or "")

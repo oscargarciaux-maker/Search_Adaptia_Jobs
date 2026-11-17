@@ -52,6 +52,12 @@ sirvan, o «Añadir todas».
 resaltado. «Cupo diario» es el máximo de vacantes al día entre todos (antes «Techo del día») e «Historial» es lo que
 antes se llamaba «Actividad».
 
+**Ciudades de todo el mundo (17 nov, contrato v38).** Una vacante en «Chicago», «Toronto» o «New York, NY 10001»
+cuenta como de EE. UU. o Canadá aunque el aviso no lo diga. Si en «¿Dónde trabajaría?» pones una ciudad, también
+llegan las de sus alrededores (hasta 50 km). Los nombres que existen en varios países sin una ciudad claramente más
+grande («Cambridge», «Richmond») no se adivinan. Para un apodo que falte (como «NYC»), añádelo en
+`datos/alias_lugares.yaml`.
+
 **Cobertura por persona (17 nov, contrato v37).** En Actividad verás, para cada persona, si hoy llegó a 5, en
 cuántos de sus últimos días lo logró, cuántas vacantes tiene listas y por qué le faltan. «Aún sin datos» quiere decir
 que todavía hay pocas búsquedas con ese perfil. Quien queda corto tiene turno primero en la búsqueda siguiente. Si un
