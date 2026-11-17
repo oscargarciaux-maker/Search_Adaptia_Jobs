@@ -17,8 +17,8 @@ hora_bodega_bogota: "06:30"
 
 # GET de fichas y enlaces de aplicación visibles. No consume Apify ni envía formularios.
 verificacion_enlaces:
-  vacantes_por_corrida: 400
-  segundos_corrida: 360
+  vacantes_por_corrida: 800  # contrato v39 (17 nov): antes 400 en 6 min; 73 de 100 Product Designer útiles quedaron sin comprobar
+  segundos_corrida: 600
   vacantes_por_captura: 120
   segundos_captura: 180
 

@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 import re
 import socket
-from threading import BoundedSemaphore
+from threading import BoundedSemaphore, Lock
 import time
 from urllib.parse import urldefrag, urljoin, urlparse
 
@@ -35,6 +35,60 @@ _BLOQUEO = re.compile(r"captcha|verify (?:you are|you're) human|access denied|ch
 _LOGIN = re.compile(r"^(?:sign in|log in|iniciar sesi[oó]n|acceder|login)(?:\s|$)", re.I)
 _APLICAR = re.compile(r"^(?:apply(?: now| for (?:this )?(?:job|position))?|postular(?:me)?|aplicar(?: ahora)?|"
                        r"candidatar(?:-se)?|inscrever-se|solicitar (?:este )?empleo)$", re.I)
+
+
+# Contrato v39: la ficha pública de LinkedIn (la misma que lee la búsqueda) en lugar de la página del aviso, que
+# responde 429 cuando se le pregunta seguido (17 nov: 1.676 enlaces quedaron «bloqueados» y no se entregaron).
+_LINKEDIN_AVISO = re.compile(r"^https?://(?:[a-z]{2,3}\.)?(?:www\.)?linkedin\.com/jobs/view/(?:[^/?#]*-)?(\d+)", re.I)
+LINKEDIN_FICHA = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/"
+_CERRADA_LINKEDIN = re.compile(r"closed-job|Ya no se aceptan solicitudes", re.I)
+# Indeed responde 401 a cualquier comprobación: no se le pregunta; su vacante vale si el enlace directo está comprobado.
+SIN_COMPROBACION_DIRECTA = ("indeed.com",)
+PAUSA_LINKEDIN = 1.5  # segundos entre comprobaciones de LinkedIn
+BLOQUEOS_LINKEDIN = 3  # tras tantos 429 seguidos, LinkedIn descansa el resto de la ronda
+
+
+def aviso_linkedin(url):
+    m = _LINKEDIN_AVISO.match(url or "")
+    return m.group(1) if m else ""
+
+
+def ficha_linkedin(html, titulo):
+    """Contrato v39: (estado, motivo) de la ficha pública de LinkedIn. Abierta solo si trae el título del aviso y su
+    descripción; cerrada si dice que ya no recibe postulaciones. Un 200 sin el título (un aviso que ya no existe
+    también responde 200) nunca aprueba."""
+    if _CERRADA.search(html or "") or _CERRADA_LINKEDIN.search(html or ""):
+        return "rechazada", "vacante cerrada"
+    m = re.search(r"top-card-layout__title[^>]*>([\s\S]*?)</h[1-3]>", html or "")
+    nombre = BeautifulSoup(m.group(1), "html.parser").get_text(" ", strip=True) if m else ""
+    if not nombre or not _coincide(titulo, nombre):
+        return "pendiente", "ficha específica sin confirmar"
+    if "show-more-less-html__markup" not in html:
+        return "pendiente", "contenido insuficiente"
+    return "verificada", "ficha de LinkedIn abierta"
+
+
+def sin_comprobacion_directa(url):
+    return enlaces.host(url).endswith(SIN_COMPROBACION_DIRECTA)
+
+
+def incorporar(vacantes, cache, fichas):
+    """Contrato v39: las fichas de LinkedIn que la búsqueda ya leyó hoy valen como comprobación (abierta o cerrada) del
+    enlace, sin volver a preguntar. Solo reemplaza una comprobación más antigua. Devuelve cuántas incorporó."""
+    n = 0
+    for v in vacantes:
+        for u in urls(v):
+            leida = fichas.get(u)
+            if not leida:
+                continue
+            anterior = cache.get(u) or {}
+            if anterior.get("_titulo") == v["titulo"] and (anterior.get("comprobada_en") or "") >= leida["comprobada_en"]:
+                continue
+            cache[u] = {"url": u, "destino": LINKEDIN_FICHA + aviso_linkedin(u), "estado": leida["estado"],
+                        "motivo": leida["motivo"], "comprobada_en": leida["comprobada_en"], "http": 200, "saltos": 0,
+                        "ruta": [u], "_titulo": v["titulo"]}
+            n += 1
+    return n
 
 
 def publica(url, resolver=socket.getaddrinfo):
@@ -141,6 +195,16 @@ def comprobar(url, titulo, *, sesion=None, validar_url=publica, ahora=None, plaz
                 "comprobada_en": ahora.isoformat(timespec="seconds").replace("+00:00", "Z"),
                 "http": codigo, "saltos": max(0, len(ruta) - 1), "ruta": ruta}
     try:
+        if aviso_linkedin(url):
+            ruta.append(url)
+            timeout = min(12, max(0.1, plazo - time.monotonic())) if plazo else 12
+            r = sesion.get(LINKEDIN_FICHA + aviso_linkedin(url), headers=NAVEGADOR, timeout=timeout)
+            codigo = r.status_code
+            if codigo in (404, 410):
+                return resultado("rechazada", "enlace roto")
+            if codigo != 200:
+                return resultado("pendiente", "acceso bloqueado o fallo temporal")
+            return resultado(*ficha_linkedin(r.text, titulo))
         while True:
             if plazo and time.monotonic() >= plazo:
                 return resultado("pendiente", "presupuesto de comprobación agotado")
@@ -239,12 +303,15 @@ def auditar(vacantes, cache, *, maximo=240, segundos=240, hilos=6, comprobar_url
     plazo = time.monotonic() + segundos
     escogidas, peticiones = [], {}
     for v in vacantes:
-        pendientes = [u for u in urls(v) if not vigente(cache.get(u, {}), v["titulo"], ahora, vigencia)]
+        pendientes = [u for u in urls(v) if not vigente(cache.get(u, {}), v["titulo"], ahora, vigencia)
+                      and not sin_comprobacion_directa(u)]
         if pendientes and len(escogidas) < maximo:
             escogidas.append(v)
             for u in pendientes:
                 peticiones.setdefault((u, v["titulo"]), None)
-    semaforos = {enlaces.host(u): BoundedSemaphore(2) for u, _ in peticiones}
+    # Contrato v39: LinkedIn de una en una y con pausa; tras varios bloqueos seguidos deja el tiempo a los demás sitios.
+    semaforos = {enlaces.host(u): BoundedSemaphore(1 if aviso_linkedin(u) else 2) for u, _ in peticiones}
+    linkedin = {"ultima": 0.0, "bloqueos": 0, "lock": Lock()}
     def tarea(clave):
         u, titulo = clave
         if time.monotonic() >= plazo:
@@ -253,7 +320,18 @@ def auditar(vacantes, cache, *, maximo=240, segundos=240, hilos=6, comprobar_url
         if not semaforo.acquire(timeout=max(0, plazo - time.monotonic())):
             return None
         try:
-            return comprobar_url(u, titulo, ahora=ahora, plazo=plazo)
+            if aviso_linkedin(u):
+                if linkedin["bloqueos"] >= BLOQUEOS_LINKEDIN:
+                    return None
+                espera = linkedin["ultima"] + PAUSA_LINKEDIN - time.monotonic()
+                if espera > 0:
+                    time.sleep(min(espera, max(0, plazo - time.monotonic())))
+                linkedin["ultima"] = time.monotonic()
+            r = comprobar_url(u, titulo, ahora=ahora, plazo=plazo)
+            if aviso_linkedin(u) and r:
+                with linkedin["lock"]:
+                    linkedin["bloqueos"] = linkedin["bloqueos"] + 1 if r.get("http") == 429 else 0
+            return r
         finally:
             semaforo.release()
     with ThreadPoolExecutor(hilos) as ex:

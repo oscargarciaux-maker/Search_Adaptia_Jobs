@@ -18,6 +18,17 @@ NOMBRE = "LinkedIn"
 BUSQUEDA = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
 AVISO = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/"
 CERRADO = re.compile(r"No longer accepting applications|Ya no se aceptan solicitudes|closed-job", re.I)
+# Contrato v39: lo que dijo cada ficha leída en esta búsqueda (abierta o cerrada, con la hora), para que valga como
+# comprobación del enlace sin volver a preguntarle a LinkedIn. Enlace → {estado, motivo, comprobada_en}.
+FICHAS = {}
+
+
+def _anotar_ficha(enlace, titulo, pagina):
+    from buscador import verificar_enlaces
+    estado, motivo = verificar_enlaces.ficha_linkedin(pagina, titulo)
+    if estado != "pendiente":
+        FICHAS[enlace] = {"estado": estado, "motivo": motivo,
+                          "comprobada_en": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")}
 # Lugares de búsqueda además de cada país: remoto para toda la región
 LUGARES_EXTRA = [("LATAM", {"location": "Latin America"}), ("REMOTO", {"location": "Latin America", "f_WT": "2"}),
                  ("REMOTO_MUNDO", {"location": "Worldwide", "f_WT": "2"}),
@@ -146,6 +157,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
             r = cliente.get(AVISO + a["id"])
             if r is not None and r.status_code == 200:
                 descripcion, cerrado, externo, remoto = ficha(r.text)
+                _anotar_ficha(a["enlace"], a["titulo"], r.text)
                 con_ficha += 1
                 seguidas = 0
             elif r is not None and r.status_code == 429:
@@ -193,6 +205,7 @@ def completar_descripciones(cliente, previas, max_fichas, hoy=None, max_dias=21,
             continue
         seguidas = 0
         descripcion, cerrado, _, _ = ficha(r.text)
+        _anotar_ficha(v["enlace"], v["titulo"], r.text)
         if cerrado:
             cerradas += 1
             continue
