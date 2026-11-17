@@ -5092,3 +5092,179 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   background: var(--osc-bg-ambar-3, #faf2e1);
   color: var(--osc-text-ambar-fuerte, #6b4d12);
 }
+
+/* PR 2 (sesión de prueba, 17 nov). */
+.casilla-comunidad {
+  align-items: center;
+}
+.casilla-comunidad > label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+/* Los 3 pasos del día, numerados y sin flechas: cada uno abre su pantalla y se resalta si tiene algo pendiente. */
+.pasos-dia {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.paso-dia {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.paso-dia:hover {
+  border-color: var(--marca, #0b6bcb);
+  box-shadow: 0 4px 14px #0a192f14;
+}
+.paso-dia.pendiente {
+  border-color: var(--osc-line-ambar, #f3d9a4);
+  background: var(--osc-bg-ambar-1, #fff8eb);
+}
+.paso-numero {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--fuente-titulo);
+  font-weight: 700;
+  background: var(--osc-bg-azul-2, #eaf3ff);
+  color: var(--osc-text-azul-medio, #0b4a8b);
+}
+.paso-dia.pendiente .paso-numero {
+  background: var(--osc-bg-ambar-3, #faf2e1);
+  color: var(--osc-text-ambar-fuerte, #6b4d12);
+}
+.paso-texto {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.paso-texto strong {
+  font-size: 14px;
+}
+.paso-texto span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.resumen-arriba {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 2fr);
+}
+.resumen-arriba > .tarjeta-actividad {
+  grid-column: auto;
+}
+@media (max-width: 1100px) {
+  .resumen-arriba {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .resumen-arriba > .tarjeta-actividad {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 760px) {
+  .pasos-dia,
+  .resumen-arriba {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* Tarjeta de cliente: «3 de 17» encima de la barra; «por confirmar» como ícono discreto con el detalle al pasar. */
+.cliente-avance {
+  flex: 0 0 96px;
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+}
+.cliente-avance .cliente-barra {
+  width: 100%;
+  flex: none;
+}
+.cliente-avance .cliente-cifra {
+  font-size: 13px;
+}
+.cliente-alerta {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  color: #c9d6ea;
+}
+.en-grilla .cliente-avance {
+  flex: none;
+  width: 100%;
+  justify-items: stretch;
+}
+/* Quién inició sesión, junto a «Cerrar sesión». */
+.operador-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 600;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.operador-inicial {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--osc-bg-azul-2, #eaf3ff);
+  color: var(--osc-text-azul-medio, #0b4a8b);
+  font-weight: 700;
+  flex: none;
+}
+/* «Programar»: cada opción con su hora exacta. */
+.opciones-programar {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+}
+.opciones-programar > div {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px;
+}
+/* «Por confirmar»: las decisiones en una sola fila. */
+.revision-decisiones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+/* Los nombres de los clientes se leen completos (hasta 2 líneas) en vez de cortarse. */
+.resumen-b .cliente-texto strong {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

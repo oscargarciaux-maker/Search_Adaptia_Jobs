@@ -195,14 +195,18 @@ const secciones: Record<string, string> = {
   Vacantes: "vacantes",
   "Por confirmar": "por-confirmar",
   Mensajes: "mensajes",
-  Actividad: "actividad",
+  Historial: "historial",
 };
 function seccionDeHash() {
   // Contrato v29: «#vacantes/<id>» recuerda la vacante abierta; la sección es lo que va antes de la barra.
   const h = decodeURIComponent(location.hash.replace(/^#\/?/, "")).split(
     "/",
   )[0];
-  return Object.keys(secciones).find((t) => secciones[t] === h) || "Resumen";
+  // «#actividad» (nombre anterior de Historial) sigue abriendo la misma sección.
+  const clave = h === "actividad" ? "historial" : h;
+  return (
+    Object.keys(secciones).find((t) => secciones[t] === clave) || "Resumen"
+  );
 }
 const estadosEjecucion: Record<string, string> = {
   completa: "Completada",
@@ -214,6 +218,23 @@ const estadosEjecucion: Record<string, string> = {
 // Resumen con jerarquía (13 nov, pedido de Oscar): Clientes y Cargos y cupos mandan; Vacantes, Por confirmar y
 // Mensajes acompañan; Actividad es una franja tipo «entrada de evento» con la próxima búsqueda. La rejilla no es
 // uniforme a propósito: tamaños distintos y una franja desplazada guían la mirada de lo más usado a lo demás.
+// La próxima búsqueda de hoy en palabras: la de las 8:30 a. m. si aún no pasó; si no, la próxima de cada hora.
+function textoProximaDeHoy(ahora = new Date()) {
+  const ochoYMedia = new Date(
+    Date.UTC(
+      ahora.getUTCFullYear(),
+      ahora.getUTCMonth(),
+      ahora.getUTCDate(),
+      13,
+      30,
+    ),
+  );
+  const seisYMedia = new Date(ochoYMedia.getTime() - 2 * 3600 * 1000);
+  if (ahora < seisYMedia) return "la de las 6:30 a. m.";
+  if (ahora < ochoYMedia) return "la de las 8:30 a. m.";
+  return "la próxima captura de cada hora (a los 23 minutos)";
+}
+
 function proximaBusqueda(ahora = new Date()) {
   // 6:30 a. m. de Bogotá (UTC−5, sin horario de verano) = 11:30 UTC.
   const hoy = new Date(
@@ -299,7 +320,7 @@ function DistintivoComunidad() {
   return (
     <span
       className="distintivo-comunidad"
-      title="Recibe después de los clientes reales, con lo que sobra del techo"
+      title="Grupo de WhatsApp: recibe solo lo que sobra del cupo diario, después de los clientes"
     >
       <Users size={11} aria-hidden="true" />
       Comunidad
@@ -329,7 +350,7 @@ function DonaTecho({
       className="dona-techo"
       viewBox="0 0 104 104"
       role="img"
-      aria-label={`Techo del día: ${usado} de ${total} repartidas por cargo`}
+      aria-label={`Cupo diario: ${usado} de ${total} repartidas por cargo`}
     >
       <circle cx="52" cy="52" r={r} className="dona-fondo" />
       {partes.map((p, i) => (
@@ -402,7 +423,71 @@ function TarjetasResumen({
   const deHoy = diaConteo === hoyBogota();
   return (
     <section className="resumen-grid resumen-b" aria-label="Resumen del panel">
-      {/* Lista grande (17 nov, variante B elegida): indicadores arriba, Actividad y los clientes abajo a todo lo ancho. */}
+      {/* Sesión de prueba (17 nov): arriba, las 3 tareas del día en orden y numeradas (sin flechas). */}
+      <ol className="pasos-dia" aria-label="Tu día en 3 pasos">
+        <li>
+          <button
+            type="button"
+            className={"paso-dia" + (porConfirmar ? " pendiente" : "")}
+            onClick={() => go("Por confirmar")}
+          >
+            <span className="paso-numero" aria-hidden="true">
+              1
+            </span>
+            <span className="paso-texto">
+              <strong>Revisa las dudosas</strong>
+              <span>
+                {porConfirmar
+                  ? `${porConfirmar} por confirmar`
+                  : "Nada por confirmar"}
+              </span>
+            </span>
+          </button>
+        </li>
+        <li>
+          <button
+            type="button"
+            className={
+              "paso-dia" +
+              (vivos.length && enviados < vivos.length ? " pendiente" : "")
+            }
+            onClick={() => go("Mensajes")}
+          >
+            <span className="paso-numero" aria-hidden="true">
+              2
+            </span>
+            <span className="paso-texto">
+              <strong>Envía los mensajes</strong>
+              <span>
+                {!borradores
+                  ? "Ábrelos para prepararlos"
+                  : vivos.length
+                    ? `${vivos.length - enviados} por enviar de ${vivos.length}`
+                    : "Aún no hay mensajes de hoy"}
+              </span>
+            </span>
+          </button>
+        </li>
+        <li>
+          <button
+            type="button"
+            className={"paso-dia" + (bajos ? " pendiente" : "")}
+            onClick={() => go("Clientes")}
+          >
+            <span className="paso-numero" aria-hidden="true">
+              3
+            </span>
+            <span className="paso-texto">
+              <strong>Ajusta clientes y cargos</strong>
+              <span>
+                {diaConteo && bajos
+                  ? `${bajos} ${bajos === 1 ? "cliente bajo su meta" : "clientes bajo su meta"}`
+                  : "Solo cuando haga falta"}
+              </span>
+            </span>
+          </button>
+        </li>
+      </ol>
       <div className="resumen-arriba">
         <button
           type="button"
@@ -414,7 +499,7 @@ function TarjetasResumen({
         >
           <span className="tarjeta-cabeza">
             <SlidersHorizontal size={17} />
-            Techo del día
+            Cupo diario
           </span>
           <div className="cupos-fila">
             <strong className="tarjeta-numero">
@@ -460,11 +545,10 @@ function TarjetasResumen({
           </span>
           <strong className="tarjeta-numero">
             {ultima ? (r.vacantes ?? 0) : "—"}
-            {ultima && <small> / {r.meta ?? 120}</small>}
           </strong>
           <span className="tarjeta-detalle">
             {ultima
-              ? `Búsqueda del ${fecha(ultima.fecha)}`
+              ? `Entregadas en la búsqueda del ${fecha(ultima.fecha)}`
               : "Sin búsquedas aún"}
           </span>
           <span className="tarjeta-accion">
@@ -475,58 +559,8 @@ function TarjetasResumen({
 
         <button
           type="button"
-          className={
-            "tarjeta-resumen tarjeta-chica tarjeta-confirmar" +
-            (porConfirmar ? " pendiente" : "")
-          }
-          onClick={() => go("Por confirmar")}
-        >
-          <span className="tarjeta-cabeza">
-            <MapPin size={16} />
-            Por confirmar
-            {porConfirmar > 0 && (
-              <span className="punto-vivo" aria-hidden="true" />
-            )}
-          </span>
-          <strong className="tarjeta-numero">{porConfirmar}</strong>
-          <span className="tarjeta-detalle">
-            {porConfirmar ? "Esperan tu decisión" : "Nada pendiente"}
-          </span>
-          <span className="tarjeta-accion">
-            Revisar
-            <ArrowRight size={14} />
-          </span>
-        </button>
-
-        <button
-          type="button"
-          className="tarjeta-resumen tarjeta-chica tarjeta-mensajes"
-          onClick={() => go("Mensajes")}
-        >
-          <span className="tarjeta-cabeza">
-            <MessageCircle size={16} />
-            Mensajes de hoy
-          </span>
-          <strong className="tarjeta-numero">
-            {borradores ? vivos.length : "—"}
-          </strong>
-          <span className="tarjeta-detalle">
-            {!borradores
-              ? "Ábrelos para prepararlos"
-              : vivos.length
-                ? `${enviados} ${enviados === 1 ? "enviado" : "enviados"} de ${vivos.length}`
-                : "Aún no preparados"}
-          </span>
-          <span className="tarjeta-accion">
-            Ver mensajes
-            <ArrowRight size={14} />
-          </span>
-        </button>
-
-        <button
-          type="button"
           className="tarjeta-resumen tarjeta-actividad"
-          onClick={() => go("Actividad")}
+          onClick={() => go("Historial")}
         >
           <span className="evento-fecha" aria-hidden="true">
             <b>{dia}</b>
@@ -535,7 +569,7 @@ function TarjetasResumen({
           <span className="evento-texto">
             <span className="tarjeta-cabeza">
               <Clock3 size={15} />
-              Actividad
+              Historial
             </span>
             <span className="evento-titulo">
               Próxima búsqueda: {semana} {dia} de {mes} · 6:30 a. m.
@@ -559,7 +593,7 @@ function TarjetasResumen({
             </span>
           )}
           <span className="tarjeta-accion">
-            Ver actividad
+            Ver historial
             <ArrowRight size={14} />
           </span>
         </button>
@@ -598,8 +632,8 @@ function TarjetasResumen({
                   : Math.min(100, Math.round((c.recibidas / c.meta) * 100));
               const cifra =
                 c.recibidas == null
-                  ? `— / ${c.meta}`
-                  : `${c.recibidas}/${c.meta}`;
+                  ? `— de ${c.meta}`
+                  : `${c.recibidas} de ${c.meta}`;
               const pendiente = `${c.porConfirmar} por confirmar`;
               return (
                 <li key={c.id}>
@@ -626,20 +660,25 @@ function TarjetasResumen({
                         {c.nombre}
                         {c.comunidad && <DistintivoComunidad />}
                       </strong>
-                      <span>
-                        {c.cargo}
-                        {!grilla && c.porConfirmar > 0 && (
-                          <span className="solo-lista"> · {pendiente}</span>
-                        )}
+                      <span>{c.cargo}</span>
+                    </span>
+                    {/* Sesión de prueba: el «3 de 17» encima de la barra y «por confirmar» como ícono discreto. */}
+                    <span className="cliente-avance" aria-hidden="true">
+                      <span className="cliente-cifra">{cifra}</span>
+                      <span className="cliente-barra">
+                        <span style={{ width: pct + "%" }} />
                       </span>
                     </span>
-                    <span className="cliente-barra" aria-hidden="true">
-                      <span style={{ width: pct + "%" }} />
-                    </span>
-                    <span className="cliente-pie">
-                      <span className="cliente-cifra">{cifra}</span>
-                      <span className="cliente-confirmar">{pendiente}</span>
-                    </span>
+                    {c.porConfirmar > 0 && (
+                      <span
+                        className="cliente-alerta"
+                        title={pendiente}
+                        aria-hidden="true"
+                      >
+                        <MapPin size={14} />
+                        {c.porConfirmar}
+                      </span>
+                    )}
                   </button>
                 </li>
               );
@@ -651,7 +690,9 @@ function TarjetasResumen({
           className="ver-todos"
           onClick={() => go("Clientes")}
         >
-          Ver clientes
+          {clientes.length === 1
+            ? "Ver el cliente"
+            : `Ver los ${clientes.length} clientes`}
           <ArrowRight size={15} />
         </button>
       </div>
@@ -1193,8 +1234,8 @@ function ImportarClientes({
             )}
             {previa.excede_techo && previa.metas && (
               <p className="importar-aviso">
-                Las metas suman {previa.metas.reales} y el techo del día es{" "}
-                {previa.metas.techo}: antes de programar, sube el techo o baja
+                Las metas suman {previa.metas.reales} y el cupo diario es{" "}
+                {previa.metas.techo}: antes de programar, sube el cupo o baja
                 metas.
               </p>
             )}
@@ -1394,6 +1435,8 @@ function App() {
   const [loadingResults, setLoadingResults] = useState(false);
   const [errorResultados, setErrorResultados] = useState(false);
   const [porConfirmar, setPorConfirmar] = useState(0);
+  // Sesión de prueba (17 nov): quién inició sesión, visible arriba.
+  const [yo, setYo] = useState<{ nombre: string; correo: string } | null>(null);
   // Contrato v30: los WhatsApp se cargan con el panel para que el formulario del cliente abra sin esperar.
   const [contactos, setContactos] = useState<Record<string, Contacto>>({});
   function cargarContactos() {
@@ -1469,6 +1512,9 @@ function App() {
       setSesion(s);
       if (s.sesion) {
         cargarContactos();
+        api<{ nombre: string; correo: string }>("/yo")
+          .then(setYo)
+          .catch(() => setYo(null));
         api<Revisiones>(PENDIENTES_RESUMEN)
           .then((r) => {
             setPorConfirmar(r.en_espera ?? r.total);
@@ -1738,13 +1784,9 @@ function App() {
             <span className="brand-icon">a</span>adaptia
             <span className="brand-dot">.</span>
           </div>
-          <span className="eyebrow">CONTROL DE BÚSQUEDA</span>
-          <h1>
-            Las oportunidades correctas,
-            <br />
-            para cada persona.
-          </h1>
-          <p>Accede al espacio privado de tu empresa.</p>
+          {/* Sesión de prueba (17 nov): un solo recorrido de lectura, marca → título → campos → botón. */}
+          <h1>Inicia sesión</h1>
+          <p>Las vacantes correctas para cada persona.</p>
           <form
             onSubmit={async (e) => {
               e.preventDefault();
@@ -1764,7 +1806,7 @@ function App() {
             }}
           >
             <div className="field">
-              <label htmlFor="email">Correo del operador</label>
+              <label htmlFor="email">Correo electrónico</label>
               <input
                 id="email"
                 type="email"
@@ -1801,7 +1843,7 @@ function App() {
           </form>
           <div className="secure-note">
             <ShieldCheck size={15} />
-            Acceso exclusivo para el operador
+            Solo entran las personas autorizadas.
           </div>
         </div>
       </div>
@@ -1866,14 +1908,14 @@ function App() {
                   : tab === "Clientes"
                     ? "Configura los criterios que hacen útil una vacante para cada cliente."
                     : tab === "Cargos y metas"
-                      ? "Cada perfil tiene su meta diaria; aquí defines el techo del día y los cargos."
+                      ? "Cada perfil tiene su meta diaria; aquí defines el cupo diario y los cargos."
                       : tab === "Vacantes"
                         ? "Revisa las coincidencias de cada cliente y prepara su mensaje."
                         : tab === "Por confirmar"
                           ? "Vacantes que le servirían a tus clientes, pero cuyo país no se pudo confirmar solo. Decide con un clic: las que confirmes llegan hoy a sus clientes."
                           : tab === "Mensajes"
                             ? "Cada mañana cada persona tiene su mensaje con sus vacantes. Ábrelo en WhatsApp, revísalo y envíalo."
-                            : tab === "Actividad"
+                            : tab === "Historial"
                               ? "Cada día: cuántas vacantes trajo la búsqueda con tu configuración y qué cargos quedaron cortos."
                               : "Información sobre la conexión y el funcionamiento del espacio."}
               </p>
@@ -1893,14 +1935,6 @@ function App() {
                   >
                     {textoProgramacion(estado, dirty)}
                   </span>
-                  <button
-                    className="button secondary"
-                    onClick={guardarClick}
-                    disabled={!dirty || busy}
-                  >
-                    <Save size={16} />
-                    {busy ? "Guardando…" : "Guardar borrador"}
-                  </button>
                   <Ayuda etiqueta="Guardar y programar">
                     <strong>Guardar borrador</strong> conserva tus cambios sin
                     tocar la próxima búsqueda.{" "}
@@ -1911,6 +1945,14 @@ function App() {
                     siguen con la configuración anterior.
                   </Ayuda>
                   <button
+                    className="button secondary"
+                    onClick={guardarClick}
+                    disabled={!dirty || busy}
+                  >
+                    <Save size={16} />
+                    {busy ? "Guardando…" : "Guardar borrador"}
+                  </button>
+                  <button
                     className="button primary"
                     onClick={() => setModal("publicar")}
                     disabled={busy || total < 1 || excede}
@@ -1920,7 +1962,27 @@ function App() {
                   </button>
                 </>
               )}
+              {tab === "Resumen" && (
+                <button
+                  className="button secondary"
+                  onClick={() => {
+                    setEditCliente(null);
+                    setModal("cliente");
+                  }}
+                >
+                  <Plus size={16} />
+                  Nuevo cliente
+                </button>
+              )}
               <BotonTema />
+              {yo && (
+                <span className="operador-chip" title={yo.correo || yo.nombre}>
+                  <span className="operador-inicial" aria-hidden="true">
+                    {yo.nombre.trim().charAt(0).toUpperCase() || "·"}
+                  </span>
+                  {yo.nombre}
+                </span>
+              )}
               {!sesion.demo && (
                 <button
                   className="button secondary boton-tema cerrar-sesion"
@@ -2139,7 +2201,7 @@ function App() {
             <>
               <div className={"allocation card " + (excede ? "invalid" : "")}>
                 <div className="field techo-campo">
-                  <label htmlFor="techo-diario">Techo del día</label>
+                  <label htmlFor="techo-diario">Cupo diario</label>
                   <CampoTecho
                     key={metas.techo}
                     valor={metas.techo}
@@ -2150,12 +2212,12 @@ function App() {
                   <strong>{metas.reales}</strong> a clientes · {metas.cabe} a
                   Comunidad · {metas.libre} libres
                   {excede &&
-                    " · Las metas de los clientes pasan el techo: baja metas o sube el techo"}
+                    " · Las metas de los clientes pasan el cupo diario: baja metas o sube el cupo"}
                 </p>
-                <Ayuda etiqueta="Techo del día">
-                  Máximo de vacantes al día, para cuidar los consumos. Primero
-                  se llenan las metas de los clientes reales; lo que sobre va al
-                  cliente «Comunidad».
+                <Ayuda etiqueta="Cupo diario">
+                  Máximo de vacantes al día entre todos, para cuidar los
+                  consumos. Primero se llenan las metas de los clientes; lo que
+                  sobre va al grupo «Comunidad».
                 </Ayuda>
                 <div className="allocation-track">
                   <span
@@ -2537,8 +2599,8 @@ function App() {
           {tab === "Mensajes" && (
             <Mensajes clientes={draft.clientes} notify={notify} />
           )}
-          {tab === "Actividad" && <AvisoUltimaBusqueda ultima={runs?.[0]} />}
-          {tab === "Actividad" && (
+          {tab === "Historial" && <AvisoUltimaBusqueda ultima={runs?.[0]} />}
+          {tab === "Historial" && (
             <section className="card activity">
               <div className="section-title">
                 <h2>Resultado de cada búsqueda diaria</h2>
@@ -2619,7 +2681,7 @@ function App() {
               )}
             </section>
           )}
-          {tab === "Actividad" && sesion?.sesion && (
+          {tab === "Historial" && sesion?.sesion && (
             <CoberturaPersonas
               nombrePais={(c) =>
                 sesion.paises.find((x) => x.codigo === c)?.nombre ||
@@ -2627,7 +2689,7 @@ function App() {
               }
             />
           )}
-          {tab === "Actividad" && <ReglasAprendidas notify={notify} />}
+          {tab === "Historial" && <ReglasAprendidas notify={notify} />}
         </main>
       </div>
       {modal === "cargo" && (
@@ -2718,21 +2780,30 @@ function App() {
               {total} / {metas.techo}
             </strong>
           </div>
+          {/* Sesión de prueba (17 nov): cada opción dice desde qué búsqueda y a qué hora rige. */}
+          <div className="opciones-programar">
+            <div>
+              <strong>Confirmar configuración</strong>
+              <span>
+                Se usa desde la búsqueda de mañana,{" "}
+                <b>{fecha(manana())} a las 6:30 a. m.</b> (hora Colombia).
+              </span>
+            </div>
+            <div>
+              <strong>Aplicar hoy</strong>
+              <span>
+                Se usa desde la próxima búsqueda de hoy:{" "}
+                <b>{textoProximaDeHoy()}</b>. Lo que ya se entregó hoy no
+                cambia.
+              </span>
+            </div>
+          </div>
           <p className="helper note">
-            Al confirmar se guardan tus cambios y esta configuración se usa
-            desde la búsqueda del <strong>{fecha(manana())}</strong> a las 6:30
-            a. m. (hora Colombia). La de hoy, si ya empezó, conserva la
-            anterior.
             {!estado?.publicada &&
-              " Es tu primera configuración: desde entonces dejan de buscarse los seis cargos fijos anteriores; solo se buscarán los cargos de esta lista."}{" "}
+              "Es tu primera configuración: desde entonces dejan de buscarse los seis cargos fijos anteriores; solo se buscarán los cargos de esta lista. "}
             Si las fuentes no ofrecen suficientes vacantes válidas, verás el
             faltante; no se rellena con duplicados ni con vacantes fuera de los
             filtros.
-          </p>
-          <p className="helper note">
-            <strong>Aplicar hoy</strong> la usa desde la próxima búsqueda de hoy
-            (la manual, la de las 8:30 o la de cada hora). Lo que ya se entregó
-            hoy no cambia.
           </p>
           {sesion.demo && (
             <p className="demo-inline">
@@ -2900,7 +2971,7 @@ function AvisoUltimaBusqueda({
           : `La búsqueda del ${fecha(ultima.fecha)} trajo ${r.vacantes ?? 0} de ${r.meta ?? 120} vacantes.`}
       </strong>{" "}
       {ultima.estado === "fallida"
-        ? "Revisa «Actividad»; la siguiente búsqueda lo intentará de nuevo."
+        ? "Revisa «Historial»; la siguiente búsqueda lo intentará de nuevo."
         : faltan.length
           ? `Faltan vacantes en ${faltan.join(", ")}: revisa los filtros de sus clientes en «Dónde se pierden las vacantes de cada cargo».`
           : ""}

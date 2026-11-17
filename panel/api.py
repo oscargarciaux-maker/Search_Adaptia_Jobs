@@ -266,6 +266,21 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
     def aplicar_hoy(body: Publicar):
         return repo.publicar_hoy(body.revision)
 
+    @app.get("/api/yo")
+    def yo(request: Request):
+        """Sesión de prueba (17 nov): el nombre de quien inició sesión, para mostrarlo arriba. Solo a esa persona."""
+        if demo:
+            return {"nombre": "Operador de prueba", "correo": ""}
+        token = request.cookies.get(COOKIE_SESION, "")
+        try:
+            u = _usuario(token) if token else {}
+        except (requests.RequestException, ValueError):
+            u = {}
+        datos = u.get("user_metadata") or {}
+        correo = u.get("email", "")
+        nombre = datos.get("full_name") or datos.get("name") or correo.split("@")[0].replace(".", " ").title()
+        return {"nombre": nombre, "correo": correo}
+
     @app.get("/api/cobertura")
     def ver_cobertura():
         """Contrato v37: cobertura por persona (panel privado)."""

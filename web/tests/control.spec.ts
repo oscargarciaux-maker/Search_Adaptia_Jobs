@@ -3,15 +3,24 @@ import { revisarContraste } from "./contraste";
 
 // Sección 5 (13 nov): sin menú lateral; cada sección se abre desde su tarjeta del resumen.
 const accion: Record<string, string> = {
-  Clientes: "Ver clientes",
+  // Sesión de prueba (17 nov): «Ver los N clientes», los 3 pasos del día y «Historial».
+  Clientes: "Ver (los \\d+ clientes|el cliente)",
   "Cargos y metas": "Editar cargos y metas",
   Vacantes: "Ver vacantes",
-  "Por confirmar": "Revisar",
-  Mensajes: "Ver mensajes",
-  Actividad: "Ver actividad",
+  "Por confirmar": "Revisa las dudosas",
+  Mensajes: "Envía los mensajes",
+  Historial: "Ver historial",
 };
 const tarjeta = (page: Page, seccion: string) =>
-  page.getByRole("button", { name: new RegExp(accion[seccion] + "$") });
+  page
+    .getByRole("button", {
+      name: new RegExp(
+        ["Por confirmar", "Mensajes"].includes(seccion)
+          ? "^\\d?\\s*" + accion[seccion]
+          : accion[seccion] + "$",
+      ),
+    })
+    .first();
 async function ir(page: Page, seccion: string) {
   await page.getByRole("heading", { level: 1 }).waitFor(); // tras recargar
   const volver = page.getByRole("button", { name: "Volver al resumen" });
@@ -189,17 +198,17 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await page.getByRole("button", { name: "Reactivar", exact: true }).click();
   await ir(page, "Cargos y metas");
   // La operadora suma 10 a los 120 de los demás: con techo 120 no se puede programar; con 130, sí.
-  await expect(page.getByText(/pasan el techo/)).toBeVisible();
+  await expect(page.getByText(/pasan el cupo diario/)).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Programar para mañana", exact: true }),
   ).toBeDisabled();
   // Lista grande del 16 nov: el techo se puede borrar del todo y se valida al salir del campo.
-  const techo = page.getByLabel("Techo del día", { exact: true });
+  const techo = page.getByLabel("Cupo diario", { exact: true });
   await techo.fill("");
   await expect(techo).toHaveValue("");
   await techo.fill("130");
   await techo.blur();
-  await expect(page.getByText(/pasan el techo/)).toHaveCount(0);
+  await expect(page.getByText(/pasan el cupo diario/)).toHaveCount(0);
   await expect(page.locator(".cifras-cargo").first()).toContainText(
     "Meta del día",
   );
@@ -329,7 +338,7 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await expect(
     page.getByRole("link", { name: "Abrir en WhatsApp" }),
   ).toHaveCount(antes - 1);
-  await ir(page, "Actividad");
+  await ir(page, "Historial");
   // Sin avisos por correo: el operador no quiere servicios externos (13 nov).
   await expect(page.getByText("Avisos por correo")).toHaveCount(0);
   // Sección 8: el embudo de la última búsqueda se ve abierto, en tarjetas y sin desbordar.
@@ -497,7 +506,7 @@ test("revisión masiva por CSV y reglas aprendidas sin IA", async ({
     buffer: Buffer.from(csvLlenado),
   });
   await expect(page.getByText(/Revisión aplicada: 1 decididas/)).toBeVisible();
-  await ir(page, "Actividad");
+  await ir(page, "Historial");
   // Auditoría H4: el resultado de la búsqueda va primero; las reglas, al final y plegadas.
   await page.getByRole("button", { name: /Ver reglas de ubicación/ }).click();
   const regla = page.locator(".reglas-lista li", { hasText: "«granada»" });
@@ -525,7 +534,7 @@ test("resumen: tablero de una pantalla, sin menú propio, con dirección por sec
   await expect(
     page.getByRole("heading", { level: 1, name: "Resumen" }),
   ).toBeVisible();
-  await expect(page.locator(".tarjeta-resumen")).toHaveCount(6);
+  await expect(page.locator(".tarjeta-resumen")).toHaveCount(4);
   await expect(page.locator("aside, header.topbar, footer")).toHaveCount(0);
   await expect(page.getByText("TU CENTRO DE OPORTUNIDADES")).toHaveCount(0);
   // Paso 8: la lista de clientes crece con ellos (Andrés maneja 15 o más); lo demás del tablero se ve sin bajar.
@@ -543,9 +552,9 @@ test("resumen: tablero de una pantalla, sin menú propio, con dirección por sec
   await expect(
     page.getByRole("heading", { level: 1, name: "Resumen" }),
   ).toBeVisible();
-  await page.goto("/#actividad");
+  await page.goto("/#historial");
   await expect(
-    page.getByRole("heading", { level: 1, name: "Actividad" }),
+    page.getByRole("heading", { level: 1, name: "Historial" }),
   ).toBeVisible();
   // Contrato v37: cobertura por persona, con su estado y por qué le faltan.
   await expect(
@@ -557,7 +566,7 @@ test("resumen: tablero de una pantalla, sin menú propio, con dirección por sec
   );
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await expect(page.locator(".tarjeta-resumen")).toHaveCount(6);
+  await expect(page.locator(".tarjeta-resumen")).toHaveCount(4);
   const cajas = await page
     .locator(".tarjeta-resumen")
     .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().left));
@@ -595,7 +604,7 @@ test("arreglos de la auditoría: error de carga, textos, título y botones táct
   // H8: la pestaña dice en qué sección estás.
   await expect(page).toHaveTitle("Vacantes · Scraper");
   // H2 y H4: sin «noche»; primero el resultado, luego las reglas.
-  await page.goto("/#actividad");
+  await page.goto("/#historial");
   await expect(page.getByText(/Cada noche|búsqueda nocturna/)).toHaveCount(0);
   const orden = await page
     .locator("main h2")
@@ -1055,7 +1064,7 @@ test("paso 9: modo oscuro con botón, recordado, por la dirección o por el sist
     "#cargos",
     "#vacantes",
     "#por-confirmar",
-    "#actividad",
+    "#historial",
     "#mensajes",
   ]) {
     await page.goto("/" + h);
@@ -1219,7 +1228,7 @@ test("contrato v27: aplicar hoy, etiquetas de lo que no cumple y distintivo de C
     .getByRole("button", { name: "Editar Cliente de ejemplo 02", exact: true })
     .click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel(/Es «Comunidad»/).check();
+  await dialog.getByLabel(/Es un grupo de WhatsApp/).check();
   await dialog.getByRole("button", { name: "Aplicar cambios" }).click();
   await expect(
     page.locator(".client-card h3", { hasText: "Cliente de ejemplo 02" }),
@@ -1277,7 +1286,7 @@ test("auditoría axe: sin fallos serios de accesibilidad en ninguna pantalla", a
     "#vacantes",
     "#por-confirmar",
     "#mensajes",
-    "#actividad",
+    "#historial",
   ]) {
     await page.goto("/" + h);
     await page.getByRole("heading", { level: 1 }).waitFor();

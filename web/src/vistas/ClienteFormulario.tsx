@@ -702,15 +702,20 @@ export function ClienteDialog({
                 onChange={(e) => setC({ ...c, nombre: e.target.value })}
               />
             </div>
-            <label className="casilla-comunidad">
-              <input
-                type="checkbox"
-                checked={!!c.comunidad}
-                onChange={(e) => setC({ ...c, comunidad: e.target.checked })}
-              />
-              Es «Comunidad» (grupo de WhatsApp): recibe después de los clientes
-              reales, con lo que sobra del techo del día
-            </label>
+            <span className="casilla-comunidad">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={!!c.comunidad}
+                  onChange={(e) => setC({ ...c, comunidad: e.target.checked })}
+                />
+                Es un grupo de WhatsApp (Comunidad)
+              </label>
+              <Ayuda etiqueta="grupo Comunidad">
+                Un grupo en vez de una persona. Recibe vacantes solo cuando
+                sobra cupo diario, después de atender a los clientes.
+              </Ayuda>
+            </span>
           </div>
           <fieldset className="whatsapp-contacto">
             <legend>WhatsApp (opcional)</legend>
