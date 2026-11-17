@@ -37,6 +37,14 @@ cualquier persona el sistema lo lea».
 - Con los 21 perfiles reales del CSV v6 y las 46 combinaciones que LinkedIn alcanza a revisar en un día, la persona
   con menos búsquedas pasa de 1 a 2, y varias de Product Designer pasan de 1 o 2 a 4.
 
+### Ajuste del 17 nov (tarde), tras la búsqueda de prueba #31
+- **Lugares principales primero.** Cada día, los turnos de una persona empiezan por sus lugares principales: los de
+  donde vive (su primera fila) y las regiones de sus filas. Después siguen los demás, por antigüedad.
+- **Por qué:** en la #31, los turnos de quien vive en Emiratos se fueron en países sueltos de Europa, y ni «remoto en
+  Emiratos» ni «European Union» llegaron a buscarse.
+- **Resultado simulado:** con los perfiles reales, Emiratos, la Unión Europea, EE. UU. y Chicago quedan dentro de las
+  primeras 46 búsquedas.
+
 ## 3. Rendimiento medido (`cobertura.medir`, `estado["rendimiento"]`)
 - Cada aviso de LinkedIn e Indeed guarda de qué búsqueda salió (`_busqueda` = cargo@lugar).
 - Al limpiar se cuenta cuántas vacantes nuevas de un cargo trajo cada combinación buscada hoy.
@@ -56,6 +64,15 @@ cualquier persona el sistema lo lea».
 - Si su país solo tiene LinkedIn e Indeed, la explicación lo dice.
 - El conteo se guarda solo en el resumen privado de la corrida (`panel_ejecuciones.resumen.busquedas_por_perfil`),
   nunca en archivos públicos.
+
+## 6. Comprobación final (`buscador/validacion.py`, 17 nov)
+- Una vacante elegida hoy que después cerró, o salió del inventario, ya no se comparte (su enlace queda rechazado).
+  Ahora es un **aviso**, no una falla; antes salía como «fuera del perfil».
+- Sigue fallando:
+  - una vacante que ya no encaja en ningún perfil del cargo;
+  - un enlace de la selección de hoy que quedó sin comprobar.
+- **El Resumen** vuelve a pedir las búsquedas cada vez que se entra en él y dice a qué hora se actualizó. Una segunda
+  búsqueda del mismo día actualiza la de hoy y antes no se notaba hasta recargar la página.
 
 ## Lo que no cambia
 - Admisión, afinidad, filtros por persona, comprobación de enlaces (v39) y reglas de entrega.

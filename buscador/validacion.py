@@ -21,13 +21,33 @@ def errores(reporte):
     if reporte.get("catalogo") is not None:
         fallos.extend(errores_catalogo(reporte))
     revision = (reporte.get("verificacion_enlaces") or {}).get("seleccion_del_dia")
-    if revision and revision.get("vacantes") and revision.get("estados", {}).get("verificada", 0) != revision["vacantes"]:
-        fallos.append("La selección histórica tiene enlaces sin comprobación vigente o rechazados; revisar antes de compartir.")
-    seleccion = reporte.get("seleccion_actual") or {}
-    for rol in seleccion.get("roles", {}).values():
-        if any(not v.get("afinidad_vigente") for v in rol.get("vacantes", [])):
-            fallos.append(f"{rol['nombre']}: la selección histórica contiene vacantes fuera del perfil o del catálogo activo.")
+    # 17 nov: solo falla lo que quedó sin comprobar; un enlace rechazado es una vacante que cerró y ya no se comparte.
+    if revision and revision.get("vacantes") and revision.get("estados", {}).get("pendiente", 0):
+        fallos.append(f"{revision['estados']['pendiente']} vacantes de la selección de hoy tienen el enlace sin comprobar; "
+                      "no se comparten hasta comprobarlo.")
+    for rol in (reporte.get("seleccion_actual") or {}).get("roles", {}).values():
+        fuera = [v for v in rol.get("vacantes", []) if not v.get("afinidad_vigente") and not _cerro_despues(v)]
+        if fuera:
+            fallos.append(f"{rol['nombre']}: {len(fuera)} vacantes de la selección de hoy ya no encajan en ningún perfil "
+                          "del cargo.")
     return fallos
+
+
+def _cerro_despues(v):
+    """17 nov: una vacante elegida hoy que después se detectó cerrada (o salió del inventario) ya no se comparte —su
+    enlace queda rechazado—; es un aviso, no una falla. Antes se reportaba como «fuera del perfil»."""
+    return v.get("catalog_status") != "active" or (v.get("verificacion") or {}).get("estado") == "rechazada"
+
+
+def avisos(reporte):
+    """Lo que conviene saber sin que la búsqueda falle."""
+    salida = []
+    for rol in (reporte.get("seleccion_actual") or {}).get("roles", {}).values():
+        cerradas = [v for v in rol.get("vacantes", []) if not v.get("afinidad_vigente") and _cerro_despues(v)]
+        if cerradas:
+            salida.append(f"{rol['nombre']}: {len(cerradas)} vacantes elegidas hoy cerraron o salieron del inventario "
+                          "después; no se comparten.")
+    return salida
 
 
 def errores_catalogo(reporte):
@@ -72,6 +92,8 @@ def main():
         return
     reporte = json.loads((Path(args.salida) / "datos/salud.json").read_text(encoding="utf-8"))
     fallos = errores_catalogo(reporte) if args.catalogo else errores(reporte)
+    for mensaje in ([] if args.catalogo else avisos(reporte)):
+        print("::warning::" + mensaje)
     for mensaje in fallos:
         print("::error::" + mensaje)
     if fallos:
