@@ -301,7 +301,9 @@ def limpiar(previas, crudas, hoy, dias_maximos, enlaces_ats, empresas_leidas, co
             descartes["cerrada en el portal de la empresa"] += 1
             retirar(v, "closed", "ausente de un listado completo de la empresa")
             continue
-        if not v.get("paises"):
+        # 17 nov (caso Danna): en modo panel se conservan también las de los países de los perfiles (EE. UU., Emiratos,
+        # Europa…). La admisión ya las dejaba pasar (v24), pero aquí se archivaban al final y nunca llegaban a nadie.
+        if not v.get("paises") and not _sirve_a_perfiles(v):
             retirar(v, "archived", "sin elegibilidad regional")
             continue
         salida.append(v)

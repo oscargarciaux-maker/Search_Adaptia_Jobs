@@ -168,3 +168,20 @@ def test_el_lugar_principal_de_cada_persona_va_primero():
     finally:
         cobertura.configurar_personas()
     assert orden[:2] == ["REMOTO_REGION_EUROPA", "REMOTO_AE"]  # aunque Emiratos se haya buscado ayer
+
+
+def test_la_limpieza_conserva_las_vacantes_de_los_paises_de_los_perfiles(monkeypatch):
+    """17 nov, caso Danna: LinkedIn traía Product Designer en Chicago, la admisión los dejaba pasar y el final de la
+    limpieza los archivaba por no tener un país de LATAM. Solo quedaban 15 vacantes de EE. UU. de 5.034."""
+    from buscador import bodega
+    cruda = {"titulo": "Senior Product Designer", "empresa": "Acme", "enlace": "https://www.linkedin.com/jobs/view/987",
+             "fuente": "LinkedIn", "ubicacion": "Chicago, Illinois, Estados Unidos", "descripcion": "Design " * 60,
+             "fecha": "2026-11-17"}
+    monkeypatch.setattr(bodega, "_config_operativa", None)  # modo heredado: se archiva como siempre
+    vacantes, _, _ = bodega.limpiar([], [cruda], "2026-11-17", 30, set(), set())
+    assert vacantes == []
+    motor = bodega.config()
+    motor.update(paises_objetivo_mundo=["US"], acepta_horario=False)
+    monkeypatch.setattr(bodega, "_config_operativa", motor)
+    vacantes, _, _ = bodega.limpiar([], [cruda], "2026-11-17", 30, set(), set())
+    assert len(vacantes) == 1 and vacantes[0]["paises"] == [] and vacantes[0]["paises_mundo"] == ["US"]
