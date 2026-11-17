@@ -8,6 +8,7 @@ corrida toma las combinaciones que hace más tiempo no se revisan y les pide los
 import html
 import re
 import time
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 
 from buscador import cobertura, enlaces
@@ -124,7 +125,13 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
             estado[clave_terminos] = hoy
     # Descripción completa y estado de los avisos: primero los de las familias prioritarias (la entrega diaria solo usa
     # avisos con descripción) y los remotos (ahí la descripción decide el país)
-    avisos.sort(key=lambda a: (a["familia"] not in prioritarias, "REMOTO" not in a["lugar_busqueda"],
+    # Contrato v36: por turnos entre los lugares buscados (la 1.ª de cada lugar, luego la 2.ª…), para que las búsquedas
+    # de cada perfil (p. ej. Chicago o EE. UU.) también reciban fichas; antes casi todas iban a las remotas de LATAM.
+    turno, vistos_lugar = {}, Counter()
+    for a in avisos:
+        turno[id(a)] = vistos_lugar[a["lugar_busqueda"]]
+        vistos_lugar[a["lugar_busqueda"]] += 1
+    avisos.sort(key=lambda a: (a["familia"] not in prioritarias, turno[id(a)], "REMOTO" not in a["lugar_busqueda"],
                                -(int((a["fecha"] or "0000-00-00").replace("-", "")))))
     crudas, con_ficha, cerradas = [], 0, 0
     for a in avisos:

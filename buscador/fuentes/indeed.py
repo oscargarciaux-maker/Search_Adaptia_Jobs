@@ -8,9 +8,30 @@ from datetime import datetime, timezone
 from buscador import cobertura
 
 NOMBRE = "Indeed"
-# Países de LATAM que Indeed tiene en JobSpy (código ISO → nombre en JobSpy)
+# Países que Indeed tiene en JobSpy (código ISO → nombre en JobSpy). LATAM y España de siempre; desde el contrato v36
+# también los de fuera donde viven o trabajarían perfiles del panel (por ejemplo EE. UU. para quien vive en Chicago).
 PAISES = {"AR": "argentina", "BR": "brazil", "CL": "chile", "CO": "colombia", "CR": "costa rica", "EC": "ecuador",
-          "MX": "mexico", "PA": "panama", "PE": "peru", "UY": "uruguay", "VE": "venezuela", "ES": "spain"}
+          "MX": "mexico", "PA": "panama", "PE": "peru", "UY": "uruguay", "VE": "venezuela", "ES": "spain",
+          "US": "usa", "CA": "canada", "GB": "uk", "IE": "ireland", "DE": "germany", "FR": "france", "IT": "italy",
+          "PT": "portugal", "NL": "netherlands", "BE": "belgium", "CH": "switzerland", "AT": "austria",
+          "AU": "australia", "NZ": "new zealand"}
+# Nombre en inglés para completar una ubicación que no nombra país («Remote»): el aviso es del Indeed de ese país.
+NOMBRE_EN = {"US": "United States", "CA": "Canada", "GB": "United Kingdom", "IE": "Ireland", "DE": "Germany",
+             "FR": "France", "IT": "Italy", "PT": "Portugal", "NL": "Netherlands", "BE": "Belgium",
+             "CH": "Switzerland", "AT": "Austria", "AU": "Australia", "NZ": "New Zealand"}
+
+
+def ubicacion(texto, pais):
+    """La ubicación del aviso; si no nombra ningún país (p. ej. «Remote») y el Indeed es de fuera de LATAM, se añade el
+    país de ese Indeed, igual que cuando el aviso viene sin ubicación."""
+    texto = _limpio(texto)
+    if not texto:
+        return NOMBRE_EN.get(pais) or PAISES[pais].title()
+    if pais in NOMBRE_EN:
+        from buscador import paises
+        if not paises.alcance("", texto).get("paises_mundo"):
+            return f"{texto}, {NOMBRE_EN[pais]}"
+    return texto
 
 
 def _limpio(valor):
@@ -70,7 +91,7 @@ def buscar(mapa, paises_activos, estado, presupuesto, hoy=None, max_dias=30, por
             fecha = r.get("date_posted")
             crudas.append({
                 "titulo": _limpio(r.get("title")), "empresa": _limpio(r.get("company")),
-                "ubicacion": _limpio(r.get("location")) or PAISES[pais].title(),
+                "ubicacion": ubicacion(r.get("location"), pais),
                 "descripcion": _limpio(r.get("description"))[:30000],
                 "fecha": fecha.isoformat()[:10] if hasattr(fecha, "isoformat") else _limpio(fecha)[:10],
                 "enlace": _limpio(r.get("job_url")), "enlace_directo": _limpio(r.get("job_url_direct")),

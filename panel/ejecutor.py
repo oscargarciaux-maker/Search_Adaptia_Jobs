@@ -1,6 +1,7 @@
 """Adaptador del control privado al motor de captura existente, sin datos de clientes en reportes públicos."""
 import argparse
 from contextlib import contextmanager
+from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -122,7 +123,10 @@ def preparar(version, fecha, aprendidos=None):
             "excluir": raw["terminos_excluidos"], "herramientas": [], "lugares": list(lugares.items()),
             "_control_cargo": raw,
             "consultas_es": consultas_es, "lugares_es": list(lugares_es.items()) if consultas_es else [],
-            "paises_objetivo": sorted({x for p in perfiles for x in p.paises_oficina}),
+            # Contrato v36: también el país donde vive quien acepta remoto (Indeed busca ahí; antes solo oficinas).
+            "paises_objetivo": sorted({x for p in perfiles for x in p.paises_oficina} |
+                                      {f for p in perfiles for fila in p.filas if "remoto" in fila.modalidades
+                                       for f in fila.paises}),
             "solo_remoto": all(p.modalidades == ["remoto"] for p in perfiles)})
         roles.append({"id": rid, "nombre": c.nombre, "familias": [rid], "cupo": c.cupo,
                       "_perfiles": [p.model_dump(mode="json") for p in perfiles], "_hoy": fecha,
@@ -237,6 +241,111 @@ def _reutilizar(repo, cfg, fecha, estrictas, filas, fila):
     return añadidas
 
 
+# Contrato v36 (caso Danna, 17 nov): completar el mínimo con TODA la bodega, no solo con lo que entró a algún lote.
+MAX_COMPROBAR_RESCATE = 80  # enlaces que se comprueban al momento para estos perfiles (no usa Apify)
+SEGUNDOS_RESCATE = 150
+
+
+def _vigente_24h(v, ahora):
+    """True si la vacante tiene un enlace comprobado como vigente en las últimas 24 h (el plazo para compartir, v31)."""
+    from buscador import tiempos
+    for e in (v.get("verificacion") or {}).get("enlaces") or []:
+        fecha = tiempos.instante(e.get("comprobada_en") or "")
+        if e.get("estado") == "verificada" and fecha:
+            edad = (ahora - datetime.fromisoformat(fecha.replace("Z", "+00:00"))).total_seconds()
+            if 0 <= edad < 24 * 3600:
+                return True
+    return False
+
+
+def _rescatar(repo, cfg, fecha, estrictas, filas, fila, vacantes, cache=None, comprobar=None, subir=None,
+              maximo=MAX_COMPROBAR_RESCATE, segundos=SEGUNDOS_RESCATE):
+    """Contrato v36: a cada perfil que sigue bajo el mínimo se le dan vacantes de toda la bodega de la noche que cumplen
+    su ubicación e idioma (lo demás ordena, v27), con enlace comprobado en 24 h, que esa persona nunca recibió —aunque
+    otro cliente sí— y con máximo 2 por empresa. Los enlaces que falten se comprueban aquí mismo (como mucho
+    `MAX_COMPROBAR_RESCATE`) y su comprobación se guarda en el catálogo para poder compartirlas. No cuentan en el cupo ni
+    van a `ofertas`: solo la asignación por persona, como las reutilizadas (v11)."""
+    from datetime import timezone
+    from buscador import catalogo, contrato, tiempos, verificar_enlaces
+    bajos = [(c, p) for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id))
+             if estrictas.get(p.id, 0) < MINIMO_POR_PERFIL]
+    if not bajos or not vacantes:
+        return 0
+    ahora = datetime.now(timezone.utc)
+    ids = ",".join(str(p.id) for _, p in bajos)
+    vistas = {}
+    for r in _paginas(repo, "panel_asignaciones", {"perfil_id": f"in.({ids})", "select": "perfil_id,vacante_id"}):
+        vistas.setdefault(r["perfil_id"], set()).add(r["vacante_id"])
+    for f in filas:
+        vistas.setdefault(f["perfil_id"], set()).add(f["vacante_id"])
+    utiles = [v for v in vacantes if v.get("tipo") != "post" and v.get("titulo")
+              and not contrato.entregable(dict(v, verificacion=None), panel=True)]
+    # 1) Candidatas de cada perfil, de mejor a peor (grado, lo que no cumple, más reciente).
+    candidatas = {}
+    for cargo, p in bajos:
+        raw = cargo.model_dump(mode="json")
+        lista = []
+        for v in utiles:
+            if v["id"] in vistas.get(str(p.id), set()):
+                continue
+            afinidad, _ = grado(v["titulo"], raw, cercanos=True)
+            if afinidad not in entrega.GRADOS:  # «funciones» nunca se entrega sola (v25)
+                continue
+            match, extra = evaluar(v, p, fecha), []
+            if not match["compatible"]:
+                nivel = next((n for n in AMPLIACIONES if evaluar_ampliada(v, p, fecha, n)["compatible"]), None)
+                if not nivel:
+                    continue
+                match, extra = evaluar_ampliada(v, p, fecha, nivel), [{"ampliacion": nivel}]
+            lista.append((entrega.GRADOS.index(afinidad) + len(match.get("incumple") or ()) + 2 * bool(extra),
+                          -int((v.get("fecha_publicacion") or "0000-00-00").replace("-", "")[:8] or 0),
+                          v, afinidad, match, extra))
+        lista.sort(key=lambda x: x[:2])
+        candidatas[(cargo.id, p.id)] = lista
+    # 2) Comprobar al momento los enlaces de las que podrían entrar (las 3 mejores por plaza que falta).
+    por_comprobar, ya = [], set()
+    for cargo, p in bajos:
+        falta = MINIMO_POR_PERFIL - estrictas.get(p.id, 0)
+        for x in candidatas[(cargo.id, p.id)][:falta * 3]:
+            v = x[2]
+            if v["id"] not in ya and not _vigente_24h(v, ahora):
+                ya.add(v["id"])
+                por_comprobar.append(v)
+    comprobadas = []
+    if por_comprobar:
+        cache = {} if cache is None else cache
+        try:
+            verificar_enlaces.auditar(por_comprobar, cache, maximo=maximo, segundos=segundos, comprobar_url=comprobar)
+            comprobadas = [v for v in por_comprobar if _vigente_24h(v, datetime.now(timezone.utc))]
+        except Exception as e:  # noqa: BLE001 — sin comprobar, simplemente no se entregan
+            registro.aviso("ejecutor:rescate", e)
+    if comprobadas:
+        try:  # la comprobación nueva queda en el catálogo: el panel y WhatsApp la leen de ahí
+            from buscador import supabase
+            (subir or supabase.subir_catalogo)([catalogo.fila(v, tiempos.ahora()) for v in comprobadas])
+        except Exception as e:  # noqa: BLE001
+            registro.aviso("ejecutor:rescate-catalogo", e)
+    # 3) Asignar con enlace vigente, sin repetir a la persona y con máximo 2 por empresa.
+    añadidas = 0
+    ahora = datetime.now(timezone.utc)
+    empresa_de = {v["id"]: normalizar.texto(v.get("empresa") or "") for v in vacantes}
+    for cargo, p in bajos:
+        empresas = Counter(empresa_de.get(f["vacante_id"], "") for f in filas if f["perfil_id"] == str(p.id))
+        for _, _, v, afinidad, match, extra in candidatas[(cargo.id, p.id)]:
+            if estrictas.get(p.id, 0) >= MINIMO_POR_PERFIL:
+                break
+            empresa = normalizar.texto(v.get("empresa") or "")
+            if v["id"] in vistas.setdefault(str(p.id), set()) or empresas[empresa] >= 2 or not _vigente_24h(v, ahora):
+                continue
+            row = {"vacante_id": v["id"], "snapshot": v, "match_grade": entrega.GRADO_CONTRATO.get(afinidad, "close")}
+            vistas[str(p.id)].add(v["id"])
+            empresas[empresa] += 1
+            estrictas[p.id] = estrictas.get(p.id, 0) + 1
+            filas.append(fila(row, p, str(cargo.id), match["pruebas"], [{"rescatada": "bodega"}, *extra]))
+            añadidas += 1
+    return añadidas
+
+
 DIAS_POSTS = 2  # un post se comparte el día en que se leyó o el siguiente (su comprobación vale 24 h)
 
 
@@ -297,7 +406,8 @@ def _posts(repo, cfg, fecha, estrictas, filas, fila):
     return añadidos
 
 
-def registrar(repo, version, fecha, reporte=None, reglas_info=None):
+def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=None, cache_enlaces=None,
+              limites_rescate=(MAX_COMPROBAR_RESCATE, SEGUNDOS_RESCATE)):
     """Reconstruible desde la selección confirmada, incluso tras perder el proceso anterior."""
     ejecucion = iniciar(repo, version, fecha)
     cfg = validar_version(version)
@@ -331,11 +441,18 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None):
         if match["compatible"]:
             estrictas[p.id] = estrictas.get(p.id, 0) + 1
             filas.append(fila(row, p, cargo_id, match["pruebas"], [{"ampliacion": nivel}]))
-    reutilizadas = posts = 0
+    reutilizadas = posts = rescatadas = 0
     try:
         reutilizadas = _reutilizar(repo, cfg, fecha, estrictas, filas, fila)
     except Exception as e:  # noqa: BLE001 — completar con días anteriores nunca impide registrar lo del día
         registro.aviso("ejecutor:329", e)
+    if vacantes:
+        bodega.etapa("Completar a quien va corto con toda la bodega")
+        try:
+            rescatadas = _rescatar(repo, cfg, fecha, estrictas, filas, fila, vacantes, cache=cache_enlaces,
+                                   maximo=limites_rescate[0], segundos=limites_rescate[1])
+        except Exception as e:  # noqa: BLE001 — completar nunca impide registrar lo del día
+            registro.aviso("ejecutor:rescate-general", e)
     bodega.etapa(f"Asignadas {len(filas)}; completar con posts a quien va corto")
     try:
         posts = _posts(repo, cfg, fecha, estrictas, filas, fila)
@@ -361,7 +478,7 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None):
                           "metas": cfg.metas(), "faltantes": faltantes,
                           "asignaciones": len(filas),
                           "ampliadas": sum(any(isinstance(e, dict) and e.get("ampliacion") for e in f["explicacion"]) for f in filas),
-                          "reutilizadas": reutilizadas, "posts": posts, **por_confirmar,
+                          "reutilizadas": reutilizadas, "rescatadas": rescatadas, "posts": posts, **por_confirmar,
                           **({"reglas": reglas_info} if reglas_info else {}),
                           "perfiles_bajo_minimo": sum(1 for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id))
                                                       if estrictas.get(p.id, 0) < MINIMO_POR_PERFIL),
@@ -412,7 +529,12 @@ def correr(salida, modo="diario", prueba=False, repo=None):
                     reglas_info["ubicaciones_resueltas_por_reglas"] = aprender.guardar_usos(repo, reglas)
                 except Exception as e:  # noqa: BLE001
                     registro.aviso("ejecutor:405", e)
-            registrar(repo, version, fecha, reporte, reglas_info)
+            # Contrato v36: la bodega completa de la noche, para completar el mínimo de cada persona.
+            trabajo = Path(salida) / "trabajo"
+            registrar(repo, version, fecha, reporte, reglas_info,
+                      vacantes=bodega._leer_json(trabajo / "bodega.json.gz", []),
+                      cache_enlaces=bodega._leer_json(trabajo / "verificacion_enlaces.json", {}),
+                      limites_rescate=(30, 60) if modo == "incremental" else (MAX_COMPROBAR_RESCATE, SEGUNDOS_RESCATE))
             if modo != "incremental":
                 try:  # borradores de WhatsApp listos para revisar; un fallo aquí nunca tumba la búsqueda
                     from panel import borradores
