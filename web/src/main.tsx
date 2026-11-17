@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   ArrowDownToLine,
@@ -145,8 +145,23 @@ function PreviewCargo({
         "preview-chip " + info.estado + (estado === "cargando" ? " stale" : "")
       }
     >
-      <Target size={12} />≈ {info.disponibles} guardadas sin entregar ·{" "}
-      {textoEstadoCargo[info.estado]}
+      <Target size={12} />
+      {/* Lista grande (17 nov): cuántos días alcanza lo guardado, en vez de «≈ 136 guardadas sin entregar». */}
+      {!info.cupo ? (
+        textoEstadoCargo[info.estado]
+      ) : info.disponibles >= info.cupo ? (
+        <>
+          Alcanza para{" "}
+          <b>
+            ~{Math.floor(info.disponibles / info.cupo)}{" "}
+            {Math.floor(info.disponibles / info.cupo) === 1 ? "día" : "días"}
+          </b>
+        </>
+      ) : (
+        <>
+          No alcanza para mañana: faltan <b>{info.cupo - info.disponibles}</b>
+        </>
+      )}
       {!!info.solapes?.length && (
         <span className="overlap">
           {" "}
@@ -157,8 +172,9 @@ function PreviewCargo({
         </span>
       )}
       <Ayuda etiqueta="vacantes del cargo">
-        Vacantes ya guardadas, aún no entregadas, que cumplen los filtros de
-        algún perfil de este cargo.
+        Hay {info.disponibles} vacantes ya guardadas, aún no entregadas, que
+        cumplen algún perfil de este cargo, y su meta es de {info.cupo} al día.
+        Cada noche la búsqueda trae más.
         {!!info.solapes?.length &&
           " Las que sirven a dos cargos se reparten por turnos según lo que le falta a cada uno. Mejor un solo cargo con varios perfiles."}
       </Ayuda>
@@ -287,6 +303,53 @@ function DistintivoComunidad() {
   );
 }
 
+// El techo del día como dona (lista grande, 17 nov): cada cargo es un tramo con su color; el centro dice lo usado.
+function DonaTecho({
+  partes,
+  total,
+  usado,
+}: {
+  partes: { valor: number; color: string }[];
+  total: number;
+  usado: number;
+}) {
+  const r = 42;
+  const largo = 2 * Math.PI * r;
+  // Dónde empieza cada tramo: la suma de los anteriores (calculada antes de pintar).
+  const tramos = partes.map((p) => (largo * p.valor) / Math.max(1, total));
+  const inicios = tramos.map((_, i) =>
+    tramos.slice(0, i).reduce((a, b) => a + b, 0),
+  );
+  return (
+    <svg
+      className="dona-techo"
+      viewBox="0 0 104 104"
+      role="img"
+      aria-label={`Techo del día: ${usado} de ${total} repartidas por cargo`}
+    >
+      <circle cx="52" cy="52" r={r} className="dona-fondo" />
+      {partes.map((p, i) => (
+        <circle
+          key={i}
+          cx="52"
+          cy="52"
+          r={r}
+          stroke={p.color}
+          strokeDasharray={`${Math.max(0, tramos[i] - 2)} ${largo}`}
+          strokeDashoffset={-inicios[i]}
+          transform="rotate(-90 52 52)"
+        />
+      ))}
+      <text x="52" y="55" textAnchor="middle" className="dona-cifra">
+        {usado}
+      </text>
+      <text x="52" y="70" textAnchor="middle" className="dona-sub">
+        de {total}
+      </text>
+    </svg>
+  );
+}
+
 function TarjetasResumen({
   clientes,
   diaConteo,
@@ -334,103 +397,9 @@ function TarjetasResumen({
   const grilla = clientes.length >= CLIENTES_EN_GRILLA;
   const deHoy = diaConteo === hoyBogota();
   return (
-    <section
-      className={"resumen-grid" + (grilla ? " con-muchos" : "")}
-      aria-label="Resumen del panel"
-    >
-      <div className="tarjeta-resumen tarjeta-clientes">
-        <span className="tarjeta-cabeza">
-          <Users size={18} />
-          Clientes
-        </span>
-        <strong className="tarjeta-numero">
-          {clientes.length}
-          <small>
-            {" "}
-            {clientes.length === 1 ? "activo" : "activos"}
-            {diaConteo
-              ? ` · ${bajos} bajo su meta`
-              : ` · ${perfiles} ${perfiles === 1 ? "perfil" : "perfiles"}`}
-          </small>
-        </strong>
-        {diaConteo && (
-          <span className="tarjeta-detalle">
-            {deHoy
-              ? "Recibidas hoy de su meta del día"
-              : `Recibidas en la búsqueda del ${fecha(diaConteo)} (la de hoy aún no corre)`}
-          </span>
-        )}
-        {clientes.length > 0 && (
-          <ul
-            className={"clientes-lista" + (grilla ? " en-grilla" : "")}
-            aria-label="Clientes y su avance"
-          >
-            {clientes.map((c) => {
-              const pct =
-                c.recibidas == null || !c.meta
-                  ? 0
-                  : Math.min(100, Math.round((c.recibidas / c.meta) * 100));
-              const cifra =
-                c.recibidas == null
-                  ? `— / ${c.meta}`
-                  : `${c.recibidas}/${c.meta}`;
-              const pendiente = `${c.porConfirmar} por confirmar`;
-              return (
-                <li key={c.id}>
-                  <button
-                    type="button"
-                    className={
-                      "cliente-mini" +
-                      (bajoMeta(c) ? " bajo" : "") +
-                      (c.comunidad ? " es-comunidad" : "")
-                    }
-                    aria-label={
-                      `${c.nombre}${c.comunidad ? " (Comunidad)" : ""}: ` +
-                      (c.recibidas == null
-                        ? `meta de ${c.meta}`
-                        : `${c.recibidas} de ${c.meta}`) +
-                      `, ${pendiente}` +
-                      (bajoMeta(c) ? ", bajo su meta" : "") +
-                      ". Ver detalle"
-                    }
-                    onClick={() => onCliente(c.id)}
-                  >
-                    <span className="cliente-texto">
-                      <strong>
-                        {c.nombre}
-                        {c.comunidad && <DistintivoComunidad />}
-                      </strong>
-                      <span>
-                        {c.cargo}
-                        {!grilla && c.porConfirmar > 0 && (
-                          <span className="solo-lista"> · {pendiente}</span>
-                        )}
-                      </span>
-                    </span>
-                    <span className="cliente-barra" aria-hidden="true">
-                      <span style={{ width: pct + "%" }} />
-                    </span>
-                    <span className="cliente-pie">
-                      <span className="cliente-cifra">{cifra}</span>
-                      <span className="cliente-confirmar">{pendiente}</span>
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        <button
-          type="button"
-          className="ver-todos"
-          onClick={() => go("Clientes")}
-        >
-          Ver clientes
-          <ArrowRight size={15} />
-        </button>
-      </div>
-
-      <div className="resumen-derecha">
+    <section className="resumen-grid resumen-b" aria-label="Resumen del panel">
+      {/* Lista grande (17 nov, variante B elegida): indicadores arriba, Actividad y los clientes abajo a todo lo ancho. */}
+      <div className="resumen-arriba">
         <button
           type="button"
           className={
@@ -452,25 +421,23 @@ function TarjetasResumen({
               {total - comunidad} a clientes · {comunidad} a Comunidad
             </span>
           </div>
-          <span className="cupos-barra" aria-hidden="true">
-            {conCupo.map((c, i) => (
-              <span
-                key={c.id}
-                style={{
-                  width: (c.cupo / Math.max(total, techo)) * 100 + "%",
-                  background: colores[i % 5],
-                  animationDelay: 120 + i * 70 + "ms",
-                }}
-              />
-            ))}
-          </span>
-          <span className="cupos-leyenda">
-            {conCupo.map((c, i) => (
-              <span key={c.id}>
-                <i style={{ background: colores[i % 5] }} />
-                {c.nombre} <b>{c.cupo}</b>
-              </span>
-            ))}
+          <span className="cupos-dona-fila">
+            <DonaTecho
+              partes={conCupo.map((c, i) => ({
+                valor: c.cupo,
+                color: colores[i % 5],
+              }))}
+              total={Math.max(total, techo)}
+              usado={total}
+            />
+            <span className="cupos-leyenda">
+              {conCupo.map((c, i) => (
+                <span key={c.id}>
+                  <i style={{ background: colores[i % 5] }} />
+                  {c.nombre} <b>{c.cupo}</b>
+                </span>
+              ))}
+            </span>
           </span>
           <span className="tarjeta-accion">
             Editar cargos y metas
@@ -571,7 +538,10 @@ function TarjetasResumen({
             </span>
             <span className="tarjeta-detalle">
               {ultima
-                ? `Última, del ${fecha(ultima.fecha)}: ${(estadosEjecucion[ultima.estado] || ultima.estado).toLowerCase()}`
+                ? `Última, del ${fecha(ultima.fecha)}: ${r.vacantes ?? 0} vacantes` +
+                  (diaConteo && bajos
+                    ? ` · ${bajos} ${bajos === 1 ? "cliente" : "clientes"} bajo su meta`
+                    : "")
                 : "Aún no hay búsquedas registradas"}
             </span>
           </span>
@@ -588,6 +558,97 @@ function TarjetasResumen({
             Ver actividad
             <ArrowRight size={14} />
           </span>
+        </button>
+      </div>
+      <div className="tarjeta-resumen tarjeta-clientes">
+        <span className="tarjeta-cabeza">
+          <Users size={18} />
+          Clientes
+        </span>
+        <strong className="tarjeta-numero">
+          {clientes.length}
+          <small>
+            {" "}
+            {clientes.length === 1 ? "activo" : "activos"}
+            {diaConteo
+              ? ` · ${bajos} bajo su meta`
+              : ` · ${perfiles} ${perfiles === 1 ? "perfil" : "perfiles"}`}
+          </small>
+        </strong>
+        {diaConteo && (
+          <span className="tarjeta-detalle">
+            {deHoy
+              ? "Recibidas hoy de su meta del día"
+              : `Recibidas en la búsqueda del ${fecha(diaConteo)} (la de hoy aún no corre)`}
+          </span>
+        )}
+        {clientes.length > 0 && (
+          <ul
+            className={"clientes-lista" + (grilla ? " en-grilla" : "")}
+            aria-label="Clientes y su avance"
+          >
+            {clientes.map((c) => {
+              const pct =
+                c.recibidas == null || !c.meta
+                  ? 0
+                  : Math.min(100, Math.round((c.recibidas / c.meta) * 100));
+              const cifra =
+                c.recibidas == null
+                  ? `— / ${c.meta}`
+                  : `${c.recibidas}/${c.meta}`;
+              const pendiente = `${c.porConfirmar} por confirmar`;
+              return (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    className={
+                      "cliente-mini" +
+                      (bajoMeta(c) ? " bajo" : "") +
+                      (c.comunidad ? " es-comunidad" : "")
+                    }
+                    aria-label={
+                      `${c.nombre}${c.comunidad ? " (Comunidad)" : ""}: ` +
+                      (c.recibidas == null
+                        ? `meta de ${c.meta}`
+                        : `${c.recibidas} de ${c.meta}`) +
+                      `, ${pendiente}` +
+                      (bajoMeta(c) ? ", bajo su meta" : "") +
+                      ". Ver detalle"
+                    }
+                    onClick={() => onCliente(c.id)}
+                  >
+                    <span className="cliente-texto">
+                      <strong>
+                        {c.nombre}
+                        {c.comunidad && <DistintivoComunidad />}
+                      </strong>
+                      <span>
+                        {c.cargo}
+                        {!grilla && c.porConfirmar > 0 && (
+                          <span className="solo-lista"> · {pendiente}</span>
+                        )}
+                      </span>
+                    </span>
+                    <span className="cliente-barra" aria-hidden="true">
+                      <span style={{ width: pct + "%" }} />
+                    </span>
+                    <span className="cliente-pie">
+                      <span className="cliente-cifra">{cifra}</span>
+                      <span className="cliente-confirmar">{pendiente}</span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <button
+          type="button"
+          className="ver-todos"
+          onClick={() => go("Clientes")}
+        >
+          Ver clientes
+          <ArrowRight size={15} />
         </button>
       </div>
     </section>
@@ -1279,11 +1340,26 @@ function BorrarClienteDialog({
   );
 }
 
+// Compara dos configuraciones por su contenido, sin importar el orden de las claves.
+function ordenado(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(ordenado);
+  if (v && typeof v === "object")
+    return Object.fromEntries(
+      Object.keys(v as Record<string, unknown>)
+        .sort()
+        .map((k) => [k, ordenado((v as Record<string, unknown>)[k])]),
+    );
+  return v;
+}
+function mismoContenido(a: unknown, b: unknown) {
+  return JSON.stringify(ordenado(a)) === JSON.stringify(ordenado(b));
+}
+
 function App() {
   const [sesion, setSesion] = useState<Sesion | null>(null),
     [estado, setEstado] = useState<EstadoConfig | null>(null),
     [draft, setDraft] = useState<Configuracion>(vacio),
-    [dirty, setDirty] = useState(false),
+    [marcado, setDirty] = useState(false),
     [tab, setTab] = useState(seccionDeHash),
     [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true),
@@ -1359,6 +1435,12 @@ function App() {
   const [borradoresHoy, setBorradoresHoy] = useState<Borrador[] | null>(null);
   const previaCargos = useVistaPrevia(
     tab === "Cargos y metas" && sesion?.sesion ? draft : null,
+  );
+  // Lista grande (17 nov): hay cambios solo si el borrador es distinto del guardado. Si deshaces lo que cambiaste,
+  // vuelve a «sin cambios» y no pide guardar ni programar otra vez.
+  const dirty = useMemo(
+    () => marcado && mismoContenido(draft, estado?.borrador) === false,
+    [marcado, draft, estado?.borrador],
   );
   const metas = conMetas(draft),
     total = metas.total,
@@ -2159,11 +2241,22 @@ function App() {
                         />
                         <div className="role-terms">
                           <span>También buscará</span>
-                          {c.terminos_similares.slice(0, 5).map((t) => (
+                          {c.terminos_similares.slice(0, 1).map((t) => (
                             <span className="term readonly" key={t}>
                               {t}
                             </span>
                           ))}
+                          {c.terminos_similares.length > 1 && (
+                            <span
+                              className="terminos-mas"
+                              title={c.terminos_similares.slice(1).join(", ")}
+                            >
+                              +{c.terminos_similares.length - 1}{" "}
+                              {c.terminos_similares.length === 2
+                                ? "nombre más"
+                                : "nombres más"}
+                            </span>
+                          )}
                           {!c.terminos_similares.length && (
                             <span className="helper">
                               Añade o descubre denominaciones afines.
@@ -2215,36 +2308,36 @@ function App() {
                     }
                   }}
                 >
-                  <h3>
-                    <Archive size={16} />
+                  {/* Lista grande (17 nov): una franja baja bajo los cargos, con cada archivado como ficha pequeña. */}
+                  <span className="archivados-titulo">
+                    <Archive size={15} />
                     Archivados ({draft.cargos.filter((c) => !c.activo).length})
-                  </h3>
-                  <p className="field-help">
-                    Arrastra un cargo aquí para archivarlo, o usa su botón de
-                    archivar. Vuelve solo si le asignas un perfil.
-                  </p>
-                  <ul>
-                    {draft.cargos
-                      .filter((c) => !c.activo)
-                      .map((c) => (
-                        <li key={c.id}>
-                          <span>{c.nombre}</span>
-                          <button
-                            className="text-button"
-                            onClick={() =>
-                              cambiar({
-                                ...draft,
-                                cargos: draft.cargos.map((x) =>
-                                  x.id === c.id ? { ...x, activo: true } : x,
-                                ),
-                              })
-                            }
-                          >
-                            Reactivar
-                          </button>
-                        </li>
-                      ))}
-                  </ul>
+                  </span>
+                  {draft.cargos
+                    .filter((c) => !c.activo)
+                    .map((c) => (
+                      <span className="archivado-ficha" key={c.id}>
+                        {c.nombre}
+                        <button
+                          type="button"
+                          className="text-button"
+                          aria-label={"Reactivar " + c.nombre}
+                          onClick={() =>
+                            cambiar({
+                              ...draft,
+                              cargos: draft.cargos.map((x) =>
+                                x.id === c.id ? { ...x, activo: true } : x,
+                              ),
+                            })
+                          }
+                        >
+                          Reactivar
+                        </button>
+                      </span>
+                    ))}
+                  <span className="archivados-ayuda">
+                    Arrastra un cargo aquí para archivarlo.
+                  </span>
                 </aside>
               </div>
               {previaCargos.datos?.nota && (
@@ -2274,13 +2367,9 @@ function App() {
                       value={selectedClient}
                       onChange={(e) => setSelectedClient(e.target.value)}
                     >
-                      {Array.from(
-                        new Map(
-                          [...clientes, ...(results?.clientes || [])].map(
-                            (c) => [c.id, c],
-                          ),
-                        ).values(),
-                      ).map((c) => (
+                      {/* Lista grande (17 nov): solo los clientes de hoy; los de configuraciones anteriores (CSV viejo) ya no
+                          aparecen con «pendiente». */}
+                      {clientes.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.nombre}
                         </option>

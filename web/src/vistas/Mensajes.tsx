@@ -177,85 +177,88 @@ export function Mensajes({
           texto="Los mensajes se preparan solos cada mañana tras la búsqueda. También puedes pulsar «Preparar mensajes»."
         />
       ) : (
-        visibles.map((b) => (
-          <article className="mensaje" key={b.id}>
-            <div className="mensaje-lado">
-              <div className="mensaje-top">
-                <div>
-                  <h3>{nombre(b.cliente_id)}</h3>
-                  <p className="muted">
-                    {b.cargos.join(" · ")} · {b.vacantes.length}{" "}
-                    {b.vacantes.length === 1 ? "vacante" : "vacantes"}
-                    {b.pocas && " · hoy hubo menos de 5"}
-                  </p>
+        // Lista grande (17 nov, opción B): las tarjetas de mensaje de dos en dos, para ver más clientes a la vez.
+        <div className="mensajes-columnas">
+          {visibles.map((b) => (
+            <article className="mensaje" key={b.id}>
+              <div className="mensaje-lado">
+                <div className="mensaje-top">
+                  <div>
+                    <h3>{nombre(b.cliente_id)}</h3>
+                    <p className="muted">
+                      {b.cargos.join(" · ")} · {b.vacantes.length}{" "}
+                      {b.vacantes.length === 1 ? "vacante" : "vacantes"}
+                      {b.pocas && " · hoy hubo menos de 5"}
+                    </p>
+                  </div>
+                  <span
+                    className={
+                      "pill " + (b.estado === "enviado" ? "green" : "amber")
+                    }
+                  >
+                    {estadosMensaje[b.estado]}
+                  </span>
                 </div>
-                <span
-                  className={
-                    "pill " + (b.estado === "enviado" ? "green" : "amber")
-                  }
-                >
-                  {estadosMensaje[b.estado]}
-                </span>
               </div>
-            </div>
-            <label className="sr-only" htmlFor={"texto-" + b.id}>
-              Mensaje para {nombre(b.cliente_id)}
-            </label>
-            <textarea
-              id={"texto-" + b.id}
-              defaultValue={b.texto}
-              rows={8}
-              onBlur={(e) =>
-                e.target.value !== b.texto &&
-                cambiar(b, { texto: e.target.value })
-              }
-            />
-            <div className="alerts-actions">
-              <button
-                type="button"
-                className="text-button"
-                onClick={() => cambiar(b, { estado: "descartado" })}
-              >
-                Descartar
-              </button>
-              <button
-                type="button"
-                className="button secondary"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(b.texto);
-                    notify("Mensaje copiado.");
-                  } catch {
-                    notify("No se pudo copiar; selecciona el texto.", true);
-                  }
-                }}
-              >
-                <Copy size={14} /> Copiar
-              </button>
-              <button
-                type="button"
-                className="button secondary"
-                onClick={() => cambiar(b, { estado: "enviado" })}
-              >
-                <Check size={14} /> Marcar como enviado
-              </button>
-              {b.enlace && (
-                <a
-                  className="button primary"
-                  href={b.enlace}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={() =>
-                    b.estado === "pendiente" &&
-                    cambiar(b, { estado: "abierto" })
-                  }
+              <label className="sr-only" htmlFor={"texto-" + b.id}>
+                Mensaje para {nombre(b.cliente_id)}
+              </label>
+              <textarea
+                id={"texto-" + b.id}
+                defaultValue={b.texto}
+                rows={8}
+                onBlur={(e) =>
+                  e.target.value !== b.texto &&
+                  cambiar(b, { texto: e.target.value })
+                }
+              />
+              <div className="alerts-actions">
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => cambiar(b, { estado: "descartado" })}
                 >
-                  <MessageCircle size={14} /> Abrir en WhatsApp
-                </a>
-              )}
-            </div>
-          </article>
-        ))
+                  Descartar
+                </button>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(b.texto);
+                      notify("Mensaje copiado.");
+                    } catch {
+                      notify("No se pudo copiar; selecciona el texto.", true);
+                    }
+                  }}
+                >
+                  <Copy size={14} /> Copiar
+                </button>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => cambiar(b, { estado: "enviado" })}
+                >
+                  <Check size={14} /> Marcar como enviado
+                </button>
+                {b.enlace && (
+                  <a
+                    className="button primary"
+                    href={b.enlace}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() =>
+                      b.estado === "pendiente" &&
+                      cambiar(b, { estado: "abierto" })
+                    }
+                  >
+                    <MessageCircle size={14} /> Abrir en WhatsApp
+                  </a>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
       )}
     </section>
   );

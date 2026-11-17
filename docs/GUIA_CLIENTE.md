@@ -42,6 +42,11 @@ en dos paneles: a la izquierda sus últimos 7 días, sus perfiles, lo que más c
 sus vacantes» y «Descargar su CSV de hoy»; a la derecha sus «por confirmar» para decidir ahí mismo («Sí, sirve» usa
 el país sugerido; si no hay sugerencia, «Elegir país en Por confirmar»).
 
+**Panel (17 nov).** El Resumen muestra arriba el techo del día (dona), vacantes, «por confirmar» y mensajes, después
+Actividad y al final a todos los clientes a lo ancho; toca un cliente para ver su detalle. En Cargos y metas cada cargo
+dice para cuántos días alcanza lo guardado, y los archivados se reactivan desde sus fichas. En Clientes, toca cualquier
+parte de la tarjeta para editarla. Los mensajes se ven de dos en dos. Si deshaces un cambio, el panel ya no pide guardar.
+
 **Formulario del cliente (16 nov, contrato v35).** El WhatsApp se llena en una fila: elige el país en la lista y
 escribe solo el número. En «Otras zonas horarias en las que puede trabajar» añade las zonas que acepta (por ejemplo
 «UTC−5 · Bogotá, Lima, Nueva York»). En «Este perfil NO acepta…», «Otra…» deja escribir cualquier cosa que no esté en
