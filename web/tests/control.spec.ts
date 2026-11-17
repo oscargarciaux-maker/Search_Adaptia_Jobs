@@ -99,7 +99,7 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await dialog.getByLabel("Cargo del perfil 1").selectOption({ label: "QA" });
   await dialog.getByLabel("Antigüedad del perfil 1").selectOption("7");
   // Contrato v20: un solo campo de años; busca de 3 menos a 3 más.
-  await dialog.getByLabel("Años de experiencia del perfil 1").fill("4");
+  await dialog.getByLabel("Años de experiencia del perfil 1").selectOption("4");
   await dialog
     .getByRole("button", { name: "Más información: años de experiencia" })
     .first()
@@ -721,7 +721,7 @@ test("contrato v22: restricciones, prioridades y margen de años en el perfil", 
     .getByRole("button", { name: "Editar Cliente de ejemplo 01", exact: true })
     .click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Años de experiencia del perfil 1").fill("6");
+  await dialog.getByLabel("Años de experiencia del perfil 1").selectOption("6");
   await dialog.getByLabel("Margen de años del perfil 1").selectOption("4");
   // Contrato v35: la explicación de los años está en el «ⓘ» junto al título.
   await dialog
@@ -802,6 +802,15 @@ test("contrato v23 y v30: ubicaciones en filas, permiso de trabajo, horario y ci
       name: "Quitar UTC−5 · Bogotá, Lima, Nueva York del perfil 1",
     }),
   ).toBeVisible();
+  // PR 3 de la sesión de prueba: la zona dice la diferencia con donde vive; primero el país, luego la ciudad.
+  await expect(
+    dialog
+      .getByText(/hora que donde vive|h (más|menos) que donde vive/)
+      .first(),
+  ).toBeVisible();
+  const fila = dialog.locator(".ubicacion-fila").first();
+  await expect(fila.locator("label").nth(0)).toHaveText(/^Países/);
+  await expect(fila.locator("datalist option").first()).toBeAttached();
   // «Otra…» restricción en texto libre (solo ordena) y la cifra de 30 días que no asusta.
   await dialog
     .getByLabel("Añadir restricción al perfil 1")
@@ -1493,4 +1502,25 @@ test("contrato v31: mi número, mandarme todos a mi WhatsApp y lista de enviados
   );
   expect(await page.evaluate(revisarContraste)).toEqual([]);
   expect(errores).toEqual([]);
+});
+
+test("sesión de prueba: nombres afines con un clic y explicación del 0", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await ir(page, "Cargos y metas");
+  await page.getByRole("button", { name: "Añadir cargo", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Cargo", { exact: true }).fill("UX Designer");
+  await dialog
+    .getByRole("button", { name: "Buscar denominaciones afines" })
+    .click();
+  const sugerido = dialog.locator(".chip-sugerido").first();
+  await expect(sugerido).toBeVisible();
+  const nombre = ((await sugerido.textContent()) || "").trim();
+  await sugerido.click();
+  await expect(
+    dialog.getByRole("button", { name: "Quitar " + nombre }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
 });

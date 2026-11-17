@@ -25,6 +25,27 @@ from panel.terminos import sugerir
 RAIZ = Path(__file__).resolve().parent.parent
 COOKIE_SESION, COOKIE_RENOVAR = "adaptia_session", "adaptia_renovar"
 DIAS_RENOVACION = 30
+# Hora estándar de países de fuera de la tabla propia donde suelen vivir clientes (EE. UU. y Canadá por la costa este).
+UTC_FUERA = {"US": -5, "CA": -5, "GB": 0, "IE": 0, "PT": 0, "DE": 1, "FR": 1, "IT": 1, "NL": 1, "BE": 1, "CH": 1,
+             "AT": 1, "AU": 10, "NZ": 12}
+
+
+def _ciudades_por_pais():
+    """{país: [ciudades]} con las principales de la tabla propia y las áreas metropolitanas (sin repetir)."""
+    salida = {}
+    for p in paises.datos()["paises"]:
+        salida.setdefault(p["codigo"], []).extend(p.get("ciudades") or [])
+    for ciudad, codigo in paises.areas_metropolitanas().items():
+        salida.setdefault(codigo, []).append(ciudad)
+    ruido = ("district", "distrito", "metropolitan", "metropolitana", "gran ", "greater", "caba", "area ")
+
+    def limpias(nombres):
+        unicas = sorted({x for x in nombres if len(x) > 2 and not any(r in x for r in ruido)}, key=len)
+        # «bogota d c» sobra si ya está «bogota».
+        return sorted(x.title() for i, x in enumerate(unicas) if not any(x.startswith(y + " ") for y in unicas[:i]))
+    return {c: limpias(v)[:40] for c, v in salida.items()}
+
+
 PREFIJOS_MOSTRAR = {"1": "US", "44": "GB", "49": "DE", "33": "FR", "39": "IT", "351": "PT", "55": "BR", "31": "NL",
                     "41": "CH", "353": "IE", "61": "AU", "1809": "DO", "1829": "DO", "1849": "DO", "1787": "PR"}
 
@@ -160,7 +181,11 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
                 # Contrato v23: todos los países, para residencia, mudanza y permiso legal.
                 "paises_mundo": [{"codigo": x["codigo"], "nombre": x["nombre"]} for x in paises.mundo()["lista"]],
                 # Contrato v30: la bandera junto al WhatsApp (solo para mostrar; +1 se muestra como EE. UU.).
-                "prefijos": {**PREFIJOS, **PREFIJOS_MOSTRAR}}
+                "prefijos": {**PREFIJOS, **PREFIJOS_MOSTRAR},
+                # PR 3 de la sesión de prueba (17 nov): ciudades principales por país (primero el país, luego la
+                # ciudad) y la hora de cada país para decir «2 h menos que donde vive».
+                "ciudades_por_pais": _ciudades_por_pais(),
+                "utc_paises": {**UTC_FUERA, **paises.datos()["utc"]}}
 
     @app.post("/api/auth/login")
     async def login(request: Request, body: Credenciales):
