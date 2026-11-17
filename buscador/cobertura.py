@@ -144,7 +144,12 @@ def _por_personas(combinaciones, estado, hoy, prioritarias):
     for i, lista in suyas.items():
         for c in lista:
             sirve[id(c)].append(i)
-    colas = {i: deque(sorted(lista, key=orden)) for i, lista in suyas.items() if lista}
+    def cola(i, lista):
+        # Primero sus lugares principales (donde vive y sus regiones), después el resto por antigüedad.
+        principales = set(_PERSONAS[i].get("principales") or ())
+        return deque(sorted(lista, key=lambda c: (not (_claves_lugar(c[2]) & principales), orden(c))))
+
+    colas = {i: cola(i, lista) for i, lista in suyas.items() if lista}
     pase = {i: 0.0 for i in colas}
     tomadas, salida = set(), []
     while colas:

@@ -150,3 +150,21 @@ def test_un_cargo_nuevo_y_cualquier_persona_entran_a_la_busqueda():
     assert familia["paises_busqueda"] == ["NZ"]
     persona = next(p for p in motor["personas_busqueda"] if p["perfil"] == perfil["id"])
     assert persona["peso"] == 10  # meta 5 × 2: Nueva Zelanda no tiene fuentes propias
+
+
+def test_el_lugar_principal_de_cada_persona_va_primero():
+    """17 nov, búsqueda #31: los turnos de quien vive en Emiratos se iban en países sueltos de Europa y «remoto en
+    Emiratos» y la región Europa nunca se buscaron."""
+    europa = expandir(["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV",
+                       "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "GB", "CH", "NO"])
+    persona = ejecutor.persona_de_busqueda(_perfil([{"paises": ["AE"], "modalidades": ["remoto"]},
+                                                    {"paises": europa, "modalidades": ["remoto"]}]), "cargo:x")
+    assert persona["principales"] == ["REMOTO_AE", "REMOTO_REGION_EUROPA"]
+    combos = [("cargo:x", ["q"], lugar, {}) for lugar in ("REMOTO_GB", "REMOTO_DE", "REMOTO_FR", "REMOTO_AE",
+                                                            "REMOTO_REGION_EUROPA", "REMOTO_MUNDO")]
+    cobertura.configurar_personas([persona])
+    try:
+        orden = [c[2] for c in cobertura.repartir(combos, {"cargo:x@REMOTO_AE": "2026-11-17"}, "2026-11-18")]
+    finally:
+        cobertura.configurar_personas()
+    assert orden[:2] == ["REMOTO_REGION_EUROPA", "REMOTO_AE"]  # aunque Emiratos se haya buscado ayer

@@ -128,8 +128,12 @@ def persona_de_busqueda(p, rid, nombres=None, corto=False):
         peso *= PESO_CORTO
     if not set(codigos) & _con_fuentes_propias():
         peso *= PESO_POCAS_FUENTES
+    # Lugares principales: donde vive (su primera fila) y las regiones de sus filas. Van primero cada día (17 nov: los
+    # turnos de quien vive en Emiratos se iban en países sueltos de Europa y «remoto en Emiratos» nunca llegaba).
+    primera = lugares_perfil(p.model_copy(update={"ubicaciones": p.filas[:1]}), nombres) if p.filas else {}
+    principales = [k for k in lugares if (k in primera and k != "REMOTO_MUNDO") or k.startswith(("REMOTO_REGION_", "REGION_"))]
     return {"familia": rid, "perfil": str(p.id), "lugares": sorted(set(lugares) | set(codigos)), "peso": peso,
-            "corto": bool(corto)}
+            "corto": bool(corto), "principales": principales}
 
 
 # PR 1b (16 nov): palabras con que empiezan los títulos en español. Sirven para elegir, entre los nombres del cargo y los

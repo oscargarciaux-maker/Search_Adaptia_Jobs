@@ -549,7 +549,10 @@ function TarjetasResumen({
           </strong>
           <span className="tarjeta-detalle">
             {ultima
-              ? `Entregadas en la búsqueda del ${fecha(ultima.fecha)}`
+              ? `Entregadas en la búsqueda del ${fecha(ultima.fecha)}` +
+                (ultima.terminada_en
+                  ? ` · actualizada ${horaBogota(ultima.terminada_en)}`
+                  : "")
               : "Sin búsquedas aún"}
           </span>
           <span className="tarjeta-accion">
@@ -1561,6 +1564,11 @@ function App() {
   }, [tab, sesion?.sesion]);
   // Paso 8: recibidas de cada cliente en sus últimos 7 días y sus «por confirmar».
   function recargarResumen() {
+    // 17 nov: una segunda búsqueda del día actualiza la de hoy; sin esto, el Resumen mostraba la de la mañana hasta
+    // volver a cargar la página.
+    api<Ejecucion[]>("/ejecuciones")
+      .then(setRuns)
+      .catch(() => undefined);
     api<Revisiones>(PENDIENTES_RESUMEN)
       .then((r) => {
         setPorConfirmar(r.en_espera ?? r.total);
@@ -3009,6 +3017,19 @@ function CampoTecho({
       onKeyDown={(e) => e.key === "Enter" && confirmar()}
     />
   );
+}
+
+// «3:32 p. m.» en hora de Colombia, de la hora en que terminó la última búsqueda.
+function horaBogota(iso: string) {
+  try {
+    return new Date(iso).toLocaleTimeString("es-CO", {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "America/Bogota",
+    });
+  } catch {
+    return "";
+  }
 }
 
 function llegaronHoy(ultima: Ejecucion | undefined, cargo: string) {

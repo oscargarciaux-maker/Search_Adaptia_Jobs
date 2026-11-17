@@ -252,10 +252,17 @@ def test_validacion_no_aprueba_historial_si_sus_enlaces_actuales_fallaron():
          "supabase": {"filas": 120, "enviadas": 120}},
          "verificacion_enlaces": {"seleccion_del_dia": {"vacantes": 120,
                                   "estados": {"verificada": 108, "pendiente": 5, "rechazada": 7}}}}
-    assert any("selección histórica" in error for error in validacion.errores(r))
-    r["verificacion_enlaces"]["seleccion_del_dia"]["estados"] = {"verificada": 120}
-    r["seleccion_actual"] = {"roles": {"qa": {"nombre": "QA", "vacantes": [{"afinidad_vigente": False}]}}}
-    assert any("fuera del perfil" in error for error in validacion.errores(r))
+    assert any("enlace sin comprobar" in error for error in validacion.errores(r))
+    # 17 nov: un enlace rechazado es una vacante que cerró y ya no se comparte: aviso, no falla.
+    r["verificacion_enlaces"]["seleccion_del_dia"]["estados"] = {"verificada": 113, "rechazada": 7}
+    assert not validacion.errores(r)
+    r["seleccion_actual"] = {"roles": {"qa": {"nombre": "QA", "vacantes": [
+        {"afinidad_vigente": False, "catalog_status": "active", "verificacion": {"estado": "verificada"}}]}}}
+    assert any("ya no encajan en ningún perfil" in error for error in validacion.errores(r))
+    r["seleccion_actual"]["roles"]["qa"]["vacantes"] = [
+        {"afinidad_vigente": False, "catalog_status": "closed", "verificacion": {"estado": "rechazada"}}]
+    assert not validacion.errores(r) and validacion.avisos(r) == [
+        "QA: 1 vacantes elegidas hoy cerraron o salieron del inventario después; no se comparten."]
 
 
 @pytest.mark.parametrize("en_inventario", [True, False])
