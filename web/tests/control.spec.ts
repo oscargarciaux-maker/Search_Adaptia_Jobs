@@ -203,7 +203,10 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await expect(page.locator(".cifras-cargo").first()).toContainText(
     "Meta del día",
   );
-  await expect(page.getByText(/guardadas sin entregar/).first()).toBeVisible();
+  // Lista grande (17 nov): cada cargo dice para cuántos días alcanza lo guardado.
+  await expect(
+    page.getByText(/Alcanza para|No alcanza para mañana/).first(),
+  ).toBeVisible();
   // Accesibilidad: al cerrar con Escape el foco vuelve al botón que abrió la ventana; ningún texto bajo 12 px.
   await page.getByRole("button", { name: "Añadir cargo", exact: true }).click();
   await page.keyboard.press("Escape");
@@ -527,10 +530,12 @@ test("resumen: tablero de una pantalla, sin menú propio, con dirección por sec
   await expect(page.getByText("TU CENTRO DE OPORTUNIDADES")).toHaveCount(0);
   // Paso 8: la lista de clientes crece con ellos (Andrés maneja 15 o más); lo demás del tablero se ve sin bajar.
   await page.waitForTimeout(700); // termina la animación de entrada
+  // Lista grande (17 nov, variante B): los indicadores y Actividad arriba se ven sin bajar; los clientes van debajo.
   const fondo = await page
-    .locator(".resumen-derecha")
+    .locator(".resumen-arriba")
     .evaluate((e) => e.getBoundingClientRect().bottom);
   expect(fondo).toBeLessThanOrEqual(768);
+  await expect(page.locator(".dona-techo")).toBeVisible();
   await page.screenshot({ path: "/tmp/adaptia-resumen.png" });
   await tarjeta(page, "Clientes").click();
   await expect(page).toHaveURL(/#clientes$/);
@@ -991,7 +996,8 @@ test("paso 8: una tarjeta por cliente, detalle con 7 días y dos columnas desde 
   const columnas = await lista.evaluate(
     (e) => getComputedStyle(e).gridTemplateColumns.split(" ").length,
   );
-  expect(columnas).toBe(3); // lista grande del 16 nov: con muchos clientes, 3 columnas que caben en 1366×768
+  // Lista grande (17 nov): los clientes ocupan todo el ancho, con 4 o más columnas en 1366 px.
+  expect(columnas).toBeGreaterThanOrEqual(4);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -1298,6 +1304,22 @@ test("lista grande 16 nov: detalle en dos paneles, editar perfil y archivar carg
   ).toBeVisible();
   await page.keyboard.press("Escape");
 
+  // Lista grande (17 nov): deshacer un cambio deja el panel «sin cambios» (no pide guardar otra vez).
+  await page.goto("/#cargos");
+  const techoCampo = page.locator("#techo-diario");
+  const original = await techoCampo.inputValue();
+  await techoCampo.fill(String(Number(original) + 5));
+  await techoCampo.blur();
+  await expect(
+    page.getByRole("button", { name: "Guardar borrador" }),
+  ).toBeEnabled();
+  await techoCampo.fill(original);
+  await techoCampo.blur();
+  await expect(
+    page.getByRole("button", { name: "Guardar borrador" }),
+  ).toBeDisabled();
+  // Ventana alta: la franja de archivados queda a la vista y el arrastre no desplaza la página a mitad de camino.
+  await page.setViewportSize({ width: 1366, height: 1400 });
   await page.goto("/#cargos");
   const tarjeta = page.locator(".role-card").first();
   const nombre = (await tarjeta.locator("h3").textContent()) || "";

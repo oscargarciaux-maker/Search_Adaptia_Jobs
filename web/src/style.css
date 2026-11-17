@@ -4789,3 +4789,220 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   font-weight: 550;
   color: var(--osc-text-neutro-medio, #5e6d52);
 }
+
+/* Lista grande (17 nov): Resumen con la disposición B elegida por Oscar. Arriba el techo (dona), vacantes, por confirmar
+   y mensajes; debajo Actividad; al final los clientes con sus tarjetas de siempre, a todo lo ancho. */
+.resumen-grid.resumen-b {
+  grid-template-columns: minmax(0, 1fr);
+}
+.resumen-arriba {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  min-width: 0;
+}
+.resumen-arriba > .tarjeta-actividad {
+  grid-column: 1 / -1;
+}
+.resumen-b .tarjeta-clientes {
+  grid-column: 1 / -1;
+}
+.resumen-b .clientes-lista,
+.resumen-b .clientes-lista.en-grilla {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+.cupos-dona-fila {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+.dona-techo {
+  width: 96px;
+  height: 96px;
+  flex: none;
+}
+.dona-techo circle {
+  fill: none;
+  stroke-width: 13;
+}
+.dona-techo .dona-fondo {
+  stroke: var(--osc-bg-neutro-3, #eef1ee);
+}
+.dona-techo .dona-cifra {
+  fill: var(--ink);
+  font-family: var(--fuente-titulo);
+  font-size: 22px;
+  font-weight: 700;
+}
+.dona-techo .dona-sub {
+  fill: var(--muted);
+  font-size: 10px;
+}
+.resumen-b .cupos-leyenda {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+@media (max-width: 1100px) {
+  .resumen-arriba {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .resumen-arriba > .tarjeta-cupos {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 640px) {
+  .resumen-arriba {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Lista grande (17 nov): Cargos y metas con la opción A. Tarjetas a la mitad de alto, «Alcanza para ~N días» y los
+   archivados como fichas en una franja baja debajo de los cargos (también es donde se sueltan para archivar). */
+.cargos-tablero {
+  grid-template-columns: minmax(0, 1fr);
+}
+.cargos-tablero .role-list {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+.cargos-tablero .role-card {
+  padding: 14px 16px;
+}
+.cargos-tablero .role-symbol {
+  width: 34px;
+  height: 34px;
+}
+.cargos-tablero .role-terms {
+  padding: 10px 0 4px;
+  gap: 4px;
+}
+.cargos-tablero .cifras-cargo {
+  margin-top: 6px;
+}
+.cargos-tablero .cifras-cargo dd {
+  font-size: 18px;
+}
+.terminos-mas {
+  font-size: 12px;
+  color: var(--muted);
+  cursor: help;
+}
+.cargos-archivados {
+  min-height: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 10px 14px;
+}
+.archivados-titulo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 650;
+  font-size: 13px;
+}
+.archivado-ficha {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 4px 6px 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.archivado-ficha .text-button {
+  font-size: 12px;
+  padding: 2px 4px;
+  min-height: 0;
+}
+.archivados-ayuda {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+/* Al archivar o editar, las cifras se recalculan sin «apagar» las tarjetas (antes parecían deshabilitadas un segundo). */
+.cargos-tablero .preview-chip.stale {
+  opacity: 1;
+}
+
+/* Lista grande (17 nov): la tarjeta de cliente de siempre, separada del fondo, con hover y abriendo «Editar» al tocarla
+   en cualquier parte. El botón «Editar» se estira sobre toda la tarjeta (un solo control, accesible con teclado); los
+   demás botones quedan por encima y siguen funcionando. */
+.client-card {
+  position: relative;
+  border-color: var(--osc-line-azul, #c5d3e8);
+  box-shadow:
+    0 1px 2px #0a192f0f,
+    0 4px 14px #0a192f0d;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    transform 0.15s;
+}
+.client-card:hover,
+.client-card:focus-within {
+  border-color: var(--marca, #0b6bcb);
+  box-shadow: 0 6px 20px #0a192f1f;
+  transform: translateY(-1px);
+}
+.client-card .client-bottom .editar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 11px;
+  cursor: pointer;
+}
+.client-card .client-bottom .editar:focus-visible {
+  outline: none;
+}
+.client-card .client-bottom .editar:focus-visible::after {
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
+}
+.client-card .client-bottom > :not(.editar) {
+  position: relative;
+  z-index: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .client-card,
+  .client-card:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* Lista grande (17 nov): Mensajes con la opción B. Dos columnas de tarjetas; dentro, datos y botones arriba y el texto
+   debajo. En pantallas angostas, una columna. */
+.mensajes-columnas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr));
+  gap: 14px;
+  align-items: start;
+}
+.mensajes-columnas .mensaje {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "lado"
+    "texto"
+    "acciones";
+  margin: 0;
+}
+.mensajes-columnas .mensaje > textarea {
+  min-height: 180px;
+}
+.mensajes-columnas .mensaje > .alerts-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+/* La dona ya dice cuánto se usa del techo: la cifra grande no se repite en esa tarjeta. */
+.resumen-b .tarjeta-cupos .cupos-fila .tarjeta-numero {
+  display: none;
+}
+.resumen-b .tarjeta-cupos .cupos-fila .tarjeta-detalle {
+  margin: 0;
+}
