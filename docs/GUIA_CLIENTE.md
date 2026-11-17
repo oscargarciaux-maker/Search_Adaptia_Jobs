@@ -42,6 +42,11 @@ en dos paneles: a la izquierda sus últimos 7 días, sus perfiles, lo que más c
 sus vacantes» y «Descargar su CSV de hoy»; a la derecha sus «por confirmar» para decidir ahí mismo («Sí, sirve» usa
 el país sugerido; si no hay sugerencia, «Elegir país en Por confirmar»).
 
+**Tu día en el Resumen (17 nov).** Arriba están los 3 pasos de cada mañana: 1) revisa las dudosas en «Por confirmar»,
+2) envía los mensajes y 3) ajusta clientes y cargos solo cuando haga falta. El paso que tiene algo pendiente se ve
+resaltado. «Cupo diario» es el máximo de vacantes al día entre todos (antes «Techo del día») e «Historial» es lo que
+antes se llamaba «Actividad».
+
 **Cobertura por persona (17 nov, contrato v37).** En Actividad verás, para cada persona, si hoy llegó a 5, en
 cuántos de sus últimos días lo logró, cuántas vacantes tiene listas y por qué le faltan. «Aún sin datos» quiere decir
 que todavía hay pocas búsquedas con ese perfil. Quien queda corto tiene turno primero en la búsqueda siguiente. Si un

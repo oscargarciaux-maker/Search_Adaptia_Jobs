@@ -13,6 +13,7 @@ import {
   MapPin,
   RefreshCw,
   Upload,
+  X,
 } from "lucide-react";
 import { api } from "../api";
 import {
@@ -517,19 +518,6 @@ export function PorConfirmar({
                     </strong>{" "}
                     — {r.por_que}
                   </p>
-                  {r.sugerida && (
-                    <button
-                      type="button"
-                      className="button primary"
-                      disabled={ocupado === r.vacante_id}
-                      onClick={() =>
-                        decidir(r, r.sugerida as string, r.paises_sugeridos)
-                      }
-                    >
-                      <CheckCheck size={15} />
-                      Aceptar sugerencia
-                    </button>
-                  )}
                 </div>
               )}
               <DatosAviso
@@ -609,6 +597,22 @@ export function PorConfirmar({
                     </div>
                   </>
                 )}
+              </div>
+              {/* Sesión de prueba (17 nov): las decisiones juntas, con ✓ y ✗ parejos. */}
+              <div className="revision-decisiones">
+                {r.sugerida && (
+                  <button
+                    type="button"
+                    className="button primary"
+                    disabled={ocupado === r.vacante_id}
+                    onClick={() =>
+                      decidir(r, r.sugerida as string, r.paises_sugeridos)
+                    }
+                  >
+                    <CheckCheck size={15} />
+                    Aceptar sugerencia
+                  </button>
+                )}
                 <button
                   type="button"
                   className={r.sugerida ? "button secondary" : "button primary"}
@@ -618,6 +622,15 @@ export function PorConfirmar({
                   <Check size={15} />
                   {pais ? `Sirve para ${nombre(pais)}` : "Sirve"}
                 </button>
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={ocupado === r.vacante_id}
+                  onClick={() => decidir(r, "no_sirve")}
+                >
+                  <X size={15} />
+                  No sirve
+                </button>
                 {!r.funciones && (
                   <button
                     type="button"
@@ -625,17 +638,10 @@ export function PorConfirmar({
                     disabled={ocupado === r.vacante_id}
                     onClick={() => decidir(r, "otro_pais")}
                   >
+                    <X size={15} />
                     Solo para otro país
                   </button>
                 )}
-                <button
-                  type="button"
-                  className="button secondary"
-                  disabled={ocupado === r.vacante_id}
-                  onClick={() => decidir(r, "no_sirve")}
-                >
-                  No sirve
-                </button>
                 <button
                   type="button"
                   className="text-button"
