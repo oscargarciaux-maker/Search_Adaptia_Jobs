@@ -8,29 +8,40 @@ from datetime import datetime, timezone
 from buscador import cobertura
 
 NOMBRE = "Indeed"
-# Países que Indeed tiene en JobSpy (código ISO → nombre en JobSpy). LATAM y España de siempre; desde el contrato v36
-# también los de fuera donde viven o trabajarían perfiles del panel (por ejemplo EE. UU. para quien vive en Chicago).
-PAISES = {"AR": "argentina", "BR": "brazil", "CL": "chile", "CO": "colombia", "CR": "costa rica", "EC": "ecuador",
-          "MX": "mexico", "PA": "panama", "PE": "peru", "UY": "uruguay", "VE": "venezuela", "ES": "spain",
-          "US": "usa", "CA": "canada", "GB": "uk", "IE": "ireland", "DE": "germany", "FR": "france", "IT": "italy",
-          "PT": "portugal", "NL": "netherlands", "BE": "belgium", "CH": "switzerland", "AT": "austria",
-          "AU": "australia", "NZ": "new zealand"}
-# Nombre en inglés para completar una ubicación que no nombra país («Remote»): el aviso es del Indeed de ese país.
-NOMBRE_EN = {"US": "United States", "CA": "Canada", "GB": "United Kingdom", "IE": "Ireland", "DE": "Germany",
-             "FR": "France", "IT": "Italy", "PT": "Portugal", "NL": "Netherlands", "BE": "Belgium",
-             "CH": "Switzerland", "AT": "Austria", "AU": "Australia", "NZ": "New Zealand"}
+# Países que Indeed tiene en JobSpy (código ISO → nombre en JobSpy). Contrato v40: todos los que JobSpy admite (62), así
+# cualquier persona del panel tiene Indeed donde vive o trabajaría; solo se busca en los países de sus lugares.
+PAISES = {"AR": "argentina", "AU": "australia", "AT": "austria", "BH": "bahrain", "BE": "belgium", "BR": "brazil",
+          "CA": "canada", "CL": "chile", "CN": "china", "CO": "colombia", "CR": "costa rica", "CZ": "czech republic",
+          "DK": "denmark", "EC": "ecuador", "EG": "egypt", "FI": "finland", "FR": "france", "DE": "germany",
+          "GR": "greece", "HK": "hong kong", "HU": "hungary", "IN": "india", "ID": "indonesia", "IE": "ireland",
+          "IL": "israel", "IT": "italy", "JP": "japan", "KW": "kuwait", "LU": "luxembourg", "MY": "malaysia",
+          "MX": "mexico", "MA": "morocco", "NL": "netherlands", "NZ": "new zealand", "NG": "nigeria", "NO": "norway",
+          "OM": "oman", "PK": "pakistan", "PA": "panama", "PE": "peru", "PH": "philippines", "PL": "poland",
+          "PT": "portugal", "QA": "qatar", "RO": "romania", "SA": "saudi arabia", "SG": "singapore",
+          "ZA": "south africa", "KR": "south korea", "ES": "spain", "SE": "sweden", "CH": "switzerland",
+          "TW": "taiwan", "TH": "thailand", "TR": "türkiye", "UA": "ukraine", "AE": "united arab emirates",
+          "GB": "uk", "US": "usa", "UY": "uruguay", "VE": "venezuela", "VN": "vietnam"}
+
+
+def _nombre_en(pais):
+    """Nombre en inglés del país de un Indeed de fuera de LATAM y España, o "" (los de la tabla propia no se completan)."""
+    from buscador import paises
+    if pais in paises.datos()["codigos"] or pais == "BR":
+        return ""
+    return next((x["nombre_en"] for x in paises.mundo()["lista"] if x["codigo"] == pais), "")
 
 
 def ubicacion(texto, pais):
     """La ubicación del aviso; si no nombra ningún país (p. ej. «Remote») y el Indeed es de fuera de LATAM, se añade el
     país de ese Indeed, igual que cuando el aviso viene sin ubicación."""
     texto = _limpio(texto)
+    nombre_en = _nombre_en(pais)
     if not texto:
-        return NOMBRE_EN.get(pais) or PAISES[pais].title()
-    if pais in NOMBRE_EN:
+        return nombre_en or PAISES[pais].title()
+    if nombre_en:
         from buscador import paises
         if not paises.alcance("", texto).get("paises_mundo"):
-            return f"{texto}, {NOMBRE_EN[pais]}"
+            return f"{texto}, {nombre_en}"
     return texto
 
 
@@ -54,7 +65,8 @@ def buscar(mapa, paises_activos, estado, presupuesto, hoy=None, max_dias=30, por
     hoy = hoy or datetime.now(timezone.utc).date().isoformat()
     inicio = reloj()
     combinaciones = [(f["id"], cobertura.rotar(cobertura.consultas(f), hoy, 1, desfase=desfase_terminos)[0], p + sufijo)
-                     for f in mapa for p in f.get("paises_objetivo", paises_activos) if p in PAISES
+                     for f in mapa for p in f.get("paises_busqueda") or f.get("paises_objetivo", paises_activos)
+                     if p in PAISES
                      # El filtro remoto de Indeed casi nunca marca avisos de LATAM (11 nov: 0 frente a 4 sin filtro):
                      # también se busca sin él y la ubicación del aviso decide la modalidad.
                      for sufijo in (":REMOTO", "")]
@@ -74,6 +86,7 @@ def buscar(mapa, paises_activos, estado, presupuesto, hoy=None, max_dias=30, por
         hechas += 1
         por_familia[familia] = por_familia.get(familia, 0) + 1
         por_pais[lugar] = por_pais.get(lugar, 0) + 1
+        cobertura.anotar_busqueda("indeed", familia, lugar)
         try:
             df = scrape(site_name=["indeed"], search_term=consulta, hours_old=dias * 24, results_wanted=por_busqueda,
                         country_indeed=PAISES[pais], description_format="markdown", verbose=0,
@@ -96,6 +109,7 @@ def buscar(mapa, paises_activos, estado, presupuesto, hoy=None, max_dias=30, por
                 "fecha": fecha.isoformat()[:10] if hasattr(fecha, "isoformat") else _limpio(fecha)[:10],
                 "enlace": _limpio(r.get("job_url")), "enlace_directo": _limpio(r.get("job_url_direct")),
                 "remoto": bool(r.get("is_remote")) or None, "fuente": NOMBRE,
+                "_busqueda": clave,  # contrato v40: de qué búsqueda salió
             })
     return crudas, {"busquedas": hechas, "fallidas": fallidas, "avisos": len(crudas),
                     "combinaciones_total": len(combinaciones), "por_familia": por_familia, "por_lugar": por_pais}

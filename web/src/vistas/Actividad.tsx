@@ -221,6 +221,8 @@ type FilaCobertura = {
   listas: number;
   por_comprobar: number;
   causa: string;
+  busquedas_hoy?: Record<string, number>;
+  pocas_fuentes?: boolean;
 };
 type Grupo = {
   perfiles: number;
@@ -245,6 +247,18 @@ const NOMBRE_GRUPO = {
   pais: "Por país",
   idioma: "Por idioma",
 };
+
+// Contrato v40: páginas buscadas para la persona en la última búsqueda («LinkedIn 6 · Indeed 2»).
+const FUENTES_BUSQUEDA: Record<string, string> = {
+  linkedin: "LinkedIn",
+  indeed: "Indeed",
+};
+function textoBusquedas(b?: Record<string, number>) {
+  const partes = Object.entries(b || {})
+    .filter(([, n]) => n > 0)
+    .map(([k, n]) => `${FUENTES_BUSQUEDA[k] || k} ${n}`);
+  return partes.length ? partes.join(" · ") : "—";
+}
 
 export function CoberturaPersonas({
   nombrePais,
@@ -330,6 +344,7 @@ export function CoberturaPersonas({
                   <th scope="col">Días con {datos.minimo}</th>
                   <th scope="col">Listas</th>
                   <th scope="col">Por comprobar</th>
+                  <th scope="col">Búsquedas hoy</th>
                   <th scope="col">Por qué le faltan</th>
                 </tr>
               </thead>
@@ -351,6 +366,7 @@ export function CoberturaPersonas({
                     </td>
                     <td className="num">{f.listas}</td>
                     <td className="num">{f.por_comprobar}</td>
+                    <td className="num">{textoBusquedas(f.busquedas_hoy)}</td>
                     <td className="causa">{f.causa || "—"}</td>
                   </tr>
                 ))}

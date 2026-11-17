@@ -1,0 +1,26 @@
+# Contrato v40: regiones que se buscan como región. Si una fila de «¿Dónde trabajaría?» abarca buena parte de una región
+# (6 países o más, y al menos el 60 % de sus miembros), LinkedIn la busca con el nombre de la región y, aparte, en sus
+# países principales que la fila incluya. Así «remoto para Europa» no se vuelve 30 búsquedas sueltas ni se pierde.
+# Para editar (poner "NO", Noruega, entre comillas: sin ellas YAML lo lee como «falso»): `linkedin` es el texto que se escribe en «Ubicación» de LinkedIn; `miembros`, los países (ISO);
+# `principales`, los que se buscan también por separado (los de más vacantes primero). LATAM toma sus miembros de
+# datos/paises.yaml.
+europa:
+  linkedin: European Union
+  miembros: [AT, BE, BG, HR, CY, CZ, DK, EE, FI, FR, DE, GR, HU, IE, IT, LV, LT, LU, MT, NL, PL, PT, RO, SK, SI, ES, SE,
+             GB, CH, "NO", IS, LI]
+  principales: [GB, DE, NL, FR, IE, ES, PT, PL]
+latam:
+  linkedin: Latin America
+  principales: [MX, CO, AR, CL, PE]
+norteamerica:
+  linkedin: North America
+  miembros: [US, CA, MX]
+  principales: [US, CA]
+asia_pacifico:
+  linkedin: Asia Pacific
+  miembros: [AU, NZ, SG, JP, KR, CN, HK, TW, IN, ID, MY, PH, TH, VN]
+  principales: [AU, SG, JP, IN]
+medio_oriente:
+  linkedin: Middle East
+  miembros: [AE, SA, QA, KW, BH, OM, IL, JO, EG, TR]
+  principales: [AE, SA, QA]

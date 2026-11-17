@@ -344,6 +344,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     pendientes_v1, guardar_v1 = recuperar_cola("ofertas", "pendientes_supabase.json")
     pendientes_registro, guardar_registro = recuperar_cola("registro", "pendientes_registro.json")
     estado = _leer_json(trabajo / "estado.json", {})
+    cobertura.configurar_rendimiento(estado.get("rendimiento"))  # contrato v40
     previas = _leer_json(trabajo / "bodega.json.gz", [])
     salud_anterior = _leer_json(salida / "datos" / "salud.json", {})
     memoria_db = {}
@@ -408,6 +409,8 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     retiradas = []
     vacantes, sin_familia, descartes = limpiar(previas, crudas, hoy, cfg["dias_maximos"], enlaces_ats, leidas,
                                                consulta=consulta or "", retiradas=retiradas)
+    if not consulta:
+        cobertura.medir(estado, crudas, vacantes, hoy)  # contrato v40: qué trajo cada búsqueda, para la siguiente
     from buscador import verificar_enlaces
     cache_enlaces = _leer_json(trabajo / "verificacion_enlaces.json", {})
     # Contrato v39: las fichas de LinkedIn leídas en esta búsqueda ya comprueban sus enlaces (abiertas o cerradas).
