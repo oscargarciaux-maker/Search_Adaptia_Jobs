@@ -65,6 +65,14 @@ cualquier persona el sistema lo lea».
 - El conteo se guarda solo en el resumen privado de la corrida (`panel_ejecuciones.resumen.busquedas_por_perfil`),
   nunca en archivos públicos.
 
+## 5 bis. La limpieza ya no borra lo de fuera de LATAM (17 nov, caso Danna)
+- Al final de `bodega.limpiar` se archivaba toda vacante sin un país de LATAM o España («sin elegibilidad
+  regional»), aunque la admisión de v24 la hubiera dejado pasar por ser de un país de los perfiles.
+- Así se perdían, por ejemplo, los Product Designer de Chicago que LinkedIn sí traía: de 5.034 vacantes guardadas,
+  solo 15 eran de EE. UU.
+- En modo panel ahora se conservan si sirven a algún perfil (`_sirve_a_perfiles`); en modo heredado se archivan como
+  siempre. La entrega ya las aceptaba desde v24 (`contrato.entregable` con `paises_mundo`).
+
 ## 6. Comprobación final (`buscador/validacion.py`, 17 nov)
 - Una vacante elegida hoy que después cerró, o salió del inventario, ya no se comparte (su enlace queda rechazado).
   Ahora es un **aviso**, no una falla; antes salía como «fuera del perfil».
