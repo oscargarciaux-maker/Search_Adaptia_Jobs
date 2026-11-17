@@ -1,0 +1,22 @@
+# Contrato v38: nombres cortos o apodos de lugares que GeoNames no trae (o trae con menos de 4 letras) y que los avisos
+# usan solos. Clave: el texto sin tildes en minúsculas; valor: código ISO del país. Solo cuenta cuando un tramo de la
+# ubicación es exactamente ese texto («NYC», «Remote - NYC»), nunca dentro de otra palabra.
+# Para añadir uno: el apodo y el país. No poner siglas que también sean estados o países («LA», «DC», «CA»).
+# Si el apodo es de una ciudad, se puede poner «país, ciudad» para que cuente como esa ciudad y sus alrededores.
+nyc: US, new york city
+new york city: US
+sf: US, san francisco
+sf bay area: US
+bay area: US
+silicon valley: US
+tri-state area: US
+tri state area: US
+dfw: US
+socal: US
+norcal: US
+gta: CA
+greater toronto area: CA
+cdmx: MX, ciudad de mexico
+df: MX, ciudad de mexico
+gba: AR
+caba: AR, buenos aires

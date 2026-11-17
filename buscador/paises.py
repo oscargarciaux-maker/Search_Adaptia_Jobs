@@ -20,6 +20,7 @@ RUTA = Path(__file__).resolve().parent.parent / "datos" / "paises.yaml"
 RUTA_MUNDO = RUTA.parent / "paises_mundo.yaml"
 RUTA_LUGARES = RUTA.parent / "lugares_mundo.json.gz"  # contrato v19: GeoNames (CC BY 4.0), generado
 RUTA_AREAS = RUTA.parent / "areas_metropolitanas.yaml"  # contrato v32
+RUTA_ALIAS = RUTA.parent / "alias_lugares.yaml"  # contrato v38
 _METRO = re.compile(r"^(?:area metropolitana de |region metropolitana de |greater )(.+?)(?: area| metropolitan area)?$|"
                     r"^(.+?) (?:y alrededores|and surrounding areas|metropolitan area|area metropolitana|area)$")
 
@@ -34,11 +35,41 @@ def areas_metropolitanas():
 
 
 def area_metropolitana(texto):
-    """Contrato v32: el país de un área metropolitana con formato LinkedIn («Roma y alrededores» → IT), o ""."""
+    """Contrato v32: el país de un área metropolitana con formato LinkedIn («Roma y alrededores» → IT), o "".
+    Contrato v38: si la lista no la trae, el país de fuera de la ciudad en GeoNames cuando no es ambigua («Greater
+    Toronto Area» → CA, «Seattle y alrededores» → US)."""
     m = _METRO.match(normalizar.texto(texto or ""))
     if not m:
         return ""
-    return areas_metropolitanas().get((m.group(1) or m.group(2) or "").strip(), "")
+    nombre = (m.group(1) or m.group(2) or "").strip()
+    if nombre in areas_metropolitanas():
+        return areas_metropolitanas()[nombre]
+    pais = _pais_de_nombre(nombre)
+    return pais if pais not in datos()["codigos"] else ""  # los países cubiertos siguen con su tabla curada
+
+
+@lru_cache(maxsize=1)
+def _alias():
+    try:
+        crudo = yaml.safe_load(RUTA_ALIAS.read_text(encoding="utf-8")) or {}
+    except OSError:
+        return {}
+    salida = {}
+    for k, v in crudo.items():
+        pais, _, ciudad = str(v).partition(",")
+        salida[normalizar.texto(k)] = (pais.strip().upper(), normalizar.texto(ciudad))
+    return salida
+
+
+@lru_cache(maxsize=1)
+def alias_lugares():
+    """Contrato v38: apodo → país ISO («nyc» → US)."""
+    return {k: pais for k, (pais, _) in _alias().items()}
+
+
+def alias_ciudad(nombre):
+    """Contrato v38: la ciudad a la que equivale un apodo («nyc» → «new york city»), o el mismo nombre."""
+    return _alias().get(nombre, ("", ""))[1] or nombre
 
 _REMOTO = re.compile(r"\b(remote|remoto|remota|remotely|teletrabajo|home ?office|work from home|wfh|trabajo a distancia|"
                      r"100% remoto|distributed|fully distributed|anywhere|desde casa|trabajo desde casa|remote work)\b")
@@ -312,15 +343,114 @@ _SOLO_CODIGOS = re.compile(r"^\s*([A-Za-z]{2}|[A-Z]{3})(?:\s+\1)*\s*$")
 
 
 @lru_cache(maxsize=1)
-def _lugares_mundo():
+def _crudo_lugares():
     import gzip
     import json
     try:
         with gzip.open(RUTA_LUGARES, "rt", encoding="utf-8") as f:
             crudo = json.load(f)
     except (OSError, ValueError):
-        return {}, frozenset()
-    return crudo.get("cubiertos", {}), frozenset(crudo.get("extranjeros", []))
+        return {}
+    extranjeros = crudo.get("extranjeros") or {}
+    if isinstance(extranjeros, list):  # formato v19: sin país
+        extranjeros = dict.fromkeys(extranjeros, "")
+    return {"cubiertos": crudo.get("cubiertos") or {}, "extranjeros": extranjeros,
+            "coordenadas": crudo.get("coordenadas") or {}}
+
+
+def _lugares_mundo():
+    crudo = _crudo_lugares()
+    return crudo.get("cubiertos", {}), crudo.get("extranjeros", {})
+
+
+def _pais_de_nombre(nombre):
+    """Contrato v38: país ISO de un nombre de lugar exacto (ya normalizado): alias, lista curada de paises.yaml si
+    apunta a un solo país, o GeoNames (cubierto o el país dominante de una ciudad de fuera). "" si no se sabe."""
+    if not nombre:
+        return ""
+    if nombre in alias_lugares():
+        return alias_lugares()[nombre]
+    curados = datos()["ciudades"].get(nombre) or []
+    if curados:
+        return curados[0] if len(curados) == 1 else ""
+    cubiertos, extranjeros = _lugares_mundo()
+    return cubiertos.get(nombre) or extranjeros.get(nombre) or ""
+
+
+_POSTAL = re.compile(r"(?:\s|^)(?:\d{4,6}(?:-\d{3,4})?|[a-z]\d[a-z] ?\d[a-z]\d|[a-z]{1,2}\d[a-z\d]? ?\d[a-z]{2})$")
+
+
+def _candidatos_tramo(tramo):
+    """Formas de un tramo de ubicación para buscarlo como lugar: tal cual, sin código postal («new york ny 10001»),
+    sin la sigla final del estado o provincia («harrisburg pa», «melbourne vic»)."""
+    t = normalizar.texto(_REMOTO.sub(" ", _HIBRIDO.sub(" ", _PRESENCIAL.sub(" ", normalizar.texto(tramo)))))
+    t = re.sub(r"^(?:area metropolitana de |region metropolitana de |greater |remote in |based in |in )", "", t)
+    t = re.sub(r" (?:y alrededores|and surrounding areas|metropolitan area|area metropolitana|area)$", "", t)
+    sin_postal = _POSTAL.sub("", t).strip()
+    vistos = []
+    for c in (t, sin_postal, re.sub(r" [a-z]{2,3}$", "", sin_postal)):
+        if c and c not in vistos:
+            vistos.append(c)
+    return vistos
+
+
+def _tramos(ubicacion):
+    return re.split(r"[,;|/()]| - | – |·", ubicacion or "")
+
+
+RADIO_CIUDAD_KM = 50  # contrato v38: un lugar a esta distancia o menos cuenta como la misma ciudad (alrededores)
+
+
+def coordenadas(nombre, codigos=(), estado=""):
+    """Contrato v38: (lat, lon) de la ciudad de 15.000 habitantes o más con ese nombre, la más poblada de los países
+    dados (y del estado de EE. UU., si se da). None si no está o si, sin países, el nombre es de varios."""
+    lugares = _crudo_lugares().get("coordenadas", {})
+    for candidato in _candidatos_tramo(nombre):
+        candidato = alias_ciudad(candidato)
+        filas = lugares.get(candidato)
+        if not filas:
+            continue
+        if codigos:
+            filas = [f for f in filas if f[0] in codigos]
+        elif len({f[0] for f in filas}) > 1:
+            pais = _pais_de_nombre(candidato)
+            filas = [f for f in filas if f[0] == pais] if pais else []
+        if estado:
+            filas = [f for f in filas if f[1] == estado] or filas
+        if filas:
+            return filas[0][2], filas[0][3]
+    return None
+
+
+def cerca(lugar, otro, codigos=(), estado=""):
+    """Contrato v38: True si dos ciudades quedan a RADIO_CIUDAD_KM o menos («Brooklyn» y «New York», «Chía» y
+    «Bogotá»). Sin coordenadas de alguna de las dos, False: nunca se adivina."""
+    from math import asin, cos, radians, sin, sqrt
+    a, b = coordenadas(lugar, codigos, estado), coordenadas(otro, codigos)
+    if not a or not b:
+        return False
+    la1, lo1, la2, lo2 = map(radians, (*a, *b))
+    h = sin((la2 - la1) / 2) ** 2 + cos(la1) * cos(la2) * sin((lo2 - lo1) / 2) ** 2
+    return 2 * 6371 * asin(sqrt(h)) <= RADIO_CIUDAD_KM
+
+
+def estado_eeuu(ubicacion):
+    """La sigla de estado de EE. UU. tras la ciudad («Brooklyn, NY» → NY), o ""."""
+    m = _SIGLA.search(ubicacion or "")
+    return m.group(1) if m and m.group(1) in _ESTADOS_EEUU else ""
+
+
+def pais_de_lugar(ubicacion):
+    """Contrato v38: el país (cualquiera, ISO2) de la ciudad o región que nombra la ubicación, o None. Por tramos: un
+    tramo de fuera sin país conocido no cuenta; dos tramos con países distintos no deciden."""
+    hallados = set()
+    for tramo in _tramos(ubicacion):
+        for candidato in _candidatos_tramo(tramo):
+            pais = _pais_de_nombre(candidato)
+            if pais:
+                hallados.add(pais)
+                break
+    return next(iter(hallados)) if len(hallados) == 1 else None
 
 
 _GENERICAS_LUGAR = {"", "na", "n a", "job", "location", "locations", "multiple locations", "various locations",
@@ -335,11 +465,12 @@ def lugar_conocido(ubicacion):
     if not cubiertos and not extranjeros:
         return None
     resultados = set()
-    for tramo in re.split(r"[,;|/()]| - | – ", ubicacion or ""):
-        t = normalizar.texto(_REMOTO.sub(" ", _HIBRIDO.sub(" ", _PRESENCIAL.sub(" ", normalizar.texto(tramo)))))
-        t = re.sub(r"^(?:area metropolitana de |region metropolitana de |greater )", "", t)
-        t = re.sub(r" (?:y alrededores|and surrounding areas|metropolitan area|area)$", "", t)
-        for candidato in (t, re.sub(r" [a-z]{2}$", "", t)):  # «harrisburg pa» → «harrisburg»
+    for tramo in _tramos(ubicacion):
+        for candidato in _candidatos_tramo(tramo):  # «harrisburg pa» → «harrisburg»; v38: sin código postal
+            alias = alias_lugares().get(candidato)
+            if alias:  # contrato v38: «NYC», «GTA», «CDMX»
+                resultados.add(alias if alias in datos()["codigos"] else "fuera")
+                break
             if candidato in cubiertos:
                 resultados.add(cubiertos[candidato])
                 break
@@ -373,6 +504,8 @@ def _expandir_codigos(ubicacion):
             return "pais extranjero" if codigo in d["iso3_extranjeros"] else None
         mayus = codigo.upper()
         if ciudad and codigo.isupper() and mayus in _ESTADOS_EEUU:
+            if mayus in _COMUNIDADES_ES and "ES" in nombres and _pais_de_nombre(ciudad) == "ES":
+                return nombres["ES"]  # contrato v38: «Sabadell, CT» es Cataluña, «Vigo, GA» es Galicia
             if mayus in nombres:
                 es_de = mayus in d["ciudades"].get(ciudad, []) or _pais_por_nombre(ciudad, [mayus])
                 return nombres[mayus] if es_de else None
@@ -492,7 +625,25 @@ def mundo():
     # Una sola expresión con las frases más largas primero: en cada posición gana la más larga.
     patron = re.compile(r"(?<![a-z0-9])(" + "|".join(re.escape(n) for n in por_nombre) + r")(?![a-z0-9])") \
         if por_nombre else None
-    return {"lista": lista, "codigos": {m["iso2"] for m in filas}, "por_nombre": por_nombre, "patron": patron}
+    solo_paises = sorted({n for n, _ in paises_n}, key=len, reverse=True)
+    patron_paises = re.compile(r"(?<![a-z0-9])(" + "|".join(re.escape(n) for n in solo_paises) + r")(?![a-z0-9])") \
+        if solo_paises else None
+    # Contrato v38: nombres que son país y también región de otro país («Georgia»: país y estado de EE. UU.).
+    homonimos = {}
+    for m in filas:
+        for n in m.get("subdivisiones", []):
+            if n in de_pais and m["iso2"] not in {c for x, c in paises_n if x == n}:
+                homonimos.setdefault(n, set()).add(m["iso2"])
+    return {"lista": lista, "codigos": {m["iso2"] for m in filas}, "por_nombre": por_nombre, "patron": patron,
+            "patron_paises": patron_paises, "pais_de": {n: c for n, c in paises_n}, "homonimos": homonimos}
+
+
+def paises_por_nombre_entero(texto):
+    """Contrato v38: solo los países nombrados por su nombre («Spain», «Canada»), sin ciudades ni regiones."""
+    m = mundo()
+    if not texto or m["patron_paises"] is None:
+        return set()
+    return {m["pais_de"][h.group(1)] for h in m["patron_paises"].finditer(texto)}
 
 
 def paises_en_texto(texto):
@@ -502,6 +653,45 @@ def paises_en_texto(texto):
     if not texto or m["patron"] is None:
         return set()
     return {c for hallado in m["patron"].finditer(texto) for c in m["por_nombre"][hallado.group(1)]}
+
+
+# Contrato v38: siglas de provincias de Canadá y estados de Australia tras la ciudad («Toronto, ON», «Sydney NSW»).
+_PROVINCIAS_CA = set("AB BC MB NB NL NS NT NU ON PE QC SK YT".split())
+_ESTADOS_AU = set("NSW VIC QLD TAS ACT SA WA NT".split())
+_COMUNIDADES_ES = set("AN AR AS CB CE CL CM CN CT EX GA IB MC MD ML NC PV RI VC".split())  # ISO 3166-2:ES
+_SIGLA = re.compile(r"(?:,|\s)\s*([A-Z]{2,3})(?=\s*(?:\d{4,5}(?:-\d{4})?|[A-Z]\d[A-Z] ?\d[A-Z]\d)?\s*(?:,|\(|$))")
+
+
+def _paises_por_sigla(ubicacion, nombrados=()):
+    """Contrato v32/v38: el país que dice una sigla de estado o provincia tras la ciudad, admitiendo código postal
+    («New York, NY 10001», «Toronto, ON M5V 3L9»). Si la sigla también es código de país («Berlin, DE», «Toronto, CA»,
+    «Amsterdam, NL»), decide la ciudad: si la ciudad es de ese país, es el país; si no, es el estado de EE. UU.
+    («London, KY»: KY también es Islas Caimán). Una sigla de estado no suma EE. UU. si la ubicación nombra otro país
+    («Barcelona, CT, Spain»: CT es Cataluña). Tras una ciudad de un país cubierto solo cuenta una sigla que no sea
+    también código de país ni de comunidad de España («Panama City, FL»). AR, CO y PA siguen la regla de v15."""
+    texto = ubicacion or ""
+    codigos_iso = mundo()["codigos"]
+    ciudad = pais_de_lugar(_tramos(texto)[0]) if _tramos(texto) else None
+    hallados = set()
+    for m in _SIGLA.finditer(texto):
+        sigla = m.group(1)
+        if m.start() == 0 or not texto[:m.start()].strip(" ,-"):
+            continue  # la sigla sola no es una ciudad con su estado
+        if sigla in codigos_iso and ciudad == sigla:
+            hallados.add(sigla)
+        elif sigla in _ESTADOS_AU and ciudad == "AU":
+            hallados.add("AU")
+        elif sigla in _PROVINCIAS_CA and (ciudad == "CA" or (sigla not in codigos_iso and sigla not in _ESTADOS_AU)):
+            hallados.add("CA")
+        elif sigla in {"NSW", "VIC", "QLD", "TAS", "ACT"}:
+            hallados.add("AU")
+        elif sigla in _ESTADOS_EEUU and sigla not in {"AR", "CO", "PA"} and not (set(nombrados) - {"US"}) and (
+                ciudad not in datos()["codigos"] or (sigla not in codigos_iso and
+                                                     not (ciudad == "ES" and sigla in _COMUNIDADES_ES))):
+            # «nombrados»: países escritos con su nombre. «Toledo, OH» y «Panama City, FL» son de EE. UU.; «Vigo, GA»
+            # es Galicia.
+            hallados.add("US")
+    return hallados
 
 
 def alcance(titulo, ubicacion, descripcion=""):
@@ -514,15 +704,38 @@ def alcance(titulo, ubicacion, descripcion=""):
     sin_propios = ubicacion_n
     for frase in d["propios_con_fuera"]:
         sin_propios = re.sub(r"(?<![a-z0-9])" + re.escape(frase) + r"(?![a-z0-9])", " ", sin_propios)
-    hallados = paises_en_texto(sin_propios) | (paises_en_texto(ubicacion_n) & set(d["reconocidos"]))
+    # Contrato v38: un tramo que es entero una ciudad de fuera conocida dice su país, aunque contenga el nombre de otro
+    # («Jersey City» es EE. UU., no Jersey). Un tramo que es exactamente un país («Georgia») sigue siendo el país.
+    de_ciudades = set()
+    for tramo in _tramos(ubicacion):
+        t = normalizar.texto(tramo)
+        pais = "" if not t or t in mundo()["pais_de"] else pais_de_lugar(tramo)
+        if pais and pais not in d["codigos"] and paises_en_texto(t) - {pais}:
+            de_ciudades.add(pais)
+            sin_propios = re.sub(r"(?<![a-z0-9])" + re.escape(t) + r"(?![a-z0-9])", " ", sin_propios)
+            ubicacion_n = re.sub(r"(?<![a-z0-9])" + re.escape(t) + r"(?![a-z0-9])", " ", ubicacion_n)
+    hallados = paises_en_texto(sin_propios) | (paises_en_texto(ubicacion_n) & set(d["reconocidos"])) | de_ciudades
+    tramos = [normalizar.texto(t) for t in _tramos(ubicacion)]
+    ciudad = pais_de_lugar(_tramos(ubicacion)[0]) if tramos and tramos[0] else None
+    for t in tramos[1:]:  # «Atlanta, Georgia»: la ciudad es de EE. UU., así que Georgia es el estado
+        if ciudad and ciudad in mundo()["homonimos"].get(t, ()):
+            hallados = (hallados - {mundo()["pais_de"][t]}) | {ciudad}
     # Contrato v32: LinkedIn muestra muchas de EE. UU. como «Chicago, IL», «Austin, TX» o «Remote, US». Sin esto no
     # tenían país y se descartaban al entrar, aunque un perfil viva en EE. UU. AR, CO y PA también son países cubiertos:
     # esos tres siguen por la regla de v15.
-    estado = re.search(r",\s*([A-Z]{2})\s*(?:\(|$)", ubicacion or "")
-    if estado and estado.group(1) in _ESTADOS_EEUU and estado.group(1) not in {"AR", "CO", "PA"}:
+    resto = (ubicacion or "").split(",", 1)[1] if "," in (ubicacion or "") else ""
+    siglas = _paises_por_sigla(ubicacion, paises_por_nombre_entero(normalizar.texto(resto)))
+    if siglas:  # v38: la sigla del estado manda sobre la ciudad homónima («Paris, TX» es EE. UU., no Francia)
+        hallados = siglas | paises_en_texto(normalizar.texto(_expandir_codigos(resto)))
+    # Contrato v38: también «US-Remote», «Remote/USA», «US | Canada».
+    if re.search(r"(?:^|[,\s(/|\-])(?:US|USA|U\.S\.A?\.?)(?:$|[,\s)/|\-])", ubicacion or ""):
         hallados.add("US")
-    if re.search(r"(?:^|[,\s(])(?:US|USA|U\.S\.A?\.?)(?:$|[,\s)])", ubicacion or ""):
-        hallados.add("US")
+    if re.search(r"\b(?:north america|norteamerica|america del norte)\b", ubicacion_n):
+        hallados |= {"US", "CA"}  # v38: México solo si el aviso lo nombra
+    if not hallados:  # contrato v38: la ciudad dice el país («Chicago» → US, «Toronto» → CA, «Tokio» → JP)
+        por_lugar = pais_de_lugar(ubicacion)
+        if por_lugar and por_lugar not in d["codigos"]:  # los países cubiertos siguen con su tabla curada
+            hallados.add(por_lugar)
     metro = area_metropolitana(_REMOTO.sub(" ", _HIBRIDO.sub(" ", _PRESENCIAL.sub(" ", ubicacion_n))))
     if metro:  # contrato v32: «Granada y alrededores» es España, no Granada (el país del Caribe)
         hallados = {metro}
@@ -545,6 +758,7 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
     """Lo que dicen la ubicación, el título y la descripción con la tabla oficial (sin reglas)."""
     d = datos()
     todos, latam, europa = d["codigos"], d["latam"], d["europa"]
+    ubicacion_original = ubicacion or ""
     ubicacion = _expandir_codigos(ubicacion)
     lugar = normalizar.texto(f"{ubicacion} {titulo}")
     ambito = normalizar.texto(ubicacion) or lugar
@@ -555,6 +769,12 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
     sin_homonimos = geografia
     for frase in d["fuera_con_propio"]:  # «New Mexico» no es México
         sin_homonimos = re.sub(r"(?<![a-z0-9])" + re.escape(frase) + r"(?![a-z0-9])", " ", sin_homonimos)
+    siglas = _paises_por_sigla(ubicacion_original)
+    if siglas and not siglas & set(todos) and "," in ubicacion_original:
+        # Contrato v38: «Panama City, FL» es Florida. La sigla dice un país de fuera: el nombre de país que va dentro
+        # del nombre de la ciudad no cuenta.
+        primera = normalizar.texto(ubicacion_original.split(",", 1)[0])
+        sin_homonimos = re.sub(r"(?<![a-z0-9])" + re.escape(primera) + r"(?![a-z0-9])", " ", sin_homonimos)
     nombres_pais = [codigo for codigo,nombres in d["nombres_pais"] if _nombra(sin_homonimos,nombres)]
     ciudad_sola = normalizar.texto(_REMOTO.sub(" ",_HIBRIDO.sub(" ",_PRESENCIAL.sub(" ",geografia))))
     ciudad_sola = re.sub(r"^(?:area metropolitana de |region metropolitana de |greater )", "", ciudad_sola)
@@ -563,7 +783,7 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
     # Contrato v32: «Roma y alrededores», «Greater Madrid Area»: el área de la ciudad grande, aunque el nombre exista en
     # otros países. Sin el sufijo, un nombre ambiguo sigue sin decidir.
     metro = "" if nombres_pais else area_metropolitana(_REMOTO.sub(" ", _HIBRIDO.sub(" ", _PRESENCIAL.sub(" ", geografia))))
-    if metro and metro in todos:
+    if metro and metro in d["reconocidos"]:  # v38: Brasil también («Recife y alrededores»: país sin cobertura)
         ciudades = [metro]
     if not nombres_pais and not ciudades and not _nombra(ciudad_sola, d["fuera_lugares"]):
         ciudades = _ciudad_dentro(ciudad_sola, d["ciudades"])
@@ -574,7 +794,7 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
     ambito_sin_propios = ambito
     for frase in d["propios_con_fuera"]:
         ambito_sin_propios = re.sub(r"(?<![a-z0-9])" + re.escape(frase) + r"(?![a-z0-9])", " ", ambito_sin_propios)
-    fuera = _nombra(ambito_sin_propios, d["fuera_lugares"]) or bool(metro and metro not in todos)
+    fuera = _nombra(ambito_sin_propios, d["fuera_lugares"]) or bool(metro and metro not in d["reconocidos"])
     if not nombrados and not fuera and not es_latam and not es_mundo and not es_europa:
         por_lugar = lugar_conocido(ubicacion)  # contrato v19: municipios y ciudades del mundo, solo si nada más decidió
         if por_lugar == "fuera":
