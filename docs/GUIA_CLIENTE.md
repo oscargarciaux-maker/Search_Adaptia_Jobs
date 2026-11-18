@@ -209,6 +209,26 @@ La captura horaria no consume Apify. La búsqueda nocturna y la profunda pueden 
 hasta USD 5/mes para este programa. Revisar el gasto global de la cuenta, que puede incluir otros trabajos.
 Las fuentes y variantes rotan; no se recorren todos los títulos de todos los países en cada ejecución.
 
+### «Buscar ahora» desde el panel (18 nov)
+
+Si la búsqueda del día no arrancó, en el Resumen está **«Buscar ahora»**, junto a «Confirmar y aplicar». Lanza la
+misma búsqueda diaria: si hoy ya hubo una, completa lo que falte sin repetir lo entregado. Tarda alrededor de una hora y
+media; mientras tanto el botón dice «Buscando desde …» y no deja lanzar otra.
+
+Para que aparezca, el servidor del panel necesita una llave de GitHub, una sola vez:
+1. En GitHub: foto de perfil → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** →
+   Generate new token.
+2. Nombre: «Panel · Buscar ahora». Expiration: **No expiration** (así no hay que renovarla; se puede borrar cuando se
+   quiera desde la misma página).
+3. Repository access: **Only select repositories** → este repositorio.
+4. Permissions → Repository permissions → **Actions: Read and write**. Nada más.
+5. Generate token y copiarlo (GitHub lo muestra una sola vez).
+6. En el alojamiento del panel, junto a SUPABASE_URL y los demás valores privados, crear `GITHUB_ACCIONES_TOKEN` con
+   el token y `GITHUB_REPOSITORIO` con `dueño/nombre` del repositorio. Reiniciar el panel.
+
+La llave solo permite lanzar y ver las búsquedas de este repositorio: no da acceso al código, a la cuenta ni a Supabase,
+y nunca llega al navegador. Al traspasar el proyecto, el cliente crea la suya y borra la anterior.
+
 Una búsqueda a pedido se inicia en Actions → Búsqueda profunda → Run workflow, rama main, con cargo y país opcional.
 No crea otra entrega diaria ni acredita la vigencia de todas las ofertas encontradas.
 

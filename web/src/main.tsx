@@ -67,6 +67,7 @@ import {
 } from "./comunes";
 import { PorConfirmar } from "./vistas/PorConfirmar";
 import { TarjetaPorConfirmar } from "./vistas/TarjetaPorConfirmar";
+import { BuscarAhora } from "./vistas/BuscarAhora";
 import { Mensajes } from "./vistas/Mensajes";
 import {
   CoberturaPersonas,
@@ -1955,6 +1956,35 @@ function App() {
                     <Save size={16} />
                     {busy ? "Guardando…" : "Guardar borrador"}
                   </button>
+                  {tab === "Resumen" && (
+                    <BuscarAhora
+                      hoyCorrio={
+                        runs?.[0]?.fecha ===
+                        new Date().toLocaleDateString("en-CA", {
+                          timeZone: "America/Bogota",
+                        })
+                          ? new Date(runs[0].iniciada_en).toLocaleTimeString(
+                              "es-CO",
+                              {
+                                hour: "numeric",
+                                minute: "2-digit",
+                                timeZone: "America/Bogota",
+                              },
+                            )
+                          : null
+                      }
+                      sinConfirmar={
+                        dirty ||
+                        Boolean(
+                          estado?.revision &&
+                            estado.publicada?.revision !== estado.revision,
+                        )
+                      }
+                      demo={Boolean(sesion.demo)}
+                      onAviso={notify}
+                      onTermino={recargarResumen}
+                    />
+                  )}
                   <button
                     className="button primary"
                     onClick={() => setModal("publicar")}

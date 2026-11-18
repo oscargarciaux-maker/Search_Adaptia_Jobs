@@ -189,6 +189,9 @@ que deba repetirse por cada cliente ni al cambiar criterios. No se eligió ni co
 4. Guardar en el alojamiento SUPABASE_URL, SUPABASE_SECRET_KEY, PANEL_ORIGIN y PANEL_OPERATOR_EMAILS. El ejemplo sin valores
    está en panel/.env.example. PANEL_ORIGIN es el origen HTTPS exacto; PANEL_OPERATOR_EMAILS es el correo autorizado.
    La clave de servicio solo está en el servidor. No se necesita contraseña PostgreSQL ni token Apify en el servidor web.
+   Opcional, para «Buscar ahora» (18 nov): GITHUB_ACCIONES_TOKEN (token fino de GitHub solo de este repositorio, permiso
+   «Actions: Read and write» y nada más) y GITHUB_REPOSITORIO (dueño/nombre). Sin ellos el botón no aparece. La llave solo
+   la usa el servidor (`panel/acciones.py`): nunca va al navegador, a las respuestas ni a los registros.
 5. Compilar/ejecutar con Docker o el procedimiento Python/Node anterior, **sin --demo**. El servidor rechaza arrancar sin
    origen HTTPS y operador autorizado. La API verifica la sesión y el correo confirmado antes de devolver datos.
 6. Probar rechazo sin sesión, acceso del operador, guardado/recarga y programación de una versión. Comprobar que secretos

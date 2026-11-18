@@ -1553,3 +1553,28 @@ test("sesión de prueba: nombres afines con un clic y explicación del 0", async
   ).toBeVisible();
   await page.keyboard.press("Escape");
 });
+
+test("18 nov: «Buscar ahora» lanza la búsqueda desde el Resumen y se bloquea mientras corre", async ({
+  page,
+}) => {
+  const errores: string[] = [];
+  page.on("pageerror", (e) => errores.push(e.message));
+  await page.goto("/");
+  await page.getByRole("heading", { level: 1, name: "Resumen" }).waitFor();
+  await page.getByRole("button", { name: "Buscar ahora" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("una hora y media");
+  await expect(dialog).toContainText("Demostración");
+  await dialog.getByRole("button", { name: "Buscar ahora" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText("Búsqueda pedida")).toBeVisible();
+  const enCurso = page.getByRole("button", { name: /^(En cola|Buscando)/ });
+  await expect(enCurso).toBeDisabled();
+  // Otras pestañas no lo muestran: solo el Resumen.
+  await ir(page, "Cargos y metas");
+  await expect(
+    page.getByRole("button", { name: /Buscar ahora|Buscando|En cola/ }),
+  ).toHaveCount(0);
+  expect(await page.evaluate(revisarContraste)).toEqual([]);
+  expect(errores).toEqual([]);
+});

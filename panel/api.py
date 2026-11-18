@@ -65,7 +65,7 @@ def a_v8(estado):
     return estado
 
 
-def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
+def crear_app(demo=False, repositorio=None, origen=None, operadores=None, acciones=None):
     app = FastAPI(title="Adaptia · Control de búsqueda", docs_url=None, redoc_url=None, openapi_url=None)
     origen = (origen or os.environ.get("PANEL_ORIGIN", "")).rstrip("/")
     operadores = operadores if operadores is not None else [x.strip().casefold() for x in os.environ.get("PANEL_OPERATOR_EMAILS", "").split(",") if x.strip()]
@@ -83,6 +83,14 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         import threading
         threading.Thread(target=precargar, daemon=True).start()
     app.state.repo, app.state.demo = repo, demo
+    if acciones is None:  # «Buscar ahora»: sin la llave de GitHub en el alojamiento, el botón no aparece
+        from panel import acciones as modulo_acciones
+        try:
+            acciones = modulo_acciones.desde_entorno(demo)
+        except ValueError as e:
+            registro.aviso("api:acciones", e)
+            acciones = None
+    app.state.acciones = acciones
     # Contrato v29: copias cortas en memoria. Cualquier escritura del panel (POST/PUT/PATCH/DELETE) sube el sello e
     # invalida los resultados guardados; la búsqueda nocturna corre en otro proceso y la cubre la vigencia de 2 min.
     sello = [0]
@@ -584,6 +592,19 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         if body.decision == "sirve" and resultado.get("asignadas"):
             pedir_borradores()
         return resultado
+
+    @app.get("/api/busqueda")
+    def busqueda():
+        """«Buscar ahora»: si el panel puede lanzar la búsqueda y si hay una en cola o corriendo."""
+        if not app.state.acciones:
+            return {"disponible": False}
+        return app.state.acciones.estado()
+
+    @app.post("/api/busqueda")
+    def buscar_ahora():
+        if not app.state.acciones:
+            raise ErrorRepositorio("Falta la llave de GitHub en el alojamiento del panel (GITHUB_ACCIONES_TOKEN).", 409)
+        return app.state.acciones.lanzar()
 
     @app.get("/api/ejecuciones")
     def ejecuciones():

@@ -131,6 +131,7 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
 - **Instalación automática**: `migraciones.py`, `preparar.py`, `respaldo.py` y acción compartida: claves iniciales,
   plan/corte cifrado confirmado, migraciones transaccionales, versiones y activación sin variables. El horario consulta
   la marca incluso si no existe la variable antigua. Respaldo previo a cambios no equivale a backups periódicos.
+- **«Buscar ahora»** (Resumen, 18 nov): el servidor del panel lanza `bodega.yml` (modo diario) con su llave `GITHUB_ACCIONES_TOKEN` (token fino del repositorio, solo «Actions»; `panel/acciones.py`); sin la llave el botón no aparece; nunca va al navegador.
 - **Búsqueda profunda** (`profunda.yml`): un cargo a pedido, en vivo. **Diagnóstico** (`diagnostico.yml`).
 - Skills del proyecto: `nueva-familia`, `ampliar-mapa`, `diagnostico`, `nueva-fuente` (leen archivos cortos, no la bodega),
   `auditor-ux` (auditoría UX/accesibilidad con capturas en modo demo; no implementa sin aprobación), `thermos`
