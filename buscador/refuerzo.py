@@ -78,10 +78,14 @@ def rescate_apify(vacantes, entregadas, hoy, cfg_entrega, mapa, buscar_apify, in
         familia = por_id.get(rol["familias"][0])
         if not familia:
             continue
+        consultas = cobertura.consultas(familia)
+        if set(p.get("idiomas") or []) == {"es"} and familia.get("consultas_es"):
+            # Contrato v44: quien solo habla español busca primero con los títulos en español.
+            consultas = familia["consultas_es"] + [c for c in consultas if c not in familia["consultas_es"]]
         for lugar, params in lugares_perfil(Perfil.model_validate(p)).items():
             if (rol["id"], lugar) not in vistas:
                 vistas.add((rol["id"], lugar))
-                combinaciones.append((rol["id"], cobertura.consultas(familia), lugar, params))
+                combinaciones.append((rol["id"], consultas, lugar, params))
     crudas, stats = buscar_apify(combinaciones[:max_busquedas])
     if crudas:
         vacantes = incorporar(vacantes, crudas)

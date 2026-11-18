@@ -1443,7 +1443,9 @@ def test_pr1b_perfil_solo_espanol_busca_titulos_en_espanol_en_sus_lugares(cfg):
     combos = linkedin_publico.combinaciones(mapa, [])
     espanol = [c for c in combos if c[2].endswith(":ES")]
     assert espanol and all(c[1] == f["consultas_es"] for c in espanol)
-    assert computrabajo._primero_es(f)[:len(f["consultas_es"])] == f["consultas_es"]
+    # v44: en Computrabajo el español tiene su propio turno en los países de quien solo habla español.
+    ct = [c for c in computrabajo.combinaciones(mapa, {}) if c[0] == f["id"]]
+    assert any(c[2].endswith(":ES") and c[1] == f["consultas_es"] for c in ct) == bool(set(f["paises_es"]) & set(computrabajo.SITIOS))
     assert motor["dias_maximos"] == afinidad.ANTIGUEDAD_SISTEMA  # v27: la antigüedad del perfil solo ordena
 
 

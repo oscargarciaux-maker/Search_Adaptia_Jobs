@@ -7,33 +7,23 @@ desde qué país se postula (`applicantLocationRequirements`) y salario. Nada se
 vacío. Como Computrabajo, rota las familias y cada corrida toma las que hace más tiempo no se revisan.
 """
 import html
-import json
-import re
 import time
 from datetime import datetime, timezone
 
 from buscador import cobertura
+from buscador.fuentes import jobposting
 from buscador.fuentes.computrabajo import slug
 
 NOMBRE = "Elempleo"
 BASE = "https://www.elempleo.com"
 PAISES = {"CO"}
-_LDJSON = re.compile(r'<script type="application/ld\+json"[^>]*>(.*?)</script>', re.S)
-_PERIODO = {"MONTH": "mensual", "YEAR": "anual", "HOUR": "por hora"}
 
 
-def _bloques(pagina):
-    for crudo in _LDJSON.findall(pagina or ""):
-        try:
-            datos = json.loads(crudo)
-        except ValueError:
-            continue
-        yield from datos if isinstance(datos, list) else [datos]
-
-
-def _texto(fragmento):
-    limpio = re.sub(r"<(br|/p|/li)\s*/?>", "\n", str(fragmento or ""), flags=re.I)
-    return re.sub(r"[ \t]+", " ", html.unescape(re.sub(r"<[^>]+>", " ", limpio))).strip()
+# Contrato v44: el JobPosting se lee con el lector común (también para Hireline y Magneto).
+_bloques = jobposting.bloques
+_texto = jobposting.texto
+_fecha = jobposting.fecha
+_salario = jobposting.salario
 
 
 def tarjetas(pagina):
@@ -50,46 +40,9 @@ def tarjetas(pagina):
     return salida
 
 
-def _salario(base):
-    valor = (base or {}).get("value") or {}
-    moneda = (base or {}).get("currency") or ""
-    minimo, maximo = valor.get("minValue"), valor.get("maxValue")
-    periodo = _PERIODO.get(str(valor.get("unitText") or "").upper(), "")
-    if not moneda or not (minimo or maximo) or not periodo:
-        return ""
-    cifra = lambda x: f"{int(float(x)):,}".replace(",", ".")
-    rango = f"{cifra(minimo)} - {cifra(maximo)}" if minimo and maximo else cifra(minimo or maximo)
-    return f"Salario: {moneda} {rango} {periodo}"
-
-
-def _fecha(valor):
-    """«2026-10-6» o «2026-10-06T…» → «2026-10-06»; otra cosa → ""."""
-    m = re.match(r"\s*(\d{4})-(\d{1,2})-(\d{1,2})", str(valor or ""))
-    return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}" if m else ""
-
-
 def ficha(pagina, hoy):
     """Datos del `JobPosting` de la ficha, o None si no lo trae. `cerrada` si `validThrough` ya pasó."""
-    posting = next((b for b in _bloques(pagina) if b.get("@type") == "JobPosting"), None)
-    if not posting:
-        return None
-    direccion = ((posting.get("jobLocation") or {}).get("address")) or {}
-    ciudad = str(direccion.get("addressLocality") or "").strip()
-    remota = str(posting.get("jobLocationType") or "").upper() == "TELECOMMUTE"
-    requisito = posting.get("applicantLocationRequirements") or {}
-    pais_postula = str(requisito.get("name") or "").strip() if isinstance(requisito, dict) else ""
-    fecha, hasta = _fecha(posting.get("datePosted")), _fecha(posting.get("validThrough"))
-    descripcion = _texto(posting.get("description"))
-    salario = _salario(posting.get("baseSalary"))
-    if remota:
-        ubicacion = f"{pais_postula or 'Colombia'} (Remoto)"
-    else:
-        ubicacion = ", ".join(x for x in (ciudad, "Colombia") if x)
-    return {"titulo": html.unescape(str(posting.get("title") or "")).strip(),
-            "empresa": str(((posting.get("hiringOrganization") or {}).get("name")) or "").strip(),
-            "ubicacion": ubicacion, "remoto": True if remota else None,
-            "descripcion": "\n".join(x for x in (descripcion, salario) if x)[:30000],
-            "fecha": fecha if fecha and fecha <= hoy else "", "cerrada": bool(hasta) and hasta < hoy}
+    return jobposting.ficha(pagina, hoy, "CO")
 
 
 def buscar(cliente, mapa, estado, presupuesto, hoy=None, max_fichas=80, reloj=time.monotonic, limite_segundos=None,
@@ -121,23 +74,7 @@ def buscar(cliente, mapa, estado, presupuesto, hoy=None, max_fichas=80, reloj=ti
                 avisos.append({"enlace": enlace, "titulo": titulo, "familia": familia})
         estado[f"{familia}@CO"] = hoy
     avisos.sort(key=lambda a: a["familia"] not in prioritarias)
-    crudas, con_ficha, cerradas = [], 0, 0
-    for a in avisos[:max_fichas]:
-        if seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
-            break
-        r = cliente.get(a["enlace"])
-        if r is None or r.status_code != 200:
-            seguidas += 1 if r is not None and r.status_code in (403, 429) else 0
-            continue
-        seguidas = 0
-        datos = ficha(r.text, hoy)
-        if not datos:
-            continue
-        con_ficha += 1
-        if datos.pop("cerrada"):
-            cerradas += 1
-            continue
-        crudas.append(dict(datos, titulo=datos["titulo"] or a["titulo"], enlace=a["enlace"], enlace_directo="",
-                           fuente=NOMBRE))
-    return crudas, {"busquedas": hechas, "fallidas": fallidas, "avisos": len(avisos), "con_descripcion": con_ficha,
-                    "cerradas": cerradas, "combinaciones_total": len(todas)}
+    crudas, leidas = jobposting.leer_fichas(cliente, [(a["enlace"], a["titulo"], "CO") for a in avisos], hoy, NOMBRE,
+                                            max_fichas, reloj, inicio, limite_segundos)
+    return crudas, {"busquedas": hechas, "fallidas": fallidas, "avisos": len(avisos), **leidas,
+                    "combinaciones_total": len(todas)}
