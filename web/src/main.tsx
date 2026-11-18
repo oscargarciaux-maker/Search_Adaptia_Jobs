@@ -666,6 +666,7 @@ function TarjetasResumen({
                     }
                     // WCAG 2.5.3 (axe 4.14): sin aria-label; el nombre accesible sale del texto visible, con las
                     // partes que solo oye el lector de pantalla en .sr-only (control por voz: se dice lo que se ve).
+                    // Se oye: «Ana (Comunidad): Product Designer, 3 de 17, 1 por confirmar, bajo su meta. Ver detalle».
                     onClick={() => onCliente(c.id)}
                   >
                     {/* 18 nov: la cifra grande arriba a la derecha; «por confirmar» como alerta con su número. */}
@@ -694,7 +695,16 @@ function TarjetasResumen({
                         <span>{c.cargo}</span>
                       </span>
                       <span className="sr-only">, </span>
-                      <span className="cliente-cifra">{cifra}</span>
+                      {c.recibidas == null ? (
+                        <>
+                          <span className="cliente-cifra" aria-hidden="true">
+                            {cifra}
+                          </span>
+                          <span className="sr-only">meta de {c.meta}</span>
+                        </>
+                      ) : (
+                        <span className="cliente-cifra">{cifra}</span>
+                      )}
                       <span className="sr-only">
                         {`, ${pendiente}${bajoMeta(c) ? ", bajo su meta" : ""}. Ver detalle`}
                       </span>

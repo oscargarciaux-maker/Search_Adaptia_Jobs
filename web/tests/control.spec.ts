@@ -981,9 +981,7 @@ test("paso 8: una tarjeta por cliente, detalle con 7 días y dos columnas desde 
   });
   await expect(boton02).toHaveAccessibleName(/, [1-9]\d* por confirmar/);
   const pendientesAntes = Number(
-    /, (\d+) por confirmar/.exec(
-      (await boton02.textContent())!, // el nombre accesible sale del texto (WCAG 2.5.3)
-    )![1],
+    await boton02.locator(".cliente-alerta").textContent(),
   );
   await boton02.click();
   const detalle = page.locator("dialog[open]");
