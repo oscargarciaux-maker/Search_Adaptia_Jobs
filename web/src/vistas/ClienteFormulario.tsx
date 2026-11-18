@@ -39,11 +39,66 @@ const todosLosCodigos = [...new Set(CODIGOS.map((x) => x.pais))]
   .filter((x) => !FRECUENTES.includes(x))
   .sort((a, b) => nombrePais(a).localeCompare(nombrePais(b), "es"));
 
-function OpcionCodigo({ pais }: { pais: string }) {
+// 18 nov (pedido de Oscar): el país del WhatsApp se escribe; al escribir «Colombia», «colo» o «+57» aparece con su
+// bandera y su código. Lista nativa del navegador (datalist): se usa con teclado y con lectores de pantalla.
+const ordenCodigos = [...FRECUENTES, ...todosLosCodigos];
+const etiquetaCodigo = (pais: string) =>
+  `${bandera(pais)} ${nombrePais(pais)} +${codigoDe(pais)}`;
+const plano = (t: string) =>
+  t
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}+ ]/gu, "")
+    .trim()
+    .toLowerCase();
+
+export function resolverPais(texto: string): string {
+  const t = plano(texto);
+  if (!t) return "";
+  const exacta = ordenCodigos.find((x) => plano(etiquetaCodigo(x)) === t);
+  if (exacta) return exacta;
+  const codigo = t.replace(/^\+/, "");
+  if (/^\d{1,4}$/.test(codigo))
+    return ordenCodigos.find((x) => codigoDe(x) === codigo) || "";
+  const porNombre = ordenCodigos.filter((x) =>
+    plano(nombrePais(x)).startsWith(t),
+  );
+  const igual = porNombre.find((x) => plano(nombrePais(x)) === t);
+  return igual || (porNombre.length === 1 ? porNombre[0] : "");
+}
+
+function PaisTelefono({
+  valor,
+  onCambio,
+}: {
+  valor: string;
+  onCambio: (pais: string) => void;
+}) {
+  const [texto, setTexto] = useState(valor ? etiquetaCodigo(valor) : "");
   return (
-    <option value={pais}>
-      {bandera(pais)} {nombrePais(pais)} +{codigoDe(pais)}
-    </option>
+    <>
+      <input
+        id="cliente-codigo"
+        list="lista-codigos-pais"
+        autoComplete="off"
+        placeholder="Escribe el país o +57"
+        value={texto}
+        onChange={(e) => {
+          setTexto(e.target.value);
+          const pais = resolverPais(e.target.value);
+          if (pais && pais !== valor) onCambio(pais);
+        }}
+        onBlur={() => {
+          const pais = resolverPais(texto) || valor;
+          setTexto(pais ? etiquetaCodigo(pais) : "");
+        }}
+      />
+      <datalist id="lista-codigos-pais">
+        {ordenCodigos.map((x) => (
+          <option key={x} value={etiquetaCodigo(x)} />
+        ))}
+      </datalist>
+    </>
   );
 }
 
@@ -748,29 +803,16 @@ export function ClienteDialog({
                 <div className="whatsapp-fila">
                   <div className="field">
                     <label htmlFor="cliente-codigo">País</label>
-                    <select
-                      id="cliente-codigo"
-                      value={telPais}
-                      onChange={(e) => {
-                        setTelPais(e.target.value);
+                    <PaisTelefono
+                      valor={telPais}
+                      onCambio={(pais) => {
+                        setTelPais(pais);
                         setCt({
                           ...ct,
-                          telefono: unirTelefono(e.target.value, numero),
+                          telefono: unirTelefono(pais, numero),
                         });
                       }}
-                    >
-                      <option value="">Elige…</option>
-                      <optgroup label="Frecuentes">
-                        {FRECUENTES.map((x) => (
-                          <OpcionCodigo key={x} pais={x} />
-                        ))}
-                      </optgroup>
-                      <optgroup label="Todos los países">
-                        {todosLosCodigos.map((x) => (
-                          <OpcionCodigo key={x} pais={x} />
-                        ))}
-                      </optgroup>
-                    </select>
+                    />
                   </div>
                   <div className="field">
                     <label htmlFor="cliente-telefono">Número</label>
@@ -1288,9 +1330,10 @@ function UbicacionesPerfil({
       </legend>
       {filas.map((f, n) => (
         <div className="ubicacion-fila" key={n}>
-          <span className="ubicacion-titulo">
-            {n === 0 ? "¿Dónde vive?" : "Ubicación " + (n + 1)}
-          </span>
+          {/* 18 nov: la primera fila (donde vive) va sin título; las demás dicen su número. */}
+          {n > 0 && (
+            <span className="ubicacion-titulo">{"Ubicación " + (n + 1)}</span>
+          )}
           {/* Sesión de prueba (17 nov): primero el país; después la ciudad, con sugerencias de ese país. */}
           <SelectorPaises
             visible="Países"

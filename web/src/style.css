@@ -4861,7 +4861,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 /* Lista grande (17 nov): Cargos y metas con la opción A. Tarjetas a la mitad de alto, «Alcanza para ~N días» y los
    archivados como fichas en una franja baja debajo de los cargos (también es donde se sueltan para archivar). */
 .cargos-tablero {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
+  align-items: start;
 }
 .cargos-tablero .role-list {
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -4891,38 +4892,57 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 .cargos-archivados {
   min-height: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 10px;
-  padding: 10px 14px;
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 .archivados-titulo {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: auto 1fr;
   align-items: center;
-  gap: 6px;
-  font-weight: 650;
-  font-size: 13px;
-}
-.archivado-ficha {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  padding: 4px 6px 4px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
+  column-gap: 6px;
+  padding: 12px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
   background: var(--surface);
-}
-.archivado-ficha .text-button {
-  font-size: 12px;
-  padding: 2px 4px;
-  min-height: 0;
+  font-weight: 650;
+  font-size: 14px;
 }
 .archivados-ayuda {
-  margin-left: auto;
+  grid-column: 1 / -1;
+  font-weight: 400;
   font-size: 12px;
   color: var(--muted);
+}
+.archivado-ficha {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 13px;
+}
+.archivado-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.archivado-acciones .button {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.archivado-acciones .button.peligro {
+  color: var(--osc-text-rojo-medio, #b91c1c);
+}
+@media (max-width: 900px) {
+  .cargos-tablero {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 /* Al archivar o editar, las cifras se recalculan sin «apagar» las tarjetas (antes parecían deshabilitadas un segundo). */
 .cargos-tablero .preview-chip.stale {
@@ -5164,93 +5184,125 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   font-size: 13px;
   color: var(--muted);
 }
+/* 18 nov (pedido de Oscar): cuatro columnas — cupo diario, vacantes, historial y los 3 pasos uno sobre otro. */
 .resumen-arriba {
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 2fr);
+  grid-template-columns:
+    minmax(0, 1.5fr) minmax(0, 0.9fr) minmax(0, 1fr)
+    minmax(0, 1fr);
+  align-items: stretch;
 }
 .resumen-arriba > .tarjeta-actividad {
   grid-column: auto;
 }
-@media (max-width: 1100px) {
+.resumen-arriba > .pasos-dia {
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 8px;
+}
+.resumen-arriba .paso-dia {
+  height: 100%;
+  padding: 10px 12px;
+}
+/* El cupo ocupa menos alto: dona más pequeña y cargos en dos columnas. */
+.resumen-b .dona-techo {
+  width: 72px;
+  height: 72px;
+}
+.resumen-b .cupos-leyenda {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 12px;
+  row-gap: 2px;
+}
+.resumen-b .cupos-leyenda > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 1280px) {
+  .resumen-arriba {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .resumen-arriba > .pasos-dia {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 900px) {
   .resumen-arriba {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .resumen-arriba > .tarjeta-actividad {
+  .resumen-arriba > .tarjeta-cupos {
     grid-column: 1 / -1;
   }
 }
 @media (max-width: 760px) {
-  .pasos-dia,
-  .resumen-arriba {
+  .resumen-arriba,
+  .resumen-arriba > .pasos-dia {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-/* Tarjeta de cliente: «3 de 17» encima de la barra; «por confirmar» como ícono discreto con el detalle al pasar. */
-.cliente-avance {
-  flex: 0 0 96px;
-  display: grid;
-  gap: 4px;
-  justify-items: end;
-}
-.cliente-avance .cliente-barra {
-  width: 100%;
-  flex: none;
-}
-.cliente-avance .cliente-cifra {
-  font-size: 13px;
-}
-.cliente-alerta {
-  flex: none;
-  display: inline-flex;
+/* «Nuevo cliente» dentro de la tarjeta de Clientes. */
+.clientes-cabeza {
+  display: flex;
   align-items: center;
-  gap: 2px;
-  font-size: 12px;
-  color: #c9d6ea;
-}
-.en-grilla .cliente-avance {
-  flex: none;
+  justify-content: space-between;
+  gap: 12px;
   width: 100%;
-  justify-items: stretch;
 }
-/* Quién inició sesión, junto a «Cerrar sesión». */
-.operador-chip {
+.clientes-cabeza > span {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 12px 4px 4px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface);
+}
+.clientes-cabeza .nuevo-cliente {
+  min-height: 36px;
+  padding: 6px 12px;
   font-size: 13px;
-  font-weight: 600;
-  max-width: 220px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
-.operador-inicial {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--osc-bg-azul-2, #eaf3ff);
-  color: var(--osc-text-azul-medio, #0b4a8b);
-  font-weight: 700;
-  flex: none;
+/* Tarjeta de cliente: la cifra grande arriba a la derecha y la barra debajo; «por confirmar» como alerta con su
+   número junto al nombre. */
+.cliente-mini,
+.en-grilla .cliente-mini {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
 }
-/* «Programar»: cada opción con su hora exacta. */
-.opciones-programar {
-  display: grid;
+.cliente-arriba {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 10px;
-  margin: 12px 0;
+  min-width: 0;
 }
-.opciones-programar > div {
-  display: grid;
-  gap: 2px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  font-size: 13px;
+.cliente-arriba .cliente-cifra {
+  font-family: var(--fuente-titulo);
+  font-size: 19px;
+  line-height: 1.1;
+}
+.cliente-mini .cliente-barra {
+  flex: none;
+  width: 100%;
+}
+.cliente-texto strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cliente-alerta {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #fbbf24;
+  color: #1f1a10;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0 0 2px #fbbf2440;
 }
 /* «Por confirmar»: las decisiones en una sola fila. */
 .revision-decisiones {
@@ -5302,4 +5354,63 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .chip-sugerido:hover {
   border-style: solid;
   border-color: var(--marca, #0b6bcb);
+}
+/* 18 nov: en su columna angosta, el historial apila la fecha con el texto y debajo el estado y el enlace. */
+.resumen-arriba > .tarjeta-actividad {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-areas:
+    "fecha texto"
+    "estado estado"
+    "accion accion";
+  align-content: start;
+  align-items: start;
+  gap: 10px 12px;
+  padding: 16px;
+}
+.resumen-arriba > .tarjeta-actividad .evento-fecha {
+  grid-area: fecha;
+  width: 52px;
+  height: 52px;
+}
+.resumen-arriba > .tarjeta-actividad .evento-texto {
+  grid-area: texto;
+}
+.resumen-arriba > .tarjeta-actividad .pill {
+  grid-area: estado;
+  justify-self: start;
+  margin-left: 0;
+}
+.resumen-arriba > .tarjeta-actividad .tarjeta-accion {
+  grid-area: accion;
+}
+.cliente-texto .cliente-alerta {
+  color: #1f1a10;
+  font-size: 11px;
+  overflow: visible;
+}
+/* 18 nov: la casilla «Comunidad» queda centrada con el campo del nombre. */
+.cliente-cabecera {
+  align-items: end;
+}
+.cliente-cabecera > .field {
+  margin-bottom: 0;
+}
+.cliente-cabecera .casilla-comunidad {
+  min-height: 42px;
+  margin: 0;
+  align-items: center;
+}
+/* 18 nov: «Antigüedad máxima» y «Años de experiencia» con la misma altura de etiqueta y la misma separación. */
+.form-grid.tres {
+  align-items: start;
+}
+.form-grid.tres > .field:last-child {
+  row-gap: 7px;
+}
+.form-grid.tres > .field > label,
+.form-grid.tres > .field > .etiqueta-ayuda {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
 }
