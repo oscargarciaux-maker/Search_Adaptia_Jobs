@@ -383,6 +383,24 @@ function ParaMi({
           Mandarme todos a mi WhatsApp
         </button>
       )}
+      {/* 18 nov (Oscar): copiar el mismo mensaje, con sus saltos de línea y espacios, para pegarlo donde quiera. */}
+      <button
+        type="button"
+        className="button secondary"
+        aria-disabled={!listo}
+        onClick={async () => {
+          if (!listo) return notify(motivo, true);
+          try {
+            await navigator.clipboard.writeText(paraMi!.texto);
+            notify("Mensaje copiado: pégalo donde quieras.");
+          } catch {
+            notify("No se pudo copiar el mensaje.", true);
+          }
+        }}
+      >
+        <Copy size={15} />
+        Copiar mensaje
+      </button>
       {listo && (
         <span className="muted para-mi-cuantos">
           Un solo mensaje con {paraMi!.clientes}{" "}
