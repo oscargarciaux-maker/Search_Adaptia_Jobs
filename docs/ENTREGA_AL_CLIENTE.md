@@ -4,6 +4,9 @@ Guía en lenguaje sencillo para (1) probar el sistema antes de entregarlo, (2) p
 el día de la entrega y (3) revisarlo la primera semana. Los detalles técnicos siguen en [TRASPASO.md](TRASPASO.md),
 [OPERACION_Y_RECUPERACION.md](OPERACION_Y_RECUPERACION.md) y [PANEL_CONTROL.md](PANEL_CONTROL.md).
 
+> **¿Ceder el mismo proyecto sin copiar nada?** (la misma base, el mismo repositorio y el panel pasan a las cuentas del
+> nuevo dueño) Ver [CEDER_EL_PROYECTO.md](CEDER_EL_PROYECTO.md). Esta guía es para copiar a un Supabase nuevo.
+
 Todo lo que se hace en GitHub está en la pestaña **Actions** del repositorio: se elige el flujo a la izquierda y se
 pulsa **Run workflow**. Las claves se guardan en **Settings → Secrets and variables → Actions → Secrets**. Nunca se
 pegan claves en el código, en el chat ni en documentos.
