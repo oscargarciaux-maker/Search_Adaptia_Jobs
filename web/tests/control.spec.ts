@@ -315,7 +315,22 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   const texto = await page.evaluate(() => navigator.clipboard.readText());
   expect(texto).toMatch(/Hola|Buen día/);
   expect(texto).toContain("Product Designer");
-  expect((texto.match(/https:\/\//g) || []).length).toBe(50);
+  // Contrato v43: 10 por defecto (2 por empresa); el operador elige cuántas.
+  expect((texto.match(/https:\/\//g) || []).length).toBe(10);
+  await dialog
+    .getByRole("button", { name: "Cerrar", exact: true })
+    .last()
+    .click();
+  await page.getByLabel("Cuántas").fill("3");
+  await page
+    .getByRole("button", { name: "Copiar WhatsApp", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Copiar el mensaje", exact: true })
+    .click();
+  const tres = await page.evaluate(() => navigator.clipboard.readText());
+  expect((tres.match(/https:\/\//g) || []).length).toBe(3);
+  expect(tres).toContain("Tengo 47 vacantes más");
   await dialog
     .getByRole("button", { name: "Cerrar", exact: true })
     .last()
@@ -345,18 +360,23 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await ir(page, "Historial");
   // Sin avisos por correo: el operador no quiere servicios externos (13 nov).
   await expect(page.getByText("Avisos por correo")).toHaveCount(0);
-  // Sección 8: el embudo de la última búsqueda se ve abierto, en tarjetas y sin desbordar.
-  const embudo = page.locator(".embudo-cargo").first();
+  // 18 nov: una frase y un solo embudo del día, con «Qué hacer» en la etapa que más pierde; sin desbordar.
+  const embudo = page.locator(".embudo-dia").first();
+  await expect(embudo.locator(".embudo-frase")).toContainText(
+    /De [\d.]+ vacantes encontradas llegaron [\d.]+ a tus clientes/,
+  );
   // Contrato v31: etapas con nombres claros y qué hacer en la que más pierde.
-  await expect(embudo.getByText("Abiertas y vigentes hoy")).toBeVisible();
-  await expect(embudo.getByText("Qué hacer:")).toBeVisible();
+  await expect(
+    embudo.locator(".embudo-barras").getByText("Abiertas y vigentes hoy"),
+  ).toBeVisible();
+  await expect(embudo.getByText("Qué hacer:").first()).toBeVisible();
   for (const ancho of [1366, 390]) {
     await page.setViewportSize({ width: ancho, height: 900 });
     expect(
       await page.evaluate(
         () =>
           document.documentElement.scrollWidth <= innerWidth &&
-          [...document.querySelectorAll(".embudo-cargo")].every(
+          [...document.querySelectorAll(".embudo-dia")].every(
             (e) => e.scrollWidth <= e.clientWidth,
           ),
       ),
@@ -613,7 +633,9 @@ test("arreglos de la auditoría: error de carga, textos, título y botones táct
   const orden = await page
     .locator("main h2")
     .evaluateAll((hs) => hs.map((h) => h.textContent || ""));
-  expect(orden[0]).toContain("Resultado de cada búsqueda diaria");
+  expect(orden[0]).toContain("La última búsqueda");
+  // El detalle de cada cargo se abre al tocarlo.
+  await page.locator(".embudo-por-cargo summary").first().click();
   // H3: «Entregadas» explica por qué puede superar a la etapa anterior.
   await expect(
     page

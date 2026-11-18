@@ -66,10 +66,11 @@ import {
   nombrePais,
 } from "./comunes";
 import { PorConfirmar } from "./vistas/PorConfirmar";
+import { TarjetaPorConfirmar } from "./vistas/TarjetaPorConfirmar";
 import { Mensajes } from "./vistas/Mensajes";
 import {
   CoberturaPersonas,
-  EmbudoCargos,
+  EmbudoDelDia,
   ReglasAprendidas,
 } from "./vistas/Actividad";
 import { CargoDialog } from "./vistas/CargoDialog";
@@ -945,58 +946,20 @@ function ClienteDetalle({
           {visibles.map((r) => {
             const paises = paisesDe(r);
             return (
-              <article key={r.vacante_id} className="detalle-pendiente">
-                <small>
-                  {r.motivo || "País por confirmar"}
-                  {paises?.length
-                    ? " · sugerido: " +
-                      paises.slice(0, 3).map(nombreLugar).join(", ") +
+              <TarjetaPorConfirmar
+                key={r.vacante_id}
+                r={r}
+                sugeridos={
+                  paises === null
+                    ? null
+                    : paises.slice(0, 3).map(nombreLugar).join(", ") +
                       (paises.length > 3 ? ` y ${paises.length - 3} más` : "")
-                    : ""}
-                </small>
-                <strong>{r.titulo}</strong>
-                <span className="tarjeta-detalle">
-                  {[r.empresa, r.ubicacion].filter(Boolean).join(" · ")}
-                </span>
-                <div className="fila-botones">
-                  {paises ? (
-                    <button
-                      type="button"
-                      className="button primary"
-                      disabled={ocupado === r.vacante_id}
-                      onClick={() => decidir(r, "sirve")}
-                    >
-                      Sí, sirve
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="button secondary"
-                      onClick={onRevisar}
-                    >
-                      Elegir país en Por confirmar
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="button secondary"
-                    disabled={ocupado === r.vacante_id}
-                    onClick={() => decidir(r, "no_sirve")}
-                  >
-                    No sirve
-                  </button>
-                  {r.enlace && (
-                    <a
-                      className="button secondary"
-                      href={r.enlace}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Ver aviso
-                    </a>
-                  )}
-                </div>
-              </article>
+                }
+                ocupado={ocupado === r.vacante_id}
+                onSirve={() => decidir(r, "sirve")}
+                onNoSirve={() => decidir(r, "no_sirve")}
+                onElegirPais={onRevisar}
+              />
             );
           })}
           {totalPendientes > visibles.length && (
@@ -1452,6 +1415,10 @@ function App() {
     [runs, setRuns] = useState<Ejecucion[]>([]),
     [mensaje, setMensaje] = useState(""),
     [copiado, setCopiado] = useState(false),
+    // Contrato v43 (regla 7): el operador elige cuántas copiar; con más de 10 se copia en partes.
+    [cuantasWhats, setCuantasWhats] = useState(10),
+    [partesWhats, setPartesWhats] = useState<string[]>([]),
+    [parteCopiada, setParteCopiada] = useState<number | null>(null),
     [email, setEmail] = useState(""),
     [password, setPassword] = useState("");
   const peticionResultados = useRef(0);
@@ -1753,16 +1720,22 @@ function App() {
     // 18 nov: la carga se ve en el botón; el resto de la página sigue usable.
     setAbriendoWhatsApp(true);
     try {
-      const r = await api<{ texto: string; vacantes: number }>(
-        "/whatsapp/" +
-          selectedClient +
-          (resultDate ? "?fecha=" + encodeURIComponent(resultDate) : ""),
-      );
+      const consulta = new URLSearchParams({
+        cuantas: String(Math.max(1, cuantasWhats || 1)),
+        ...(resultDate ? { fecha: resultDate } : {}),
+      });
+      const r = await api<{
+        texto: string;
+        vacantes: number;
+        partes?: string[];
+      }>("/whatsapp/" + selectedClient + "?" + consulta.toString());
       if (!r.texto) {
         notify("No hay vacantes con comprobación vigente para copiar.", true);
         return;
       }
       setMensaje(r.texto);
+      setPartesWhats(r.partes?.length ? r.partes : [r.texto]);
+      setParteCopiada(null);
       setCopiado(false);
       setModal("whatsapp");
     } catch (e) {
@@ -1771,11 +1744,16 @@ function App() {
       setAbriendoWhatsApp(false);
     }
   }
-  async function copiar() {
+  async function copiar(texto = mensaje, parte: number | null = null) {
     try {
-      await navigator.clipboard.writeText(mensaje);
-      setCopiado(true);
-      notify("Mensaje copiado. Ya puedes pegarlo en WhatsApp.");
+      await navigator.clipboard.writeText(texto);
+      setCopiado(parte === null);
+      setParteCopiada(parte);
+      notify(
+        parte === null
+          ? "Mensaje copiado. Ya puedes pegarlo en WhatsApp."
+          : `Parte ${parte + 1} copiada. Pégala en WhatsApp y vuelve por la siguiente.`,
+      );
     } catch {
       notify(
         "El navegador bloqueó el portapapeles. Selecciona el mensaje y cópialo manualmente.",
@@ -2473,6 +2451,20 @@ function App() {
                     <strong>{results?.listas || 0}</strong>
                     <span>listas para compartir</span>
                   </div>
+                  <label className="cuantas-whatsapp">
+                    Cuántas
+                    <input
+                      type="number"
+                      min={1}
+                      max={Math.max(1, results?.listas || 1)}
+                      value={cuantasWhats}
+                      onChange={(e) =>
+                        setCuantasWhats(
+                          Math.max(1, Math.round(Number(e.target.value) || 1)),
+                        )
+                      }
+                    />
+                  </label>
                   <button
                     className="button whatsapp"
                     disabled={
@@ -2630,7 +2622,7 @@ function App() {
           {tab === "Historial" && (
             <section className="card activity">
               <div className="section-title">
-                <h2>Resultado de cada búsqueda diaria</h2>
+                <h2>La última búsqueda</h2>
                 <button
                   className="icon"
                   aria-label="Actualizar actividad"
@@ -2649,63 +2641,80 @@ function App() {
                 <Empty
                   icon={Clock3}
                   title="Aún no hay capturas dirigidas"
-                  texto="Programa tu configuración. La primera búsqueda con esos criterios aparecerá aquí."
+                  texto="Confirma tu configuración. La primera búsqueda con esos criterios aparecerá aquí."
                 />
               ) : (
-                runs.map((r, n) => (
-                  <div className="run" key={r.id}>
+                <>
+                  {/* 18 nov: la última búsqueda en una frase y un solo embudo; lo demás se abre al tocarlo. */}
+                  <div className="run-cabeza">
+                    <h3>
+                      {sesion.demo
+                        ? "Captura de demostración"
+                        : "Búsqueda dirigida"}{" "}
+                      · {fecha(runs[0].fecha)}
+                    </h3>
                     <span
                       className={
-                        "run-dot " + (r.estado === "completa" ? "ok" : "")
+                        "pill " +
+                        (runs[0].estado === "completa" ? "green" : "amber")
                       }
                     >
-                      <CheckCheck size={19} />
-                    </span>
-                    <div>
-                      <h3>
-                        {sesion.demo
-                          ? "Captura de demostración"
-                          : "Búsqueda dirigida"}{" "}
-                        · {fecha(r.fecha)}
-                      </h3>
-                      <p>
-                        {r.resumen.vacantes || 0} oportunidades distintas de{" "}
-                        {r.resumen.meta || 120} previstas
-                      </p>
-                      {r.resumen.faltantes &&
-                        Object.entries(r.resumen.faltantes).some(
-                          ([, n]) => n > 0,
-                        ) && (
-                          <p className="form-error">
-                            {Object.entries(r.resumen.faltantes)
-                              .filter(([, n]) => n > 0)
-                              .map(([c, n]) => c + ": faltan " + n)
-                              .join(" · ")}
-                          </p>
-                        )}
-                      {!!r.resumen.ampliadas && (
-                        <p className="helper">
-                          {r.resumen.ampliadas} asignaciones entraron por
-                          ampliación para que cada cliente llegue a 5.
-                        </p>
-                      )}
-                      {r.resumen.embudo && (
-                        <EmbudoCargos
-                          embudo={r.resumen.embudo}
-                          abierto={n === 0}
-                        />
-                      )}
-                    </div>
-                    <span
-                      className={
-                        "pill " + (r.estado === "completa" ? "green" : "amber")
-                      }
-                    >
-                      {estadosEjecucion[r.estado] || r.estado}
+                      {estadosEjecucion[runs[0].estado] || runs[0].estado}
                     </span>
                   </div>
-                ))
+                  {runs[0].resumen.embudo ? (
+                    <EmbudoDelDia
+                      embudo={runs[0].resumen.embudo}
+                      faltantes={runs[0].resumen.faltantes}
+                    />
+                  ) : (
+                    <p>
+                      {runs[0].resumen.vacantes_vigentes ??
+                        runs[0].resumen.vacantes ??
+                        0}{" "}
+                      vacantes de {runs[0].resumen.meta || 0} previstas.
+                    </p>
+                  )}
+                </>
               )}
+            </section>
+          )}
+          {tab === "Historial" && runs.length > 1 && (
+            <section className="card activity" aria-labelledby="anteriores">
+              <h2 id="anteriores">Búsquedas anteriores</h2>
+              <ul className="runs-anteriores">
+                {runs.slice(1).map((r) => (
+                  <li key={r.id}>
+                    <details>
+                      <summary>
+                        <span>{fecha(r.fecha)}</span>
+                        <span>
+                          {r.resumen.vacantes_vigentes ??
+                            r.resumen.vacantes ??
+                            0}{" "}
+                          de {r.resumen.meta || 0}
+                        </span>
+                        <span
+                          className={
+                            "pill " +
+                            (r.estado === "completa" ? "green" : "amber")
+                          }
+                        >
+                          {estadosEjecucion[r.estado] || r.estado}
+                        </span>
+                      </summary>
+                      {r.resumen.embudo ? (
+                        <EmbudoDelDia
+                          embudo={r.resumen.embudo}
+                          faltantes={r.resumen.faltantes}
+                        />
+                      ) : (
+                        <p className="helper">Sin detalle de esta búsqueda.</p>
+                      )}
+                    </details>
+                  </li>
+                ))}
+              </ul>
             </section>
           )}
           {tab === "Historial" && sesion?.sesion && (
@@ -2953,19 +2962,50 @@ function App() {
           subtitulo="Revisa el mensaje antes de copiarlo y compartirlo en WhatsApp."
           onClose={() => setModal(null)}
         >
-          <div className="whatsapp-preview">
-            <div>
-              <MessageCircle size={18} />
-              <strong>Vista previa del mensaje</strong>
-              <span>{results?.listas || 0} vacantes</span>
+          {partesWhats.length > 1 ? (
+            // Más de 10: se copia por partes (2 por empresa; el resto va en «Tengo N más»).
+            partesWhats.map((parte, i) => (
+              <div className="whatsapp-preview whatsapp-parte" key={i}>
+                <div>
+                  <MessageCircle size={18} />
+                  <strong>
+                    Parte {i + 1} de {partesWhats.length}
+                  </strong>
+                  <button
+                    type="button"
+                    className="button whatsapp"
+                    onClick={() => copiar(parte, i)}
+                  >
+                    {parteCopiada === i ? (
+                      <CheckCheck size={16} />
+                    ) : (
+                      <Copy size={16} />
+                    )}
+                    {parteCopiada === i ? "Copiada" : "Copiar esta parte"}
+                  </button>
+                </div>
+                <textarea
+                  aria-label={`Parte ${i + 1} del mensaje de WhatsApp`}
+                  readOnly
+                  value={parte}
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+              </div>
+            ))
+          ) : (
+            <div className="whatsapp-preview">
+              <div>
+                <MessageCircle size={18} />
+                <strong>Vista previa del mensaje</strong>
+              </div>
+              <textarea
+                aria-label="Mensaje de WhatsApp"
+                readOnly
+                value={mensaje}
+                onFocus={(e) => e.currentTarget.select()}
+              />
             </div>
-            <textarea
-              aria-label="Mensaje de WhatsApp"
-              readOnly
-              value={mensaje}
-              onFocus={(e) => e.currentTarget.select()}
-            />
-          </div>
+          )}
           <p className="helper">
             Los enlaces se vuelven a contrastar al preparar el mensaje. Copiar
             no envía nada ni confirma una postulación.
@@ -2974,10 +3014,12 @@ function App() {
             <button className="button secondary" onClick={() => setModal(null)}>
               Cerrar
             </button>
-            <button className="button whatsapp" onClick={copiar}>
-              {copiado ? <CheckCheck size={17} /> : <Copy size={17} />}
-              {copiado ? "Mensaje copiado" : "Copiar el mensaje"}
-            </button>
+            {partesWhats.length <= 1 && (
+              <button className="button whatsapp" onClick={() => copiar()}>
+                {copiado ? <CheckCheck size={17} /> : <Copy size={17} />}
+                {copiado ? "Mensaje copiado" : "Copiar el mensaje"}
+              </button>
+            )}
           </div>
         </Dialog>
       )}

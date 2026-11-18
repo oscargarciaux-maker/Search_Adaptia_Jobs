@@ -117,6 +117,91 @@ const SOLUCIONES: Partial<Record<keyof Embudo, string>> = {
     "No hace falta hacer nada: la segunda pasada de las 8:30 comprueba más enlaces, y lo que no alcance queda guardado para mañana.",
 };
 
+// La etapa que más vacantes pierde respecto a la anterior (índice en `etapasEmbudo`, o -1).
+function peorEtapa(e: Embudo) {
+  let peor = -1,
+    perdida = 0;
+  etapasEmbudo.forEach(([k], n) => {
+    if (n === 0 || k === "entregadas") return;
+    const caida =
+      ((e[etapasEmbudo[n - 1][0]] as number) || 0) - ((e[k] as number) || 0);
+    if (caida > perdida) {
+      perdida = caida;
+      peor = n;
+    }
+  });
+  return peor;
+}
+
+function sumarEmbudos(embudo: Record<string, Embudo>): Embudo {
+  const total = {
+    encontradas: 0,
+    con_descripcion: 0,
+    entregables: 0,
+    nuevas: 0,
+    enlace_comprobado: 0,
+    cumplen_filtros: 0,
+    entregadas: 0,
+    ampliadas: 0,
+    principal_perdida: "",
+  } as Embudo;
+  for (const e of Object.values(embudo))
+    for (const [k] of etapasEmbudo)
+      (total[k] as number) += (e[k] as number) || 0;
+  return total;
+}
+
+// El embudo de un cargo, con su «Qué hacer» (se abre desde la lista de cargos).
+function EmbudoUnCargo({ cargo, e }: { cargo: string; e: Embudo }) {
+  const peor = peorEtapa(e);
+  return (
+    <section className="embudo-cargo">
+      <h4>
+        <span>{cargo}</span>
+        <span className="embudo-entregadas">Entregadas {e.entregadas}</span>
+      </h4>
+      <ol className="embudo-etapas">
+        {etapasEmbudo.map(([k, t], n) => (
+          <li key={k} className={n === peor ? "mayor-perdida" : ""}>
+            <strong>{e[k] as number}</strong>
+            <span>
+              {t}
+              {k === "entregadas" && (
+                <Ayuda etiqueta={"entregadas de " + cargo}>
+                  Puede ser más que la etapa anterior: además de las nuevas de
+                  esta búsqueda, incluye vacantes por ampliación (para que cada
+                  persona llegue a 5) y vacantes de días anteriores que esa
+                  persona aún no había recibido.
+                </Ayuda>
+              )}
+            </span>
+            {k === "entregadas" && e.ampliadas > 0 && (
+              <span className="embudo-nota">
+                incluye {e.ampliadas} por ampliación
+              </span>
+            )}
+          </li>
+        ))}
+      </ol>
+      {e.principal_perdida && (
+        <p className="field-help">Mayor pérdida: {e.principal_perdida}</p>
+      )}
+      {peor > 0 && SOLUCIONES[etapasEmbudo[peor][0]] && (
+        <p className="embudo-solucion">
+          <strong>Qué hacer:</strong> {SOLUCIONES[etapasEmbudo[peor][0]]}
+        </p>
+      )}
+      {(e.de_su_busqueda ?? 0) + (e.de_la_amplia ?? 0) > 0 && (
+        <p className="field-help">
+          Origen de las entregadas: {e.de_su_busqueda ?? 0} de su búsqueda
+          propia (LinkedIn por perfil) · {e.de_la_amplia ?? 0} de la búsqueda
+          amplia
+        </p>
+      )}
+    </section>
+  );
+}
+
 // Sección 8 (13 nov): una tarjeta por cargo en vez de una tabla ancha; cabe en el móvil sin scroll horizontal.
 export function EmbudoCargos({
   embudo,
@@ -133,75 +218,94 @@ export function EmbudoCargos({
       ocultar="Ocultar dónde se pierden las vacantes"
     >
       <div className="embudo-lista">
-        {Object.entries(embudo).map(([cargo, e]) => {
-          // La etapa que más vacantes pierde respecto a la anterior.
-          let peor = -1,
-            perdida = 0;
-          etapasEmbudo.forEach(([k], n) => {
-            if (n === 0) return;
-            const caida =
-              ((e[etapasEmbudo[n - 1][0]] as number) || 0) -
-              ((e[k] as number) || 0);
-            if (caida > perdida) {
-              perdida = caida;
-              peor = n;
-            }
-          });
-          return (
-            <section className="embudo-cargo" key={cargo}>
-              <h4>
-                <span>{cargo}</span>
-                <span className="embudo-entregadas">
-                  Entregadas {e.entregadas}
-                </span>
-              </h4>
-              <ol className="embudo-etapas">
-                {etapasEmbudo.map(([k, t], n) => (
-                  <li key={k} className={n === peor ? "mayor-perdida" : ""}>
-                    <strong>{e[k] as number}</strong>
-                    <span>
-                      {t}
-                      {k === "entregadas" && (
-                        <Ayuda etiqueta={"entregadas de " + cargo}>
-                          Puede ser más que la etapa anterior: además de las
-                          nuevas de esta búsqueda, incluye vacantes por
-                          ampliación (para que cada persona llegue a 5) y
-                          vacantes de días anteriores que esa persona aún no
-                          había recibido.
-                        </Ayuda>
-                      )}
-                    </span>
-                    {k === "entregadas" && e.ampliadas > 0 && (
-                      <span className="embudo-nota">
-                        incluye {e.ampliadas} por ampliación
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ol>
-              {e.principal_perdida && (
-                <p className="field-help">
-                  Mayor pérdida: {e.principal_perdida}
-                </p>
-              )}
-              {peor > 0 && SOLUCIONES[etapasEmbudo[peor][0]] && (
-                <p className="embudo-solucion">
-                  <strong>Qué hacer:</strong>{" "}
-                  {SOLUCIONES[etapasEmbudo[peor][0]]}
-                </p>
-              )}
-              {(e.de_su_busqueda ?? 0) + (e.de_la_amplia ?? 0) > 0 && (
-                <p className="field-help">
-                  Origen de las entregadas: {e.de_su_busqueda ?? 0} de su
-                  búsqueda propia (LinkedIn por perfil) · {e.de_la_amplia ?? 0}{" "}
-                  de la búsqueda amplia
-                </p>
-              )}
-            </section>
-          );
-        })}
+        {Object.entries(embudo).map(([cargo, e]) => (
+          <EmbudoUnCargo key={cargo} cargo={cargo} e={e} />
+        ))}
       </div>
     </Plegable>
+  );
+}
+
+// 18 nov (pedido de Oscar): el Historial dice en una frase y en un solo embudo cómo se reducen las vacantes del día;
+// el detalle por cargo se abre al tocarlo.
+export function EmbudoDelDia({
+  embudo,
+  faltantes = {},
+}: {
+  embudo: Record<string, Embudo>;
+  faltantes?: Record<string, number>;
+}) {
+  const total = sumarEmbudos(embudo);
+  const peor = peorEtapa(total);
+  const base = Math.max(1, total.encontradas);
+  return (
+    <div className="embudo-dia">
+      <p className="embudo-frase">
+        De <b>{total.encontradas.toLocaleString("es-CO")}</b> vacantes
+        encontradas llegaron <b>{total.entregadas.toLocaleString("es-CO")}</b> a
+        tus clientes.
+        {peor > 0 && (
+          <>
+            {" "}
+            Donde más se pierden: <b>«{etapasEmbudo[peor][1]}»</b>.
+          </>
+        )}
+      </p>
+      <ol className="embudo-barras" aria-label="Cómo se reducen las vacantes">
+        {etapasEmbudo.map(([k, t], n) => {
+          const valor = (total[k] as number) || 0;
+          const anterior =
+            n === 0 ? valor : (total[etapasEmbudo[n - 1][0]] as number) || 0;
+          return (
+            <li key={k} className={n === peor ? "mayor-perdida" : ""}>
+              <span className="embudo-barra-texto">{t}</span>
+              <span className="embudo-barra-pista" aria-hidden="true">
+                <span
+                  style={{
+                    width: Math.max(1.5, (100 * valor) / base) + "%",
+                  }}
+                />
+              </span>
+              <b>{valor.toLocaleString("es-CO")}</b>
+              <small>
+                {n === 0 || !anterior || k === "entregadas" || valor > anterior
+                  ? ""
+                  : `queda el ${Math.round((100 * valor) / anterior)} %`}
+              </small>
+            </li>
+          );
+        })}
+      </ol>
+      {peor > 0 && SOLUCIONES[etapasEmbudo[peor][0]] && (
+        <p className="embudo-solucion">
+          <strong>Qué hacer:</strong> {SOLUCIONES[etapasEmbudo[peor][0]]}
+        </p>
+      )}
+      <h3 className="embudo-subtitulo">Por cargo</h3>
+      <ul className="embudo-por-cargo">
+        {Object.entries(embudo).map(([cargo, e]) => {
+          const meta = e.entregadas + (faltantes[cargo] || 0);
+          return (
+            <li key={cargo}>
+              <details>
+                <summary>
+                  <span className="cargo-nombre">{cargo}</span>
+                  <span
+                    className={"pill " + (faltantes[cargo] ? "amber" : "green")}
+                  >
+                    {e.entregadas} de {meta}
+                  </span>
+                  <span className="cargo-perdida">
+                    {e.principal_perdida || "Sin pérdidas que revisar"}
+                  </span>
+                </summary>
+                <EmbudoUnCargo cargo={cargo} e={e} />
+              </details>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -302,33 +406,38 @@ export function CoberturaPersonas({
               {a}
             </p>
           ))}
-          <div className="cobertura-grupos">
-            {(["cargo", "pais", "idioma"] as const).map((k) => (
-              <div key={k}>
-                <h3>{NOMBRE_GRUPO[k]}</h3>
-                <ul>
-                  {Object.entries(datos.grupos[k] || {}).map(([n, g]) => (
-                    <li key={n}>
-                      <span>
-                        {k === "pais"
-                          ? nombrePais(n)
-                          : k === "idioma"
-                            ? n === "es"
-                              ? "Español"
-                              : "Inglés"
-                            : n}
-                      </span>
-                      <b>{pct(g)}</b>
-                      <small>
-                        {g.dias_con_minimo} de {g.dias_medidos}{" "}
-                        {g.dias_medidos === 1 ? "día" : "días"}
-                      </small>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
+          <Plegable
+            mostrar="Ver por cargo, país e idioma"
+            ocultar="Ocultar por cargo, país e idioma"
+          >
+            <div className="cobertura-grupos">
+              {(["cargo", "pais", "idioma"] as const).map((k) => (
+                <div key={k}>
+                  <h3>{NOMBRE_GRUPO[k]}</h3>
+                  <ul>
+                    {Object.entries(datos.grupos[k] || {}).map(([n, g]) => (
+                      <li key={n}>
+                        <span>
+                          {k === "pais"
+                            ? nombrePais(n)
+                            : k === "idioma"
+                              ? n === "es"
+                                ? "Español"
+                                : "Inglés"
+                              : n}
+                        </span>
+                        <b>{pct(g)}</b>
+                        <small>
+                          {g.dias_con_minimo} de {g.dias_medidos}{" "}
+                          {g.dias_medidos === 1 ? "día" : "días"}
+                        </small>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </Plegable>
           <div className="tabla-cobertura">
             <table>
               <caption className="sr-only">
@@ -339,34 +448,53 @@ export function CoberturaPersonas({
                 <tr>
                   <th scope="col">Persona</th>
                   <th scope="col">Cargo</th>
-                  <th scope="col">Estado</th>
-                  <th scope="col">Hoy</th>
-                  <th scope="col">Días con {datos.minimo}</th>
-                  <th scope="col">Listas</th>
-                  <th scope="col">Por comprobar</th>
-                  <th scope="col">Búsquedas hoy</th>
-                  <th scope="col">Por qué le faltan</th>
+                  <th scope="col">Hoy / mínimo</th>
+                  <th scope="col">Por qué le falta</th>
                 </tr>
               </thead>
               <tbody>
                 {datos.perfiles.map((f) => (
                   <tr key={f.perfil_id}>
-                    <th scope="row">{f.cliente}</th>
+                    <th scope="row">
+                      {/* 18 nov: lo demás se ve al abrir la fila. */}
+                      <details className="cobertura-mas">
+                        <summary>{f.cliente}</summary>
+                        <dl>
+                          <dt>Estado</dt>
+                          <dd>
+                            <span
+                              className={
+                                "pill " + ESTADO_COBERTURA[f.estado][1]
+                              }
+                            >
+                              {ESTADO_COBERTURA[f.estado][0]}
+                            </span>
+                          </dd>
+                          <dt>Días con {datos.minimo}</dt>
+                          <dd>
+                            {f.dias_medidos
+                              ? `${f.dias_con_minimo} de ${f.dias_medidos}`
+                              : "—"}
+                          </dd>
+                          <dt>Listas</dt>
+                          <dd>{f.listas}</dd>
+                          <dt>Por comprobar</dt>
+                          <dd>{f.por_comprobar}</dd>
+                          <dt>Búsquedas hoy</dt>
+                          <dd>{textoBusquedas(f.busquedas_hoy)}</dd>
+                        </dl>
+                      </details>
+                    </th>
                     <td>{f.cargo}</td>
-                    <td>
-                      <span className={"pill " + ESTADO_COBERTURA[f.estado][1]}>
-                        {ESTADO_COBERTURA[f.estado][0]}
+                    <td className="num">
+                      <span
+                        className={
+                          "pill " + (f.hoy >= datos.minimo ? "green" : "amber")
+                        }
+                      >
+                        {f.hoy} / {datos.minimo}
                       </span>
                     </td>
-                    <td className="num">{f.hoy}</td>
-                    <td className="num">
-                      {f.dias_medidos
-                        ? `${f.dias_con_minimo} de ${f.dias_medidos}`
-                        : "—"}
-                    </td>
-                    <td className="num">{f.listas}</td>
-                    <td className="num">{f.por_comprobar}</td>
-                    <td className="num">{textoBusquedas(f.busquedas_hoy)}</td>
                     <td className="causa">{f.causa || "—"}</td>
                   </tr>
                 ))}
