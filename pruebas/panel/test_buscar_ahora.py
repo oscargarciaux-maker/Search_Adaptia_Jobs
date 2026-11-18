@@ -314,28 +314,32 @@ def test_correr_con_faltantes_enfoca_solo_en_ellos(monkeypatch, tmp_path):
         assert vistos["enfocar"] == esperado and (esperado is None or esperado)
 
 
-def test_a_fondo_solo_reparte_turnos_entre_quienes_faltan_y_duplica_presupuesto():
+def test_faltantes_solo_reparte_entre_quienes_faltan_y_es_corta():
+    # Contrato v47: turnos solo para quienes faltan, sin el resto de combinaciones, presupuestos de siempre con tope
+    # de tiempo y una sola ronda de refuerzo.
     from panel import ejecutor
     from panel.repositorio import configuracion_demo, hoy
     from buscador import cobertura
     cfg = configuracion_demo()
     uno = cfg["perfiles"][0]["id"]
     _, _, normal = ejecutor.preparar({"configuracion": cfg}, hoy())
-    _, _, fondo = ejecutor.preparar({"configuracion": cfg}, hoy(), enfocar={uno})
-    assert [p["perfil"] for p in fondo["personas_busqueda"]] == [uno]
-    assert fondo["presupuestos"]["linkedin_busquedas"] == normal["presupuestos"]["linkedin_busquedas"] * 2
-    assert fondo["a_fondo"] and not normal.get("a_fondo")
-    # Sus lugares piden los 30 días aunque se hayan buscado ayer.
-    rid, lugar = next(iter(fondo["lugares_primero"].items()))
-    cobertura.configurar_primero(fondo["lugares_primero"])
-    cobertura.configurar_a_fondo(True)
+    _, _, foco = ejecutor.preparar({"configuracion": cfg}, hoy(), enfocar={uno})
+    assert [p["perfil"] for p in foco["personas_busqueda"]] == [uno]
+    assert foco["presupuestos"]["linkedin_busquedas"] == normal["presupuestos"]["linkedin_busquedas"]
+    assert foco["presupuestos"]["minutos_por_fuente"] == ejecutor.MINUTOS_FALTANTES < normal["presupuestos"]["minutos_por_fuente"]
+    assert foco["faltantes"] and not normal.get("faltantes") and foco["refuerzo"]["rondas"] == 1
+    persona = foco["personas_busqueda"][0]
+    suyas = [(persona["familia"], ["x"], sorted(persona["lugares"])[0], {})]
+    otras = [("cargo:otro", ["y"], "REMOTO_CO", {})]
+    cobertura.configurar_personas(foco["personas_busqueda"])
     try:
-        assert cobertura.dias_busqueda(f"{rid}@{sorted(lugar)[0]}", "2026-11-17", "2026-11-18", 30) == 30
-        assert cobertura.dias_busqueda("otro@CO", "2026-11-17", "2026-11-18", 30) == 2
+        cobertura.configurar_faltantes(True)
+        assert cobertura.repartir(suyas + otras, {}, hoy()) == suyas  # nada de los demás
+        cobertura.configurar_faltantes()
+        assert len(cobertura.repartir(suyas + otras, {}, hoy())) == 2
     finally:
-        cobertura.configurar_primero()
-        cobertura.configurar_a_fondo()
-
+        cobertura.configurar_personas()
+        cobertura.configurar_faltantes()
 
 def test_busquedas_por_persona_se_suman_entre_pasadas_del_dia():
     from panel import ejecutor
@@ -343,3 +347,75 @@ def test_busquedas_por_persona_se_suman_entre_pasadas_del_dia():
     assert ejecutor._sumar_busquedas(antes, {"p1": {"linkedin": 6, "indeed": 2}}) == {
         "p1": {"linkedin": 10, "indeed": 2}, "p2": {"indeed": 1}}
     assert ejecutor._sumar_busquedas(antes, None) == antes and antes["p1"] == {"linkedin": 4}
+
+
+
+# ── Contrato v47: no repetir lo ya buscado hoy ─────────────────────────────────────────────────────────────────────
+def test_no_repite_lo_ya_buscado_hoy_y_sigue_con_otros_nombres_o_la_pagina_siguiente():
+    from buscador import cobertura
+    hoy, nombres, clave = "2026-11-18", ["A", "B", "C", "D", "E", "F"], "cargo:x@REMOTO_CO"
+    estado = {}
+    primera = cobertura.rotar(nombres, hoy, 4)
+    assert cobertura.siguiente_busqueda(nombres, hoy, 4, clave, estado) == (primera, 0, None)  # fuera del modo
+    cobertura.configurar_faltantes(True)
+    try:
+        estado[cobertura.clave_consulta(clave, primera)] = hoy
+        otros, desde, _ = cobertura.siguiente_busqueda(nombres, hoy, 4, clave, estado)
+        assert otros != primera and desde == 0  # otros nombres del cargo
+        estado[cobertura.clave_consulta(clave, otros)] = hoy
+        assert cobertura.siguiente_busqueda(nombres, hoy, 4, clave, estado) is None  # sin saber dónde quedó, no repite
+        cobertura.anotar_paginas(estado, cobertura.clave_consulta(clave, primera), hoy, 3, False, 2)
+        assert cobertura.siguiente_busqueda(nombres, hoy, 4, clave, estado) == (primera, 3, 2)  # sigue en la página 4
+        cobertura.anotar_paginas(estado, cobertura.clave_consulta(clave, primera), hoy, 4, True, 2)
+        assert cobertura.siguiente_busqueda(nombres, hoy, 4, clave, estado) is None  # ya no hay más páginas
+        # Si cambian las condiciones del perfil (otro lugar u otros nombres), la clave es otra y sí se busca.
+        assert cobertura.siguiente_busqueda(nombres, hoy, 4, "cargo:x@REMOTO_MX", estado) == (primera, 0, None)
+        assert cobertura.siguiente_busqueda(["G", "H"], hoy, 4, clave, estado)[1] == 0
+        # Ayer no cuenta: hoy se busca de nuevo.
+        assert cobertura.siguiente_busqueda(nombres, "2026-11-19", 4, clave, estado)[1] == 0
+    finally:
+        cobertura.configurar_faltantes()
+
+
+def test_linkedin_en_faltantes_no_repite_y_lee_paginas_nuevas():
+    from buscador import cobertura
+    from buscador.fuentes import linkedin_publico
+
+    class R:
+        status_code = 200
+        text = ""
+
+    pedidas = []
+
+    class Cliente:
+        def get(self, url, params=None):
+            pedidas.append((params["keywords"], params["start"]))
+            return R()
+    mapa = [{"id": "cargo:x", "consultas": ["A", "B", "C", "D", "E"], "lugares": [("REMOTO_CO", {"geoId": "1"})]}]
+    estado = {}
+    cobertura.configurar_faltantes(True)
+    try:
+        for _ in range(3):
+            linkedin_publico.buscar(Cliente(), mapa, [], estado, 10, hoy="2026-11-18", max_fichas=0)
+    finally:
+        cobertura.configurar_faltantes()
+    # Cada pasada busca otros nombres; ninguna búsqueda (nombres + página) se repite.
+    assert len(pedidas) == len(set(pedidas)) and len({k for k, _ in pedidas}) >= 2
+
+
+def test_en_faltantes_no_se_leen_los_portales_ni_las_listas(monkeypatch, tmp_path):
+    from buscador import bodega
+    from buscador.fuentes import ats, open_seat, remotos, sitemaps_empleo, tableros_latam
+    llamadas = []
+    for modulo, nombre in ((ats, "buscar"), (ats, "descubrir"), (open_seat, "tableros"),
+                           (tableros_latam, "tableros"), (remotos, "buscar"), (sitemaps_empleo, "buscar")):
+        monkeypatch.setattr(modulo, nombre, lambda *a, _n=f"{modulo.__name__}.{nombre}", **k: llamadas.append(_n))
+    cfg = bodega.config()
+    cfg["faltantes"] = True
+    for clave in list(cfg["presupuestos"]):
+        if clave.endswith("busquedas") or clave.endswith("fichas"):
+            cfg["presupuestos"][clave] = 0
+    cfg["presupuestos"]["minutos_por_fuente"] = 0
+    _, _, _, salud = bodega.recoger(cfg, {}, "2026-11-18", tmp_path)
+    assert llamadas == []
+    assert "omitida" in salud["Portales de empresas"] and "omitida" in salud["Descubrir portales"]

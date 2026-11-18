@@ -121,7 +121,7 @@ export function BuscarAhora({
       setPedidaEn(Date.now());
       onAviso(
         r.tipo === "faltantes"
-          ? "Búsqueda pedida para quienes no llegan a su meta. Empieza en unos minutos; puedes cerrar el panel."
+          ? "Búsqueda pedida para quienes no llegan a su meta. Tarda unos 30 minutos; puedes cerrar el panel."
           : "Búsqueda del día pedida. Empieza en unos minutos y tarda alrededor de una hora y media; puedes cerrar el panel.",
       );
     } catch (e) {

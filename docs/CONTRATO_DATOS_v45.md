@@ -1,5 +1,8 @@
 # Contrato de datos v45 — «Buscar ahora» que decide solo (18 nov 2026)
 
+> Desde v47 la búsqueda para quien falta es corta y no repite lo ya buscado hoy: ya no duplica los presupuestos ni
+> fuerza 30 días (regla 3). Ver `CONTRATO_DATOS_v47.md`.
+
 Decisión de Oscar: un solo botón «Buscar ahora», sin más botones. Al pulsarlo, el servidor revisa qué hace falta y lanza
 eso. Sin IA y sin SQL.
 

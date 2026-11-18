@@ -384,9 +384,10 @@ def plan_busqueda(repo, fecha=None, ejecuciones=None):
                           "buscar más."}
     return {"tipo": "faltantes", "faltan": faltan,
             "motivo": f"La búsqueda de hoy ya corrió y {len(faltan)} "
-                      f"{'perfil no llega' if len(faltan) == 1 else 'perfiles no llegan'} a su meta: se buscará más a "
-                      "fondo solo para ellos (sus cargos y lugares, el doble de búsqueda y los 30 días).",
-            "detalle": "Busca solo sus cargos y lugares, más a fondo. Empieza en unos minutos; puedes cerrar el panel."}
+                      f"{'perfil no llega' if len(faltan) == 1 else 'perfiles no llegan'} a su meta: se buscará solo "
+                      "para ellos, en sus cargos y lugares, sin repetir lo que ya se buscó hoy.",
+            "detalle": "Primero les reparte lo que ya hay guardado y luego busca nombres y páginas nuevas. Tarda unos 30 "
+                       "minutos; puedes cerrar el panel."}
 
 
 # ── Contrato v44: «Qué hacer» por persona, con cifras ──────────────────────────────────────────────────────────────
