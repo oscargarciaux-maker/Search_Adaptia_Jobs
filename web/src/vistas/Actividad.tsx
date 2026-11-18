@@ -202,30 +202,6 @@ function EmbudoUnCargo({ cargo, e }: { cargo: string; e: Embudo }) {
   );
 }
 
-// Sección 8 (13 nov): una tarjeta por cargo en vez de una tabla ancha; cabe en el móvil sin scroll horizontal.
-export function EmbudoCargos({
-  embudo,
-  abierto = false,
-}: {
-  embudo: Record<string, Embudo>;
-  abierto?: boolean;
-}) {
-  return (
-    <Plegable
-      className="funnel"
-      inicial={abierto}
-      mostrar="Ver dónde se pierden las vacantes"
-      ocultar="Ocultar dónde se pierden las vacantes"
-    >
-      <div className="embudo-lista">
-        {Object.entries(embudo).map(([cargo, e]) => (
-          <EmbudoUnCargo key={cargo} cargo={cargo} e={e} />
-        ))}
-      </div>
-    </Plegable>
-  );
-}
-
 // 18 nov (pedido de Oscar): el Historial dice en una frase y en un solo embudo cómo se reducen las vacantes del día;
 // el detalle por cargo se abre al tocarlo.
 export function EmbudoDelDia({
@@ -240,10 +216,12 @@ export function EmbudoDelDia({
   const base = Math.max(1, total.encontradas);
   return (
     <div className="embudo-dia">
+      {/* Thermos (18 nov): es la suma por cargo; una vacante que sirve a dos cargos cuenta en ambos. */}
       <p className="embudo-frase">
-        De <b>{total.encontradas.toLocaleString("es-CO")}</b> vacantes
-        encontradas llegaron <b>{total.entregadas.toLocaleString("es-CO")}</b> a
-        tus clientes.
+        Sumando tus cargos: de{" "}
+        <b>{total.encontradas.toLocaleString("es-CO")}</b> vacantes encontradas
+        llegaron <b>{total.entregadas.toLocaleString("es-CO")}</b> a tus
+        clientes.
         {peor > 0 && (
           <>
             {" "}
