@@ -397,11 +397,14 @@ def test_linkedin_en_faltantes_no_repite_y_lee_paginas_nuevas():
     mapa = [{"id": "cargo:x", "consultas": ["A", "B", "C", "D", "E"], "lugares": [("REMOTO_CO", {"geoId": "1"})]}]
     estado = {}
     cobertura.configurar_faltantes(True)
+    cobertura.configurar_personas([{"familia": "cargo:x", "perfil": "p1", "lugares": {"CO", "REMOTO_CO"}, "peso": 1, "corto": True,
+                                    "principales": []}])
     try:
         for _ in range(3):
             linkedin_publico.buscar(Cliente(), mapa, [], estado, 10, hoy="2026-11-18", max_fichas=0)
     finally:
         cobertura.configurar_faltantes()
+        cobertura.configurar_personas()
     # Cada pasada busca otros nombres; ninguna búsqueda (nombres + página) se repite.
     assert len(pedidas) == len(set(pedidas)) and len({k for k, _ in pedidas}) >= 2
 
@@ -432,12 +435,13 @@ def test_en_faltantes_no_se_leen_los_portales_ni_las_listas(monkeypatch, tmp_pat
                                                 "Tableros LATAM", "Tableros remotos", "Hireline", "Magneto"))
 
 
-def test_get_on_board_anota_lo_que_busca_y_en_faltantes_no_lo_repite(monkeypatch):
+def test_get_on_board_anota_lo_que_busca_y_en_faltantes_no_lo_repite(monkeypatch, tmp_path):
     from buscador import bodega, cobertura
     from buscador.fuentes import (ats, computrabajo, elempleo, getonbrd, indeed, linkedin_apify, linkedin_publico,
                                   remotos, sitemaps_empleo)
     pedidas = []
-    monkeypatch.setattr(getonbrd, "buscar", lambda cliente, consultas: (pedidas.append(list(consultas)) or ([], {})))
+    monkeypatch.setattr(getonbrd, "buscar", lambda cliente, consultas: (pedidas.append(list(consultas)) or
+                                                                     ([], {"respondidas": list(consultas)})))
     for modulo in (linkedin_publico, indeed, linkedin_apify, computrabajo, elempleo, sitemaps_empleo):  # sin red
         monkeypatch.setattr(modulo, "buscar", lambda *a, **k: ([], {}))
     monkeypatch.setattr(remotos, "buscar", lambda *a, **k: ([], [], {}))
@@ -450,10 +454,50 @@ def test_get_on_board_anota_lo_que_busca_y_en_faltantes_no_lo_repite(monkeypatch
     cfg["presupuestos"].update(getonbrd_busquedas=1, minutos_por_fuente=0)
     mapa = [{"id": "cargo:x", "consultas": ["A", "B"], "exactos": [], "similares": [], "lugares": []}]
     estado = {}
-    bodega.recoger(cfg, estado, "2026-11-18", __import__("pathlib").Path("/tmp"), solo_mapa=mapa)  # la de la noche
+    bodega.recoger(cfg, estado, "2026-11-18", tmp_path, solo_mapa=mapa)  # la de la noche
     cobertura.configurar_faltantes(True)
+    cobertura.configurar_personas([{"familia": "cargo:x", "perfil": "p1", "lugares": {"CO", "REMOTO_CO"}, "peso": 1, "corto": True,
+                                    "principales": []}])
     try:
-        bodega.recoger(cfg, estado, "2026-11-18", __import__("pathlib").Path("/tmp"), solo_mapa=mapa)
+        bodega.recoger(cfg, estado, "2026-11-18", tmp_path, solo_mapa=mapa)
     finally:
         cobertura.configurar_faltantes()
+        cobertura.configurar_personas()
     assert pedidas[0] and pedidas[1] and pedidas[0] != pedidas[1]  # el segundo pase busca otro nombre
+
+
+def test_faltantes_sin_personas_no_busca_para_todos_y_sigue_paginas_de_otras_vueltas():
+    from buscador import cobertura
+    hoy, nombres, clave = "2026-11-18", ["A", "B", "C", "D", "E", "F", "G", "H"], "cargo:x@REMOTO_CO"
+    cobertura.configurar_faltantes(True)
+    try:
+        assert cobertura.repartir([("cargo:x", ["A"], "REMOTO_CO", {})], {}, hoy) == []
+        estado = {}
+        primera = cobertura.siguiente_busqueda(nombres, hoy, 4, clave, estado)
+        cobertura.anotar_hecha(estado, primera, hoy)
+        cobertura.anotar_paginas(estado, primera, hoy, 1, True)  # la primera vuelta se agotó
+        segunda = cobertura.siguiente_busqueda(nombres, hoy, 4, clave, estado)
+        cobertura.anotar_hecha(estado, segunda, hoy)
+        cobertura.anotar_paginas(estado, segunda, hoy, 3, False)  # la segunda tiene más páginas
+        sigue = cobertura.siguiente_busqueda(nombres, hoy, 4, clave, estado)
+        assert (sigue.terminos, sigue.desde) == (segunda.terminos, 3)
+    finally:
+        cobertura.configurar_faltantes()
+
+
+def test_get_on_board_no_anota_lo_que_fallo(monkeypatch, tmp_path):
+    from buscador import bodega
+    from buscador.fuentes import (ats, computrabajo, elempleo, getonbrd, indeed, linkedin_apify, linkedin_publico,
+                                  remotos, sitemaps_empleo)
+    monkeypatch.setattr(getonbrd, "buscar", lambda cliente, consultas: ([], {"respondidas": []}))
+    for modulo in (linkedin_publico, indeed, linkedin_apify, computrabajo, elempleo, sitemaps_empleo):
+        monkeypatch.setattr(modulo, "buscar", lambda *a, **k: ([], {}))
+    monkeypatch.setattr(remotos, "buscar", lambda *a, **k: ([], [], {}))
+    monkeypatch.setattr(ats, "buscar", lambda *a, **k: ([], set(), {}))
+    monkeypatch.setattr(ats, "descubrir", lambda *a, **k: ([], 0))
+    cfg = bodega.config()
+    cfg["presupuestos"].update(getonbrd_busquedas=2, minutos_por_fuente=0)
+    estado = {}
+    mapa = [{"id": "cargo:x", "consultas": ["A", "B"], "exactos": [], "similares": [], "lugares": []}]
+    bodega.recoger(cfg, estado, "2026-11-18", tmp_path, solo_mapa=mapa)
+    assert not estado.get("getonbrd")

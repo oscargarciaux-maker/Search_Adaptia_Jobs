@@ -735,7 +735,8 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
 
 def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPLETO):
     """`enfoque` (contrato v45): «faltantes» = «Buscar ahora» cuando la búsqueda de hoy ya corrió y hay perfiles bajo su
-    meta: se busca más a fondo solo para ellos. Si hoy aún no hay búsqueda, se hace la completa."""
+    meta: se busca solo para ellos, corto y sin repetir lo ya buscado hoy (v47). Si hoy aún no hay búsqueda, se hace la
+    completa."""
     fecha = hoy()
     if prueba:
         return bodega.correr(salida, modo=modo, prueba=True)
@@ -756,7 +757,7 @@ def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPL
             bodega.etapa("Todos los perfiles llegan hoy a su meta: búsqueda normal del día")
             enfocar = None
         if enfocar:
-            bodega.etapa(f"Buscar más a fondo para {len(enfocar)} perfiles bajo su meta")
+            bodega.etapa(f"Buscar solo para {len(enfocar)} perfiles bajo su meta, sin repetir lo de hoy (v47)")
     ejecucion = iniciar(repo, version, fecha)
     reglas_info, reglas = {}, []
     if hasattr(repo, "decisiones_ubicacion"):

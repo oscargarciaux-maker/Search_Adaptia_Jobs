@@ -223,7 +223,7 @@ Las fuentes y variantes rotan; no se recorren todos los títulos de todos los pa
 
 ### «Buscar ahora» desde el panel (18 nov)
 
-Desde v45, **«Buscar ahora» decide solo**: si hoy no corrió la búsqueda, hace la del día; si ya corrió y alguien no llega a su meta, busca más a fondo solo para esas personas (el diálogo te muestra quiénes); si todos cumplen, te lo dice.
+Desde v45, **«Buscar ahora» decide solo**: si hoy no corrió la búsqueda, hace la del día; si ya corrió y alguien no llega a su meta, busca solo para esas personas (el diálogo te muestra quiénes); si todos cumplen, te lo dice. Desde v47 esa búsqueda tarda unos 30 minutos: no repite lo ya buscado hoy (usa otros nombres del cargo o la página siguiente) y no relee los portales de empresas.
 
 Si la búsqueda del día no arrancó, en el Resumen está **«Buscar ahora»**, junto a «Confirmar y aplicar». Lanza la
 misma búsqueda diaria: si hoy ya hubo una, completa lo que falte sin repetir lo entregado. Tarda alrededor de una hora y

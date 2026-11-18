@@ -55,12 +55,15 @@ def vacante(item):
 
 
 def buscar(cliente, consultas):
-    vistos, crudas = set(), []
+    """Vacantes crudas y estadísticas; `respondidas` (contrato v47): las consultas que sí respondieron."""
+    vistos, crudas, respondidas = set(), [], []
     for q in consultas:
         datos = cliente.json(URL, params={"query": q, "per_page": 100, "expand": '["company","location_tenants"]'})
+        if datos is not None:
+            respondidas.append(q)
         for item in (datos or {}).get("data") or []:
             v = vacante(item)
             if v["enlace"] and v["enlace"] not in vistos:
                 vistos.add(v["enlace"])
                 crudas.append(v)
-    return crudas, {"busquedas": len(consultas), "avisos": len(crudas)}
+    return crudas, {"busquedas": len(consultas), "avisos": len(crudas), "respondidas": respondidas}

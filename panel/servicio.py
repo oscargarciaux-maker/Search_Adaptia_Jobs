@@ -358,7 +358,7 @@ PLAN_COMPLETO = {"tipo": "completa", "faltan": [],
 
 def plan_busqueda(repo, fecha=None, ejecuciones=None):
     """Un solo botón, tres casos: hoy no hay búsqueda que haya armado su lote (o falló) → la completa del día; ya corrió
-    y hay perfiles que no llegan a su meta y pueden recibir más → más a fondo solo para ellos («faltantes»); si no →
+    y hay perfiles que no llegan a su meta y pueden recibir más → solo para ellos, corta y sin repetir («faltantes», v47); si no →
     nada. Solo nombres de clientes del panel privado. Nunca falla: sin datos, la completa."""
     from panel.ejecutor import faltan_hoy, validar_version
     fecha = fecha or hoy()
