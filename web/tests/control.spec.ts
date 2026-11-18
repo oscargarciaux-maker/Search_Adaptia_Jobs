@@ -965,8 +965,8 @@ test("paso 8: una tarjeta por cliente, detalle con 7 días y dos columnas desde 
   await expect(page.getByText(/activos · \d+ bajo su meta/)).toBeVisible();
   await expect(lista).not.toHaveClass(/en-grilla/);
   await expect(
-    lista.getByRole("button", { name: /^Cliente de ejemplo 02:/ }),
-  ).toHaveAccessibleName(/: \d+ de 17, \d+ por confirmar, bajo su meta/);
+    lista.getByRole("button", { name: /^Cliente de ejemplo 02\s*:/ }),
+  ).toHaveAccessibleName(/,\s*\d+ de 17\s*,\s*\d+ por confirmar, bajo su meta/);
   // Los que van peor van primero; el que está completo, después.
   const nombres = await lista.getByRole("button").allTextContents();
   expect(
@@ -977,13 +977,11 @@ test("paso 8: una tarjeta por cliente, detalle con 7 días y dos columnas desde 
 
   const nombre = "Cliente de ejemplo 02";
   const boton02 = lista.getByRole("button", {
-    name: /^Cliente de ejemplo 02:/,
+    name: /^Cliente de ejemplo 02\s*:/,
   });
   await expect(boton02).toHaveAccessibleName(/, [1-9]\d* por confirmar/);
   const pendientesAntes = Number(
-    /, (\d+) por confirmar/.exec(
-      (await boton02.getAttribute("aria-label"))!,
-    )![1],
+    await boton02.locator(".cliente-alerta").textContent(),
   );
   await boton02.click();
   const detalle = page.locator("dialog[open]");
@@ -1216,8 +1214,8 @@ test("importar clientes: vista previa con errores, borrar los actuales y program
   await expect(lista.getByRole("button")).toHaveCount(4);
   // El cliente actualizado sigue mostrando lo que recibió hoy.
   await expect(
-    lista.getByRole("button", { name: /^Cliente de ejemplo 02:/ }),
-  ).toHaveAccessibleName(/: [1-9]\d* de 10/);
+    lista.getByRole("button", { name: /^Cliente de ejemplo 02\s*:/ }),
+  ).toHaveAccessibleName(/,\s*[1-9]\d* de 10/);
   await page
     .getByRole("button", { name: "Confirmar y aplicar", exact: true })
     .click();
@@ -1285,7 +1283,9 @@ test("contrato v27: aplicar hoy, etiquetas de lo que no cumple y distintivo de C
   expect(cfg.publicada.vigente_desde).toBe(hoy);
   await page.getByRole("button", { name: "Volver al resumen" }).click();
   await expect(
-    page.getByRole("button", { name: /Cliente de ejemplo 02 \(Comunidad\)/ }),
+    page.getByRole("button", {
+      name: /Cliente de ejemplo 02\s*\(\s*Comunidad\s*\)/,
+    }),
   ).toBeVisible();
   expect(await page.evaluate(revisarContraste)).toEqual([]);
   // Una vacante que pide más años que el perfil llega igual, con su etiqueta.

@@ -240,8 +240,8 @@ export function CargoDialog({
             className="opciones-cargo"
             inicial={Boolean(
               (c.terminos_cercanos || []).length ||
-                c.terminos_excluidos.length ||
-                (c.funciones || []).length,
+              c.terminos_excluidos.length ||
+              (c.funciones || []).length,
             )}
             mostrar={
               "Opciones avanzadas" +
