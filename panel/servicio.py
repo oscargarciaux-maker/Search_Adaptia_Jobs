@@ -498,13 +498,22 @@ def whatsapp(repo, cliente_id, fecha=None, resultados=None, contactos=None, cuan
 
 def partir_mensaje(texto, por_parte=10):
     """Parte el mensaje en trozos de hasta `por_parte` vacantes, sin cortar ninguna: el saludo va con la primera y el
-    cierre con la última. La numeración sigue de una parte a la otra."""
-    partes, actual, n = [], [], 0
+    cierre con la última. La numeración sigue de una parte a la otra. Con varios cargos (`*Cargo*`), el título nunca
+    queda suelto al final de una parte y se repite al empezar la siguiente (revisión Thermos del 18 nov)."""
+    partes, actual, n, titulo = [], [], 0, ""
     for parrafo in texto.split("\n\n"):
         es_vacante = bool(re.match(r"^\d+\. ", parrafo))
+        es_titulo = bool(re.fullmatch(r"\*[^*\n]+\*", parrafo))
         if es_vacante and n == por_parte:
+            arrastre = []
+            if actual and re.fullmatch(r"\*[^*\n]+\*", actual[-1]):
+                arrastre = [actual.pop()]
+            elif titulo:
+                arrastre = [titulo]
             partes.append("\n\n".join(actual))
-            actual, n = [], 0
+            actual, n = arrastre, 0
+        if es_titulo:
+            titulo = parrafo
         actual.append(parrafo)
         n += es_vacante
     partes.append("\n\n".join(actual))

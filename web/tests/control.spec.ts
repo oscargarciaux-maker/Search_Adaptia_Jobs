@@ -363,7 +363,7 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   // 18 nov: una frase y un solo embudo del día, con «Qué hacer» en la etapa que más pierde; sin desbordar.
   const embudo = page.locator(".embudo-dia").first();
   await expect(embudo.locator(".embudo-frase")).toContainText(
-    /De [\d.]+ vacantes encontradas llegaron [\d.]+ a tus clientes/,
+    /de [\d.]+ vacantes encontradas llegaron [\d.]+ a tus clientes/,
   );
   // Contrato v31: etapas con nombres claros y qué hacer en la que más pierde.
   await expect(

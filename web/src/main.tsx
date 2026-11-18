@@ -1416,7 +1416,7 @@ function App() {
     [mensaje, setMensaje] = useState(""),
     [copiado, setCopiado] = useState(false),
     // Contrato v43 (regla 7): el operador elige cuántas copiar; con más de 10 se copia en partes.
-    [cuantasWhats, setCuantasWhats] = useState(10),
+    [cuantasWhats, setCuantasWhats] = useState("10"),
     [partesWhats, setPartesWhats] = useState<string[]>([]),
     [parteCopiada, setParteCopiada] = useState<number | null>(null),
     [email, setEmail] = useState(""),
@@ -1721,7 +1721,7 @@ function App() {
     setAbriendoWhatsApp(true);
     try {
       const consulta = new URLSearchParams({
-        cuantas: String(Math.max(1, cuantasWhats || 1)),
+        cuantas: String(Math.max(1, Math.round(Number(cuantasWhats)) || 10)),
         ...(resultDate ? { fecha: resultDate } : {}),
       });
       const r = await api<{
@@ -2458,11 +2458,8 @@ function App() {
                       min={1}
                       max={Math.max(1, results?.listas || 1)}
                       value={cuantasWhats}
-                      onChange={(e) =>
-                        setCuantasWhats(
-                          Math.max(1, Math.round(Number(e.target.value) || 1)),
-                        )
-                      }
+                      // Thermos (18 nov): el campo se puede vaciar mientras se escribe; vacío vale 10.
+                      onChange={(e) => setCuantasWhats(e.target.value)}
                     />
                   </label>
                   <button

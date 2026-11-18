@@ -161,7 +161,8 @@ def resumen_de(datos, motivo="", s=None):
 
 def extracto(texto, largo=260):
     """Primeras líneas legibles de la descripción, cortadas en una palabra (sin HTML ni saltos)."""
-    limpio = " ".join(re.sub(r"<[^>]+>|\*\*", " ", texto or "").split())
+    from buscador.ficha import a_texto  # la limpieza canónica (también traduce &amp; y &nbsp;)
+    limpio = " ".join(a_texto(texto or "").replace("**", "").split())
     if len(limpio) <= largo:
         return limpio
     return limpio[:largo].rsplit(" ", 1)[0].rstrip(",.;:") + "…"

@@ -1,5 +1,7 @@
 """Contrato v43 (regla 7, decisión de Oscar del 18 nov): al copiar a WhatsApp desde «Vacantes» el operador elige
 cuántas; se mantienen 2 por empresa y, con más de 10, el mensaje se entrega en partes de 10 sin cortar ninguna."""
+import re
+
 from fastapi.testclient import TestClient
 
 from panel import servicio
@@ -40,3 +42,18 @@ def test_api_valida_cuantas():
     cliente = configuracion_demo()["clientes"][0]["id"]
     assert api.get(f"/api/whatsapp/{cliente}?cuantas=0").status_code == 422
     assert api.get(f"/api/whatsapp/{cliente}?cuantas=3").json()["vacantes"] == 3
+
+
+def test_con_dos_cargos_el_titulo_no_queda_suelto_y_se_repite():
+    """Revisión Thermos del 18 nov: con 10 del cargo A y 4 del B, la parte 1 terminaba en «*B*» suelto y la parte 2
+    empezaba sin decir de qué cargo eran sus vacantes."""
+    r = _r(14, 14)
+    for v in r["vacantes"][10:]:
+        v["cargo_nombre"] = "QA"
+    msg = servicio.whatsapp(None, "c1", resultados=r, contactos=[], cuantas=14)
+    assert len(msg["partes"]) == 2
+    assert not msg["partes"][0].rstrip().endswith("*QA*")
+    assert msg["partes"][1].startswith("*QA*\n\n11. ")
+    for parte in msg["partes"][1:]:
+        primer = parte.split("\n\n")[0]
+        assert primer.startswith("*") or not re.match(r"^\d+\. ", primer)

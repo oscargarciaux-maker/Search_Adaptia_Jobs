@@ -105,7 +105,7 @@ export function TarjetaPorConfirmar({
           <X size={15} />
           No sirve
         </button>
-        {r.enlace.startsWith("http") && (
+        {(r.enlace || "").startsWith("http") && (
           <a
             className="text-button"
             href={r.enlace}
