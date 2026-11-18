@@ -2,6 +2,7 @@
 import hashlib
 from collections import Counter, defaultdict, deque
 from datetime import date, timedelta
+from typing import NamedTuple
 
 from buscador import normalizar
 
@@ -115,8 +116,17 @@ def sirve_a_corta(v):
 # las combinaciones de quienes faltan (sin el resto) y, si una ya se buscó hoy con los mismos términos, los términos
 # siguientes del cargo o la página siguiente. Si cambian las condiciones del perfil, cambian las claves y se busca.
 _FALTANTES = False
-PAGINAS = "~paginas"  # {clave con términos: [fecha, siguiente página, agotada, días pedidos]} en el estado de la fuente
+PAGINAS = "~paginas"  # {clave con términos: {fecha, pagina, agotada, dias}} en el estado de la fuente
 TOPE_PAGINAS_DIA = 10
+
+
+class Busqueda(NamedTuple):
+    """Una búsqueda por hacer en una fuente: términos, sus claves en el estado, desde qué página y cuántos días."""
+    terminos: list
+    clave: str           # cargo@lugar
+    clave_terminos: str  # cargo@lugar#huella de los términos
+    desde: int           # primera página por leer (0 = la primera)
+    dias: int
 
 
 def configurar_faltantes(activo=False):
@@ -128,36 +138,43 @@ def modo_faltantes():
     return _FALTANTES
 
 
-def familias_personas():
-    """Los cargos de las personas de esta búsqueda (en modo faltantes, solo los de quienes faltan)."""
-    return {p["familia"] for p in _PERSONAS}
-
-
-def siguiente_busqueda(consultas, hoy, cantidad, clave, estado, desfase=0):
-    """(términos, página desde la que leer, días que pidió esa búsqueda o None) o None si no queda nada nuevo por buscar
-    hoy en ese lugar. Fuera del modo faltantes, la de siempre: la rotación del día desde la primera página.
-    En modo faltantes: la primera rotación de términos que no se buscó hoy ahí; si ya se buscaron todas, la del día
-    desde la página donde quedó, con los mismos días (si no se agotó y no pasó del tope del día)."""
+def siguiente_busqueda(consultas, hoy, cantidad, clave, estado, desfase=0, max_dias=30, paginada=True):
+    """La próxima `Busqueda` de esa combinación, o None si no queda nada nuevo por buscar hoy ahí.
+    Fuera del modo faltantes, la de siempre: la rotación del día desde la primera página.
+    En modo faltantes (contrato v47): la primera rotación de términos que no se buscó hoy ahí; si ya se buscaron todas
+    y la fuente tiene páginas, la del día desde la página donde quedó y con los mismos días (si no se agotó ni pasó
+    del tope del día). Los días: completos si nunca se buscó o la última vez no trajo nada (`dias_busqueda`)."""
     terminos = rotar(consultas, hoy, cantidad, desfase=desfase)
-    if not _FALTANTES or not terminos:
-        return terminos, 0, None
-    vueltas = max(1, -(-len(consultas) // max(1, cantidad)))
-    for k in range(vueltas):
+    if not terminos:
+        return None
+
+    def nueva(t, desde=0, dias=None):
+        ck = clave_consulta(clave, t)
+        return Busqueda(t, clave, ck, desde, dias or dias_busqueda(clave, estado.get(ck), hoy, max_dias))
+    if not _FALTANTES:
+        return nueva(terminos)
+    for k in range(max(1, -(-len(consultas) // max(1, cantidad)))):
         otra = rotar(consultas, hoy, cantidad, desfase=desfase + k * cantidad)
         if estado.get(clave_consulta(clave, otra)) != hoy:
-            return otra, 0, None
-    fecha, desde, agotada, dias = ((estado.get(PAGINAS) or {}).get(clave_consulta(clave, terminos))
-                                   or ("", 0, True, None))
-    if fecha != hoy or agotada or desde >= TOPE_PAGINAS_DIA:
+            return nueva(otra)
+    pagina = (estado.get(PAGINAS) or {}).get(clave_consulta(clave, terminos)) or {}
+    if not paginada or pagina.get("fecha") != hoy or pagina.get("agotada") or pagina.get("pagina", 0) >= TOPE_PAGINAS_DIA:
         return None  # sin saber dónde quedó (o ya no hay más páginas), no se repite
-    return terminos, desde, dias
+    return nueva(terminos, pagina["pagina"], pagina.get("dias"))
 
 
-def anotar_paginas(estado, clave_terminos, hoy, siguiente, agotada, dias):
+def anotar_hecha(estado, busqueda, hoy):
+    estado[busqueda.clave] = hoy
+    estado[busqueda.clave_terminos] = hoy
+
+
+def anotar_paginas(estado, busqueda, hoy, siguiente, agotada):
     """Hasta dónde se leyó hoy esa búsqueda y con cuántos días (solo se guardan las de hoy)."""
-    paginas = {k: v for k, v in (estado.get(PAGINAS) or {}).items() if v and v[0] == hoy}
-    previa = paginas.get(clave_terminos) or (hoy, 0, False, dias)
-    paginas[clave_terminos] = (hoy, max(previa[1], siguiente), bool(agotada or previa[2]), previa[3] or dias)
+    paginas = {k: v for k, v in (estado.get(PAGINAS) or {}).items() if isinstance(v, dict) and v.get("fecha") == hoy}
+    previa = paginas.get(busqueda.clave_terminos) or {}
+    paginas[busqueda.clave_terminos] = {"fecha": hoy, "pagina": max(previa.get("pagina", 0), siguiente),
+                                        "agotada": bool(agotada or previa.get("agotada")),
+                                        "dias": previa.get("dias") or busqueda.dias}
     estado[PAGINAS] = paginas
 
 
@@ -184,7 +201,9 @@ def de_personas(combinaciones):
     """Contrato v40: {índice de persona: [combinaciones]} de las que le sirven a cada persona."""
     salida = {}
     for i, persona in enumerate(_PERSONAS):
-        salida[i] = [c for c in combinaciones if c[0] == persona["familia"] and _claves_lugar(c[2]) & persona["lugares"]]
+        # «GLOBAL» (Get on Board: todo LATAM y remoto) sirve a cualquier persona del cargo.
+        salida[i] = [c for c in combinaciones if c[0] == persona["familia"]
+                     and (str(c[2]).startswith("GLOBAL") or _claves_lugar(c[2]) & persona["lugares"])]
     return salida
 
 
