@@ -454,9 +454,15 @@ def filas_de(elegidas, roles, hoy, capturada):
     return filas
 
 
-def registrar_medicion(historial, resumen, hoy, dias=30):
-    """Serie corta para medir continuidad real; no predice ofertas futuras ni almacena descripciones."""
+def registrar_medicion(historial, resumen, hoy, *, busqueda_diaria, dias=30):
+    """Serie corta para medir continuidad real; no predice ofertas futuras ni almacena descripciones.
+    `pasadas` cuenta las búsquedas diarias (`busqueda_diaria`; no las capturas horarias) que terminaron la entrega del
+    día: la usa buscador/arranque.py (18 nov) para los horarios de respaldo. Un registro anterior sin el campo cuenta 1."""
+    previo = historial.get(hoy)
+    previas = previo.get("pasadas", 1) if isinstance(previo, dict) else 0
+    pasadas = previas + (1 if busqueda_diaria else 0)
     historial[hoy] = {
+        "pasadas": pasadas,
         "fecha": hoy, "meta_cumplida": resumen["meta_cumplida"],
         "pendientes_supabase": (resumen.get("supabase") or {}).get("pendientes", 0),
         "registro_confirmado": bool(resumen.get("registro_seleccion")) and not any(

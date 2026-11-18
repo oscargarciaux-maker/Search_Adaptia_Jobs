@@ -1,5 +1,8 @@
 name: Captura horaria
 
+# 18 nov: además de capturar, vigila que la búsqueda diaria haya corrido. Si después de las 7:00 de Bogotá GitHub no
+# la lanzó, el trabajo «vigia» la lanza una vez (buscador/arranque.py). Solo lee fechas, sin datos de clientes.
+
 on:
   schedule:
     - cron: "23 * * * *" # evitar el minuto cero, propenso a retrasos de Actions
@@ -86,3 +89,35 @@ jobs:
             if [ "${{ job.status }}" = "success" ]; then curl -fsS -m 10 --retry 3 "$AVISO" >/dev/null || true
             else curl -fsS -m 10 --retry 3 "$AVISO/fail" >/dev/null || true; fi
           fi
+  vigia:
+    # Solo en la corrida programada: una prueba a mano no lanza nada.
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write # solo para lanzar bodega.yml con workflow_dispatch
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: Lanzar la búsqueda diaria si GitHub no la arrancó
+        id: vigia
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          rama=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
+          echo "rama=$rama" >> "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/trabajo"
+          if git fetch -q --depth 1 origin publicado; then
+            git show FETCH_HEAD:trabajo/metricas_entrega.json > "$RUNNER_TEMP/trabajo/metricas_entrega.json" 2>/dev/null || true
+          fi
+          gh run list --workflow bodega.yml --limit 40 --json createdAt,conclusion,event,headBranch > "$RUNNER_TEMP/corridas.json"
+          python3 -m buscador.arranque --trabajo "$RUNNER_TEMP/trabajo" --vigia "$RUNNER_TEMP/corridas.json" \
+            --rama "$rama" >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+      - name: Lanzar bodega.yml
+        if: steps.vigia.outputs.lanzar == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run bodega.yml --ref "${{ steps.vigia.outputs.rama }}" -f modo=diario -f prueba=false

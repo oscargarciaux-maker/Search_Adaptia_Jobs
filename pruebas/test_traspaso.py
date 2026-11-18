@@ -58,9 +58,9 @@ def test_traspaso_rechaza_destino_igual_al_origen(monkeypatch, tmp_path):
     ({"meta_cumplida": True, "registro_confirmado": True, "pendientes_supabase": 0}, False),
 ])
 def test_pasada_de_la_manana_solo_si_falta(tmp_path, dia, esperado):
-    from buscador import validacion
+    from buscador import arranque
     import json
     if dia is not None:
         (tmp_path / "metricas_entrega.json").write_text(json.dumps({"2026-11-10": dia, "2026-11-09": {"meta_cumplida": True}}))
-    assert validacion.hace_falta_completar(tmp_path, "2026-11-10") is esperado
-    assert validacion.hace_falta_completar(tmp_path / "no-existe", "2026-11-10") is True
+    assert arranque.falta_completar(arranque.leer_dia(tmp_path, "2026-11-10")) is esperado
+    assert arranque.falta_completar(arranque.leer_dia(tmp_path / "no-existe", "2026-11-10")) is True

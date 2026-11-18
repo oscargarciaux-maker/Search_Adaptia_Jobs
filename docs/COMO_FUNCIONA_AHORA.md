@@ -16,7 +16,9 @@ código y probadas.
 | Hora | Qué pasa | Qué haces tú |
 |---|---|---|
 | 6:30 a. m. | Búsqueda principal: LinkedIn público, Indeed, portales de empresas, Computrabajo, Get on Board y tableros remotos. Cada vacante útil se asigna a los perfiles que cumple. | Nada. GitHub a veces la empieza con 30–60 minutos de retraso. |
+| 7:15 y 7:50 a. m. | Respaldos: solo si GitHub no lanzó la de las 6:30, la hacen ellos (si no, terminan sin hacer nada). Desde las 7:23, la captura horaria también la lanza una vez si hoy no corrió. | Nada. |
 | 8:30 a. m. | Segunda pasada: completa a quien le faltó. | Nada. |
+| 9:30 a. m. | Respaldo de la segunda pasada: solo si la de las 8:30 no corrió y aún falta. | Nada. |
 | Cada hora (minuto 23) | Captura corta: comprueba enlaces y suma vacantes nuevas sin repetir. | Nada. |
 | 10:15 a. m. | Se preparan los mensajes de WhatsApp de cada cliente. | En «Mensajes», «Abrir en WhatsApp», revisar y enviar. |
 | Cuando quieras | | Mirar el Resumen, decidir «Por confirmar» (un par de minutos) y descargar los CSV. |

@@ -57,7 +57,7 @@ def test_historial_mide_dias_observados_y_reserva_sin_inventar_suministro():
     elegidas, r = entrega.elegir([oferta(1), oferta(2)], {}, HOY, cfg)
     r["meta_cumplida"] = True
     historial = {"2025-01-01": {"fecha": "2025-01-01"}}
-    dias = entrega.registrar_medicion(historial, r, HOY)
+    dias = entrega.registrar_medicion(historial, r, HOY, busqueda_diaria=True)
     assert len(dias) == 1 and list(historial) == [HOY]
     assert dias[0]["roles"]["ux-ui-designer"]["reserva_sin_entregar"] == 1
     assert "description_full" not in str(dias)

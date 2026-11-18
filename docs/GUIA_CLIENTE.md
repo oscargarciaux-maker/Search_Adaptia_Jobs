@@ -202,7 +202,7 @@ Las fichas externas pueden contener errores: estas reglas no equivalen a una gar
 ## 3. Ejecuciones y horarios
 
 En GitHub → Actions se revisan Bodega nocturna, Captura horaria, Preparar Supabase, Búsqueda profunda, Diagnóstico
-y Pruebas. La búsqueda diaria solicita inicio a las 6:30 a. m. Colombia (segunda pasada 8:30) y la captura al minuto 23 de cada hora. GitHub puede
+y Pruebas. La búsqueda diaria solicita inicio a las 6:30 a. m. Colombia (segunda pasada 8:30; respaldos 7:15, 7:50 y 9:30 si GitHub se salta un horario) y la captura al minuto 23 de cada hora. GitHub puede
 retrasar o saltar horarios; comprobar que la tarea se ejecutó y terminó, no solo que el código fue fusionado.
 
 La captura horaria no consume Apify. La búsqueda nocturna y la profunda pueden usarlo con presupuesto compartido de

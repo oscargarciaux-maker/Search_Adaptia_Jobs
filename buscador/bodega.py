@@ -622,7 +622,8 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         if not prueba:
             _guardar_json(trabajo / "entregadas.json", entregadas)
             historial = _leer_json(trabajo / "metricas_entrega.json", {})
-            historico_entregas = entrega.registrar_medicion(historial, resumen_entrega, hoy)
+            historico_entregas = entrega.registrar_medicion(historial, resumen_entrega, hoy,
+                                                             busqueda_diaria=modo != "incremental")
             _guardar_json(trabajo / "metricas_entrega.json", historial)
         resumen_entrega["fecha"] = hoy
         try:
