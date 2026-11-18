@@ -141,7 +141,10 @@ export function Mensajes({
           </button>
         </div>
       </div>
-      <ParaMi notify={notify} />
+      <ParaMi
+        notify={notify}
+        cambios={(lista || []).map((b) => b.id + b.estado).join()}
+      />
       {!!lista?.some((b) => b.estado !== "descartado") && (
         <fieldset className="enviados">
           <legend>
@@ -188,7 +191,12 @@ export function Mensajes({
                     <p className="muted">
                       {b.cargos.join(" · ")} · {b.vacantes.length}{" "}
                       {b.vacantes.length === 1 ? "vacante" : "vacantes"}
-                      {b.pocas && " · hoy hubo menos de 5"}
+                      {/* Contrato v46: de qué día son (caso Juan: «0 de 10» en el Resumen y 7 aquí). */}
+                      {(b.anteriores ?? 0) > 0 &&
+                        (b.de_hoy
+                          ? ` · ${b.de_hoy} de hoy y ${b.anteriores} de días anteriores`
+                          : " · de días anteriores (hoy no llegó ninguna nueva)")}
+                      {b.pocas && !b.anteriores && " · hoy hubo menos de 5"}
                     </p>
                   </div>
                   <span
@@ -264,15 +272,22 @@ export function Mensajes({
   );
 }
 
-type ParteOperador = { texto: string; enlace: string; clientes: number };
+type ParaOperador = { texto: string; enlace: string; clientes: number };
 
-// Contrato v31: el número del operador (en Ajustes) y «Mandarme todos a mi WhatsApp». Un mensaje a su propio chat con
-// un enlace por cliente; si no cabe en uno, se parte. Nada se envía solo.
-function ParaMi({ notify }: { notify: (s: string, error?: boolean) => void }) {
+// Contrato v46 (decisión de Oscar, 18 nov): «Mandarme todos a mi WhatsApp» es UN mensaje a su propio chat, con un
+// enlace corto por cliente, y un solo clic. El enlace se prepara solo al abrir Mensajes y cada vez que cambian los
+// mensajes, así el botón es un enlace de verdad (sin ventanas bloqueadas). Nada se envía solo.
+function ParaMi({
+  notify,
+  cambios,
+}: {
+  notify: (s: string, error?: boolean) => void;
+  cambios: string; // cambia cuando cambian los mensajes del día
+}) {
   const [numero, setNumero] = useState("");
   const [guardado, setGuardado] = useState("");
-  const [partes, setPartes] = useState<ParteOperador[] | null>(null);
-  const [ocupado, setOcupado] = useState(false);
+  const [paraMi, setParaMi] = useState<ParaOperador | null>(null);
+  const [error, setError] = useState("");
   useEffect(() => {
     api<{ telefono: string }>("/ajustes/operador")
       .then((r) => {
@@ -282,6 +297,20 @@ function ParaMi({ notify }: { notify: (s: string, error?: boolean) => void }) {
       })
       .catch(() => undefined);
   }, []);
+  useEffect(() => {
+    if (!guardado) return;
+    let vigente = true;
+    api<ParaOperador>("/borradores/para-mi")
+      .then((r) => {
+        if (!vigente) return;
+        setParaMi(r);
+        setError("");
+      })
+      .catch((e) => vigente && setError((e as Error).message));
+    return () => {
+      vigente = false;
+    };
+  }, [guardado, cambios]);
   async function guardar() {
     try {
       const r = await api<{ telefono: string }>("/ajustes/operador", {
@@ -290,26 +319,19 @@ function ParaMi({ notify }: { notify: (s: string, error?: boolean) => void }) {
       });
       setNumero(r.telefono);
       setGuardado(r.telefono);
+      if (!r.telefono) setParaMi(null);
       notify(r.telefono ? "Tu número quedó guardado." : "Número borrado.");
     } catch (e) {
       notify((e as Error).message, true);
     }
   }
-  async function preparar() {
-    setOcupado(true);
-    try {
-      const r = await api<{ partes: ParteOperador[]; clientes: number }>(
-        "/borradores/para-mi",
-      );
-      setPartes(r.partes);
-      if (!r.clientes)
-        notify("No hay mensajes por enviar con WhatsApp del cliente.", true);
-    } catch (e) {
-      notify((e as Error).message, true);
-    } finally {
-      setOcupado(false);
-    }
-  }
+  const listo = Boolean(guardado && paraMi?.enlace);
+  const motivo = !guardado
+    ? "Guarda primero tu número."
+    : error ||
+      (paraMi && !paraMi.clientes
+        ? "No hay mensajes por enviar con WhatsApp del cliente."
+        : "Preparando…");
   return (
     <div className="para-mi">
       <div className="field">
@@ -334,54 +356,39 @@ function ParaMi({ notify }: { notify: (s: string, error?: boolean) => void }) {
           </button>
         </div>
       </div>
-      <button
-        type="button"
-        className="button primary"
-        disabled={!guardado || ocupado}
-        onClick={preparar}
-      >
-        <Send size={15} />
-        Mandarme todos a mi WhatsApp
-      </button>
-      <Ayuda etiqueta="mandarme todos">
-        Te escribe a tu propio WhatsApp un mensaje con un enlace por cliente.
-        Desde el teléfono tocas cada enlace, se abre el chat del cliente con su
-        mensaje listo y lo envías. Si son muchos, llegan en varias partes.
-      </Ayuda>
-      {partes && partes.length > 0 && (
-        <ol className="para-mi-partes">
-          {partes.map((p, n) => (
-            <li key={n}>
-              <span>
-                Parte {n + 1} de {partes.length} · {p.clientes}{" "}
-                {p.clientes === 1 ? "cliente" : "clientes"}
-              </span>
-              <a
-                className="button secondary"
-                href={p.enlace}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <MessageCircle size={14} /> Abrir en mi WhatsApp
-              </a>
-              <button
-                type="button"
-                className="text-button"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(p.texto);
-                    notify("Parte copiada.");
-                  } catch {
-                    notify("No se pudo copiar.", true);
-                  }
-                }}
-              >
-                <Copy size={14} /> Copiar
-              </button>
-            </li>
-          ))}
-        </ol>
+      {listo ? (
+        <a
+          className="button primary"
+          href={paraMi!.enlace}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <Send size={15} />
+          Mandarme todos a mi WhatsApp
+        </a>
+      ) : (
+        <button
+          type="button"
+          className="button primary"
+          aria-disabled="true"
+          onClick={() => notify(motivo, true)}
+        >
+          <Send size={15} />
+          Mandarme todos a mi WhatsApp
+        </button>
       )}
+      {listo && (
+        <span className="muted para-mi-cuantos">
+          Un solo mensaje con {paraMi!.clientes}{" "}
+          {paraMi!.clientes === 1 ? "cliente" : "clientes"}
+        </span>
+      )}
+      <Ayuda etiqueta="mandarme todos">
+        Abre tu propio WhatsApp con un solo mensaje listo: un enlace corto por
+        cliente. Lo envías, y desde el teléfono tocas cada enlace: se abre el
+        chat del cliente con su mensaje y lo envías. Los enlaces valen solo hoy
+        y mientras el mensaje no esté enviado.
+      </Ayuda>
     </div>
   );
 }

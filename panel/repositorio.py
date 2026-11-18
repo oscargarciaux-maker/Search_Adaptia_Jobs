@@ -385,6 +385,15 @@ class RepositorioSupabase:
                               "select": "id,ejecucion_id,cliente_id"}, 1000)
         return Counter((r["ejecucion_id"], r["cliente_id"]) for r in filas)
 
+    def vacantes_por_cliente(self, ejecucion_id):
+        """Contrato v46: {cliente: ids de las vacantes asignadas en esa búsqueda} (solo ids, una lectura ligera)."""
+        filas = self._paginas("panel_asignaciones", "id", {"ejecucion_id": "eq." + ejecucion_id,
+                              "select": "id,cliente_id,vacante_id"}, 1000)
+        salida = {}
+        for r in filas:
+            salida.setdefault(r["cliente_id"], set()).add(r["vacante_id"])
+        return salida
+
     def asignaciones_por_perfil(self, ejecucion_ids):
         """Contrato v37: cuántas vacantes recibió cada perfil en cada búsqueda (solo conteos)."""
         if not ejecucion_ids:
@@ -755,6 +764,11 @@ class RepositorioDemo:
         base = datetime.fromisoformat(actual["fecha"]).date()
         return [actual] + [{"id": id_demo("ejecucion-" + str(n)), "fecha": (base - timedelta(days=n)).isoformat(),
                             "revision": 1, "estado": "completa", "resumen": {}} for n in range(1, dias)]
+
+    def vacantes_por_cliente(self, ejecucion_id):
+        """Demostración: la muestra es la misma cada día, así que todo lo del mensaje cuenta como de hoy."""
+        cfg = configuracion_demo()
+        return {c["id"]: {r["vacante_id"] for r in self.resultados(c["id"])["filas"]} for c in cfg["clientes"]}
 
     def asignaciones_por_perfil(self, ejecucion_ids):
         """Demostración: lo de cada cliente repartido entre sus perfiles (números fijos)."""

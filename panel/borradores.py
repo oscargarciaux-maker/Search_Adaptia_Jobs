@@ -3,7 +3,10 @@ mensaje ya escrito (enlace wa.me), lo revisa y lo envía. Textos por plantillas,
 import argparse
 from datetime import date, timedelta
 import hashlib
+import hmac
+import os
 import re
+import secrets
 from urllib.parse import quote
 
 from panel.repositorio import hoy
@@ -11,12 +14,15 @@ from panel.repositorio import hoy
 MINIMO = 5
 MAXIMO = 10
 POR_EMPRESA = 2  # contrato v31: variedad en el mensaje, como en la entrega diaria
-LARGO_ENLACE = 7000  # contrato v31: wa.me con textos más largos falla en algunos teléfonos; se parte en varios
 SALUDOS = ("Hola {nombre} 👋", "¡Hola, {nombre}!", "Hola {nombre}, ¿cómo vas?", "¡Buen día, {nombre}!")
 INTROS = ("Hoy encontré {n} vacantes de {cargo} que creo que te pueden interesar:",
           "Te comparto {n} oportunidades de {cargo} que vi hoy y encajan con lo que buscas:",
           "Estas son {n} vacantes de {cargo} que salieron y pueden servirte:",
           "Te dejo {n} vacantes nuevas de {cargo} para que les eches un vistazo:")
+# Contrato v46: si alguna vacante es de días anteriores, el mensaje no dice «hoy» ni «nuevas».
+INTROS_ANTERIORES = ("Te comparto {n} vacantes de {cargo} que siguen abiertas y pueden interesarte:",
+                     "Estas son {n} vacantes de {cargo} que siguen abiertas y encajan con lo que buscas:",
+                     "Te dejo {n} vacantes de {cargo}, todavía abiertas, para que les eches un vistazo:")
 CIERRES = ("Revisa los requisitos y postúlate directo en cada enlace. ¡Mucho éxito!",
            "Si alguna te gusta, postúlate pronto: estas vacantes se llenan rápido. ¡Éxitos!",
            "Cuéntame si te interesa alguna o si quieres que ajuste la búsqueda. ¡Un abrazo!",
@@ -81,14 +87,16 @@ def _empresa(v):
     return " ".join(str(v.get("empresa") or "").casefold().split())
 
 
-def texto(nombre, grupos, fecha, cliente_id="", mas=0):
+def texto(nombre, grupos, fecha, cliente_id="", mas=0, todas_de_hoy=True):
     """Mensaje humano: saludo, una frase con el cargo, la lista corta y un cierre. `grupos`: [(cargo, [vacantes])].
-    `mas` (contrato v31): cuántas otras vacantes listas quedaron fuera del tope de 10."""
+    `mas` (contrato v31): cuántas otras vacantes listas quedaron fuera del tope de 10.
+    `todas_de_hoy` (contrato v46): False si alguna viene de días anteriores (la frase no dice «hoy»)."""
     semilla = f"{fecha}:{cliente_id}"
     n = sum(len(vs) for _, vs in grupos)
     nombre = " ".join(str(nombre or "").split()) or "¿cómo estás?"
     saludo = _elegir(SALUDOS, semilla + "s").format(nombre=nombre) if nombre != "¿cómo estás?" else "¡Hola! 👋"
-    partes = [saludo, _elegir(INTROS, semilla + "i").format(n=n, cargo=_lista([c for c, _ in grupos]))]
+    intros = INTROS if todas_de_hoy else INTROS_ANTERIORES
+    partes = [saludo, _elegir(intros, semilla + "i").format(n=n, cargo=_lista([c for c, _ in grupos]))]
     i = 0
     for cargo, vacantes in grupos:
         if len(grupos) > 1:
@@ -151,7 +159,7 @@ def _uno(repo, fecha, dias_atras, resultados, cliente_id, contacto):
     """Borrador del día de un cliente, sin guardarlo. Devuelve (conteos que suma a `generar`, fila o None)."""
     resultado = {"generados": 0, "con_pocas": 0, "sin_vacantes": 0, "por_recomprobar": 0}
     ya = {vid for b in repo.borradores(cliente_id=cliente_id) if b.get("fecha") != fecha for vid in b.get("vacantes", [])}
-    elegidas, vistos, sobran, empresas = [], set(ya), set(), {}
+    elegidas, vistos, sobran, empresas, de_hoy = [], set(ya), set(), {}, set()
     for dia in range(dias_atras + 1):
         if len(elegidas) >= MAXIMO or (dia and len(elegidas) >= MINIMO):
             break
@@ -166,6 +174,8 @@ def _uno(repo, fecha, dias_atras, resultados, cliente_id, contacto):
             if len(elegidas) < MAXIMO and (es_post(v) or empresas.get(_empresa(v), 0) < POR_EMPRESA):
                 empresas[_empresa(v)] = empresas.get(_empresa(v), 0) + 1
                 elegidas.append(v)
+                if not dia:
+                    de_hoy.add(v["id"])
             else:
                 sobran.add(v["id"])
     elegidas = con_posts(elegidas)
@@ -177,49 +187,79 @@ def _uno(repo, fecha, dias_atras, resultados, cliente_id, contacto):
         nombres.setdefault(v.get("cargo_nombre") or "tu perfil", []).append(v)
     grupos = list(nombres.items())
     # Solo el nombre que el operador eligió para saludar: la referencia interna del cliente no va en el mensaje.
-    cuerpo = texto(contacto.get("nombre_saludo") or "", grupos, fecha, cliente_id, mas=len(sobran))
+    cuerpo = texto(contacto.get("nombre_saludo") or "", grupos, fecha, cliente_id, mas=len(sobran),
+                   todas_de_hoy=all(v["id"] in de_hoy for v in elegidas))
     resultado["generados"] += 1
     resultado["con_pocas"] += len(elegidas) < MINIMO
     return resultado, {"fecha": fecha, "cliente_id": cliente_id, "texto": cuerpo, "vacantes": [v["id"] for v in elegidas],
                        "cargos": [c for c, _ in grupos], "estado": "pendiente", "editado": False}
 
 
-def para_operador(repo, fecha=None):
-    """Contrato v31: «Mandarme todos a mi WhatsApp». Un mensaje al número del operador (Ajustes) con un enlace por
-    cliente que abre su chat con el mensaje escrito. Si el texto no cabe en un enlace, se parte en varios. No envía
-    nada: el operador abre el enlace y, desde su teléfono, toca cada cliente."""
+# ── Contrato v46: enlace corto por cliente para «Mandarme todos» en un solo mensaje ──────────────────────────────
+_LLAVE_AL_AZAR = secrets.token_bytes(32)  # sin la credencial de servicio (demostración): vale hasta reiniciar
+
+
+def _llave():
+    """Llave de las firmas, derivada en el servidor de la credencial de servicio (no hay variable nueva). Nunca sale
+    del servidor: ni al navegador, ni a los registros, ni a los enlaces (solo su firma)."""
+    secreto = os.environ.get("SUPABASE_SECRET_KEY", "")
+    return hashlib.sha256(b"adaptia-whatsapp-corto:" + secreto.encode()).digest() if secreto else _LLAVE_AL_AZAR
+
+
+def firma(borrador_id, fecha):
+    return hmac.new(_llave(), f"{borrador_id}|{fecha}".encode(), hashlib.sha256).hexdigest()[:16]
+
+
+def ficha_corta(borrador_id, fecha):
+    """Lo que va en la dirección corta: /w/<ficha>. Vale solo el día del borrador (Bogotá)."""
+    return f"{borrador_id}.{firma(borrador_id, fecha)}"
+
+
+def abrir_corto(repo, ficha, fecha=None):
+    """El enlace wa.me del cliente con su mensaje actual (lo editado en el panel cuenta), o None si la ficha no es
+    válida, no es de hoy, el mensaje ya se envió o descartó, o el cliente no tiene WhatsApp. Marca «abierto»."""
+    fecha = fecha or hoy()
+    borrador_id, _, recibida = str(ficha or "").partition(".")
+    if not borrador_id or len(recibida) != 16 or not hmac.compare_digest(recibida, firma(borrador_id, fecha)):
+        return None
+    b = next((x for x in repo.borradores(fecha=fecha) if str(x.get("id")) == borrador_id), None)
+    if not b or b.get("estado") not in ("pendiente", "abierto"):
+        return None
+    c = next((x for x in repo.contactos() if x.get("cliente_id") == b["cliente_id"]), None)
+    if not c or not c.get("telefono"):
+        return None
+    if b.get("estado") == "pendiente":
+        repo.actualizar_borrador(borrador_id, {"estado": "abierto"})
+    return enlace_whatsapp(c["telefono"], b["texto"])
+
+
+def para_operador(repo, base, fecha=None, contactos=None, borradores=None, nombres=None):
+    """Contrato v46 (decisión de Oscar, 18 nov): «Mandarme todos a mi WhatsApp» en UN solo mensaje al número del
+    operador, con un enlace corto por cliente (`base` + /w/<ficha>) que abre su chat con el mensaje escrito. Antes
+    (v31) cada cliente llevaba su mensaje completo dentro del enlace y había que partirlo. No envía nada: el operador
+    envía su mensaje y, desde su teléfono, toca cada cliente."""
     from panel.repositorio import ErrorRepositorio
     fecha = fecha or hoy()
     operador = (repo.ajuste("operador", {}) or {}).get("telefono", "")
     if not operador:
         raise ErrorRepositorio("Guarda primero tu número de WhatsApp en «Mi número».", 422)
-    contactos = {c["cliente_id"]: c for c in repo.contactos()}
-    version = repo.operativa(fecha) or {}
-    nombres = {c["id"]: c["nombre"] for c in (version.get("configuracion") or {}).get("clientes", [])}
+    contactos = {c["cliente_id"]: c for c in (contactos if contactos is not None else repo.contactos())}
+    if nombres is None:
+        version = repo.operativa(fecha) or {}
+        nombres = {c["id"]: c["nombre"] for c in (version.get("configuracion") or {}).get("clientes", [])}
     lineas = []
-    for b in repo.borradores(fecha=fecha):
+    for b in (borradores if borradores is not None else repo.borradores(fecha=fecha)):
         c = contactos.get(b["cliente_id"])
-        if b.get("estado") not in ("pendiente", "abierto") or not c:
+        if b.get("estado") not in ("pendiente", "abierto") or not c or not c.get("telefono"):
             continue
         nombre = " ".join((nombres.get(b["cliente_id"]) or c.get("nombre_saludo") or "Cliente").split())
-        lineas.append(f"*{nombre}* ({len(b.get('vacantes', []))} vacantes):\n{enlace_whatsapp(c['telefono'], b['texto'])}")
+        n = len(b.get("vacantes", []))
+        lineas.append(f"*{nombre}* ({n} vacante{'s' if n != 1 else ''}):\n{base.rstrip('/')}/w/{ficha_corta(b['id'], fecha)}")
     if not lineas:
-        return {"partes": [], "clientes": 0}
-    partes, actual = [], []
-    for linea in lineas:
-        prueba = "\n\n".join([*actual, linea])
-        if actual and len(enlace_whatsapp(operador, prueba)) > LARGO_ENLACE:
-            partes.append(actual)
-            actual = [linea]
-        else:
-            actual.append(linea)
-    partes.append(actual)
-    salida = []
-    for n, grupo in enumerate(partes, 1):
-        cabeza = f"Mensajes de hoy ({n} de {len(partes)}). Toca cada enlace para abrir el chat del cliente:"
-        cuerpo = cabeza + "\n\n" + "\n\n".join(grupo)
-        salida.append({"texto": cuerpo, "enlace": enlace_whatsapp(operador, cuerpo), "clientes": len(grupo)})
-    return {"partes": salida, "clientes": len(lineas)}
+        return {"texto": "", "enlace": "", "clientes": 0}
+    cuerpo = ("Mensajes de hoy. Toca cada enlace para abrir el chat del cliente con su mensaje listo:\n\n"
+              + "\n\n".join(lineas))
+    return {"texto": cuerpo, "enlace": enlace_whatsapp(operador, cuerpo), "clientes": len(lineas)}
 
 
 def main():

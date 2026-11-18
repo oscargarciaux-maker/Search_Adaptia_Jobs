@@ -1502,24 +1502,32 @@ test("contrato v31: mi número, mandarme todos a mi WhatsApp y lista de enviados
   page.on("pageerror", (e) => errores.push(e.message));
   await page.goto("/");
   await ir(page, "Mensajes");
-  const mandar = page.getByRole("button", {
-    name: "Mandarme todos a mi WhatsApp",
-  });
   const numero = page.getByLabel("Mi número");
-  // Sin número guardado no se puede mandar.
-  if (!(await numero.inputValue())) await expect(mandar).toBeDisabled();
+  // Sin número guardado todavía no es un enlace (dice por qué al tocarlo).
+  if (!(await numero.inputValue()))
+    await expect(
+      page.getByRole("button", { name: "Mandarme todos a mi WhatsApp" }),
+    ).toHaveAttribute("aria-disabled", "true");
   await numero.fill("+57 311 222 3344");
   await page.getByRole("button", { name: "Guardar", exact: true }).click();
   await expect(page.getByText("Tu número quedó guardado.")).toBeVisible();
   await page.getByRole("button", { name: "Preparar mensajes" }).click();
-  await mandar.click();
-  const parte = page
-    .getByRole("link", { name: "Abrir en mi WhatsApp" })
-    .first();
-  await expect(parte).toHaveAttribute(
+  // Contrato v46: un solo enlace, listo sin pasos intermedios, con un enlace corto por cliente.
+  const mandar = page.getByRole("link", {
+    name: "Mandarme todos a mi WhatsApp",
+  });
+  await expect(mandar).toHaveAttribute(
     "href",
-    /^https:\/\/wa\.me\/573112223344\?text=/,
+    /^https:\/\/wa\.me\/573112223344\?text=.*%2Fw%2F/,
   );
+  await expect(page.getByText(/Un solo mensaje con \d+ cliente/)).toBeVisible();
+  const href = (await mandar.getAttribute("href")) || "";
+  const corto = decodeURIComponent(href.split("text=")[1]).match(
+    /http:\/\/[^\s]+\/w\/[^\s]+/,
+  )![0];
+  const abierto = await page.request.get(corto, { maxRedirects: 0 });
+  expect(abierto.status()).toBe(302);
+  expect(abierto.headers()["location"]).toMatch(/^https:\/\/wa\.me\//);
   // Lista de enviados: marcar uno sube la cuenta.
   const enviados = page.locator("fieldset.enviados");
   const total = await enviados.locator("input").count();
@@ -1633,5 +1641,36 @@ test("18 nov: al editar un cargo los grupos en español aparecen solos y el cont
     "color",
     "rgb(255, 255, 255)",
   );
+  // Los tres grupos se ven siempre; si uno queda vacío dice por qué (QA es el oficio general).
+  const amplio = dialog.getByRole("group", { name: "Nombres más amplios" });
+  await expect(amplio).toContainText(/no hay uno más amplio|Ya tiene/);
+  // Van antes de «Nombres del cargo», a la vista al abrir.
+  const yGrupo = (await amplio.boundingBox())!.y;
+  const yNombres = (await dialog
+    .getByText("Nombres del cargo", { exact: true })
+    .boundingBox())!.y;
+  expect(yGrupo).toBeLessThan(yNombres);
   await page.keyboard.press("Escape");
+});
+
+test("18 nov: Cupo diario en una línea y «Ver historial» al pie de su tarjeta", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  const cabeza = page.locator(".cupos-cabeza");
+  await expect(cabeza).toContainText(/Cupo diario\s*· \d+ a clientes/);
+  const alto = (await cabeza.boundingBox())!.height;
+  expect(alto).toBeLessThan(30); // una sola línea
+  const pie = async (texto: string) => {
+    const enlace = page.locator(".tarjeta-accion", { hasText: texto });
+    const tarjeta = enlace.locator("xpath=ancestor::button[1]");
+    const e = (await enlace.boundingBox())!;
+    const t = (await tarjeta.boundingBox())!;
+    return t.y + t.height - (e.y + e.height);
+  };
+  expect(await pie("Ver historial")).toBeLessThan(24);
+  expect(
+    Math.abs((await pie("Ver historial")) - (await pie("Ver vacantes"))),
+  ).toBeLessThan(6);
 });

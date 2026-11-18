@@ -5746,3 +5746,77 @@ select,
   font-size: 12px;
   white-space: nowrap;
 }
+
+/* 18 nov (Oscar: títulos pegados y «Opciones avanzadas» muy junto): aire entre título y contenido en el cargo. */
+.form-cargo fieldset > .sugeridos-grupo + .sugeridos-grupo {
+  margin-top: 2px;
+}
+.form-cargo .sugeridos-titulo {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--contenido);
+}
+.form-cargo .sugeridos-grupo .sugeridos {
+  margin: 0;
+}
+.sugeridos-vacio {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.form-cargo .field {
+  gap: 10px;
+}
+.cargo-nombres {
+  display: grid;
+  gap: 6px;
+}
+.cargo-nombres > .field,
+.cargo-nombres > .helper {
+  margin: 0;
+}
+.form-cargo .opciones-cargo {
+  margin: 10px 0 0;
+}
+.form-cargo .plegable-contenido {
+  display: grid;
+  gap: 14px;
+  padding-top: 14px;
+}
+.form-cargo .plegable-contenido > .field,
+.form-cargo .plegable-contenido > .helper {
+  margin: 0;
+}
+.form-cargo .funciones-acciones {
+  margin: 0;
+}
+/* 18 nov (Oscar): «Ver historial» al pie de su tarjeta, alineado con «Editar cargos y metas» y «Ver vacantes». */
+.resumen-arriba > .tarjeta-actividad {
+  grid-template-rows: auto auto 1fr;
+  align-content: stretch;
+}
+.resumen-arriba > .tarjeta-actividad .tarjeta-accion {
+  align-self: end;
+}
+/* 18 nov: «Cupo diario · 130 a clientes · Comunidad hasta 20» en una sola línea. */
+.cupos-cabeza {
+  flex-wrap: wrap;
+}
+.cupos-cifras {
+  font-weight: 500;
+  color: var(--muted);
+}
+.cupos-cifras b {
+  color: var(--contenido);
+  font-weight: 700;
+}
+/* 18 nov: lo que su mensaje de WhatsApp de hoy lleva listo para enviar. */
+.cliente-por-enviar {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #c9d6ea; /* la tarjeta de clientes es oscura en los dos temas, como .cliente-texto span */
+}
+.cliente-mini.es-comunidad .cliente-por-enviar {
+  color: inherit;
+}

@@ -138,8 +138,10 @@ Nada se envía solo. Cada mañana, en «Mensajes», cada cliente con WhatsApp y 
 
 **Mensajes (16 nov, contrato v31).** Cada mensaje lleva hasta 10 vacantes, con máximo 2 de la misma empresa, y si
 quedan más dice «Tengo N vacantes más para ti; si quieres, te las paso». Solo entran enlaces comprobados en las
-últimas 24 horas. Escribe tu número en «Mi número» y pulsa «Mandarme todos a mi WhatsApp»: te llega a tu propio chat
-un enlace por cliente (en varias partes si son muchos); desde el teléfono tocas cada uno y envías su mensaje. Arriba,
+últimas 24 horas. Escribe tu número en «Mi número» y pulsa «Mandarme todos a mi WhatsApp»: se abre tu propio chat
+con un solo mensaje listo, con un enlace corto por cliente (desde el 18 nov, contrato v46). Lo envías y, desde el
+teléfono, tocas cada enlace: se abre el chat del cliente con su mensaje y lo envías. Los enlaces valen solo ese día y
+mientras el mensaje no esté enviado. Cada mensaje dice cuántas vacantes son de hoy y cuántas de días anteriores. Arriba,
 «Enviados hoy» es una lista para ir marcando. La sesión del panel ya no se cierra cada hora: se renueva sola hasta
 «Cerrar sesión» o 30 días sin entrar. En «Actividad», el embudo de cada cargo dice en qué etapa se pierden más vacantes
 y «Qué hacer».
