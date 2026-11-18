@@ -267,7 +267,8 @@ def test_api_demo_guarda_conflictos_programa_y_bloquea_origen_ajeno():
         resultados = c.get("/api/resultados").json()
         assert resultados["listas"] == 50
         msg = c.get("/api/whatsapp/" + cfg["borrador"]["clientes"][0]["id"]).json()
-        assert msg["vacantes"] == 50 and "Hola" in msg["texto"]
+        # Contrato v43: 10 por defecto y 2 por empresa (la demostración tiene 5 empresas); el resto, «Tengo N más».
+        assert msg["vacantes"] == 10 and "Hola" in msg["texto"] and msg["sobran"] == 40 and "Tengo 40" in msg["texto"]
         assert "service_role" not in c.get("/api/session").text
 
 

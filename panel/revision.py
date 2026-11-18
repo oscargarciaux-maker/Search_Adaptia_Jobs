@@ -154,7 +154,17 @@ def resumen_de(datos, motivo="", s=None):
             "salario": str(datos.get("salario") or ""), "idioma": datos.get("idioma", ""),
             "publicada": datos.get("fecha_publicacion", ""), "enlace": datos.get("enlace", ""),
             "paises": list(datos.get("paises_mundo") or datos.get("paises") or [])[:8],
-            "sugerida": s["decision"], "paises_sugeridos": s["paises"], "por_que": s["motivo"], "frase": s["frase"]}
+            "sugerida": s["decision"], "paises_sugeridos": s["paises"], "por_que": s["motivo"], "frase": s["frase"],
+            # 18 nov: para la tarjeta de «Por confirmar» (nivel y un extracto corto de la descripción).
+            "nivel": datos.get("nivel") or "", "extracto": extracto(datos.get("_descripcion") or "")}
+
+
+def extracto(texto, largo=260):
+    """Primeras líneas legibles de la descripción, cortadas en una palabra (sin HTML ni saltos)."""
+    limpio = " ".join(re.sub(r"<[^>]+>|\*\*", " ", texto or "").split())
+    if len(limpio) <= largo:
+        return limpio
+    return limpio[:largo].rsplit(" ", 1)[0].rstrip(",.;:") + "…"
 
 
 def _candidatos_funciones(repo, perfiles, recibidas, estrictas, fecha, desde, motivo_de, ya):
@@ -406,6 +416,7 @@ def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None, todas=None,
             r["catalogo_vacantes"] = {**(r.get("catalogo_vacantes") or {}), **filas[r["vacante_id"]]}
     version = (version if version is not None else repo.operativa(fecha)) or {}
     clientes = {c["id"]: c["nombre"] for c in (version.get("configuracion") or {}).get("clientes", [])}
+    nombres_cargo = {c["id"]: c["nombre"] for c in (version.get("configuracion") or {}).get("cargos", [])}
     por_ubicacion = {}
     for r in todas:
         if not es_generica(r.get("ubicacion")):
@@ -421,7 +432,10 @@ def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None, todas=None,
                 originales[r["vacante_id"]]["resumen"] = res  # la copia en memoria ya no lo vuelve a calcular
         frase = r.get("pista", "") if r.get("motivo") == FUNCIONES else res.get("frase", "")
         salida.append({**{k: res.get(k, "") for k in ("titulo", "empresa", "ubicacion", "modalidad", "salario",
-                                                       "idioma", "publicada", "enlace", "sugerida", "por_que")},
+                                                       "idioma", "publicada", "enlace", "sugerida", "por_que",
+                                                       "nivel", "extracto")},
+                       "cargos": sorted({nombres_cargo.get(p.get("cargo_id"), "") for p in r.get("perfiles") or []}
+                                        - {""}),
                        "vacante_id": r["vacante_id"], "paises_sugeridos": res.get("paises_sugeridos") or [],
                        "paises": res.get("paises") or [], "frase": frase,
                        "pista": r.get("pista", ""), "sugerencia": r.get("sugerencia", []),

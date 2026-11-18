@@ -618,14 +618,17 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         return valor
 
     @app.get("/api/whatsapp/{cliente_id}")
-    def whatsapp(cliente_id: str, fecha: str | None = None):
+    def whatsapp(cliente_id: str, fecha: str | None = None, cuantas: int = 10):
         from uuid import UUID
         UUID(cliente_id)
         if fecha:
             from datetime import date
             date.fromisoformat(fecha)
         contactos = _copia("contactos", "", 30, repo.contactos)
-        return servicio.whatsapp(repo, cliente_id, fecha, resultados=_resultados(cliente_id, fecha), contactos=contactos)
+        if not 1 <= cuantas <= 500:
+            raise HTTPException(422, "Elige entre 1 y 500 vacantes.")
+        return servicio.whatsapp(repo, cliente_id, fecha, resultados=_resultados(cliente_id, fecha), contactos=contactos,
+                                 cuantas=cuantas)
 
     dist = RAIZ / "web" / "dist"
     if dist.exists():

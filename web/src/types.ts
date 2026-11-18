@@ -245,6 +245,10 @@ export type Revision = {
   funciones?: boolean;
   // Contrato v29: entre las 10 más útiles de hoy.
   mas_util?: boolean;
+  // 18 nov: para la tarjeta del detalle del cliente.
+  nivel?: string;
+  extracto?: string;
+  cargos?: string[];
 };
 export type Revisiones = {
   pendientes: Revision[];

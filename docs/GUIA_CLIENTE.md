@@ -52,6 +52,10 @@ sirvan, o «Añadir todas».
 resaltado. «Cupo diario» es el máximo de vacantes al día entre todos (antes «Techo del día») e «Historial» es lo que
 antes se llamaba «Actividad».
 
+**Copiar a WhatsApp por partes (18 nov).** En Vacantes, escribe en «Cuántas» el número de vacantes y pulsa «Copiar
+WhatsApp». Van 2 por empresa como máximo; las demás se mencionan con «Tengo N más…». Si eliges más de 10, el mensaje
+sale en partes de 10: copia y pega una parte, y vuelve por la siguiente.
+
 **Confirmar y aplicar (18 nov, contrato v43).** Un solo botón: la configuración vale desde la próxima búsqueda, aunque
 sea dentro de unos minutos. Si la cambias mientras una búsqueda corre, esa búsqueda reparte con la nueva y no se
 detiene. Si la cambias después de que se armó el lote del día, la próxima búsqueda de cada hora completa lo que falte.

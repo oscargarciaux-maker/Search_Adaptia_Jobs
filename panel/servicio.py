@@ -2,6 +2,7 @@
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 import logging
+import re
 import threading
 import time
 
@@ -462,13 +463,25 @@ def cobertura(repo, fecha=None):
                     "comprobado, que esa persona nunca recibió; no es una promesa para los próximos días."}
 
 
-def whatsapp(repo, cliente_id, fecha=None, resultados=None, contactos=None):
-    """El mensaje para copiar. El servidor pasa los `resultados` y `contactos` que ya tiene en memoria (18 nov)."""
+def whatsapp(repo, cliente_id, fecha=None, resultados=None, contactos=None, cuantas=10):
+    """El mensaje para copiar. El servidor pasa los `resultados` y `contactos` que ya tiene en memoria (18 nov).
+    Contrato v43 (regla 7): el operador elige `cuantas` (10 por defecto, como el borrador diario), con 2 por empresa;
+    las que quedan fuera van en «Tengo N más…». Con más de 10, el texto se entrega también en `partes` de 10."""
     r = resultados if resultados is not None else globals()["resultados"](repo, cliente_id, fecha)
     from panel import borradores
-    listas = borradores.con_posts([v for v in r["vacantes"] if v["estado"] == "lista"])
+    elegidas, empresas, sobran = [], {}, 0
+    for v in (v for v in r["vacantes"] if v["estado"] == "lista"):
+        empresa = borradores._empresa(v)
+        if len(elegidas) < cuantas and (borradores.es_post(v) or empresas.get(empresa, 0) < borradores.POR_EMPRESA):
+            empresas[empresa] = empresas.get(empresa, 0) + 1
+            elegidas.append(v)
+        else:
+            sobran += 1
+    listas = borradores.con_posts(elegidas, maximo=cuantas)
+    sobran += len(elegidas) - len(listas)
     if not listas:
-        return {"texto": "", "vacantes": 0, "nota": "No hay vacantes con filtros y enlace vigentes para copiar."}
+        return {"texto": "", "partes": [], "vacantes": 0,
+                "nota": "No hay vacantes con filtros y enlace vigentes para copiar."}
     # Misma plantilla humana que los borradores diarios (contrato v10): cargo y lista, sin enumerar filtros.
     grupos = {}
     for v in listas:
@@ -479,8 +492,23 @@ def whatsapp(repo, cliente_id, fecha=None, resultados=None, contactos=None):
                      if c.get("cliente_id") == cliente_id), {})
     nombre = contacto.get("nombre_saludo", "")
     texto = borradores.texto(nombre, list(grupos.items()), (r.get("ejecucion") or {}).get("fecha") or hoy(),
-                             str(cliente_id or ""))
-    return {"texto": texto, "vacantes": len(listas)}
+                             str(cliente_id or ""), mas=sobran)
+    return {"texto": texto, "partes": partir_mensaje(texto), "vacantes": len(listas), "sobran": sobran}
+
+
+def partir_mensaje(texto, por_parte=10):
+    """Parte el mensaje en trozos de hasta `por_parte` vacantes, sin cortar ninguna: el saludo va con la primera y el
+    cierre con la última. La numeración sigue de una parte a la otra."""
+    partes, actual, n = [], [], 0
+    for parrafo in texto.split("\n\n"):
+        es_vacante = bool(re.match(r"^\d+\. ", parrafo))
+        if es_vacante and n == por_parte:
+            partes.append("\n\n".join(actual))
+            actual, n = [], 0
+        actual.append(parrafo)
+        n += es_vacante
+    partes.append("\n\n".join(actual))
+    return partes
 
 
 def proponer_funciones(repo, cargo):
