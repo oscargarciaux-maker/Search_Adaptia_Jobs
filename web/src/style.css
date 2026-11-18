@@ -5362,10 +5362,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   grid-area: accion;
   align-self: end;
 }
+/* 18 nov (Oscar): el aviso de «por confirmar» más pequeño y separado del nombre. */
 .cliente-texto .cliente-alerta {
   color: #1f1a10;
-  font-size: 11px;
+  font-size: 10px;
   overflow: visible;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  margin-left: 6px;
+  box-shadow: 0 0 0 1px #fbbf2440;
 }
 /* 18 nov: la casilla «Comunidad» queda centrada con el campo del nombre. */
 .cliente-cabecera {

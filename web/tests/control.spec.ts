@@ -1528,6 +1528,13 @@ test("contrato v31: mi número, mandarme todos a mi WhatsApp y lista de enviados
   const abierto = await page.request.get(corto, { maxRedirects: 0 });
   expect(abierto.status()).toBe(302);
   expect(abierto.headers()["location"]).toMatch(/^https:\/\/wa\.me\//);
+  // «Copiar mensaje» deja en el portapapeles el mismo texto, con sus saltos de línea.
+  await page
+    .getByRole("button", { name: "Copiar mensaje", exact: true })
+    .click();
+  const copiado = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copiado).toBe(decodeURIComponent(href.split("text=")[1]));
+  expect(copiado).toContain("\n\n");
   // Lista de enviados: marcar uno sube la cuenta.
   const enviados = page.locator("fieldset.enviados");
   const total = await enviados.locator("input").count();
