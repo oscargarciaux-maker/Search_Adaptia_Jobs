@@ -391,7 +391,8 @@ input[type="range"] {
 }
 .main {
   max-width: 1600px;
-  padding: 27px 42px 0;
+  /* 18 nov (Oscar): abajo el mismo espacio que arriba; el último cliente ya no toca el borde al bajar. */
+  padding: 27px 42px 27px;
   margin: 0 auto;
 }
 .demo-notice {
@@ -1764,7 +1765,7 @@ h1 {
 }
 @media (min-width: 1500px) {
   .main {
-    padding: 35px 55px 0;
+    padding: 35px 55px 35px;
   }
   .hero {
     min-height: 315px;
@@ -5783,4 +5784,9 @@ select,
 }
 .cliente-mini.es-comunidad .cliente-por-enviar {
   color: inherit;
+}
+
+/* 18 nov (Oscar): en Historial, las tarjetas separadas entre sí. */
+.main > * + .card.activity {
+  margin-top: 20px;
 }
