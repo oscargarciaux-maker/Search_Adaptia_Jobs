@@ -413,7 +413,7 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
 
     @app.post("/api/cargos/expandir")
     def expandir(body: Expansion):
-        return sugerir(body.cargo)
+        return sugerir(body.cargo, consultar_esco=not body.rapido)
 
     @app.post("/api/cargos/funciones")
     def proponer_funciones(body: dict):
@@ -594,16 +594,35 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         if not app.state.acciones:
             return {"disponible": False}
         try:
-            return {"disponible": True, **app.state.acciones.estado()}
+            estado = app.state.acciones.estado()
         except ErrorRepositorio as e:  # el botón queda visible y dice por qué no se puede (el mensaje no lleva la llave)
             registro.aviso("api:busqueda", RuntimeError(e.mensaje))
-            return {"disponible": True, "en_curso": None, "ocupado": e.mensaje, "ultima_pedida": None}
+            estado = {"en_curso": None, "ocupado": e.mensaje, "ultima_pedida": None}
+        return {"disponible": True, **estado, "plan": _plan()}
+
+    def _plan():
+        """Contrato v45: qué hará «Buscar ahora» (copia de 60 s; cualquier escritura la renueva)."""
+        try:
+            return _copia("plan-busqueda", "", 60,
+                          lambda: servicio.plan_busqueda(repo, ejecuciones=_copia("ejecuciones", "", 30, repo.ejecuciones)))
+        except Exception as e:  # noqa: BLE001 — sin el plan, se hace la búsqueda completa de siempre
+            registro.aviso("api:plan", e)
+            return {"tipo": "completa", "faltan": [], "motivo": "Se hará la búsqueda completa del día."}
 
     @app.post("/api/busqueda")
     def buscar_ahora():
         if not app.state.acciones:
             raise ErrorRepositorio("Falta la llave de GitHub en el alojamiento del panel (GITHUB_ACCIONES_TOKEN).", 409)
-        return app.state.acciones.lanzar()
+        # Contrato v45: el servidor decide (no el navegador) qué búsqueda lanzar, con datos frescos.
+        try:
+            plan = servicio.plan_busqueda(repo)
+        except Exception as e:  # noqa: BLE001
+            registro.aviso("api:plan", e)
+            plan = {"tipo": "completa"}
+        if plan["tipo"] == "nada":
+            raise ErrorRepositorio(plan["motivo"], 409)
+        return {**app.state.acciones.lanzar("faltantes" if plan["tipo"] == "faltantes" else "completo"),
+                "tipo": plan["tipo"]}
 
     @app.get("/api/ejecuciones")
     def ejecuciones():

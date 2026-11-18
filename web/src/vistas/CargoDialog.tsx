@@ -1,5 +1,5 @@
 // Crear o editar un cargo (nombres, funciones y opciones avanzadas).
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Check,
   Compass,
@@ -55,8 +55,10 @@ export function CargoDialog({
     setAmplios((s) => s.filter((x) => !terminos.includes(x)));
   }
   const [nota, setNota] = useState("");
-  async function expandir() {
-    setBusy(true);
+  // `tocarNombres` = false al abrir un cargo existente: solo se muestran las fichas (en español, sugeridas y más
+  // amplias), sin cambiar sus nombres ni bloquear el formulario (18 nov, Oscar no veía los grupos nuevos).
+  async function expandir(tocarNombres = true) {
+    if (tocarNombres) setBusy(true);
     try {
       const r = await api<{
         terminos_exactos: string[];
@@ -68,7 +70,7 @@ export function CargoDialog({
         requiere_revision: boolean;
       }>("/cargos/expandir", {
         method: "POST",
-        body: JSON.stringify({ cargo: c.nombre }),
+        body: JSON.stringify({ cargo: c.nombre, rapido: !tocarNombres }),
       });
       // Sesión de prueba (17 nov): los nombres principales entran solos; los afines quedan como fichas para
       // añadir con un clic (antes entraban todos y había que quitar los que no servían).
@@ -77,18 +79,19 @@ export function CargoDialog({
         [
           ...c.terminos_exactos,
           ...c.terminos_similares,
-          ...r.terminos_exactos,
+          ...(tocarNombres ? r.terminos_exactos : []),
         ].map((x) => x.toLowerCase()),
       );
-      setC((v) => ({
-        ...v,
-        terminos_exactos: Array.from(
-          new Set([...v.terminos_exactos, ...r.terminos_exactos]),
-        ),
-        terminos_cercanos: r.terminos_cercanos?.length
-          ? r.terminos_cercanos
-          : v.terminos_cercanos || [],
-      }));
+      if (tocarNombres)
+        setC((v) => ({
+          ...v,
+          terminos_exactos: Array.from(
+            new Set([...v.terminos_exactos, ...r.terminos_exactos]),
+          ),
+          terminos_cercanos: r.terminos_cercanos?.length
+            ? r.terminos_cercanos
+            : v.terminos_cercanos || [],
+        }));
       const es = (r.terminos_es || []).filter((x) => !ya.has(x.toLowerCase()));
       const enEs = new Set(es.map((x) => x.toLowerCase()));
       setEnEspanol(es);
@@ -100,18 +103,24 @@ export function CargoDialog({
       setAmplios(
         (r.terminos_base || []).filter((x) => !ya.has(x.toLowerCase())),
       );
-      setNota(
-        r.fuentes.join(" · ") +
-          (r.requiere_revision
-            ? ". No encontramos afines fiables; puedes añadirlos aquí."
-            : ". Revisa y ajusta las sugerencias."),
-      );
+      if (tocarNombres)
+        setNota(
+          r.fuentes.join(" · ") +
+            (r.requiere_revision
+              ? ". No encontramos afines fiables; puedes añadirlos aquí."
+              : ". Revisa y ajusta las sugerencias."),
+        );
     } catch (e) {
-      notify((e as Error).message, true);
+      if (tocarNombres) notify((e as Error).message, true);
     } finally {
-      setBusy(false);
+      if (tocarNombres) setBusy(false);
     }
   }
+  useEffect(() => {
+    if (cargo && cargo.nombre.trim().length >= 2) void expandir(false);
+    // Solo al abrir el cargo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Contrato v25: proponer la huella de funciones con el catálogo (sin IA).
   const [proponiendo, setProponiendo] = useState(false);
   async function proponerFunciones() {
@@ -147,6 +156,7 @@ export function CargoDialog({
       onClose={onClose}
     >
       <form
+        className="form-cargo"
         onSubmit={async (e) => {
           e.preventDefault();
           if (c.nombre.trim().length < 2 || busy) return;
@@ -193,7 +203,7 @@ export function CargoDialog({
             className="button secondary full"
             type="button"
             disabled={c.nombre.trim().length < 2 || busy}
-            onClick={expandir}
+            onClick={() => expandir()}
           >
             {busy ? (
               <Loader2 className="spin" size={16} />
@@ -221,14 +231,10 @@ export function CargoDialog({
           />
           {(
             [
+              ["En español", "Nombres en español", enEspanol],
+              ["Sugeridos", "Nombres sugeridos", sugeridos],
               [
-                "En español (toca para añadir):",
-                "Nombres en español",
-                enEspanol,
-              ],
-              ["Sugeridos (toca para añadir):", "Nombres sugeridos", sugeridos],
-              [
-                "Más amplio, sin el modificador (añádelos solo si también le sirven):",
+                "Más amplio, sin el modificador: solo si también le sirven",
                 "Nombres más amplios",
                 amplios,
               ],
@@ -238,30 +244,36 @@ export function CargoDialog({
               lista.length > 0 && (
                 <div
                   key={etiqueta}
-                  className="sugeridos"
+                  className="sugeridos-grupo"
                   role="group"
                   aria-label={etiqueta}
                 >
-                  <span className="sugeridos-titulo">{titulo}</span>
-                  {lista.map((t) => (
+                  <div className="sugeridos-cabeza">
+                    <span className="sugeridos-titulo">
+                      {titulo} · toca para añadir
+                    </span>
                     <button
                       type="button"
-                      className="chip-sugerido"
-                      key={t}
-                      aria-label={"Añadir " + t}
-                      onClick={() => anadir([t])}
+                      className="text-button"
+                      onClick={() => anadir([...lista])}
                     >
-                      <Plus size={12} />
-                      {t}
+                      Añadir todas
                     </button>
-                  ))}
-                  <button
-                    type="button"
-                    className="text-button"
-                    onClick={() => anadir([...lista])}
-                  >
-                    Añadir todas
-                  </button>
+                  </div>
+                  <div className="sugeridos">
+                    {lista.map((t) => (
+                      <button
+                        type="button"
+                        className="chip-sugerido"
+                        key={t}
+                        aria-label={"Añadir " + t}
+                        onClick={() => anadir([t])}
+                      >
+                        <Plus size={12} />
+                        {t}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ),
           )}

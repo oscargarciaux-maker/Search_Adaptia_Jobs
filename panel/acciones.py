@@ -125,7 +125,7 @@ class AccionesGitHub:
         self._copia = (time.monotonic(), valor)
         return valor
 
-    def lanzar(self):
+    def lanzar(self, enfoque="completo"):
         with self._cerrojo:
             if self._ultimo is not None and time.monotonic() - self._ultimo < ESPERA_ENTRE_LANZAMIENTOS:
                 raise ErrorRepositorio("La búsqueda ya se pidió hace un momento; aparecerá en unos segundos.", 409)
@@ -135,7 +135,7 @@ class AccionesGitHub:
             if actual["ocupado"]:
                 raise ErrorRepositorio(actual["ocupado"], 409)
             self._pedir("POST", f"/actions/workflows/{FLUJO}/dispatches",
-                        json={"ref": self.rama(), "inputs": {"modo": "diario", "prueba": "false"}})
+                        json={"ref": self.rama(), "inputs": {"modo": "diario", "prueba": "false", "enfoque": enfoque}})
             self._ultimo, self._copia = time.monotonic(), None
             return {"lanzada": True}
 
@@ -158,7 +158,7 @@ class AccionesDemo:
                              "conclusion": None if corriendo else "success"})
         return resumir(corridas, "main")
 
-    def lanzar(self):
+    def lanzar(self, enfoque="completo"):
         if self.estado()["en_curso"]:
             raise ErrorRepositorio(YA_HAY, 409)
         self._pedida = (time.monotonic(), datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))

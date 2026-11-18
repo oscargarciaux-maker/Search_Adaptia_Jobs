@@ -519,6 +519,7 @@ class VistaPrevia(Modelo):
 
 class Expansion(Modelo):
     cargo: str = Field(min_length=2, max_length=120)
+    rapido: bool = False  # 18 nov: al abrir un cargo, solo el mapa y el glosario (sin consultar ESCO)
 
     @field_validator("cargo")
     @classmethod

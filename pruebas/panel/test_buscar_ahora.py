@@ -56,7 +56,7 @@ def test_lanza_la_busqueda_diaria_de_la_rama_principal():
     assert gh.lanzar() == {"lanzada": True}
     metodo, url, cabeceras, kw = sesion.pedidos[-1]
     assert metodo == "POST" and url.endswith("/repos/dueno/repo/actions/workflows/bodega.yml/dispatches")
-    assert kw["json"] == {"ref": "main", "inputs": {"modo": "diario", "prueba": "false"}}
+    assert kw["json"] == {"ref": "main", "inputs": {"modo": "diario", "prueba": "false", "enfoque": "completo"}}
     assert cabeceras["Authorization"] == "Bearer " + TOKEN
 
 
@@ -158,10 +158,12 @@ def test_espacios_al_pegar_se_quitan(monkeypatch):
 
 def test_api_lanza_y_bloquea_en_la_demo():
     api = TestClient(crear_app(demo=True, repositorio=RepositorioDemo()))
-    assert api.get("/api/busqueda").json() == {"disponible": True, "en_curso": None, "ocupado": None,
-                                               "ultima_pedida": None}
+    estado = api.get("/api/busqueda").json()
+    assert {k: estado[k] for k in ("disponible", "en_curso", "ocupado", "ultima_pedida")} == \
+        {"disponible": True, "en_curso": None, "ocupado": None, "ultima_pedida": None}
+    assert estado["plan"]["tipo"] == "faltantes" and estado["plan"]["faltan"]  # la demo: 3 perfiles bajo su meta
     assert api.post("/api/busqueda", json={}).status_code == 403  # sin origen: como cualquier escritura
-    assert api.post("/api/busqueda", json={}, headers=H).json() == {"lanzada": True}
+    assert api.post("/api/busqueda", json={}, headers=H).json() == {"lanzada": True, "tipo": "faltantes"}
     assert api.get("/api/busqueda").json()["en_curso"]["estado"] == "corriendo"
     assert api.post("/api/busqueda", json={}, headers=H).status_code == 409
 
@@ -174,3 +176,90 @@ def test_un_error_de_github_deja_el_boton_con_el_motivo_y_sin_la_llave():
     assert TOKEN not in r.text
     r = api.post("/api/busqueda", json={}, headers=H)
     assert r.status_code == 502 and TOKEN not in r.text
+
+
+# ── Contrato v45: un solo botón que decide ─────────────────────────────────────────────────────────────────────────
+class GitHubAnotado:
+    def __init__(self):
+        self.enfoques = []
+
+    def estado(self, fresco=False):
+        return {"en_curso": None, "ocupado": None, "ultima_pedida": None}
+
+    def lanzar(self, enfoque="completo"):
+        self.enfoques.append(enfoque)
+        return {"lanzada": True}
+
+
+def _repo_con(ejecuciones, por_perfil):
+    class Repo(RepositorioDemo):
+        def ejecuciones(self):
+            return ejecuciones
+
+        def asignaciones_por_perfil(self, ids):
+            from collections import Counter
+            return Counter({(ids[0], pid): n for pid, n in por_perfil.items()})
+    return Repo()
+
+
+def test_sin_busqueda_hoy_lanza_la_completa():
+    gh = GitHubAnotado()
+    api = TestClient(crear_app(demo=True, repositorio=_repo_con([], {}), acciones=gh))
+    assert api.get("/api/busqueda").json()["plan"]["tipo"] == "completa"
+    assert api.post("/api/busqueda", json={}, headers=H).json()["tipo"] == "completa" and gh.enfoques == ["completo"]
+
+
+def test_busqueda_fallida_hoy_tambien_lanza_la_completa():
+    from panel.repositorio import hoy
+    gh = GitHubAnotado()
+    api = TestClient(crear_app(demo=True, repositorio=_repo_con([{"id": "e1", "fecha": hoy(), "estado": "fallida"}], {}),
+                               acciones=gh))
+    api.post("/api/busqueda", json={}, headers=H)
+    assert gh.enfoques == ["completo"]
+
+
+def test_si_todos_cumplen_no_lanza_y_lo_dice():
+    from panel.modelos import Configuracion
+    from panel.repositorio import configuracion_demo, hoy
+    cfg = Configuracion.model_validate(configuracion_demo())
+    todos = {str(p.id): int(p.meta_diaria or 0) + 1 for p in cfg.perfiles}
+    gh = GitHubAnotado()
+    api = TestClient(crear_app(demo=True, repositorio=_repo_con([{"id": "e1", "fecha": hoy(), "estado": "completa"}],
+                                                                todos), acciones=gh))
+    assert api.get("/api/busqueda").json()["plan"]["tipo"] == "nada"
+    r = api.post("/api/busqueda", json={}, headers=H)
+    assert r.status_code == 409 and "meta" in r.json()["detail"] and gh.enfoques == []
+
+
+def test_con_perfiles_bajo_su_meta_lanza_a_fondo_solo_para_ellos():
+    from panel.repositorio import hoy
+    gh = GitHubAnotado()
+    api = TestClient(crear_app(demo=True, repositorio=_repo_con([{"id": "e1", "fecha": hoy(), "estado": "completa"}],
+                                                                {}), acciones=gh))
+    plan = api.get("/api/busqueda").json()["plan"]
+    assert plan["tipo"] == "faltantes" and all(f["hoy"] < f["meta"] for f in plan["faltan"])
+    api.post("/api/busqueda", json={}, headers=H)
+    assert gh.enfoques == ["faltantes"]
+
+
+def test_a_fondo_solo_reparte_turnos_entre_quienes_faltan_y_duplica_presupuesto():
+    from panel import ejecutor
+    from panel.repositorio import configuracion_demo, hoy
+    from buscador import cobertura
+    cfg = configuracion_demo()
+    uno = cfg["perfiles"][0]["id"]
+    _, _, normal = ejecutor.preparar({"configuracion": cfg}, hoy())
+    _, _, fondo = ejecutor.preparar({"configuracion": cfg}, hoy(), enfocar={uno})
+    assert [p["perfil"] for p in fondo["personas_busqueda"]] == [uno]
+    assert fondo["presupuestos"]["linkedin_busquedas"] == normal["presupuestos"]["linkedin_busquedas"] * 2
+    assert fondo["a_fondo"] and not normal.get("a_fondo")
+    # Sus lugares piden los 30 días aunque se hayan buscado ayer.
+    rid, lugar = next(iter(fondo["lugares_primero"].items()))
+    cobertura.configurar_primero(fondo["lugares_primero"])
+    cobertura.configurar_a_fondo(True)
+    try:
+        assert cobertura.dias_busqueda(f"{rid}@{sorted(lugar)[0]}", "2026-11-17", "2026-11-18", 30) == 30
+        assert cobertura.dias_busqueda("otro@CO", "2026-11-17", "2026-11-18", 30) == 2
+    finally:
+        cobertura.configurar_primero()
+        cobertura.configurar_a_fondo()

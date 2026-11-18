@@ -13,11 +13,24 @@ type Corrida = {
     "en_cola" | "corriendo" | "success" | "failure" | "cancelled" | string;
   creada: string;
 };
+// Contrato v45: qué hará el botón, decidido por el servidor (un solo botón para los tres casos).
+type Plan = {
+  tipo: "completa" | "faltantes" | "nada";
+  motivo: string;
+  faltan: {
+    perfil_id: string;
+    cliente: string;
+    cargo: string;
+    hoy: number;
+    meta: number;
+  }[];
+};
 type EstadoBusqueda = {
   disponible: boolean;
   en_curso?: Corrida | null;
   ocupado?: string | null;
   ultima_pedida?: Corrida | null;
+  plan?: Plan;
 };
 
 const ESPERA_PEDIDA = 180_000; // ms: GitHub tarda unos segundos (o más) en listar la corrida pedida
@@ -94,11 +107,16 @@ export function BuscarAhora({
   async function lanzar() {
     setEnviando(true);
     try {
-      await api("/busqueda", { method: "POST", body: "{}" });
+      const r = await api<{ tipo: Plan["tipo"] }>("/busqueda", {
+        method: "POST",
+        body: "{}",
+      });
       setAbierto(false);
       setPedidaEn(Date.now());
       onAviso(
-        "Búsqueda pedida. Empieza en unos minutos y tarda alrededor de una hora y media; puedes cerrar el panel.",
+        r.tipo === "faltantes"
+          ? "Búsqueda pedida para quienes no llegan a su meta. Empieza en unos minutos; puedes cerrar el panel."
+          : "Búsqueda del día pedida. Empieza en unos minutos y tarda alrededor de una hora y media; puedes cerrar el panel.",
       );
     } catch (e) {
       onAviso((e as Error).message, true);
@@ -108,9 +126,10 @@ export function BuscarAhora({
     }
   }
 
+  const plan = estado.plan;
   const bloqueo = enCurso
     ? `Ya hay una búsqueda ${enCurso.estado === "en_cola" ? "en cola" : "corriendo"}.`
-    : estado.ocupado || "";
+    : estado.ocupado || (plan?.tipo === "nada" ? plan.motivo : "");
   const etiqueta = enCurso
     ? `${enCurso.estado === "en_cola" ? "En cola" : "Buscando"} desde ${horaBogota(enCurso.creada)}`
     : "Buscar ahora";
@@ -137,22 +156,41 @@ export function BuscarAhora({
       {abierto && (
         <Dialog
           titulo="Buscar ahora"
-          subtitulo="Lanza la búsqueda del día sin esperar a su horario."
+          subtitulo="Revisa si hoy ya corrió la búsqueda y busca lo que haga falta."
           onClose={() => !enviando && setAbierto(false)}
         >
-          {yaHoy ? (
-            <p className="helper note">
-              Hoy ya hubo una búsqueda ({yaHoy}). Esta completa lo que falte
-              para cada cliente, sin repetir lo que ya se entregó.
-            </p>
-          ) : (
-            <p className="helper">
-              Hoy todavía no hay búsqueda: esta hace la del día.
-            </p>
+          <p className="helper note">
+            {plan?.motivo ||
+              (yaHoy
+                ? `Hoy ya hubo una búsqueda (${yaHoy}). Esta completa lo que falte, sin repetir lo entregado.`
+                : "Hoy todavía no hay búsqueda: esta hace la del día.")}
+          </p>
+          {plan?.tipo === "faltantes" && (
+            <ul
+              className="faltan-lista"
+              aria-label="Quiénes no llegan a su meta"
+            >
+              {plan.faltan.slice(0, 8).map((f) => (
+                <li key={f.perfil_id}>
+                  <span>
+                    {f.cliente} · {f.cargo}
+                  </span>
+                  <strong>
+                    {f.hoy} de {f.meta}
+                  </strong>
+                </li>
+              ))}
+              {plan.faltan.length > 8 && (
+                <li>
+                  <span>y {plan.faltan.length - 8} más</span>
+                </li>
+              )}
+            </ul>
           )}
           <p className="helper">
-            Empieza en unos minutos y tarda alrededor de una hora y media.
-            Puedes cerrar el panel: sigue sola.
+            {plan?.tipo === "faltantes"
+              ? "Busca solo sus cargos y lugares, más a fondo. Empieza en unos minutos; puedes cerrar el panel."
+              : "Empieza en unos minutos y tarda alrededor de una hora y media. Puedes cerrar el panel: sigue sola."}
           </p>
           {sinConfirmar && (
             <p className="helper note">
