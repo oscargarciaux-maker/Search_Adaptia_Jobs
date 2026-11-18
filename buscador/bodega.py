@@ -186,10 +186,12 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
             b = cobertura.siguiente_busqueda(lista, hoy, 1, f"{familia}@{lugar}", vistos, paginada=False)
             if b is not None:
                 busquedas.append(b)
-        resultado = getonbrd.buscar(Cliente(pausa=(0.3, 0.8)), [b.terminos[0] for b in busquedas])
+        crudas, stats = getonbrd.buscar(Cliente(pausa=(0.3, 0.8)), [b.terminos[0] for b in busquedas])
+        respondidas = set(stats.pop("respondidas", None) or [])
         for b in busquedas:
-            cobertura.anotar_hecha(vistos, b, hoy)
-        return resultado
+            if b.terminos[0] in respondidas:  # una consulta que falló no queda como buscada
+                cobertura.anotar_hecha(vistos, b, hoy)
+        return crudas, stats
 
     def f_computrabajo():
         if not p.get("computrabajo_busquedas", 0):

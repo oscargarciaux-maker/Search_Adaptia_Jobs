@@ -157,10 +157,14 @@ def siguiente_busqueda(consultas, hoy, cantidad, clave, estado, desfase=0, max_d
         otra = rotar(consultas, hoy, cantidad, desfase=desfase + k * cantidad)
         if estado.get(clave_consulta(clave, otra)) != hoy:
             return nueva(otra)
-    pagina = (estado.get(PAGINAS) or {}).get(clave_consulta(clave, terminos)) or {}
-    if not paginada or pagina.get("fecha") != hoy or pagina.get("agotada") or pagina.get("pagina", 0) >= TOPE_PAGINAS_DIA:
-        return None  # sin saber dónde quedó (o ya no hay más páginas), no se repite
-    return nueva(terminos, pagina["pagina"], pagina.get("dias"))
+    if not paginada:
+        return None
+    for k in range(max(1, -(-len(consultas) // max(1, cantidad)))):  # la primera vuelta con páginas por leer
+        otra = rotar(consultas, hoy, cantidad, desfase=desfase + k * cantidad)
+        pagina = (estado.get(PAGINAS) or {}).get(clave_consulta(clave, otra)) or {}
+        if pagina.get("fecha") == hoy and not pagina.get("agotada") and pagina.get("pagina", 0) < TOPE_PAGINAS_DIA:
+            return nueva(otra, pagina["pagina"], pagina.get("dias"))
+    return None  # sin saber dónde quedó (o ya no hay más páginas), no se repite
 
 
 def anotar_hecha(estado, busqueda, hoy):
@@ -254,7 +258,10 @@ def _por_personas(combinaciones, estado, hoy, prioritarias):
 
 def repartir(combinaciones, estado, hoy, prioritarias=()):
     """Contrato v40: con personas configuradas (modo panel), turnos ponderados por persona (`_por_personas`).
-    Sin ellas, una consulta por familia en cada vuelta (`_repartir_familias`)."""
+    Sin ellas, una consulta por familia en cada vuelta (`_repartir_familias`). En modo faltantes sin personas (v47)
+    no hay nada que buscar: nunca se busca para todos."""
+    if _FALTANTES and not _PERSONAS:
+        return []
     if _PERSONAS:
         return _por_personas(list(combinaciones), estado, hoy, prioritarias)
     return _repartir_familias(combinaciones, estado, hoy, prioritarias)
