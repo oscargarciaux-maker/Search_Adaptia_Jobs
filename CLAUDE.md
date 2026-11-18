@@ -91,6 +91,9 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
   `registro.aviso`; skill `auditoria-codigo`, lista `docs/estandares/LISTA_DE_CONTROL.md` y flujo «Inventario de la
   base» (solo lectura). JobSpy no se copia al repo: su parte de Indeed trae la clave de la app de Indeed.
 - Completar el alcance autorizado en una rama, con un PR que Oscar revisa y fusiona; no auto-fusionar.
+- Antes de abrir cada PR: skill `thermos` (`.claude/skills/thermos/`, adaptada de Cursor, MIT) — dos revisores de solo
+  lectura en paralelo (`.claude/agents/thermos-errores.md` y `thermos-calidad.md`) sobre `git diff origin/main...HEAD`;
+  lo grave se arregla antes de pedir la revisión de Oscar.
 - Pruebas obligatorias antes de cada push: `python -m pytest -q`; CI también comprueba PostgreSQL. La interfaz nueva requiere Node 24 para compilar; CI verifica formato, compilación y recorridos Playwright.
 - Prueba en vivo corta (unos 5 minutos, con internet): `python -m buscador.bodega --salida /tmp/prueba --prueba`.
 - Lo que cambia sin tocar código vive en `datos/` (mapa de cargos, países, dominios, empresas, `config.yaml`).
@@ -130,7 +133,8 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
   la marca incluso si no existe la variable antigua. Respaldo previo a cambios no equivale a backups periódicos.
 - **Búsqueda profunda** (`profunda.yml`): un cargo a pedido, en vivo. **Diagnóstico** (`diagnostico.yml`).
 - Skills del proyecto: `nueva-familia`, `ampliar-mapa`, `diagnostico`, `nueva-fuente` (leen archivos cortos, no la bodega),
-  `auditor-ux` (auditoría UX/accesibilidad con capturas en modo demo; no implementa sin aprobación).
+  `auditor-ux` (auditoría UX/accesibilidad con capturas en modo demo; no implementa sin aprobación), `thermos`
+  (revisión a fondo de la rama antes de cada PR).
 - Instalación y traspaso: `docs/INSTALACION.md`, `docs/TRASPASO.md`.
 
 ## Estado
