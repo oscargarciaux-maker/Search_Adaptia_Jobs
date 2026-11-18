@@ -10,12 +10,7 @@ import type { Ejecucion } from "../types";
 
 type Corrida = {
   estado:
-    | "en_cola"
-    | "corriendo"
-    | "success"
-    | "failure"
-    | "cancelled"
-    | string;
+    "en_cola" | "corriendo" | "success" | "failure" | "cancelled" | string;
   creada: string;
 };
 type EstadoBusqueda = {
@@ -75,8 +70,13 @@ export function BuscarAhora({
   }, []);
   useEffect(leer, [leer]);
 
-  const esperandoLista =
-    pedidaEn !== null && Date.now() - pedidaEn < ESPERA_PEDIDA;
+  // La corrida pedida se muestra «En cola» hasta que GitHub la liste, como mucho ESPERA_PEDIDA.
+  useEffect(() => {
+    if (pedidaEn === null) return;
+    const t = window.setTimeout(() => setPedidaEn(null), ESPERA_PEDIDA);
+    return () => window.clearTimeout(t);
+  }, [pedidaEn]);
+  const esperandoLista = pedidaEn !== null;
   const enCurso: Corrida | null =
     estado?.en_curso ??
     (esperandoLista

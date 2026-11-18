@@ -664,15 +664,8 @@ function TarjetasResumen({
                       (bajoMeta(c) ? " bajo" : "") +
                       (c.comunidad ? " es-comunidad" : "")
                     }
-                    aria-label={
-                      `${c.nombre}${c.comunidad ? " (Comunidad)" : ""}: ` +
-                      (c.recibidas == null
-                        ? `meta de ${c.meta}`
-                        : `${c.recibidas} de ${c.meta}`) +
-                      `, ${pendiente}` +
-                      (bajoMeta(c) ? ", bajo su meta" : "") +
-                      ". Ver detalle"
-                    }
+                    // WCAG 2.5.3 (axe 4.14): sin aria-label; el nombre accesible sale del texto visible, con las
+                    // partes que solo oye el lector de pantalla en .sr-only (control por voz: se dice lo que se ve).
                     onClick={() => onCliente(c.id)}
                   >
                     {/* 18 nov: la cifra grande arriba a la derecha; «por confirmar» como alerta con su número. */}
@@ -689,12 +682,21 @@ function TarjetasResumen({
                               {c.porConfirmar}
                             </span>
                           )}
-                          {c.comunidad && <DistintivoComunidad />}
+                          {c.comunidad && (
+                            <>
+                              <span className="sr-only"> (</span>
+                              <DistintivoComunidad />
+                              <span className="sr-only">)</span>
+                            </>
+                          )}
                         </strong>
+                        <span className="sr-only">: </span>
                         <span>{c.cargo}</span>
                       </span>
-                      <span className="cliente-cifra" aria-hidden="true">
-                        {cifra}
+                      <span className="sr-only">, </span>
+                      <span className="cliente-cifra">{cifra}</span>
+                      <span className="sr-only">
+                        {`, ${pendiente}${bajoMeta(c) ? ", bajo su meta" : ""}. Ver detalle`}
                       </span>
                     </span>
                     <span className="cliente-barra" aria-hidden="true">
