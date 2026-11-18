@@ -320,8 +320,6 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
             # acceso ya venció, primero se obtiene uno nuevo con la renovación para poder anularla.
             token = request.cookies.get(COOKIE_SESION, "")
             renovacion = request.cookies.get(COOKIE_RENOVAR, "")
-            if token:
-                sesiones.pop(hashlib.sha256(token.encode()).hexdigest(), None)
             try:
                 if renovacion and (not token or not _usuario(token)):
                     token = (_renovar(renovacion) or {}).get("access_token", "")
@@ -336,6 +334,9 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
                 registro.aviso("api:logout", e)
             if not anulada:
                 registro.aviso("api:logout", RuntimeError("no se pudo anular la renovación en Supabase"))
+        # La salida anula todas las sesiones del usuario en Supabase («global»): se olvidan todas las copias de acceso,
+        # también la que la comprobación de arriba pudo volver a guardar.
+        sesiones.clear()
         response = JSONResponse({"sesion": False, "anulada": anulada})
         response.delete_cookie(COOKIE_SESION, path="/", secure=not demo, httponly=True, samesite="strict")
         response.delete_cookie(COOKIE_RENOVAR, path="/api/", secure=not demo, httponly=True, samesite="strict")
