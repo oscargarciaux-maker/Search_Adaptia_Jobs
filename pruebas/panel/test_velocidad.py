@@ -121,3 +121,36 @@ def test_comprobacion_reciente_no_se_repite_al_confirmar():
 def test_tiempo_del_servidor_en_cada_respuesta():
     api = TestClient(crear_app(demo=True, repositorio=RepositorioDemo()))
     assert api.get("/api/revisiones").headers["server-timing"].startswith("app;dur=")
+
+
+def test_borradores_se_guardan_siempre_en_el_orden_de_los_contactos():
+    """Se calculan en paralelo, pero el orden guardado no depende de qué cliente termina primero (CI del PR #124: el
+    primer mensaje de la lista cambiaba entre corridas)."""
+    import random
+    cfg = configuracion_demo()
+    ids = [c["id"] for c in cfg["clientes"]]
+
+    class Repo(RepositorioDemo):
+        def __init__(self):
+            super().__init__()
+            self.orden = []
+
+        def clientes_de(self, fecha=None):
+            return cfg["clientes"]
+
+        def contactos(self):
+            return [{"cliente_id": i, "telefono": "+57 300 000 00" + str(n).zfill(2), "consentimiento": True,
+                     "nombre_saludo": ""} for n, i in enumerate(ids)]
+
+        def guardar_borrador(self, fila):
+            self.orden.append(fila["cliente_id"])
+            return super().guardar_borrador(fila)
+
+    def resultados(cliente_id, f):
+        time.sleep(random.uniform(0, 0.03))  # cada cliente tarda distinto
+        return {"vacantes": [{"id": cliente_id[:6] + str(n), "estado": "lista", "empresa": f"E{n}", "titulo": "UX",
+                              "cargo_nombre": "UX", "enlace": "https://example.org/" + str(n)} for n in range(6)]}
+    for _ in range(3):
+        repo = Repo()
+        borradores.generar(repo, resultados=resultados)
+        assert repo.orden == ids

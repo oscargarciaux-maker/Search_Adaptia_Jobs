@@ -136,16 +136,19 @@ def generar(repo, fecha=None, dias_atras=3, resultados=None):
             resultado["conservados"] += 1
             continue
         por_hacer.append((cliente_id, contacto))
-    # Cada cliente es independiente: se arman de a cuatro a la vez (antes uno tras otro).
+    # Cada cliente es independiente: se calculan de a cuatro a la vez (antes uno tras otro), pero se guardan aquí, en
+    # el orden de siempre (`ex.map` conserva el orden), para que la lista de mensajes no cambie de orden entre días.
     with ThreadPoolExecutor(4) as ex:
-        for parcial in ex.map(lambda par: _uno(repo, fecha, dias_atras, resultados, *par), por_hacer):
+        for parcial, fila in ex.map(lambda par: _uno(repo, fecha, dias_atras, resultados, *par), por_hacer):
             for k, n in parcial.items():
                 resultado[k] += n
+            if fila:
+                repo.guardar_borrador(fila)
     return resultado
 
 
 def _uno(repo, fecha, dias_atras, resultados, cliente_id, contacto):
-    """Borrador del día de un cliente. Devuelve los conteos que suma a `generar`."""
+    """Borrador del día de un cliente, sin guardarlo. Devuelve (conteos que suma a `generar`, fila o None)."""
     resultado = {"generados": 0, "con_pocas": 0, "sin_vacantes": 0, "por_recomprobar": 0}
     ya = {vid for b in repo.borradores(cliente_id=cliente_id) if b.get("fecha") != fecha for vid in b.get("vacantes", [])}
     elegidas, vistos, sobran, empresas = [], set(ya), set(), {}
@@ -168,19 +171,17 @@ def _uno(repo, fecha, dias_atras, resultados, cliente_id, contacto):
     elegidas = con_posts(elegidas)
     if not elegidas:
         resultado["sin_vacantes"] += 1
-        return resultado
+        return resultado, None
     nombres = {}
     for v in elegidas:
         nombres.setdefault(v.get("cargo_nombre") or "tu perfil", []).append(v)
     grupos = list(nombres.items())
     # Solo el nombre que el operador eligió para saludar: la referencia interna del cliente no va en el mensaje.
     cuerpo = texto(contacto.get("nombre_saludo") or "", grupos, fecha, cliente_id, mas=len(sobran))
-    repo.guardar_borrador({"fecha": fecha, "cliente_id": cliente_id, "texto": cuerpo,
-                           "vacantes": [v["id"] for v in elegidas], "cargos": [c for c, _ in grupos],
-                           "estado": "pendiente", "editado": False})
     resultado["generados"] += 1
     resultado["con_pocas"] += len(elegidas) < MINIMO
-    return resultado
+    return resultado, {"fecha": fecha, "cliente_id": cliente_id, "texto": cuerpo, "vacantes": [v["id"] for v in elegidas],
+                       "cargos": [c for c, _ in grupos], "estado": "pendiente", "editado": False}
 
 
 def para_operador(repo, fecha=None):
