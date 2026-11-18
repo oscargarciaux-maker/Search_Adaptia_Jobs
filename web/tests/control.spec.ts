@@ -1563,8 +1563,11 @@ test("18 nov: «Buscar ahora» lanza la búsqueda desde el Resumen y se bloquea 
   await page.getByRole("heading", { level: 1, name: "Resumen" }).waitFor();
   await page.getByRole("button", { name: "Buscar ahora" }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText("una hora y media");
-  await expect(dialog).toContainText("Hoy ya hubo una búsqueda"); // la demo tiene la de hoy: completa sin repetir
+  // v45: un solo botón que decide. En la demo la búsqueda de hoy ya corrió y 3 perfiles no llegan a su meta.
+  await expect(dialog).toContainText("no llegan a su meta");
+  await expect(
+    dialog.getByRole("list", { name: "Quiénes no llegan a su meta" }),
+  ).toContainText("Cliente de ejemplo 02");
   await expect(dialog).toContainText("Demostración");
   await dialog.getByRole("button", { name: "Buscar ahora" }).click();
   await expect(dialog).toBeHidden();
@@ -1609,5 +1612,26 @@ test("contrato v44: nombres en español compuestos y el oficio base para «AI Pr
   await expect(
     dialog.getByRole("button", { name: "Quitar Gerente de Producto de IA" }),
   ).toBeVisible();
+  await page.keyboard.press("Escape");
+});
+
+test("18 nov: al editar un cargo los grupos en español aparecen solos y el contenido va en el color fuerte", async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/");
+  await ir(page, "Cargos y metas");
+  await page.getByRole("button", { name: "Editar QA", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByRole("group", { name: "Nombres en español" }),
+  ).toBeVisible();
+  // Lo escrito y las fichas de nombres en blanco (modo oscuro); el texto de ejemplo, gris.
+  const ficha = dialog.locator(".term").first();
+  await expect(ficha).toHaveCSS("color", "rgb(255, 255, 255)");
+  await expect(dialog.getByLabel("Cargo", { exact: true })).toHaveCSS(
+    "color",
+    "rgb(255, 255, 255)",
+  );
   await page.keyboard.press("Escape");
 });

@@ -30,6 +30,11 @@ on:
         description: "Corrida corta de prueba"
         type: boolean
         default: false
+      enfoque:
+        description: "completo, o faltantes: más a fondo solo para quienes hoy no llegan a su meta («Buscar ahora», v45)"
+        type: choice
+        options: [completo, faltantes]
+        default: completo
 
 permissions:
   contents: write
@@ -88,7 +93,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: python -m panel.ejecutor --salida salida --modo "${{ inputs.modo || 'diario' }}" ${{ inputs.prueba && '--prueba' || '' }}
+        run: python -m panel.ejecutor --salida salida --modo "${{ inputs.modo || 'diario' }}" --enfoque "${{ inputs.enfoque || 'completo' }}" ${{ inputs.prueba && '--prueba' || '' }}
       - name: Publicar en la rama publicado
         if: ${{ steps.decidir.outputs.ejecutar == 'true' && !inputs.prueba }}
         working-directory: salida

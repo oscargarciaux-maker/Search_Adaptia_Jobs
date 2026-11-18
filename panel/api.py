@@ -19,7 +19,7 @@ from buscador import paises
 from buscador.fuentes.publicaciones_apify import PREFIJOS
 from buscador import registro
 from panel import servicio
-from panel.acciones import desde_entorno as conexion_github
+from panel.acciones import ENFOQUE_COMPLETO, ENFOQUE_FALTANTES, desde_entorno as conexion_github
 from panel.modelos import AjusteOperador, BorrarCliente, ImportarClientes, CambioBorrador, Configuracion, Contacto, DecisionRevision, EstadoRegla, SubirRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia, explicar, parcial, solo_perfil
 from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase, hoy
 from panel.terminos import sugerir
@@ -413,7 +413,7 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
 
     @app.post("/api/cargos/expandir")
     def expandir(body: Expansion):
-        return sugerir(body.cargo)
+        return sugerir(body.cargo, consultar_esco=not body.rapido)
 
     @app.post("/api/cargos/funciones")
     def proponer_funciones(body: dict):
@@ -594,16 +594,31 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         if not app.state.acciones:
             return {"disponible": False}
         try:
-            return {"disponible": True, **app.state.acciones.estado()}
+            estado = app.state.acciones.estado()
         except ErrorRepositorio as e:  # el botón queda visible y dice por qué no se puede (el mensaje no lleva la llave)
             registro.aviso("api:busqueda", RuntimeError(e.mensaje))
-            return {"disponible": True, "en_curso": None, "ocupado": e.mensaje, "ultima_pedida": None}
+            estado = {"en_curso": None, "ocupado": e.mensaje, "ultima_pedida": None}
+        return {"disponible": True, **estado, "plan": _plan()}
+
+    def _plan():
+        """Contrato v45: qué hará «Buscar ahora» (copia de 60 s; cualquier escritura la renueva)."""
+        try:
+            return _copia("plan-busqueda", "", 60,
+                          lambda: servicio.plan_busqueda(repo, ejecuciones=_copia("ejecuciones", "", 30, repo.ejecuciones)))
+        except Exception as e:  # noqa: BLE001 — sin el plan, se hace la búsqueda completa de siempre
+            registro.aviso("api:plan", e)
+            return dict(servicio.PLAN_COMPLETO)
 
     @app.post("/api/busqueda")
     def buscar_ahora():
         if not app.state.acciones:
             raise ErrorRepositorio("Falta la llave de GitHub en el alojamiento del panel (GITHUB_ACCIONES_TOKEN).", 409)
-        return app.state.acciones.lanzar()
+        # Contrato v45: el servidor decide (no el navegador) qué búsqueda lanzar, con datos frescos.
+        plan = servicio.plan_busqueda(repo)  # nunca falla: sin datos, la completa
+        if plan["tipo"] == "nada":
+            raise ErrorRepositorio(plan["motivo"], 409)
+        enfoque = ENFOQUE_FALTANTES if plan["tipo"] == "faltantes" else ENFOQUE_COMPLETO
+        return {**app.state.acciones.lanzar(enfoque), "tipo": plan["tipo"]}
 
     @app.get("/api/ejecuciones")
     def ejecuciones():

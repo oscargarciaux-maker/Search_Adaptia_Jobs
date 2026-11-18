@@ -1966,7 +1966,6 @@ function App() {
                   </button>
                   {tab === "Resumen" && (
                     <BuscarAhora
-                      ultima={runs?.[0]}
                       sinConfirmar={pendienteDeConfirmar}
                       demo={Boolean(sesion.demo)}
                       onAviso={notify}

@@ -38,11 +38,18 @@ PALABRAS_PT = ("produto", "desenvolvedor", "desenvolvedora", "dados", "engenheir
 
 
 @lru_cache(maxsize=8192)
+def en_portugues(titulo):
+    """18 nov: título con palabras propias del portugués («designer de produto»): no se sugiere (solo es/en)."""
+    t = normalizar.texto(titulo)
+    return any(normalizar.contiene_frase(t, normalizar.texto(x)) for x in PALABRAS_PT)
+
+
+@lru_cache(maxsize=8192)
 def en_espanol(titulo):
     """Título en español: empieza como uno («Diseñador…») o trae palabras propias («Product Manager IA»), y no trae
     palabras del portugués."""
     t = normalizar.texto(titulo)
-    if any(normalizar.contiene_frase(t, normalizar.texto(x)) for x in PALABRAS_PT):
+    if en_portugues(titulo):
         return False
     return any(t == normalizar.texto(x) or t.startswith(normalizar.texto(x) + " ") for x in INICIO_ES) or \
         any(normalizar.contiene_frase(t, normalizar.texto(x)) for x in PALABRAS_ES)
@@ -170,7 +177,8 @@ def sugerir(cargo, sesion=None, consultar_esco=True):
     claves, principales, limpios = set(), [], []
     for destino, terminos in ((principales, exactos), (limpios, similares)):
         for x in terminos:
-            if isinstance(x, str) and 2 <= len(x) <= 120 and normalizar.titulo_base(x) not in claves:
+            if isinstance(x, str) and 2 <= len(x) <= 120 and normalizar.titulo_base(x) not in claves \
+                    and not en_portugues(x):
                 claves.add(normalizar.titulo_base(x))
                 destino.append(x)
     vecinos = []

@@ -87,8 +87,10 @@ def medir(estado, crudas, vacantes, hoy, dias=30):
     origen = {c["enlace"]: c["_busqueda"] for c in crudas if c.get("_busqueda") and c.get("enlace")}
     utiles = Counter(origen[v["enlace"]] for v in vacantes
                      if v.get("familias") and v.get("enlace") in origen and v.get("visto_primera_vez") == hoy)
-    buscadas = set(origen.values()) | {k for fuente in ("linkedin", "indeed") for k, f in (estado.get(fuente) or {}).items()
-                                       if f == hoy and "@" in k and "#" not in k}
+    # Solo lo buscado en ESTA búsqueda (contrato v45: una segunda del día no marca «sin nada» lo que no volvió a buscar).
+    buscadas = set(origen.values()) | {f"{familia}@{lugar}" for fuente, familia, lugar in BUSQUEDAS
+                                       if fuente in ("linkedin", "indeed")
+                                       and (estado.get(fuente) or {}).get(f"{familia}@{lugar}") == hoy}
     rendimiento = estado.setdefault("rendimiento", {})
     for clave in buscadas:
         n = utiles.get(clave, 0)
@@ -109,11 +111,22 @@ def sirve_a_corta(v):
                for p in _PERSONAS)
 
 
+# Contrato v45 («Buscar ahora» para quien falta): los lugares de quienes no llegan a su meta piden los días completos.
+_A_FONDO = False
+
+
+def configurar_a_fondo(activo=False):
+    global _A_FONDO
+    _A_FONDO = bool(activo)
+
+
 def dias_busqueda(clave, ultima, hoy, max_dias):
     """Días hacia atrás que pide una búsqueda. Repetida, solo lo publicado desde la vez anterior; pero si esa vez no dejó
     nada útil (`ceros`), los `max_dias` completos: lo que trajo pudo perderse (17 nov, caso Danna: la limpieza
     archivaba lo de fuera de LATAM y, al repetir, Chicago solo pedía el último día)."""
     if not ultima or (_RENDIMIENTO.get(clave) or {}).get("ceros"):
+        return max_dias
+    if _A_FONDO and "@" in clave and va_primero(*clave.split("#")[0].split("@", 1)):
         return max_dias
     from datetime import datetime
     return min(max_dias, max(1, (datetime.fromisoformat(hoy) - datetime.fromisoformat(ultima)).days + 1))

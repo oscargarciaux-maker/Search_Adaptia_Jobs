@@ -95,15 +95,25 @@ def test_lo_que_lleva_tres_busquedas_sin_nada_util_pasa_al_final():
 
 
 def test_medir_lo_que_trajo_cada_busqueda():
-    estado = {"linkedin": {"cargo:x@REMOTO_AE": "2026-11-18", "cargo:x@REMOTO_CO": "2026-11-18"},
+    # REMOTO_MX se buscó en otra búsqueda de hoy (contrato v45): esta no lo buscó y no lo cuenta como «sin nada».
+    estado = {"linkedin": {"cargo:x@REMOTO_AE": "2026-11-18", "cargo:x@REMOTO_CO": "2026-11-18",
+                           "cargo:x@REMOTO_MX": "2026-11-18"},
               "rendimiento": {"cargo:x@REMOTO_AE": {"utiles": 0, "ceros": 2, "fecha": "2026-11-17"},
+                              "cargo:x@REMOTO_MX": {"utiles": 0, "ceros": 1, "fecha": "2026-11-18"},
                               "cargo:x@VIEJA": {"utiles": 1, "ceros": 0, "fecha": "2026-09-01"}}}
     crudas = [{"enlace": "https://www.linkedin.com/jobs/view/1", "_busqueda": "cargo:x@REMOTO_CO"}]
     vacantes = [{"enlace": "https://www.linkedin.com/jobs/view/1", "familias": [{"familia": "cargo:x"}],
                  "visto_primera_vez": "2026-11-18"}]
-    r = cobertura.medir(estado, crudas, vacantes, "2026-11-18")
+    cobertura.configurar_personas()
+    try:
+        cobertura.anotar_busqueda("linkedin", "cargo:x", "REMOTO_AE")
+        cobertura.anotar_busqueda("linkedin", "cargo:x", "REMOTO_CO")
+        r = cobertura.medir(estado, crudas, vacantes, "2026-11-18")
+    finally:
+        cobertura.configurar_personas()
     assert r["cargo:x@REMOTO_CO"] == {"utiles": 1, "ceros": 0, "fecha": "2026-11-18"}
     assert r["cargo:x@REMOTO_AE"]["ceros"] == 3 and "cargo:x@VIEJA" not in r
+    assert r["cargo:x@REMOTO_MX"]["ceros"] == 1
 
 
 def test_busquedas_por_persona_y_relectura_primero_para_quien_va_corta():

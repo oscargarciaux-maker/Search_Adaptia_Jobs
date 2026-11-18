@@ -12,6 +12,7 @@ from buscador import bodega, entrega, familias, paises, normalizar
 from buscador import registro
 from panel.afinidad import (AMPLIACIONES, MINIMO_POR_PERFIL, TOPE_POSTS_SIN_CONFIRMAR, evaluar, evaluar_ampliada,
                             evaluar_post, post_ubicacion)
+from panel.acciones import ENFOQUE_COMPLETO, ENFOQUE_FALTANTES
 from panel.modelos import Configuracion
 from pydantic import ValidationError
 from panel.repositorio import RepositorioSupabase, hoy
@@ -180,11 +181,20 @@ def objetivo_mundo(cfg):
     return sorted(salida), acepta
 
 
-def preparar(version, fecha, aprendidos=None, cortos=()):
+# Contrato v45: con «Buscar ahora» para quien falta, las fuentes tienen el doble de presupuesto.
+FACTOR_A_FONDO = 2
+
+
+def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
     """`cortos` (contrato v37): ids de perfiles que en la última búsqueda quedaron bajo el mínimo (o no recibieron
-    nada, como los nuevos). Sus lugares van primero en cada fuente y sus avisos reciben ficha primero."""
+    nada, como los nuevos). Sus lugares van primero en cada fuente y sus avisos reciben ficha primero.
+    `enfocar` (contrato v45, «Buscar ahora» para quien falta): ids de los perfiles que hoy no llegan a su meta. Solo
+    ellos tienen turnos de búsqueda, sus lugares van primero y piden los 30 días, y las fuentes tienen el doble de
+    presupuesto. El mapa y los cargos son los de siempre (la clasificación y el lote del día no cambian)."""
     cfg = validar_version(version)
-    cortos = {str(x) for x in cortos}
+    # Con `enfocar`, solo ellos van primero y piden 30 días (no los cortos de la última búsqueda que ya cumplen).
+    enfocar = None if enfocar is None else {str(x) for x in enfocar}
+    cortos = enfocar if enfocar is not None else {str(x) for x in cortos}
     primero, personas = {}, []
     aprendidos = aprendidos or {}
     mapa, roles = [], []
@@ -205,7 +215,8 @@ def preparar(version, fecha, aprendidos=None, cortos=()):
             lugares.update(lugares_perfil(p, nombres))
         rid = "cargo:" + str(c.id)
         for p in perfiles:  # contrato v40: cada persona con sus lugares y su peso
-            personas.append(persona_de_busqueda(p, rid, nombres, str(p.id) in cortos))
+            if enfocar is None or str(p.id) in enfocar:
+                personas.append(persona_de_busqueda(p, rid, nombres, str(p.id) in cortos))
         for p in perfiles:
             if str(p.id) in cortos:
                 primero.setdefault(rid, set()).update(lugares_perfil(p, nombres))
@@ -258,15 +269,24 @@ def preparar(version, fecha, aprendidos=None, cortos=()):
         elempleo_busquedas=min(30, max(6, len(roles) * 3)),
         apify_busquedas=0,  # contrato v11: Apify solo para perfiles bajo el mínimo (rescate dirigido)
         empresas_por_probar=20, remotos_paginas=24)
+    if enfocar is not None:
+        pres = motor["presupuestos"]
+        for clave in ("linkedin_busquedas", "linkedin_fichas", "indeed_busquedas", "getonbrd_busquedas",
+                      "computrabajo_busquedas", "computrabajo_fichas", "elempleo_busquedas", "elempleo_fichas",
+                      "hireline_fichas", "magneto_fichas"):
+            if pres.get(clave):
+                pres[clave] = int(pres[clave] * FACTOR_A_FONDO)
+        motor["a_fondo"] = True
     return mapa, configuracion, motor
 
 
 @contextmanager
-def activar(version, fecha, aprendidos=None, cortos=()):
-    mapa, cfg, motor = preparar(version, fecha, aprendidos, cortos)
+def activar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
+    mapa, cfg, motor = preparar(version, fecha, aprendidos, cortos, enfocar)
     from buscador import cobertura, contrato
     cobertura.configurar_primero(motor.get("lugares_primero"))
     cobertura.configurar_personas(motor.get("personas_busqueda"))
+    cobertura.configurar_a_fondo(motor.get("a_fondo"))
     anterior_e, anterior_b, anterior_c = entrega._config_operativa, bodega._config_operativa, contrato._PANEL
     familias.configurar(mapa)
     entrega._config_operativa, bodega._config_operativa, contrato._PANEL = cfg, motor, True
@@ -276,6 +296,7 @@ def activar(version, fecha, aprendidos=None, cortos=()):
         familias.configurar()
         cobertura.configurar_primero()
         cobertura.configurar_personas()
+        cobertura.configurar_a_fondo()
         entrega._config_operativa, bodega._config_operativa, contrato._PANEL = anterior_e, anterior_b, anterior_c
 
 
@@ -291,6 +312,35 @@ def perfiles_cortos(repo, version, fecha):
     except Exception as e:  # noqa: BLE001 — sin este dato la búsqueda reparte como siempre
         registro.aviso("ejecutor:cortos", e)
         return set()
+
+
+LOTE_ARMADO = {"parcial", "completa"}
+
+
+def faltan_hoy(repo, version, fecha, ejecuciones=None):
+    """Contrato v45: [(perfil, recibidas hoy, meta)] de quienes hoy no llegan a su meta y todavía pueden recibir más, o
+    None si hoy aún no hay una búsqueda que haya armado su lote (no hay fila, falló, o solo corrió la captura horaria).
+    Puede recibir más quien está bajo el mínimo de 5 (rescate y reutilización lo completan) o cuyo cargo tiene cupo
+    libre en el lote del día. Comunidad no cuenta: recibe lo que sobra. Sin IA: cuenta las asignaciones del día."""
+    de_hoy = [e for e in (ejecuciones if ejecuciones is not None else repo.ejecuciones()) or []
+              if str(e.get("fecha", "")) == fecha]
+    resumen = (de_hoy[0].get("resumen") or {}) if de_hoy else {}
+    if not de_hoy or de_hoy[0].get("estado") not in LOTE_ARMADO or resumen.get("revision_del_lote") is None:
+        return None
+    cfg = validar_version(version)
+    comunidades = {c.id for c in cfg.clientes if c.comunidad}
+    cargos = {c.id: c.nombre for c in cfg.cargos}
+    cupo_libre = resumen.get("faltantes") or {}
+    eid = str(de_hoy[0]["id"])
+    conteo = repo.asignaciones_por_perfil([eid])
+    salida = []
+    for p in cfg.perfiles_activos():
+        n, meta = conteo.get((eid, str(p.id)), 0), int(p.meta_diaria or 0)
+        if p.cliente_id in comunidades or n >= meta:
+            continue
+        if n < MINIMO_POR_PERFIL or cupo_libre.get(cargos.get(p.cargo_id, ""), 1) > 0:
+            salida.append((p, n, meta))
+    return salida
 
 
 def iniciar(repo, version, fecha):
@@ -552,6 +602,16 @@ def _posts(repo, cfg, fecha, estrictas, filas, fila):
     return añadidos
 
 
+def _sumar_busquedas(anteriores, nuevas):
+    """«Búsquedas hoy» por persona y fuente: suma las pasadas del día (una segunda búsqueda o una captura horaria no
+    borran lo que ya se buscó hoy)."""
+    salida = {p: dict(f) for p, f in (anteriores or {}).items() if isinstance(f, dict)}
+    for perfil, fuentes in (nuevas or {}).items():
+        for fuente, n in (fuentes or {}).items():
+            salida.setdefault(perfil, {})[fuente] = salida.get(perfil, {}).get(fuente, 0) + int(n or 0)
+    return salida
+
+
 def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=None, cache_enlaces=None,
               limites_rescate=(MAX_COMPROBAR_RESCATE, SEGUNDOS_RESCATE), revision_lote=None):
     """Reconstruible desde la selección confirmada, incluso tras perder el proceso anterior.
@@ -661,8 +721,9 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
                           "asignaciones": len(filas),
                           "ampliadas": sum(any(isinstance(e, dict) and e.get("ampliacion") for e in f["explicacion"]) for f in filas),
                           "reutilizadas": reutilizadas, "rescatadas": rescatadas, "posts": posts, **por_confirmar,
-                          **({"busquedas_por_perfil": reporte["busquedas_por_perfil"]}
-                             if (reporte or {}).get("busquedas_por_perfil") else {}),
+                          **({"busquedas_por_perfil": b} if (b := _sumar_busquedas(
+                              (ejecucion.get("resumen") or {}).get("busquedas_por_perfil"),
+                              (reporte or {}).get("busquedas_por_perfil"))) else {}),
                           **({"reglas": reglas_info} if reglas_info else {}),
                           "perfiles_bajo_minimo": sum(1 for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id))
                                                       if estrictas.get(p.id, 0) < MINIMO_POR_PERFIL),
@@ -671,7 +732,9 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
               "terminada_en": datetime.now().astimezone().isoformat()})
 
 
-def correr(salida, modo="diario", prueba=False, repo=None):
+def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPLETO):
+    """`enfoque` (contrato v45): «faltantes» = «Buscar ahora» cuando la búsqueda de hoy ya corrió y hay perfiles bajo su
+    meta: se busca más a fondo solo para ellos. Si hoy aún no hay búsqueda, se hace la completa."""
     fecha = hoy()
     if prueba:
         return bodega.correr(salida, modo=modo, prueba=True)
@@ -679,6 +742,20 @@ def correr(salida, modo="diario", prueba=False, repo=None):
     version = repo.operativa(fecha)
     if not version:
         return bodega.correr(salida, modo=modo)
+    enfocar = None
+    if enfoque == ENFOQUE_FALTANTES and modo == "diario":
+        try:
+            faltan = faltan_hoy(repo, version, fecha)
+            enfocar = None if faltan is None else {str(p.id) for p, _, _ in faltan}
+        except Exception as e:  # noqa: BLE001 — sin el dato, la búsqueda completa de siempre
+            registro.aviso("ejecutor:faltantes", e)
+        if enfocar is not None and not enfocar:
+            # El panel no lo lanza si todos cumplen; si cambió mientras tanto, se hace la búsqueda de siempre (el
+            # flujo publica y comprueba salud.json: una salida temprana lo dejaría sin reporte).
+            bodega.etapa("Todos los perfiles llegan hoy a su meta: búsqueda normal del día")
+            enfocar = None
+        if enfocar:
+            bodega.etapa(f"Buscar más a fondo para {len(enfocar)} perfiles bajo su meta")
     ejecucion = iniciar(repo, version, fecha)
     reglas_info, reglas = {}, []
     if hasattr(repo, "decisiones_ubicacion"):
@@ -698,7 +775,7 @@ def correr(salida, modo="diario", prueba=False, repo=None):
         # siguiente pasada horaria también arma lote para lo que falte (excepción a «la captura horaria no entrega»).
         lote_de = (ejecucion.get("resumen") or {}).get("revision_del_lote")
         completar = modo == "incremental" and lote_de is not None and lote_de != version["revision"]
-        with activar(version, fecha, aprendidos, perfiles_cortos(repo, version, fecha)):
+        with activar(version, fecha, aprendidos, perfiles_cortos(repo, version, fecha), enfocar):
             if completar:
                 bodega._config_operativa["completar_lote"] = True
             if hasattr(repo, "decisiones_ubicacion"):
@@ -757,6 +834,8 @@ def main():
     parser.add_argument("--salida", required=True)
     parser.add_argument("--modo", choices=["diario", "incremental", "inicial"], default="diario")
     parser.add_argument("--prueba", action="store_true")
+    parser.add_argument("--enfoque", choices=[ENFOQUE_COMPLETO, ENFOQUE_FALTANTES], default=ENFOQUE_COMPLETO,
+                        help="faltantes: «Buscar ahora» para quienes hoy no llegan a su meta (contrato v45)")
     parser.add_argument("--config", help="Versión ficticia para ensayo dirigido; requiere --prueba")
     args = parser.parse_args()
     if args.config:
@@ -765,7 +844,7 @@ def main():
         version = json.loads(Path(args.config).read_text())
         with activar(version,hoy()): bodega.correr(args.salida,modo=args.modo,prueba=True)
     else:
-        correr(args.salida, args.modo, args.prueba)
+        correr(args.salida, args.modo, args.prueba, enfoque=args.enfoque)
 
 
 if __name__ == "__main__":

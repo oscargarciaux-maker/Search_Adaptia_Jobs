@@ -349,6 +349,46 @@ def resumen_clientes(repo, fecha=None, dias=7):
     return {"fecha": fecha, "busqueda_de_hoy": any(d["fecha"] == fecha for d in por_dia), "dias": por_dia}
 
 
+# ── Contrato v45: qué hará «Buscar ahora» ────────────────────────────────────────────────────────────────────────
+PLAN_COMPLETO = {"tipo": "completa", "faltan": [],
+                 "motivo": "Hoy todavía no hay una búsqueda terminada: se hará la búsqueda completa del día.",
+                 "detalle": "Empieza en unos minutos y tarda alrededor de una hora y media. Puedes cerrar el panel: "
+                            "sigue sola."}
+
+
+def plan_busqueda(repo, fecha=None, ejecuciones=None):
+    """Un solo botón, tres casos: hoy no hay búsqueda que haya armado su lote (o falló) → la completa del día; ya corrió
+    y hay perfiles que no llegan a su meta y pueden recibir más → más a fondo solo para ellos («faltantes»); si no →
+    nada. Solo nombres de clientes del panel privado. Nunca falla: sin datos, la completa."""
+    from panel.ejecutor import faltan_hoy, validar_version
+    fecha = fecha or hoy()
+    try:
+        version = repo.operativa(fecha)
+        if not version:
+            return {**PLAN_COMPLETO, "motivo": "Aún no hay configuración confirmada: se hará la búsqueda de siempre."}
+        avance = faltan_hoy(repo, version, fecha, ejecuciones)
+        if avance is None:
+            return dict(PLAN_COMPLETO)
+        cfg = validar_version(version)
+    except Exception as e:  # noqa: BLE001 — sin el dato, el botón hace la búsqueda completa de siempre
+        registro.aviso("servicio:plan_busqueda", e)
+        return dict(PLAN_COMPLETO)
+    clientes = {str(c.id): c.nombre for c in cfg.clientes}
+    cargos = {str(c.id): c.nombre for c in cfg.cargos}
+    faltan = sorted(({"perfil_id": str(p.id), "cliente": clientes.get(str(p.cliente_id), ""),
+                      "cargo": cargos.get(str(p.cargo_id), ""), "hoy": n, "meta": meta} for p, n, meta in avance),
+                    key=lambda f: (f["hoy"] / max(1, f["meta"]), f["cliente"]))
+    if not faltan:
+        return {"tipo": "nada", "faltan": [],
+                "motivo": "Hoy todos llegaron a su meta o ya recibieron todo lo que cabe en el día: no hace falta "
+                          "buscar más."}
+    return {"tipo": "faltantes", "faltan": faltan,
+            "motivo": f"La búsqueda de hoy ya corrió y {len(faltan)} "
+                      f"{'perfil no llega' if len(faltan) == 1 else 'perfiles no llegan'} a su meta: se buscará más a "
+                      "fondo solo para ellos (sus cargos y lugares, el doble de búsqueda y los 30 días).",
+            "detalle": "Busca solo sus cargos y lugares, más a fondo. Empieza en unos minutos; puedes cerrar el panel."}
+
+
 # ── Contrato v44: «Qué hacer» por persona, con cifras ──────────────────────────────────────────────────────────────
 def _ampliaciones_del_cargo(cargo, raw, base):
     """Contrato v44: por cargo (una vez, no por persona), las listas de nombres que se podrían añadir y las vacantes que

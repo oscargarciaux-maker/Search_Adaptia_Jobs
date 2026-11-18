@@ -130,3 +130,8 @@ def test_que_hacer_propone_presencial_y_meta_solo_con_historia():
     assert claves["meta"]["accion"] == "Bajar su meta diaria de 10 a 5"
     assert "meta" not in {a["clave"] for a in servicio.que_hacer(p, [], [], set(), set(), hoy(), {}, [2])}  # 1 día
     assert "meta" not in {a["clave"] for a in servicio.que_hacer(p, [], [], set(), set(), hoy(), {}, [2, 3, 10])}
+
+
+def test_sugerencias_sin_titulos_en_portugues():
+    r = terminos.sugerir("Product Designer", consultar_esco=False)
+    assert not [x for x in r["terminos_exactos"] + r["terminos_similares"] + r["terminos_es"] if terminos.en_portugues(x)]

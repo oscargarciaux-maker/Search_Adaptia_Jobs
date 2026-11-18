@@ -5,31 +5,42 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Search } from "lucide-react";
 import { api } from "../api";
-import { Dialog, horaBogota, hoyBogota } from "../comunes";
-import type { Ejecucion } from "../types";
+import { Dialog, horaBogota } from "../comunes";
 
 type Corrida = {
   estado:
     "en_cola" | "corriendo" | "success" | "failure" | "cancelled" | string;
   creada: string;
 };
+// Contrato v45: qué hará el botón, decidido por el servidor (un solo botón para los tres casos).
+type Plan = {
+  tipo: "completa" | "faltantes" | "nada";
+  motivo: string;
+  detalle?: string; // qué pasa después de pedirla (texto del servidor)
+  faltan: {
+    perfil_id: string;
+    cliente: string;
+    cargo: string;
+    hoy: number;
+    meta: number;
+  }[];
+};
 type EstadoBusqueda = {
   disponible: boolean;
   en_curso?: Corrida | null;
   ocupado?: string | null;
   ultima_pedida?: Corrida | null;
+  plan: Plan; // siempre viene cuando `disponible`
 };
 
 const ESPERA_PEDIDA = 180_000; // ms: GitHub tarda unos segundos (o más) en listar la corrida pedida
 
 export function BuscarAhora({
-  ultima,
   sinConfirmar,
   demo,
   onAviso,
   onTermino,
 }: {
-  ultima: Ejecucion | undefined; // la última búsqueda registrada por el panel
   sinConfirmar: boolean; // hay cambios que la búsqueda no va a usar
   demo: boolean;
   onAviso: (texto: string, error?: boolean) => void;
@@ -66,7 +77,15 @@ export function BuscarAhora({
         }
         setEstado(e);
       })
-      .catch(() => setEstado((v) => v ?? { disponible: false }));
+      .catch(() =>
+        setEstado(
+          (v) =>
+            v ?? {
+              disponible: false,
+              plan: { tipo: "completa", motivo: "", faltan: [] },
+            },
+        ),
+      );
   }, []);
   useEffect(leer, [leer]);
 
@@ -94,11 +113,16 @@ export function BuscarAhora({
   async function lanzar() {
     setEnviando(true);
     try {
-      await api("/busqueda", { method: "POST", body: "{}" });
+      const r = await api<{ tipo: Plan["tipo"] }>("/busqueda", {
+        method: "POST",
+        body: "{}",
+      });
       setAbierto(false);
       setPedidaEn(Date.now());
       onAviso(
-        "Búsqueda pedida. Empieza en unos minutos y tarda alrededor de una hora y media; puedes cerrar el panel.",
+        r.tipo === "faltantes"
+          ? "Búsqueda pedida para quienes no llegan a su meta. Empieza en unos minutos; puedes cerrar el panel."
+          : "Búsqueda del día pedida. Empieza en unos minutos y tarda alrededor de una hora y media; puedes cerrar el panel.",
       );
     } catch (e) {
       onAviso((e as Error).message, true);
@@ -108,14 +132,13 @@ export function BuscarAhora({
     }
   }
 
+  const plan = estado.plan;
   const bloqueo = enCurso
     ? `Ya hay una búsqueda ${enCurso.estado === "en_cola" ? "en cola" : "corriendo"}.`
-    : estado.ocupado || "";
+    : estado.ocupado || (plan.tipo === "nada" ? plan.motivo : "");
   const etiqueta = enCurso
     ? `${enCurso.estado === "en_cola" ? "En cola" : "Buscando"} desde ${horaBogota(enCurso.creada)}`
     : "Buscar ahora";
-  const yaHoy =
-    ultima?.fecha === hoyBogota() ? horaBogota(ultima.iniciada_en) : null;
   return (
     <>
       <button
@@ -137,23 +160,33 @@ export function BuscarAhora({
       {abierto && (
         <Dialog
           titulo="Buscar ahora"
-          subtitulo="Lanza la búsqueda del día sin esperar a su horario."
+          subtitulo="Revisa si hoy ya corrió la búsqueda y busca lo que haga falta."
           onClose={() => !enviando && setAbierto(false)}
         >
-          {yaHoy ? (
-            <p className="helper note">
-              Hoy ya hubo una búsqueda ({yaHoy}). Esta completa lo que falte
-              para cada cliente, sin repetir lo que ya se entregó.
-            </p>
-          ) : (
-            <p className="helper">
-              Hoy todavía no hay búsqueda: esta hace la del día.
-            </p>
+          <p className="helper note">{plan.motivo}</p>
+          {plan.tipo === "faltantes" && (
+            <ul
+              className="faltan-lista"
+              aria-label="Quiénes no llegan a su meta"
+            >
+              {plan.faltan.slice(0, 8).map((f) => (
+                <li key={f.perfil_id}>
+                  <span>
+                    {f.cliente} · {f.cargo}
+                  </span>
+                  <strong>
+                    {f.hoy} de {f.meta}
+                  </strong>
+                </li>
+              ))}
+              {plan.faltan.length > 8 && (
+                <li>
+                  <span>y {plan.faltan.length - 8} más</span>
+                </li>
+              )}
+            </ul>
           )}
-          <p className="helper">
-            Empieza en unos minutos y tarda alrededor de una hora y media.
-            Puedes cerrar el panel: sigue sola.
-          </p>
+          {plan.detalle && <p className="helper">{plan.detalle}</p>}
           {sinConfirmar && (
             <p className="helper note">
               Tienes cambios sin confirmar: la búsqueda usa la última

@@ -5677,3 +5677,72 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   color: var(--muted);
   font-size: 0.82rem;
 }
+
+/* Contrato v45: quiénes no llegan a su meta, en el diálogo de «Buscar ahora». */
+.faltan-lista {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.faltan-lista li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.88rem;
+}
+
+/* 18 nov (Oscar): lo que es contenido (lo escrito y las fichas de nombres) va en el color más fuerte, blanco en modo
+   oscuro, para que nunca se confunda con el texto de ejemplo (gris, --placeholder). */
+:root {
+  --contenido: #0a192f;
+}
+:root[data-tema="oscuro"] {
+  --contenido: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) {
+    --contenido: #ffffff;
+  }
+}
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+textarea,
+select,
+.term:not(.readonly),
+.chip-sugerido {
+  color: var(--contenido);
+}
+.term:not(.readonly) button {
+  color: var(--contenido);
+  opacity: 0.75;
+}
+
+/* Diálogo del cargo: el mismo espacio entre secciones; cada grupo de sugerencias con su título en una fila y
+   «Añadir todas» al lado del título. */
+.form-cargo fieldset {
+  display: grid;
+  gap: 14px;
+}
+/* Solo los hijos directos de la sección: los campos dentro de los plegables conservan su espacio. */
+.form-cargo fieldset > .info-line,
+.form-cargo fieldset > .helper.note,
+.form-cargo fieldset > .sugeridos,
+.form-cargo fieldset > .form-grid,
+.form-cargo fieldset > .field {
+  margin: 0;
+}
+.sugeridos-grupo {
+  display: grid;
+  gap: 8px;
+}
+.sugeridos-cabeza {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sugeridos-cabeza .text-button {
+  font-size: 12px;
+  white-space: nowrap;
+}

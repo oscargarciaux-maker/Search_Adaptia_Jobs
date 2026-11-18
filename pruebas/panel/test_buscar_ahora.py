@@ -56,6 +56,7 @@ def test_lanza_la_busqueda_diaria_de_la_rama_principal():
     assert gh.lanzar() == {"lanzada": True}
     metodo, url, cabeceras, kw = sesion.pedidos[-1]
     assert metodo == "POST" and url.endswith("/repos/dueno/repo/actions/workflows/bodega.yml/dispatches")
+    # Sin `enfoque` en la completa: también funciona con un bodega.yml anterior a v45 (orden del despliegue).
     assert kw["json"] == {"ref": "main", "inputs": {"modo": "diario", "prueba": "false"}}
     assert cabeceras["Authorization"] == "Bearer " + TOKEN
 
@@ -158,10 +159,12 @@ def test_espacios_al_pegar_se_quitan(monkeypatch):
 
 def test_api_lanza_y_bloquea_en_la_demo():
     api = TestClient(crear_app(demo=True, repositorio=RepositorioDemo()))
-    assert api.get("/api/busqueda").json() == {"disponible": True, "en_curso": None, "ocupado": None,
-                                               "ultima_pedida": None}
+    estado = api.get("/api/busqueda").json()
+    assert {k: estado[k] for k in ("disponible", "en_curso", "ocupado", "ultima_pedida")} == \
+        {"disponible": True, "en_curso": None, "ocupado": None, "ultima_pedida": None}
+    assert estado["plan"]["tipo"] == "faltantes" and estado["plan"]["faltan"]  # la demo: 3 perfiles bajo su meta
     assert api.post("/api/busqueda", json={}).status_code == 403  # sin origen: como cualquier escritura
-    assert api.post("/api/busqueda", json={}, headers=H).json() == {"lanzada": True}
+    assert api.post("/api/busqueda", json={}, headers=H).json() == {"lanzada": True, "tipo": "faltantes"}
     assert api.get("/api/busqueda").json()["en_curso"]["estado"] == "corriendo"
     assert api.post("/api/busqueda", json={}, headers=H).status_code == 409
 
@@ -174,3 +177,169 @@ def test_un_error_de_github_deja_el_boton_con_el_motivo_y_sin_la_llave():
     assert TOKEN not in r.text
     r = api.post("/api/busqueda", json={}, headers=H)
     assert r.status_code == 502 and TOKEN not in r.text
+
+
+# ── Contrato v45: un solo botón que decide ─────────────────────────────────────────────────────────────────────────
+class GitHubAnotado:
+    def __init__(self):
+        self.enfoques = []
+
+    def estado(self, fresco=False):
+        return {"en_curso": None, "ocupado": None, "ultima_pedida": None}
+
+    def lanzar(self, enfoque="completo"):
+        self.enfoques.append(enfoque)
+        return {"lanzada": True}
+
+
+def _repo_con(ejecuciones, por_perfil):
+    class Repo(RepositorioDemo):
+        def ejecuciones(self):
+            return ejecuciones
+
+        def asignaciones_por_perfil(self, ids):
+            from collections import Counter
+            return Counter({(ids[0], pid): n for pid, n in por_perfil.items()})
+    return Repo()
+
+
+def _de_hoy(estado="completa", **resumen):
+    """La fila del día de una búsqueda que ya armó su lote (contrato v43: `revision_del_lote`)."""
+    from panel.repositorio import hoy
+    return [{"id": "e1", "fecha": hoy(), "estado": estado, "resumen": {"revision_del_lote": 1, **resumen}}]
+
+
+def test_sin_busqueda_hoy_lanza_la_completa():
+    gh = GitHubAnotado()
+    api = TestClient(crear_app(demo=True, repositorio=_repo_con([], {}), acciones=gh))
+    assert api.get("/api/busqueda").json()["plan"]["tipo"] == "completa"
+    assert api.post("/api/busqueda", json={}, headers=H).json()["tipo"] == "completa" and gh.enfoques == ["completo"]
+
+
+def test_busqueda_fallida_hoy_tambien_lanza_la_completa():
+    gh = GitHubAnotado()
+    api = TestClient(crear_app(demo=True, repositorio=_repo_con(_de_hoy("fallida"), {}), acciones=gh))
+    api.post("/api/busqueda", json={}, headers=H)
+    assert gh.enfoques == ["completo"]
+
+
+def test_si_todos_cumplen_no_lanza_y_lo_dice():
+    from panel.modelos import Configuracion
+    from panel.repositorio import configuracion_demo
+    cfg = Configuracion.model_validate(configuracion_demo())
+    todos = {str(p.id): int(p.meta_diaria or 0) + 1 for p in cfg.perfiles}
+    gh = GitHubAnotado()
+    api = TestClient(crear_app(demo=True, repositorio=_repo_con(_de_hoy(), todos), acciones=gh))
+    assert api.get("/api/busqueda").json()["plan"]["tipo"] == "nada"
+    r = api.post("/api/busqueda", json={}, headers=H)
+    assert r.status_code == 409 and "meta" in r.json()["detail"] and gh.enfoques == []
+
+
+def test_con_perfiles_bajo_su_meta_lanza_a_fondo_solo_para_ellos():
+    gh = GitHubAnotado()
+    api = TestClient(crear_app(demo=True, repositorio=_repo_con(_de_hoy(), {}), acciones=gh))
+    plan = api.get("/api/busqueda").json()["plan"]
+    assert plan["tipo"] == "faltantes" and all(f["hoy"] < f["meta"] for f in plan["faltan"])
+    api.post("/api/busqueda", json={}, headers=H)
+    assert gh.enfoques == ["faltantes"]
+
+
+def test_la_captura_horaria_de_madrugada_no_cuenta_como_busqueda_del_dia():
+    # La captura horaria crea la fila del día sin lote (sin `revision_del_lote`): el botón hace la completa.
+    from panel import servicio
+    from panel.repositorio import hoy
+    for filas in ([{"id": "e1", "fecha": hoy(), "estado": "parcial", "resumen": {}}], _de_hoy("en_curso")):
+        assert servicio.plan_busqueda(_repo_con(filas, {}))["tipo"] == "completa"
+
+
+def test_solo_cuenta_quien_todavia_puede_recibir_mas():
+    # Con 5 o más, solo hay más si su cargo tiene cupo libre en el lote; Comunidad nunca (recibe lo que sobra).
+    from panel import ejecutor
+    from panel.modelos import Configuracion
+    from panel.repositorio import configuracion_demo, hoy
+    datos = configuracion_demo()
+    datos["clientes"][-1]["comunidad"] = True
+    cfg = Configuracion.model_validate(datos)
+    comunidad = {c.id for c in cfg.clientes if c.comunidad}
+    reales = [p for p in cfg.perfiles_activos() if p.cliente_id not in comunidad and (p.meta_diaria or 0) > 5]
+    assert reales
+    p = reales[0]
+    cargo = next(c.nombre for c in cfg.cargos if c.id == p.cargo_id)
+    version = {"configuracion": datos, "revision": 1}
+
+    def faltan(n, libre):
+        filas = _de_hoy(faltantes={cargo: libre})
+        return {str(x.id) for x, _, _ in ejecutor.faltan_hoy(_repo_con(filas, {str(p.id): n}), version, hoy())}
+    assert str(p.id) in faltan(2, 0)  # bajo el mínimo: el rescate la completa
+    assert str(p.id) not in faltan(5, 0)  # cupo del cargo lleno: otra búsqueda no le suma
+    assert str(p.id) in faltan(5, 3)
+    todos = ejecutor.faltan_hoy(_repo_con(_de_hoy(), {}), version, hoy())
+    assert todos and not [x for x, _, _ in todos if x.cliente_id in comunidad]
+    assert any(p.cliente_id in comunidad for p in cfg.perfiles_activos())
+
+
+def test_plan_nunca_falla():
+    from panel import servicio
+
+    class Roto(RepositorioDemo):
+        def operativa(self, fecha=None):
+            raise RuntimeError("Supabase no responde")
+    assert servicio.plan_busqueda(Roto())["tipo"] == "completa"
+
+
+def test_correr_con_faltantes_enfoca_solo_en_ellos(monkeypatch, tmp_path):
+    from contextlib import contextmanager
+    from panel import ejecutor
+    from panel.repositorio import hoy
+    repo = _repo_con(_de_hoy(), {})
+    vistos = {}
+
+    class Alto(Exception):
+        pass
+
+    @contextmanager
+    def activar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
+        vistos["enfocar"] = enfocar
+        raise Alto
+        yield  # pragma: no cover
+    monkeypatch.setattr(ejecutor, "activar", activar)
+    monkeypatch.setattr(ejecutor, "iniciar", lambda *a: {"id": "e1", "resumen": {}})
+    monkeypatch.setattr(ejecutor, "perfiles_cortos", lambda *a: set())
+    esperados = {str(p.id) for p, _, _ in ejecutor.faltan_hoy(repo, repo.operativa(hoy()), hoy())}
+    for enfoque, esperado in (("faltantes", esperados), ("completo", None)):
+        try:
+            ejecutor.correr(str(tmp_path), repo=repo, enfoque=enfoque)
+        except Alto:
+            pass
+        assert vistos["enfocar"] == esperado and (esperado is None or esperado)
+
+
+def test_a_fondo_solo_reparte_turnos_entre_quienes_faltan_y_duplica_presupuesto():
+    from panel import ejecutor
+    from panel.repositorio import configuracion_demo, hoy
+    from buscador import cobertura
+    cfg = configuracion_demo()
+    uno = cfg["perfiles"][0]["id"]
+    _, _, normal = ejecutor.preparar({"configuracion": cfg}, hoy())
+    _, _, fondo = ejecutor.preparar({"configuracion": cfg}, hoy(), enfocar={uno})
+    assert [p["perfil"] for p in fondo["personas_busqueda"]] == [uno]
+    assert fondo["presupuestos"]["linkedin_busquedas"] == normal["presupuestos"]["linkedin_busquedas"] * 2
+    assert fondo["a_fondo"] and not normal.get("a_fondo")
+    # Sus lugares piden los 30 días aunque se hayan buscado ayer.
+    rid, lugar = next(iter(fondo["lugares_primero"].items()))
+    cobertura.configurar_primero(fondo["lugares_primero"])
+    cobertura.configurar_a_fondo(True)
+    try:
+        assert cobertura.dias_busqueda(f"{rid}@{sorted(lugar)[0]}", "2026-11-17", "2026-11-18", 30) == 30
+        assert cobertura.dias_busqueda("otro@CO", "2026-11-17", "2026-11-18", 30) == 2
+    finally:
+        cobertura.configurar_primero()
+        cobertura.configurar_a_fondo()
+
+
+def test_busquedas_por_persona_se_suman_entre_pasadas_del_dia():
+    from panel import ejecutor
+    antes = {"p1": {"linkedin": 4}, "p2": {"indeed": 1}}
+    assert ejecutor._sumar_busquedas(antes, {"p1": {"linkedin": 6, "indeed": 2}}) == {
+        "p1": {"linkedin": 10, "indeed": 2}, "p2": {"indeed": 1}}
+    assert ejecutor._sumar_busquedas(antes, None) == antes and antes["p1"] == {"linkedin": 4}
