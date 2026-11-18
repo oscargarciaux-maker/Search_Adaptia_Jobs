@@ -67,6 +67,16 @@ def test_no_lanza_si_ya_hay_una_en_cola_o_corriendo():
     assert e.value.estado == 409 and not any(p[0] == "POST" for p in sesion.pedidos)
 
 
+def test_lanza_aunque_la_maquina_se_haya_encendido_hace_poco(monkeypatch):
+    """CI del PR #130: con el reloj monotónico por debajo de 180 s (máquina o panel recién encendidos), el primer
+    pedido no puede tomarse como «ya se pidió hace un momento»."""
+    monkeypatch.setattr(acciones.time, "monotonic", lambda: 5.0)
+    gh, _ = _gh()
+    assert gh.lanzar() == {"lanzada": True}
+    with pytest.raises(ErrorRepositorio):
+        gh.lanzar()
+
+
 def test_no_lanza_dos_veces_seguidas():
     gh, sesion = _gh()
     gh.lanzar()

@@ -87,7 +87,8 @@ class AccionesGitHub:
         self._cabeceras = {"Authorization": "Bearer " + token, "Accept": "application/vnd.github+json",
                            "X-GitHub-Api-Version": "2022-11-28"}
         self.repositorio, self.sesion = repositorio, sesion or requests.Session()
-        self._rama, self._copia, self._ultimo = None, None, 0.0
+        # None = aún no se lanzó nada (no 0.0: el reloj monotónico de una máquina recién encendida vale menos de 180).
+        self._rama, self._copia, self._ultimo = None, None, None
         self._cerrojo = threading.Lock()
 
     def _pedir(self, metodo, ruta, **kw):
@@ -126,7 +127,7 @@ class AccionesGitHub:
 
     def lanzar(self):
         with self._cerrojo:
-            if time.monotonic() - self._ultimo < ESPERA_ENTRE_LANZAMIENTOS:
+            if self._ultimo is not None and time.monotonic() - self._ultimo < ESPERA_ENTRE_LANZAMIENTOS:
                 raise ErrorRepositorio("La búsqueda ya se pidió hace un momento; aparecerá en unos segundos.", 409)
             actual = self.estado(fresco=True)
             if actual["en_curso"]:
