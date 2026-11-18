@@ -27,7 +27,7 @@ def _anotar_ficha(enlace, titulo, pagina):
     from buscador import verificar_enlaces
     estado, motivo = verificar_enlaces.ficha_linkedin(pagina, titulo)
     if estado != "pendiente":
-        FICHAS[enlace] = {"estado": estado, "motivo": motivo,
+        FICHAS[enlace] = {"estado": estado, "motivo": motivo, "destino": AVISO + enlace.rstrip("/").rsplit("/", 1)[-1],
                           "comprobada_en": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")}
 # Lugares de búsqueda además de cada país: remoto para toda la región
 LUGARES_EXTRA = [("LATAM", {"location": "Latin America"}), ("REMOTO", {"location": "Latin America", "f_WT": "2"}),

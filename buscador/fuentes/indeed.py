@@ -23,6 +23,21 @@ PAISES = {"AR": "argentina", "AU": "australia", "AT": "austria", "BH": "bahrain"
           "GB": "uk", "US": "usa", "UY": "uruguay", "VE": "venezuela", "VN": "vietnam"}
 
 
+# Contrato v41: avisos que la búsqueda de Indeed mostró en esta corrida (enlace → comprobación). Indeed solo lista avisos
+# activos y responde 401 a cualquier comprobación directa: verse hoy en su búsqueda cuenta como abierta 24 h.
+VISTAS = {}
+
+
+def _anotar_vista(*enlaces_aviso):
+    hora = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    from buscador import verificar_enlaces
+    for enlace in enlaces_aviso:
+        # Solo páginas de Indeed (por el dominio real, no por el texto): el enlace de la empresa se comprueba como siempre.
+        if enlace and verificar_enlaces.sin_comprobacion_directa(enlace):
+            VISTAS[enlace] = {"estado": "verificada", "motivo": "vista hoy en la búsqueda de Indeed",
+                              "comprobada_en": hora, "destino": enlace}
+
+
 def _nombre_en(pais):
     """Nombre en inglés del país de un Indeed de fuera de LATAM y España, o "" (los de la tabla propia no se completan)."""
     from buscador import paises
@@ -102,6 +117,7 @@ def buscar(mapa, paises_activos, estado, presupuesto, hoy=None, max_dias=30, por
         estado[clave_terminos] = hoy
         for r in df.to_dict("records"):
             fecha = r.get("date_posted")
+            _anotar_vista(_limpio(r.get("job_url")), _limpio(r.get("job_url_direct")))
             crudas.append({
                 "titulo": _limpio(r.get("title")), "empresa": _limpio(r.get("company")),
                 "ubicacion": ubicacion(r.get("location"), pais),

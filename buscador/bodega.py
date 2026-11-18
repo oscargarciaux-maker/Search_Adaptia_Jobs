@@ -18,7 +18,7 @@ from pathlib import Path
 import yaml
 
 from buscador import calidad, contrato, cobertura, enlaces, familias, normalizar, paises, tiempos, vacante
-from buscador.fuentes import (ats, computrabajo, elempleo, getonbrd, indeed, linkedin_apify, linkedin_publico,
+from buscador.fuentes import (ats, computrabajo, elempleo, getonbrd, indeed, linkedin_apify, linkedin_publico, open_seat,
                               publicaciones_apify, remotos)
 from buscador.http import Cliente
 
@@ -183,12 +183,28 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
                                limite_segundos=limite, prioritarias=prioritarias)
 
     filas_ats = ats.leer_lista(ats.RUTA, trabajo / "empresas_ats.csv")
+    # Open Seat (17 nov): empresas que contratan en LATAM con su portal; se leen con ats.py (ficha completa y cierres).
+    de_open_seat = set()
+    if not solo_mapa:
+        try:
+            t0 = time.monotonic()
+            filas_os, salud["Open Seat"] = open_seat.tableros(Cliente(pausa=(0, 0)), hoy)
+            conocidas = {(f["sistema"], f["slug"].lower()) for f in filas_ats}
+            nuevas_os = [f for f in filas_os if (f["sistema"], f["slug"].lower()) not in conocidas]
+            filas_ats = filas_ats + nuevas_os
+            de_open_seat = {(f["sistema"], f["slug"].lower()) for f in filas_os}
+            salud["Open Seat"].update(nuevos=len(nuevas_os), segundos=round(time.monotonic() - t0))
+            ats.guardar_lista(ats.leer_lista(trabajo / "empresas_ats.csv") + nuevas_os, trabajo / "empresas_ats.csv")
+        except Exception as e:  # noqa: BLE001 — sin Open Seat siguen los portales de siempre
+            salud["Open Seat"] = {"error": f"{type(e).__name__}: {e}"[:300]}
 
     def f_ats():
         filas = filas_ats
         if cfg.get("control_dirigido"):
             empresas = {normalizar.empresa(x) for x in cfg.get("empresas_objetivo",[])}
-            filas = [f for f in filas if normalizar.empresa(f.get("empresa","")) in empresas]
+            # Las de Open Seat se leen aunque aún no hayan traído vacantes de los cargos: contratan los mismos roles.
+            filas = [f for f in filas if normalizar.empresa(f.get("empresa","")) in empresas
+                     or (f["sistema"], f["slug"].lower()) in de_open_seat]
             if not filas:
                 return [], set(), {"omitida": "modo dirigido: aún no hay portales asociados a los cargos"}
         return ats.buscar(Cliente(pausa=(0.05, 0.2)), filas, limite_segundos=limite, prioritarias=prioritarias)
@@ -418,6 +434,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     # Contrato v39: las fichas de LinkedIn leídas en esta búsqueda ya comprueban sus enlaces (abiertas o cerradas).
     from buscador.fuentes import linkedin_publico
     fichas_incorporadas = verificar_enlaces.incorporar(vacantes, cache_enlaces, linkedin_publico.FICHAS)
+    indeed_incorporadas = verificar_enlaces.incorporar(vacantes, cache_enlaces, indeed.VISTAS)  # contrato v41
     entregadas_revision = _leer_json(trabajo / "entregadas.json", {})
     entregadas_revision.update(memoria_db)
     cfg_revision = dict(cfg.get("verificacion_enlaces", {}))
@@ -619,6 +636,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         resumen_revision["seleccion_del_dia"] = verificar_enlaces.resumen(actuales)
     resumen_revision["rechazos_en_corrida"] = {m: n for m, n in descartes.items() if m in verificar_enlaces.RECHAZOS}
     resumen_revision["fichas_linkedin_incorporadas"] = fichas_incorporadas
+    resumen_revision["vistas_indeed_incorporadas"] = indeed_incorporadas
     seleccion_actual = {"fecha": lote_actual.get("fecha"), "roles": {}}
     por_id_vigente = {v["id"]: v for v in vacantes}
     estados_catalogo = {v["id"]: estado for v, estado, _ in retiradas}
