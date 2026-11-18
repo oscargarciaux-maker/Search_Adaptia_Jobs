@@ -104,7 +104,7 @@ La entrega normal comprueba Supabase antes de recoger; la validación final fall
   familias, paises, enlaces, etiquetas, bodega, publicar, diagnostico) · `pruebas/` · `reportes/` (los escribe la bodega) · `.claude/skills/` · `.github/workflows/`.
 
 ## Cómo funciona (estado vigente)
-- **Bodega nocturna** (`.github/workflows/bodega.yml`, 6:30 a. m. Bogotá; segunda pasada 8:30; respaldos 7:15/7:50/9:30 que solo trabajan si la anterior no corrió, y la captura horaria la lanza una vez si hoy no corrió —`buscador/vigia.py`, 18 nov—): `buscador/bodega.py` corre en paralelo las fuentes
+- **Bodega nocturna** (`.github/workflows/bodega.yml`, 6:30 a. m. Bogotá; segunda pasada 8:30; respaldos 7:15/7:50/9:30 que solo trabajan si la anterior no corrió, y la captura horaria la lanza una vez si hoy no corrió —`buscador/arranque.py`, 18 nov—): `buscador/bodega.py` corre en paralelo las fuentes
   de `buscador/fuentes/` —LinkedIn público (rotación familia × país, consultas con OR), Indeed (JobSpy, 62 países desde v40),
   portales de empresas (`ats.py`: Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Recruitee; la lista crece sola
   probando las empresas que traen las demás fuentes), tableros remotos (Remotive y Working Nomads con el enlace

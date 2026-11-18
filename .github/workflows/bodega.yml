@@ -6,8 +6,9 @@ name: Bodega nocturna
 # Segunda pasada a las 8:30 a. m. de Bogotá (13:30 UTC): solo trabaja si la nocturna no llegó a la meta, no confirmó Supabase
 # o no corrió; completa el mismo lote del día (no elige otro) y no supera el tope diario de Apify ya reservado.
 # 18 nov: GitHub a veces no lanza un horario (ese día no lanzó ninguno durante horas). Horarios de respaldo que solo
-# trabajan si el anterior no lo hizo (buscador/validacion.py, hace_falta_pasada): 7:15 y 7:50 de Bogotá para la de la
-# mañana, 9:30 para la segunda. Además, la «Captura horaria» la lanza una vez si hoy no corrió (buscador/vigia.py).
+# trabajan si el anterior no lo hizo (buscador/arranque.py): 7:15 y 7:50 de Bogotá para la de la mañana, 9:30 para
+# la segunda. La de las 6:30 tampoco repite si un respaldo ya la hizo. Además, la «Captura horaria» la lanza una vez si
+# hoy no corrió (trabajo «vigia»). Un respaldo que no trabaja no manda aviso, para no tapar un fallo anterior.
 # Aviso opcional: secreto AVISO_NOCTURNA_URL (ping de Healthchecks u otro servicio similar).
 #   modo "inicial": olvida la rotación y pide 30 días a cada combinación (para la primera vez o tras un cambio grande)
 #   prueba: presupuestos mínimos (unos 5 minutos), para comprobar que todo funciona
@@ -65,14 +66,8 @@ jobs:
       - name: Decidir si esta pasada hace falta
         id: decidir
         run: |
-          case "${{ github.event.schedule }}" in
-            "15 12 * * *"|"50 12 * * *") pasada=respaldo ;;
-            "30 13 * * *") pasada=segunda ;;
-            "30 14 * * *") pasada=segunda-respaldo ;;
-            *) pasada=principal ;;
-          esac
-          echo "Pasada: $pasada"
-          python -m buscador.validacion --salida salida --pasada "$pasada" >> "$GITHUB_OUTPUT"
+          # Cada horario dice qué pasada es en buscador/arranque.py (HORARIOS); vacío = a mano, que siempre trabaja.
+          python -m buscador.arranque --trabajo salida/trabajo --horario "${{ github.event.schedule }}" >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"
       - name: Preparar base y estado automáticamente
         if: ${{ steps.decidir.outputs.ejecutar == 'true' }}
@@ -132,7 +127,8 @@ jobs:
               print('{}: {} listas; {} faltantes vigentes frente a la meta'.format(r['nombre'],listas,max(0,r.get('meta',20)-listas)))
           " >> "$GITHUB_STEP_SUMMARY" || true
       - name: Avisar
-        if: always()
+        # Solo la pasada que trabajó avisa: un respaldo que no hizo nada no debe poner en verde un fallo anterior.
+        if: ${{ always() && steps.decidir.outputs.ejecutar != 'false' }}
         env:
           AVISO: ${{ secrets.AVISO_NOCTURNA_URL }}
         run: |
