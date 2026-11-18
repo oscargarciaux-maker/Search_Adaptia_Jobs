@@ -1564,12 +1564,17 @@ test("18 nov: «Buscar ahora» lanza la búsqueda desde el Resumen y se bloquea 
   await page.getByRole("button", { name: "Buscar ahora" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText("una hora y media");
+  await expect(dialog).toContainText("Hoy ya hubo una búsqueda"); // la demo tiene la de hoy: completa sin repetir
   await expect(dialog).toContainText("Demostración");
   await dialog.getByRole("button", { name: "Buscar ahora" }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByText("Búsqueda pedida")).toBeVisible();
   const enCurso = page.getByRole("button", { name: /^(En cola|Buscando)/ });
-  await expect(enCurso).toBeDisabled();
+  // Bloqueado pero enfocable (aria-disabled): el foco vuelve a él al cerrar el diálogo y explica por qué.
+  await expect(enCurso).toHaveAttribute("aria-disabled", "true");
+  await expect(enCurso).toBeFocused();
+  await enCurso.click({ force: true }); // Playwright no hace clic solo en un botón aria-disabled
+  await expect(page.getByText("Ya hay una búsqueda")).toBeVisible();
   // Otras pestañas no lo muestran: solo el Resumen.
   await ir(page, "Cargos y metas");
   await expect(

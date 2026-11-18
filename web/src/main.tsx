@@ -62,6 +62,8 @@ import {
   fecha,
   fijarLugares,
   fijarMundo,
+  horaBogota,
+  hoyBogota,
   modos,
   nombrePais,
 } from "./comunes";
@@ -94,11 +96,6 @@ function slug(texto: string) {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "") || "cliente"
   );
-}
-function hoyBogota() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Bogota",
-  }).format(new Date());
 }
 // Por qué no hay vacantes: sin configuración, a la espera de la primera búsqueda o sin coincidencias.
 function vacioVacantes(estado: EstadoConfig | null, r: Resultados | null) {
@@ -1484,6 +1481,10 @@ function App() {
     excede = metas.reales > metas.techo,
     clientes = draft.clientes.filter((c) => c.activo),
     cargos = metas.cargos.filter((c) => c.activo);
+  // Cambios que la próxima búsqueda aún no usa (sin guardar, o guardados sin confirmar).
+  const pendienteDeConfirmar =
+    dirty ||
+    Boolean(estado?.revision && estado.publicada?.revision !== estado.revision);
   function notify(texto: string, error = false) {
     setToast({ texto, error });
   }
@@ -1931,12 +1932,7 @@ function App() {
                 <>
                   <span
                     className={
-                      "flow-pill" +
-                      (dirty ||
-                      (estado?.revision &&
-                        estado.publicada?.revision !== estado.revision)
-                        ? " pending"
-                        : "")
+                      "flow-pill" + (pendienteDeConfirmar ? " pending" : "")
                     }
                   >
                     {textoProgramacion(estado, dirty)}
@@ -1958,28 +1954,8 @@ function App() {
                   </button>
                   {tab === "Resumen" && (
                     <BuscarAhora
-                      hoyCorrio={
-                        runs?.[0]?.fecha ===
-                        new Date().toLocaleDateString("en-CA", {
-                          timeZone: "America/Bogota",
-                        })
-                          ? new Date(runs[0].iniciada_en).toLocaleTimeString(
-                              "es-CO",
-                              {
-                                hour: "numeric",
-                                minute: "2-digit",
-                                timeZone: "America/Bogota",
-                              },
-                            )
-                          : null
-                      }
-                      sinConfirmar={
-                        dirty ||
-                        Boolean(
-                          estado?.revision &&
-                            estado.publicada?.revision !== estado.revision,
-                        )
-                      }
+                      ultima={runs?.[0]}
+                      sinConfirmar={pendienteDeConfirmar}
                       demo={Boolean(sesion.demo)}
                       onAviso={notify}
                       onTermino={recargarResumen}
@@ -3130,17 +3106,6 @@ function CampoTecho({
 }
 
 // «3:32 p. m.» en hora de Colombia, de la hora en que terminó la última búsqueda.
-function horaBogota(iso: string) {
-  try {
-    return new Date(iso).toLocaleTimeString("es-CO", {
-      hour: "numeric",
-      minute: "2-digit",
-      timeZone: "America/Bogota",
-    });
-  } catch {
-    return "";
-  }
-}
 
 function llegaronHoy(ultima: Ejecucion | undefined, cargo: string) {
   if (!ultima || ultima.fecha !== hoyBogota()) return undefined;

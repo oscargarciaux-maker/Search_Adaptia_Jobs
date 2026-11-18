@@ -413,3 +413,21 @@ export function TagInput({
     </div>
   );
 }
+
+// Fecha y hora de Bogotá (el horario de la búsqueda); compartidas por el Resumen y «Buscar ahora».
+export function hoyBogota() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+  }).format(new Date());
+}
+export function horaBogota(iso: string) {
+  try {
+    return new Date(iso).toLocaleTimeString("es-CO", {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "America/Bogota",
+    });
+  } catch {
+    return "";
+  }
+}

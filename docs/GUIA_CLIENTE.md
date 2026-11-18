@@ -213,21 +213,25 @@ Las fuentes y variantes rotan; no se recorren todos los títulos de todos los pa
 
 Si la búsqueda del día no arrancó, en el Resumen está **«Buscar ahora»**, junto a «Confirmar y aplicar». Lanza la
 misma búsqueda diaria: si hoy ya hubo una, completa lo que falte sin repetir lo entregado. Tarda alrededor de una hora y
-media; mientras tanto el botón dice «Buscando desde …» y no deja lanzar otra.
+media; mientras tanto el botón dice «Buscando desde …» y no deja lanzar otra. Si otra tarea larga (una búsqueda
+profunda, una copia de seguridad, un traspaso) está corriendo o esperando turno, el botón dice que esperes: GitHub
+solo deja una tarea esperando y lanzar ahora cancelaría una de las dos.
 
 Para que aparezca, el servidor del panel necesita una llave de GitHub, una sola vez:
 1. En GitHub: foto de perfil → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** →
    Generate new token.
-2. Nombre: «Panel · Buscar ahora». Expiration: **No expiration** (así no hay que renovarla; se puede borrar cuando se
-   quiera desde la misma página).
+2. Nombre: «Panel · Buscar ahora». Expiration: la que prefieras. Con **No expiration** no hay que renovarla; con
+   1 año es más prudente y GitHub avisa por correo antes de que venza. Se puede borrar cuando se quiera desde la
+   misma página.
 3. Repository access: **Only select repositories** → este repositorio.
 4. Permissions → Repository permissions → **Actions: Read and write**. Nada más.
 5. Generate token y copiarlo (GitHub lo muestra una sola vez).
 6. En el alojamiento del panel, junto a SUPABASE_URL y los demás valores privados, crear `GITHUB_ACCIONES_TOKEN` con
    el token y `GITHUB_REPOSITORIO` con `dueño/nombre` del repositorio. Reiniciar el panel.
 
-La llave solo permite lanzar y ver las búsquedas de este repositorio: no da acceso al código, a la cuenta ni a Supabase,
-y nunca llega al navegador. Al traspasar el proyecto, el cliente crea la suya y borra la anterior.
+La llave solo sirve para las tareas de GitHub Actions de este repositorio: puede lanzarlas, verlas y cancelarlas (el
+panel solo lanza la búsqueda diaria). No da acceso a la cuenta ni a Supabase, no cambia el código y nunca llega al
+navegador. Guárdala como las demás claves del alojamiento. Al traspasar el proyecto, el cliente crea la suya y borra la anterior.
 
 Una búsqueda a pedido se inicia en Actions → Búsqueda profunda → Run workflow, rama main, con cargo y país opcional.
 No crea otra entrega diaria ni acredita la vigencia de todas las ofertas encontradas.

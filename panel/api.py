@@ -19,6 +19,7 @@ from buscador import paises
 from buscador.fuentes.publicaciones_apify import PREFIJOS
 from buscador import registro
 from panel import servicio
+from panel.acciones import desde_entorno as conexion_github
 from panel.modelos import AjusteOperador, BorrarCliente, ImportarClientes, CambioBorrador, Configuracion, Contacto, DecisionRevision, EstadoRegla, SubirRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia, explicar, parcial, solo_perfil
 from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase, hoy
 from panel.terminos import sugerir
@@ -83,14 +84,8 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         import threading
         threading.Thread(target=precargar, daemon=True).start()
     app.state.repo, app.state.demo = repo, demo
-    if acciones is None:  # «Buscar ahora»: sin la llave de GitHub en el alojamiento, el botón no aparece
-        from panel import acciones as modulo_acciones
-        try:
-            acciones = modulo_acciones.desde_entorno(demo)
-        except ValueError as e:
-            registro.aviso("api:acciones", e)
-            acciones = None
-    app.state.acciones = acciones
+    # «Buscar ahora»: la conexión con GitHub (o None, sin botón). Por defecto se lee del alojamiento.
+    app.state.acciones = acciones if acciones is not None else conexion_github(demo)
     # Contrato v29: copias cortas en memoria. Cualquier escritura del panel (POST/PUT/PATCH/DELETE) sube el sello e
     # invalida los resultados guardados; la búsqueda nocturna corre en otro proceso y la cubre la vigencia de 2 min.
     sello = [0]
@@ -598,7 +593,11 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         """«Buscar ahora»: si el panel puede lanzar la búsqueda y si hay una en cola o corriendo."""
         if not app.state.acciones:
             return {"disponible": False}
-        return app.state.acciones.estado()
+        try:
+            return {"disponible": True, **app.state.acciones.estado()}
+        except ErrorRepositorio as e:  # el botón queda visible y dice por qué no se puede (el mensaje no lleva la llave)
+            registro.aviso("api:busqueda", RuntimeError(e.mensaje))
+            return {"disponible": True, "en_curso": None, "ocupado": e.mensaje, "ultima_pedida": None}
 
     @app.post("/api/busqueda")
     def buscar_ahora():
