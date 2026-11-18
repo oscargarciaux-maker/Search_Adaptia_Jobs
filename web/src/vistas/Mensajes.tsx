@@ -29,6 +29,8 @@ export function Mensajes({
   const [lista, setLista] = useState<Borrador[] | null>(null);
   const [soloPendientes, setSoloPendientes] = useState(true);
   const [ocupado, setOcupado] = useState(false);
+  // Sube cuando el servidor ya guardó un cambio: «Mandarme todos» se rehace con lo guardado (no antes).
+  const [guardados, setGuardados] = useState(0);
   async function cargar() {
     try {
       const r = await api<{ borradores: Borrador[] }>("/borradores");
@@ -55,6 +57,7 @@ export function Mensajes({
       });
       // El enlace de WhatsApp lo calcula la lista; la respuesta del cambio no lo trae.
       poner({ ...r, enlace: b.enlace, pocas: b.pocas });
+      setGuardados((n) => n + 1);
     } catch (e) {
       poner(b);
       notify((e as Error).message, true);
@@ -143,7 +146,9 @@ export function Mensajes({
       </div>
       <ParaMi
         notify={notify}
-        cambios={(lista || []).map((b) => b.id + b.estado).join()}
+        cambios={
+          guardados + ":" + (lista || []).map((b) => b.id + b.estado).join()
+        }
       />
       {!!lista?.some((b) => b.estado !== "descartado") && (
         <fieldset className="enviados">
@@ -303,7 +308,11 @@ function ParaMi({
         setParaMi(r);
         setError("");
       })
-      .catch((e) => vigente && setError((e as Error).message));
+      .catch((e) => {
+        if (!vigente) return;
+        setParaMi(null); // sin enlace viejo: dice por qué
+        setError((e as Error).message);
+      });
     return () => {
       vigente = false;
     };

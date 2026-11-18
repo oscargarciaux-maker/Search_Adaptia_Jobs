@@ -14,7 +14,12 @@ sin partes. Eligió enlaces cortos. Sin IA y sin SQL. Reemplaza el punto 3 de v3
    - Vale solo el día del mensaje (Bogotá) y mientras el mensaje esté pendiente o abierto, y el cliente tenga WhatsApp.
    - Al abrirlo, marca el mensaje «abierto» y redirige (302) a `wa.me/<cliente>?text=<su mensaje actual>`: lo editado
      en el panel cuenta.
-   - Si no vale, una página corta: «Este enlace ya no sirve». El registro solo guarda la ruta, sin datos del cliente.
+   - Si no vale, una página corta: «Este enlace ya no sirve». Tampoco vale si el cliente retiró su consentimiento.
+   - La vista previa del enlace (WhatsApp, Facebook) no lo marca «abierto».
+   - Respuestas con `Cache-Control: no-store`. El registro de accesos guarda solo «/w/…», sin la ficha, porque la
+     ruta completa sirve hasta medianoche para abrir el mensaje del cliente.
+   - La llave sale de la misma credencial que usa el panel (`SUPABASE_SECRET_KEY` o `SUPABASE_SERVICE_ROLE_KEY`),
+     así que no cambia al reiniciar.
    - La dirección base es `PANEL_ORIGIN` (HTTPS, la misma que protege el panel); en demostración, la de la petición.
 3. **Un clic:** el panel prepara el enlace al abrir Mensajes y cada vez que cambian los mensajes, así el botón es un
    enlace de verdad. No hay «Preparar» ni lista de partes.

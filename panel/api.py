@@ -2,6 +2,7 @@
 import argparse
 from collections import defaultdict, deque
 import hashlib
+import logging
 import os
 from pathlib import Path
 import time
@@ -256,7 +257,7 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         if renovada:
             _poner_cookies(response, renovada)
         response.headers.update({"X-Content-Type-Options": "nosniff", "Referrer-Policy": "same-origin",
-            "X-Frame-Options": "DENY", "Cache-Control": "no-store" if request.url.path.startswith("/api/") else "no-cache",
+            "X-Frame-Options": "DENY", "Cache-Control": "no-store" if request.url.path.startswith(("/api/", "/w/")) else "no-cache",
             "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"})
         if not demo:  # OWASP ASVS 14.4.5 (PR 1.5): el navegador usa siempre HTTPS con el panel real
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
@@ -697,23 +698,36 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
     # Contrato v46: enlace corto de «Mandarme todos». Se abre desde el teléfono del operador, sin sesión: la firma
     # (HMAC con la llave del servidor, válida solo hoy) es la que da acceso. No registra datos del cliente.
     @app.get("/w/{ficha}")
-    def abrir_mensaje(ficha: str):
+    def abrir_mensaje(ficha: str, request: Request):
         from fastapi.responses import HTMLResponse, RedirectResponse
         from panel import borradores as b
+        # La vista previa del enlace (WhatsApp, Facebook) también lo pide: eso no cuenta como abrirlo.
+        agente = request.headers.get("user-agent", "")
+        vista_previa = agente.startswith("WhatsApp") or "facebookexternalhit" in agente
         try:
-            enlace = b.abrir_corto(repo, ficha[:80])
+            enlace = b.abrir_corto(repo, ficha[:80], marcar=not vista_previa)
         except Exception as e:  # noqa: BLE001 — sin el dato, la página de «ya no sirve»
             registro.aviso("api:enlace-corto", e)
             enlace = None
         if not enlace:
-            return HTMLResponse(PAGINA_ENLACE_VENCIDO, status_code=404)
+            return HTMLResponse(PAGINA_ENLACE_VENCIDO, status_code=404, headers={"Cache-Control": "no-store"})
         sello_mensajes[0] += 1  # quedó «abierto»
-        return RedirectResponse(enlace, status_code=302)
+        return RedirectResponse(enlace, status_code=302, headers={"Cache-Control": "no-store"})
 
     dist = RAIZ / "web" / "dist"
     if dist.exists():
         app.mount("/", StaticFiles(directory=dist, html=True), name="panel")
     return app
+
+
+class SinEnlaceCorto(logging.Filter):
+    """Contrato v46: la ruta /w/<ficha> sirve hasta medianoche para abrir el mensaje de un cliente; el registro de
+    accesos solo guarda «/w/…»."""
+    def filter(self, record):
+        args = record.args
+        if isinstance(args, tuple) and len(args) > 2 and str(args[2]).startswith("/w/"):
+            record.args = (*args[:2], "/w/…", *args[3:])
+        return True
 
 
 PAGINA_ENLACE_VENCIDO = """<!doctype html><html lang="es"><meta charset="utf-8">
@@ -732,7 +746,12 @@ def main():
                         help="Puerto; por defecto PORT del alojamiento (Render, etc.) o 8000")
     args = parser.parse_args()
     import uvicorn
-    uvicorn.run(crear_app(demo=args.demo), host=args.host, port=args.port, log_level="info")
+    from copy import deepcopy
+    from uvicorn.config import LOGGING_CONFIG
+    registro_accesos = deepcopy(LOGGING_CONFIG)  # contrato v46: el registro de accesos no guarda los enlaces cortos
+    registro_accesos.setdefault("filters", {})["sin_enlace_corto"] = {"()": "panel.api.SinEnlaceCorto"}
+    registro_accesos["handlers"]["access"]["filters"] = ["sin_enlace_corto"]
+    uvicorn.run(crear_app(demo=args.demo), host=args.host, port=args.port, log_level="info", log_config=registro_accesos)
 
 
 if __name__ == "__main__":
