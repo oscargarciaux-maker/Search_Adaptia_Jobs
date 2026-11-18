@@ -77,17 +77,50 @@ def hace_falta_completar(trabajo, hoy):
                 and not dia.get("pendientes_supabase"))
 
 
+PASADAS = ("principal", "respaldo", "segunda", "segunda-respaldo")
+
+
+def _dia(trabajo, hoy):
+    try:
+        dia = json.loads((Path(trabajo) / "metricas_entrega.json").read_text(encoding="utf-8")).get(hoy)
+    except (OSError, ValueError, AttributeError):
+        return None
+    return dia if isinstance(dia, dict) else None
+
+
+def hace_falta_pasada(trabajo, hoy, tipo):
+    """18 nov: GitHub a veces no lanza un horario programado (ese día no corrió ninguno). bodega.yml tiene horarios de
+    respaldo que solo trabajan si el anterior no lo hizo:
+    - principal (6:30 de Bogotá o a mano): siempre;
+    - respaldo de la mañana: solo si hoy aún no terminó ninguna búsqueda diaria;
+    - segunda (8:30): como antes, si falta meta, confirmar Supabase o no corrió;
+    - respaldo de la segunda: lo mismo, pero solo si hoy terminaron menos de dos búsquedas diarias.
+    Si no se puede leer el registro del día, trabaja (como cuando falta el archivo)."""
+    if tipo not in PASADAS:
+        raise ValueError(f"Pasada desconocida: {tipo}")
+    if tipo == "principal":
+        return True
+    dia = _dia(trabajo, hoy)
+    if tipo == "respaldo":
+        return dia is None
+    if not hace_falta_completar(trabajo, hoy):
+        return False
+    return tipo == "segunda" or dia is None or int(dia.get("pasadas", 1) or 0) < 2
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--salida", required=True)
     ap.add_argument("--catalogo", action="store_true")
     ap.add_argument("--hace-falta-completar", action="store_true",
                     help="Imprime ejecutar=true/false para GITHUB_OUTPUT según el día de hoy en Bogotá")
+    ap.add_argument("--pasada", choices=PASADAS,
+                    help="Igual que --hace-falta-completar, según el horario que lanzó la búsqueda (bodega.yml)")
     args = ap.parse_args()
-    if args.hace_falta_completar:
+    if args.hace_falta_completar or args.pasada:
         from datetime import datetime, timedelta, timezone
         hoy = datetime.now(timezone(timedelta(hours=-5))).date().isoformat()
-        falta = hace_falta_completar(Path(args.salida) / "trabajo", hoy)
+        falta = hace_falta_pasada(Path(args.salida) / "trabajo", hoy, args.pasada or "segunda")
         print(f"ejecutar={'true' if falta else 'false'}")
         return
     reporte = json.loads((Path(args.salida) / "datos/salud.json").read_text(encoding="utf-8"))

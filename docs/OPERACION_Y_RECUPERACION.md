@@ -71,6 +71,7 @@ pendientes, retrasar o perder horarios; no se utiliza como una cola con conserva
 | Síntoma | Revisar primero | Acción segura |
 |---|---|---|
 | No apareció la captura a la hora solicitada | Actions, habilitación del workflow, cola y avisos de GitHub | Esperar si está en curso; investigar retraso; reejecutar una sola vez si procede |
+| No corrió la búsqueda de las 6:30 (GitHub no lanzó el horario; pasó el 18 nov) | Actions > Bodega nocturna: ¿hay una corrida de hoy? | Nada en la mayoría de los casos: los respaldos de las 7:15 y 7:50 la hacen, y si tampoco arrancan, la «Captura horaria» la lanza una vez desde las 7:23 (trabajo «vigia»). Si no corrió ninguna captura horaria, GitHub no está lanzando nada: lanzarla a mano una vez (Run workflow, modo diario) |
 | Falta catálogo v2 / vistas actuales | Tablas, Project URL y permisos del mismo proyecto | Revisar Preparar Supabase y su respaldo; el instalador aplica migraciones pendientes. No desactivar integridad ni crear tablas aproximadas |
 | Error 401/403 Supabase | Tipo de clave, vigencia y proyecto | Sustituir secreto por secret/service_role de la cuenta correcta; no publicarlo |
 | Tablas existen pero API no accede | Grants, RLS y recarga de esquema | Revisar scripts completos; no abrir permisos anon para hacer funcionar el scraper |

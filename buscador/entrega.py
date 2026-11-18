@@ -454,9 +454,14 @@ def filas_de(elegidas, roles, hoy, capturada):
     return filas
 
 
-def registrar_medicion(historial, resumen, hoy, dias=30):
-    """Serie corta para medir continuidad real; no predice ofertas futuras ni almacena descripciones."""
+def registrar_medicion(historial, resumen, hoy, dias=30, pasada=True):
+    """Serie corta para medir continuidad real; no predice ofertas futuras ni almacena descripciones.
+    `pasadas` cuenta las búsquedas diarias (no las capturas horarias) que terminaron la entrega del día: la usan los
+    horarios de respaldo de bodega.yml (18 nov) para no repetir la segunda pasada. Un día anterior sin el campo cuenta 1."""
+    previo = historial.get(hoy)
+    pasadas = ((previo.get("pasadas", 1) if isinstance(previo, dict) else 0)) + (1 if pasada else 0)
     historial[hoy] = {
+        "pasadas": pasadas,
         "fecha": hoy, "meta_cumplida": resumen["meta_cumplida"],
         "pendientes_supabase": (resumen.get("supabase") or {}).get("pendientes", 0),
         "registro_confirmado": bool(resumen.get("registro_seleccion")) and not any(
