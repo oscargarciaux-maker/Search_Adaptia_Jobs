@@ -15,7 +15,7 @@ from panel.afinidad import (AMPLIACIONES, MINIMO_POR_PERFIL, TOPE_POSTS_SIN_CONF
 from panel.modelos import Configuracion
 from pydantic import ValidationError
 from panel.repositorio import RepositorioSupabase, hoy
-from panel.terminos import en_espanol, espanol_del_mapa, grado, sugerir  # noqa: F401 (en_espanol: compatibilidad)
+from panel.terminos import en_espanol, espanol_del_mapa, grado, sugerir
 
 
 def validar_version(version):
@@ -113,11 +113,6 @@ def _con_fuentes_propias():
     return set(computrabajo.SITIOS) | {"ES"} | {c for s in sitemaps_empleo.SITIOS.values() for c in s["sitemaps"]}
 
 
-# Contrato v44: países de América Latina para las remotas de Get on Board (zona LATAM).
-LATAM = {"AR", "BO", "BR", "CL", "CO", "CR", "CU", "DO", "EC", "GT", "HN", "MX", "NI", "PA", "PE", "PR", "PY", "SV",
-         "UY", "VE"}
-
-
 def fuentes_en(pais):
     """Contrato v44 (decisión de Oscar: «cualquier persona, en cualquier país»): fuentes que buscan para alguien que
     vive en `pais`, con títulos en español si solo habla español. LinkedIn y los portales de empresas cubren todo el
@@ -156,9 +151,6 @@ def persona_de_busqueda(p, rid, nombres=None, corto=False):
     principales = [k for k in lugares if (k in primera and k != "REMOTO_MUNDO") or k.startswith(("REMOTO_REGION_", "REGION_"))]
     return {"familia": rid, "perfil": str(p.id), "lugares": sorted(set(lugares) | set(codigos)), "peso": peso,
             "corto": bool(corto), "principales": principales}
-
-
-# PR 1b (16 nov): `en_espanol` vive en panel.terminos desde v44 (también lo usan las sugerencias y `grado`).
 
 
 def consultas_espanol(cargo, raw, maximo=12):
@@ -228,12 +220,12 @@ def preparar(version, fecha, aprendidos=None, cortos=()):
         # Contrato v25: títulos aprobados desde «Coincide por funciones» cuentan como similares del cargo.
         similares = list(dict.fromkeys(raw["terminos_similares"] + list(aprendidos.get(str(c.id)) or [])))
         raw["terminos_similares"] = similares
-        # Contrato v44: los títulos en español de la familia del mapa también clasifican los avisos (grado ya los acepta;
-        # sin esto, lo que se buscó en español podía quedar sin cargo al limpiar).
-        similares = list(dict.fromkeys(similares + list(espanol_del_mapa(c.nombre))))
         mapa.append({"id": rid, "nombre": c.nombre, "consultas": [c.nombre, *raw["terminos_exactos"], *raw["terminos_similares"]],
             "exactos": raw["terminos_exactos"], "similares": similares, "cercanos": raw.get("terminos_cercanos", []),
             "funciones": raw.get("funciones", []),
+            # Contrato v44: los títulos en español de la familia del mapa clasifican los avisos (como en `grado`), pero
+            # no se buscan: no van en `consultas`/`similares`, que rotan en todas las fuentes.
+            "similares_es": list(espanol_del_mapa(c.nombre)),
             "excluir": raw["terminos_excluidos"], "herramientas": [], "lugares": list(lugares.items()),
             "_control_cargo": raw,
             "consultas_es": consultas_es, "lugares_es": list(lugares_es.items()) if consultas_es else [],

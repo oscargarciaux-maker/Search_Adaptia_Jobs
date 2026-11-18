@@ -483,7 +483,16 @@ export function CoberturaPersonas({
                             <li key={q.clave}>
                               <strong>{q.accion}</strong>
                               {q.mas > 0 && (
-                                <span className="pill green">+{q.mas}</span>
+                                <span
+                                  className="pill green"
+                                  title={`${q.mas} vacantes más en los últimos 30 días`}
+                                >
+                                  +{q.mas}
+                                  <span className="sr-only">
+                                    {" "}
+                                    vacantes más en los últimos 30 días
+                                  </span>
+                                </span>
                               )}
                               {q.detalle && (
                                 <span className="que-hacer-detalle">

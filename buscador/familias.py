@@ -77,6 +77,8 @@ def preparar(mapa_crudo):
     for fam in mapa_crudo:
         f = dict(fam)
         f["_titulos"] = {grado: _frases(fam.get(campo), grado != "cercano") for campo, grado in _CAMPOS_TITULOS.items()}
+        # Contrato v44: títulos en español del mapa que solo clasifican (no se buscan: no entran en `consultas`).
+        f["_titulos"]["similar"] += [x for x in _frases(fam.get("similares_es"), False) if x not in f["_titulos"]["similar"]]
         f["_re"] = {g: _regex([x for x in f["_titulos"][g] if not _es_una_palabra(x)]) for g in GRADOS}
         f["_una"] = {g: {x for x in f["_titulos"][g] if _es_una_palabra(x)} for g in GRADOS}
         f["_herramientas"] = [normalizar.texto(h) for h in fam.get("herramientas", [])]

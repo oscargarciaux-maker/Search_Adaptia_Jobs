@@ -188,7 +188,7 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
     def f_sitemap(nombre):
         # Contrato v44: portales en español con sitemap de ofertas y JobPosting (Hireline, Magneto).
         def f():
-            fichas = p.get(nombre.lower() + "_fichas", 0)
+            fichas = p.get(sitemaps_empleo.SITIOS[nombre]["presupuesto"], 0)
             if not fichas:
                 return [], {"omitida": "sin presupuesto"}
             return sitemaps_empleo.buscar(Cliente(pausa=(0.6, 1.4)), nombre, mapa, hoy=hoy, max_fichas=fichas,
@@ -196,42 +196,42 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
         return f
 
     filas_ats = ats.leer_lista(ats.RUTA, trabajo / "empresas_ats.csv")
-    # Open Seat (17 nov): empresas que contratan en LATAM con su portal; se leen con ats.py (ficha completa y cierres).
-    de_open_seat = set()
+    # Open Seat (17 nov) y, desde v44, RemotosLatam y WeRemoto: listas de empresas que contratan en LATAM con su portal.
+    # Solo se toman las empresas (sus avisos nunca); sus portales se leen con ats.py (ficha completa y cierres).
+    de_listas = set()
     if not solo_mapa:
-        try:
-            t0 = time.monotonic()
-            filas_os, salud["Open Seat"] = open_seat.tableros(Cliente(pausa=(0, 0)), hoy)
-            conocidas = {(f["sistema"], f["slug"].lower()) for f in filas_ats}
-            nuevas_os = [f for f in filas_os if (f["sistema"], f["slug"].lower()) not in conocidas]
-            filas_ats = filas_ats + nuevas_os
-            de_open_seat = {(f["sistema"], f["slug"].lower()) for f in filas_os}
-            salud["Open Seat"].update(nuevos=len(nuevas_os), segundos=round(time.monotonic() - t0))
-            ats.guardar_lista(ats.leer_lista(trabajo / "empresas_ats.csv") + nuevas_os, trabajo / "empresas_ats.csv")
-        except Exception as e:  # noqa: BLE001 — sin Open Seat siguen los portales de siempre
-            salud["Open Seat"] = {"error": f"{type(e).__name__}: {e}"[:300]}
-        # Contrato v44: RemotosLatam y WeRemoto, igual que Open Seat: solo las empresas (sus portales), nunca sus avisos.
-        try:
-            t0 = time.monotonic()
-            filas_tl, por_tablero = tableros_latam.tableros(Cliente(pausa=(0.6, 1.2)), hoy)
-            conocidas = {(f["sistema"], f["slug"].lower()) for f in filas_ats}
-            nuevas_tl = [f for f in filas_tl if (f["sistema"], f["slug"].lower()) not in conocidas]
-            filas_ats = filas_ats + nuevas_tl
-            de_open_seat |= {(f["sistema"], f["slug"].lower()) for f in filas_tl}
-            for nombre, datos in por_tablero.items():
-                salud[nombre] = dict(datos, nuevos=sum(1 for f in nuevas_tl if f["origen"] == nombre),
-                                     segundos=round(time.monotonic() - t0))
-            ats.guardar_lista(ats.leer_lista(trabajo / "empresas_ats.csv") + nuevas_tl, trabajo / "empresas_ats.csv")
-        except Exception as e:  # noqa: BLE001 — sin estos tableros siguen los portales de siempre
-            salud["Tableros LATAM"] = {"error": f"{type(e).__name__}: {e}"[:300]}
+        def lista_open_seat():
+            filas, stats = open_seat.tableros(Cliente(pausa=(0, 0)), hoy)
+            return filas, {"Open Seat": stats}
+
+        def lista_tableros():
+            return tableros_latam.tableros(Cliente(pausa=(0.6, 1.2)), hoy, limite_segundos=90)
+
+        nuevas_todas = []
+        for etiqueta, leer in (("Open Seat", lista_open_seat), ("Tableros LATAM", lista_tableros)):
+            try:
+                t0 = time.monotonic()
+                filas_lista, por_origen = leer()
+                conocidas = {(f["sistema"], f["slug"].lower()) for f in filas_ats}
+                nuevas = [f for f in filas_lista if (f["sistema"], f["slug"].lower()) not in conocidas]
+                filas_ats = filas_ats + nuevas
+                nuevas_todas += nuevas
+                de_listas |= {(f["sistema"], f["slug"].lower()) for f in filas_lista}
+                for origen, datos in por_origen.items():
+                    salud[origen] = dict(datos, nuevos=sum(1 for f in nuevas if f.get("origen") == origen),
+                                         segundos=round(time.monotonic() - t0))
+            except Exception as e:  # noqa: BLE001 — sin estas listas siguen los portales de siempre
+                salud[etiqueta] = {"error": f"{type(e).__name__}: {e}"[:300]}
+        if nuevas_todas:
+            ats.guardar_lista(ats.leer_lista(trabajo / "empresas_ats.csv") + nuevas_todas, trabajo / "empresas_ats.csv")
 
     def f_ats():
         filas = filas_ats
         if cfg.get("control_dirigido"):
             empresas = {normalizar.empresa(x) for x in cfg.get("empresas_objetivo",[])}
-            # Las de Open Seat se leen aunque aún no hayan traído vacantes de los cargos: contratan los mismos roles.
+            # Las de las listas (Open Seat, tableros LATAM) se leen aunque aún no hayan traído vacantes de los cargos.
             filas = [f for f in filas if normalizar.empresa(f.get("empresa","")) in empresas
-                     or (f["sistema"], f["slug"].lower()) in de_open_seat]
+                     or (f["sistema"], f["slug"].lower()) in de_listas]
             if not filas:
                 return [], set(), {"omitida": "modo dirigido: aún no hay portales asociados a los cargos"}
         return ats.buscar(Cliente(pausa=(0.05, 0.2)), filas, limite_segundos=limite, prioritarias=prioritarias)
@@ -243,8 +243,7 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
                                                             ("Publicaciones LinkedIn (Apify)", f_publicaciones),
                                                             ("Computrabajo", f_computrabajo),
                                                             ("Elempleo", f_elempleo),
-                                                            ("Hireline", f_sitemap("Hireline")),
-                                                            ("Magneto", f_sitemap("Magneto"))]}
+                                                            *[(n, f_sitemap(n)) for n in sitemaps_empleo.SITIOS]]}
         resultados = {n: t.result() for n, t in tareas.items()}
     crudas, empresas = [], set()
     for n, r in resultados.items():

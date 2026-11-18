@@ -40,7 +40,7 @@ refuerzo:
   linkedin_busquedas: 18
   linkedin_fichas: 60
   indeed_busquedas: 6
-  getonbrd_busquedas: 12  # v44: también en español para quien solo habla español
+  getonbrd_busquedas: 6
 
 # Apify: crédito gratuito de hasta USD 5 por mes calendario para ofertas formales de LinkedIn.
 # Actor comprobado contra su esquema público; no se envían cookies ni sesión personal.

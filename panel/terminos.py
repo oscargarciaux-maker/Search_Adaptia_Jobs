@@ -1,9 +1,11 @@
 """Expansión abierta sin IA: variantes, mapa opcional y vocabulario público ESCO."""
 from functools import lru_cache
+from pathlib import Path
 import re
 
 import requests
 from rapidfuzz import fuzz
+import yaml
 
 from buscador import familias, normalizar
 
@@ -32,9 +34,10 @@ INICIO_ES = ("diseñador", "diseñadora", "desarrollador", "desarrolladora", "an
 PALABRAS_ES = ("ia", "inteligencia artificial", "de", "del", "y", "con", "para", "datos", "pruebas", "calidad",
                "producto", "proyectos", "ventas", "mercadeo")
 PALABRAS_PT = ("produto", "desenvolvedor", "desenvolvedora", "dados", "engenheiro", "engenheira", "projetos",
-               "vendas", "gestao", "analista de sistemas sr", "designer de", "testes", "qualidade", "pleno")
+               "vendas", "gestao", "designer de", "testes", "qualidade", "pleno")
 
 
+@lru_cache(maxsize=8192)
 def en_espanol(titulo):
     """Título en español: empieza como uno («Diseñador…») o trae palabras propias («Product Manager IA»), y no trae
     palabras del portugués."""
@@ -58,8 +61,6 @@ def _familias_de(base):
 
 @lru_cache(maxsize=1)
 def glosario():
-    import yaml
-    from pathlib import Path
     ruta = Path(__file__).resolve().parent.parent / "datos" / "glosario_cargos.yaml"
     return yaml.safe_load(ruta.read_text(encoding="utf-8")) or {}
 
@@ -90,8 +91,9 @@ def compuestos(cargo):
             if not coincidencias:
                 continue
             f = min(coincidencias, key=lambda x: x[:2])[2]
+            formas = [normalizar.texto(x) for x in [*(mod.get("en") or []), *(mod.get("es") or [])]]
             espanol = [x for x in f.get("exactos", []) if en_espanol(x)
-                       and not normalizar.contiene_frase(normalizar.texto(x), "ia")]
+                       and not any(normalizar.contiene_frase(normalizar.texto(x), y) for y in formas if y)]
             ingles = [x for x in f.get("exactos", []) if not en_espanol(x)]
             # El nombre más común en español, el original en inglés y dos más en español, cada uno con cada forma.
             titulos = [x for x in (espanol[:1] + ingles[:1] + espanol[1:3]) if x]
@@ -114,11 +116,13 @@ def espanol_del_mapa(nombre):
     coincidencias = _familias_de(base) if base else []
     if not coincidencias:
         return ()
-    mejor = min(n for n, _, _ in coincidencias)
     salida = []
+    # Solo si el cargo es un título exacto de la familia (un cargo que es «similar» de una familia amplia, como QA Lead
+    # en QA, no hereda sus títulos), solo los exactos (los similares se sugieren) y nunca de una sola palabra
+    # («Programador», «Redactor»: aceptarían «Programador CNC» en cualquier cargo).
     for nivel, _, f in sorted(coincidencias, key=lambda x: x[:2]):
-        if nivel == mejor:
-            salida += [x for x in f.get("exactos", []) if en_espanol(x)]  # solo exactos: los similares se sugieren
+        if nivel == 0:
+            salida += [x for x in f.get("exactos", []) if en_espanol(x) and len(normalizar.titulo_base(x).split()) > 1]
     return tuple(dict.fromkeys(salida))
 
 

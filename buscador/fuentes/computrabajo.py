@@ -102,10 +102,15 @@ def combinaciones(mapa, nombres):
         es = list(f.get("consultas_es") or [])
         resto = [c for c in cobertura.consultas(f) if c not in es]
         for codigo in f.get("paises_objetivo", list(nombres)):
-            if codigo in SITIOS:
-                salida.append((f["id"], resto or es, codigo, {}))
-                if es and codigo in (f.get("paises_es") or []):
-                    salida.append((f["id"], es, codigo + ":ES", {}))
+            if codigo not in SITIOS:
+                continue
+            con_es = bool(es) and codigo in (f.get("paises_es") or [])
+            if resto:
+                salida.append((f["id"], resto, codigo, {}))
+            if con_es:
+                salida.append((f["id"], es, codigo + ":ES", {}))
+            elif not resto and es:  # todos sus títulos son en español: un solo turno, sin repetir la misma búsqueda
+                salida.append((f["id"], es, codigo, {}))
     return salida
 
 

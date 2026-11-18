@@ -1,7 +1,7 @@
 """Contrato v44: Hireline y Magneto (portales en español) sin red, con un sitemap y fichas recortadas como las reales."""
 import json
 
-from buscador.fuentes import sitemaps_empleo as se
+from buscador.fuentes import jobposting, sitemaps_empleo as se
 
 HOY = "2026-11-18"
 SITEMAP_HL = """<?xml version="1.0" encoding="UTF-8"?><urlset>
@@ -59,16 +59,16 @@ def test_titulo_de_la_direccion_en_los_dos_formatos():
 
 
 def test_ficha_remota_dice_desde_donde_se_postula_y_no_inventa():
-    d = se.ficha(_ficha(), HOY, "MX")
+    d = jobposting.ficha(_ficha(), HOY, "MX")
     assert d["ubicacion"] == "México (Remoto)" and d["remoto"] is True and d["empresa"] == "Empresa MX"
     assert d["fecha"] == "2026-11-14" and not d["cerrada"] and "MXN" in d["descripcion"]
-    presencial = se.ficha(_ficha("Desarrollador Frontend (Híbrido)", remota=False), HOY, "MX")
+    presencial = jobposting.ficha(_ficha("Desarrollador Frontend (Híbrido)", remota=False), HOY, "MX")
     assert presencial["ubicacion"] == "Monterrey, México (Híbrido)" and presencial["remoto"] is None
-    assert se.ficha(_ficha(hasta="2026-11-01"), HOY, "MX")["cerrada"] is True
-    assert se.ficha("<html>sin datos</html>", HOY, "MX") is None
+    assert jobposting.ficha(_ficha(hasta="2026-11-01"), HOY, "MX")["cerrada"] is True
+    assert jobposting.ficha("<html>sin datos</html>", HOY, "MX") is None
     # Hireline escribe el país con su nombre («MÉXICO»), Magneto con su código («CO»).
     nombre = _ficha("Desarrollador Frontend", remota=False).replace('"addressCountry": "MX"', '"addressCountry": "M\\u00c9XICO"')
-    assert se.ficha(nombre, HOY, "MX")["ubicacion"] == "Monterrey, México"
+    assert jobposting.ficha(nombre, HOY, "MX")["ubicacion"] == "Monterrey, México"
 
 
 def test_buscar_lee_sitemap_y_fichas_con_presupuesto_y_quita_cerradas():
@@ -118,7 +118,7 @@ def test_tableros_solo_aportan_portales_de_empresas():
     filas, stats = tl.tableros(cli, HOY)
     assert {(f["sistema"], f["slug"]) for f in filas} == tl.portales(PAGINA_TABLERO)
     assert all(f["origen"] == "RemotosLatam" for f in filas)
-    assert stats["WeRemoto"]["fallidas"] == len(tl.PAGINAS["WeRemoto"])  # si no responde, no detiene nada
+    assert stats["WeRemoto"]["fallidas"] == 3  # si no responde, se deja tras 3 fallos seguidos y no detiene nada
     assert not any("?" in u or "/api/" in u for u in cli.pedidas)  # robots.txt: sin parámetros ni API
 
 

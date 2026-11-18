@@ -8,6 +8,7 @@ Solo páginas que su robots.txt permite (las de categoría, sin parámetros); nu
 Si un tablero no responde, la búsqueda sigue con los portales de siempre.
 """
 import re
+import time
 
 from buscador.fuentes import ats
 
@@ -27,7 +28,7 @@ _PATRONES = {
     "recruitee": re.compile(r"https?://([a-z0-9-]+)\.recruitee\.com"),
 }
 # Partes de dirección que no son empresas (rutas del propio sistema).
-_NO_EMPRESA = {"j", "a", "embed", "api", "v1", "jobs", "careers", "www", "app", "static"}
+_NO_EMPRESA = {"j", "a", "embed", "api", "v1", "jobs", "careers", "www", "app", "static", "oneclick-ui", "sr-jobs"}
 _SLUG = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{1,79}$")
 
 
@@ -41,16 +42,21 @@ def portales(pagina):
     return salida
 
 
-def tableros(cliente, hoy):
-    """(filas para `ats.buscar` con su origen, estadísticas)."""
-    filas, stats = {}, {}
+def tableros(cliente, hoy, limite_segundos=None, reloj=time.monotonic):
+    """(filas para `ats.buscar` con su origen, estadísticas). Corre antes que las fuentes: tiene tope de tiempo y deja
+    un tablero tras 3 fallos seguidos."""
+    filas, stats, inicio = {}, {}, reloj()
     for nombre, paginas in PAGINAS.items():
-        leidas = fallidas = 0
+        leidas = fallidas = seguidas = 0
         for url in paginas:
+            if seguidas >= 3 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
+                break
             r = cliente.get(url)
             if r is None or r.status_code != 200:
                 fallidas += 1
+                seguidas += 1
                 continue
+            seguidas = 0
             leidas += 1
             for sistema, slug in portales(r.text):
                 if sistema in ats.SISTEMAS:
