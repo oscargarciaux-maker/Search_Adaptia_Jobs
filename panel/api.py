@@ -19,7 +19,7 @@ from buscador import paises
 from buscador.fuentes.publicaciones_apify import PREFIJOS
 from buscador import registro
 from panel import servicio
-from panel.acciones import desde_entorno as conexion_github
+from panel.acciones import ENFOQUE_COMPLETO, ENFOQUE_FALTANTES, desde_entorno as conexion_github
 from panel.modelos import AjusteOperador, BorrarCliente, ImportarClientes, CambioBorrador, Configuracion, Contacto, DecisionRevision, EstadoRegla, SubirRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia, explicar, parcial, solo_perfil
 from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase, hoy
 from panel.terminos import sugerir
@@ -607,22 +607,18 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
                           lambda: servicio.plan_busqueda(repo, ejecuciones=_copia("ejecuciones", "", 30, repo.ejecuciones)))
         except Exception as e:  # noqa: BLE001 — sin el plan, se hace la búsqueda completa de siempre
             registro.aviso("api:plan", e)
-            return {"tipo": "completa", "faltan": [], "motivo": "Se hará la búsqueda completa del día."}
+            return dict(servicio.PLAN_COMPLETO)
 
     @app.post("/api/busqueda")
     def buscar_ahora():
         if not app.state.acciones:
             raise ErrorRepositorio("Falta la llave de GitHub en el alojamiento del panel (GITHUB_ACCIONES_TOKEN).", 409)
         # Contrato v45: el servidor decide (no el navegador) qué búsqueda lanzar, con datos frescos.
-        try:
-            plan = servicio.plan_busqueda(repo)
-        except Exception as e:  # noqa: BLE001
-            registro.aviso("api:plan", e)
-            plan = {"tipo": "completa"}
+        plan = servicio.plan_busqueda(repo)  # nunca falla: sin datos, la completa
         if plan["tipo"] == "nada":
             raise ErrorRepositorio(plan["motivo"], 409)
-        return {**app.state.acciones.lanzar("faltantes" if plan["tipo"] == "faltantes" else "completo"),
-                "tipo": plan["tipo"]}
+        enfoque = ENFOQUE_FALTANTES if plan["tipo"] == "faltantes" else ENFOQUE_COMPLETO
+        return {**app.state.acciones.lanzar(enfoque), "tipo": plan["tipo"]}
 
     @app.get("/api/ejecuciones")
     def ejecuciones():

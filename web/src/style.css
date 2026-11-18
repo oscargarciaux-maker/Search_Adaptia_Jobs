@@ -5724,11 +5724,12 @@ select,
   display: grid;
   gap: 14px;
 }
-.form-cargo .info-line,
-.form-cargo .helper.note,
-.form-cargo .sugeridos,
-.form-cargo .form-grid,
-.form-cargo .field {
+/* Solo los hijos directos de la sección: los campos dentro de los plegables conservan su espacio. */
+.form-cargo fieldset > .info-line,
+.form-cargo fieldset > .helper.note,
+.form-cargo fieldset > .sugeridos,
+.form-cargo fieldset > .form-grid,
+.form-cargo fieldset > .field {
   margin: 0;
 }
 .sugeridos-grupo {

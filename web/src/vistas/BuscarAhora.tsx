@@ -5,8 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Search } from "lucide-react";
 import { api } from "../api";
-import { Dialog, horaBogota, hoyBogota } from "../comunes";
-import type { Ejecucion } from "../types";
+import { Dialog, horaBogota } from "../comunes";
 
 type Corrida = {
   estado:
@@ -17,6 +16,7 @@ type Corrida = {
 type Plan = {
   tipo: "completa" | "faltantes" | "nada";
   motivo: string;
+  detalle?: string; // qué pasa después de pedirla (texto del servidor)
   faltan: {
     perfil_id: string;
     cliente: string;
@@ -30,19 +30,17 @@ type EstadoBusqueda = {
   en_curso?: Corrida | null;
   ocupado?: string | null;
   ultima_pedida?: Corrida | null;
-  plan?: Plan;
+  plan: Plan; // siempre viene cuando `disponible`
 };
 
 const ESPERA_PEDIDA = 180_000; // ms: GitHub tarda unos segundos (o más) en listar la corrida pedida
 
 export function BuscarAhora({
-  ultima,
   sinConfirmar,
   demo,
   onAviso,
   onTermino,
 }: {
-  ultima: Ejecucion | undefined; // la última búsqueda registrada por el panel
   sinConfirmar: boolean; // hay cambios que la búsqueda no va a usar
   demo: boolean;
   onAviso: (texto: string, error?: boolean) => void;
@@ -79,7 +77,15 @@ export function BuscarAhora({
         }
         setEstado(e);
       })
-      .catch(() => setEstado((v) => v ?? { disponible: false }));
+      .catch(() =>
+        setEstado(
+          (v) =>
+            v ?? {
+              disponible: false,
+              plan: { tipo: "completa", motivo: "", faltan: [] },
+            },
+        ),
+      );
   }, []);
   useEffect(leer, [leer]);
 
@@ -129,12 +135,10 @@ export function BuscarAhora({
   const plan = estado.plan;
   const bloqueo = enCurso
     ? `Ya hay una búsqueda ${enCurso.estado === "en_cola" ? "en cola" : "corriendo"}.`
-    : estado.ocupado || (plan?.tipo === "nada" ? plan.motivo : "");
+    : estado.ocupado || (plan.tipo === "nada" ? plan.motivo : "");
   const etiqueta = enCurso
     ? `${enCurso.estado === "en_cola" ? "En cola" : "Buscando"} desde ${horaBogota(enCurso.creada)}`
     : "Buscar ahora";
-  const yaHoy =
-    ultima?.fecha === hoyBogota() ? horaBogota(ultima.iniciada_en) : null;
   return (
     <>
       <button
@@ -159,13 +163,8 @@ export function BuscarAhora({
           subtitulo="Revisa si hoy ya corrió la búsqueda y busca lo que haga falta."
           onClose={() => !enviando && setAbierto(false)}
         >
-          <p className="helper note">
-            {plan?.motivo ||
-              (yaHoy
-                ? `Hoy ya hubo una búsqueda (${yaHoy}). Esta completa lo que falte, sin repetir lo entregado.`
-                : "Hoy todavía no hay búsqueda: esta hace la del día.")}
-          </p>
-          {plan?.tipo === "faltantes" && (
+          <p className="helper note">{plan.motivo}</p>
+          {plan.tipo === "faltantes" && (
             <ul
               className="faltan-lista"
               aria-label="Quiénes no llegan a su meta"
@@ -187,11 +186,7 @@ export function BuscarAhora({
               )}
             </ul>
           )}
-          <p className="helper">
-            {plan?.tipo === "faltantes"
-              ? "Busca solo sus cargos y lugares, más a fondo. Empieza en unos minutos; puedes cerrar el panel."
-              : "Empieza en unos minutos y tarda alrededor de una hora y media. Puedes cerrar el panel: sigue sola."}
-          </p>
+          {plan.detalle && <p className="helper">{plan.detalle}</p>}
           {sinConfirmar && (
             <p className="helper note">
               Tienes cambios sin confirmar: la búsqueda usa la última

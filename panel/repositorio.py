@@ -965,7 +965,7 @@ class RepositorioDemo:
     def ejecuciones(self):
         return [{"id": id_demo("ejecucion"), "fecha": hoy(), "revision": 1, "estado": "completa",
                  "iniciada_en": self.creada.isoformat(), "terminada_en": self.creada.isoformat(),
-                 "resumen": {"vacantes": 120, "meta": 120, "por_cargo": {"Product Designer": 50, "Frontend": 40, "QA": 30},
+                 "resumen": {"vacantes": 120, "meta": 120, "revision_del_lote": 1, "por_cargo": {"Product Designer": 50, "Frontend": 40, "QA": 30},
                              "embudo": {n: {"encontradas": e, "con_descripcion": e * 6 // 10, "entregables": e // 2,
                                             "nuevas": e * 4 // 10, "enlace_comprobado": c + 12, "cumplen_filtros": c + 4,
                                             "entregadas": c, "ampliadas": 0,

@@ -7,8 +7,8 @@ y el repositorio en GITHUB_REPOSITORIO (dueño/nombre). Ambos viven solo en el a
 repositorio, el navegador, las respuestas ni los registros. Sin ellos el botón no aparece. Al traspasar, el cliente pone
 los suyos.
 
-Siempre lanza una búsqueda diaria normal (modo diario, sin prueba): si hoy ya hubo una, completa el mismo lote y no
-repite lo entregado. GitHub deja una sola tarea esperando por grupo de concurrencia («publicar») y la que llega después
+Lanza la búsqueda diaria (modo diario, sin prueba); el servidor decide antes si es la completa o, si hoy ya corrió,
+la de quienes no llegan a su meta (contrato v45, `enfoque=faltantes`). Nunca repite lo entregado. GitHub deja una sola tarea esperando por grupo de concurrencia («publicar») y la que llega después
 cancela a la que esperaba; por eso no lanza si otra tarea del grupo espera turno o si una larga (no la captura horaria,
 que dura minutos) está corriendo, ni dos veces seguidas en pocos minutos."""
 import os
@@ -23,6 +23,8 @@ from buscador.arranque import hoy_bogota
 from panel.repositorio import ErrorRepositorio
 
 API = "https://api.github.com"
+# Contrato v45: entrada `enfoque` de bodega.yml (también `--enfoque` de panel.ejecutor).
+ENFOQUE_COMPLETO, ENFOQUE_FALTANTES = "completo", "faltantes"
 FLUJO = "bodega.yml"
 # Flujos con `concurrency: group: publicar` (pruebas/panel/test_buscar_ahora.py lo compara con .github/workflows).
 GRUPO_PUBLICAR = {"bodega.yml", "incremental.yml", "limpiar_fuera_objetivo.yml", "preparar.yml", "profunda.yml",
@@ -125,7 +127,7 @@ class AccionesGitHub:
         self._copia = (time.monotonic(), valor)
         return valor
 
-    def lanzar(self, enfoque="completo"):
+    def lanzar(self, enfoque=ENFOQUE_COMPLETO):
         with self._cerrojo:
             if self._ultimo is not None and time.monotonic() - self._ultimo < ESPERA_ENTRE_LANZAMIENTOS:
                 raise ErrorRepositorio("La búsqueda ya se pidió hace un momento; aparecerá en unos segundos.", 409)
@@ -134,8 +136,10 @@ class AccionesGitHub:
                 raise ErrorRepositorio(YA_HAY, 409)
             if actual["ocupado"]:
                 raise ErrorRepositorio(actual["ocupado"], 409)
-            self._pedir("POST", f"/actions/workflows/{FLUJO}/dispatches",
-                        json={"ref": self.rama(), "inputs": {"modo": "diario", "prueba": "false", "enfoque": enfoque}})
+            entradas = {"modo": "diario", "prueba": "false"}
+            if enfoque != ENFOQUE_COMPLETO:  # sin la entrada, también funciona con un bodega.yml anterior a v45
+                entradas["enfoque"] = enfoque
+            self._pedir("POST", f"/actions/workflows/{FLUJO}/dispatches", json={"ref": self.rama(), "inputs": entradas})
             self._ultimo, self._copia = time.monotonic(), None
             return {"lanzada": True}
 
@@ -158,7 +162,7 @@ class AccionesDemo:
                              "conclusion": None if corriendo else "success"})
         return resumir(corridas, "main")
 
-    def lanzar(self, enfoque="completo"):
+    def lanzar(self, enfoque=ENFOQUE_COMPLETO):
         if self.estado()["en_curso"]:
             raise ErrorRepositorio(YA_HAY, 409)
         self._pedida = (time.monotonic(), datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))

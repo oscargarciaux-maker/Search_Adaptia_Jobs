@@ -87,8 +87,10 @@ def medir(estado, crudas, vacantes, hoy, dias=30):
     origen = {c["enlace"]: c["_busqueda"] for c in crudas if c.get("_busqueda") and c.get("enlace")}
     utiles = Counter(origen[v["enlace"]] for v in vacantes
                      if v.get("familias") and v.get("enlace") in origen and v.get("visto_primera_vez") == hoy)
-    buscadas = set(origen.values()) | {k for fuente in ("linkedin", "indeed") for k, f in (estado.get(fuente) or {}).items()
-                                       if f == hoy and "@" in k and "#" not in k}
+    # Solo lo buscado en ESTA búsqueda (contrato v45: una segunda del día no marca «sin nada» lo que no volvió a buscar).
+    buscadas = set(origen.values()) | {f"{familia}@{lugar}" for fuente, familia, lugar in BUSQUEDAS
+                                       if fuente in ("linkedin", "indeed")
+                                       and (estado.get(fuente) or {}).get(f"{familia}@{lugar}") == hoy}
     rendimiento = estado.setdefault("rendimiento", {})
     for clave in buscadas:
         n = utiles.get(clave, 0)

@@ -1,5 +1,5 @@
 // Crear o editar un cargo (nombres, funciones y opciones avanzadas).
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Check,
   Compass,
@@ -12,6 +12,17 @@ import { api } from "../api";
 import { Ayuda, Plegable, Dialog, TagInput } from "../comunes";
 import type { Cargo } from "../types";
 import { uid } from "../perfiles";
+
+// POST /api/cargos/expandir (contrato v44: `terminos_es` en español y `terminos_base`, el oficio más amplio).
+type Sugerencias = {
+  terminos_exactos: string[];
+  terminos_similares: string[];
+  terminos_cercanos?: string[];
+  terminos_es?: string[];
+  terminos_base?: string[];
+  fuentes: string[];
+  requiere_revision: boolean;
+};
 
 export function CargoDialog({
   cargo,
@@ -55,69 +66,69 @@ export function CargoDialog({
     setAmplios((s) => s.filter((x) => !terminos.includes(x)));
   }
   const [nota, setNota] = useState("");
-  // `tocarNombres` = false al abrir un cargo existente: solo se muestran las fichas (en español, sugeridas y más
-  // amplias), sin cambiar sus nombres ni bloquear el formulario (18 nov, Oscar no veía los grupos nuevos).
-  async function expandir(tocarNombres = true) {
-    if (tocarNombres) setBusy(true);
+  // Cada pedido lleva un número: solo se muestra la respuesta del último (la carga al abrir no pisa a la completa).
+  const ultimoPedido = useRef(0);
+  function pedirSugerencias(rapido: boolean) {
+    return api<Sugerencias>("/cargos/expandir", {
+      method: "POST",
+      body: JSON.stringify({ cargo: c.nombre, rapido }),
+    });
+  }
+  // Sesión de prueba (17 nov): los nombres principales entran solos; los afines quedan como fichas para añadir con un
+  // clic. Lo que ya tiene el cargo (y `principales`, que entran solos) no se ofrece otra vez como ficha.
+  function mostrar(r: Sugerencias, principales: string[]) {
+    const ya = new Set(
+      [...c.terminos_exactos, ...c.terminos_similares, ...principales].map(
+        (x) => x.toLowerCase(),
+      ),
+    );
+    const es = (r.terminos_es || []).filter((x) => !ya.has(x.toLowerCase()));
+    const enEs = new Set(es.map((x) => x.toLowerCase()));
+    setEnEspanol(es);
+    setSugeridos(
+      r.terminos_similares.filter(
+        (x) => !ya.has(x.toLowerCase()) && !enEs.has(x.toLowerCase()),
+      ),
+    );
+    setAmplios((r.terminos_base || []).filter((x) => !ya.has(x.toLowerCase())));
+  }
+  // «Buscar denominaciones afines»: añade los nombres principales y muestra las fichas.
+  async function expandir() {
+    const n = ++ultimoPedido.current;
+    setBusy(true);
     try {
-      const r = await api<{
-        terminos_exactos: string[];
-        terminos_similares: string[];
-        terminos_cercanos?: string[];
-        terminos_es?: string[];
-        terminos_base?: string[];
-        fuentes: string[];
-        requiere_revision: boolean;
-      }>("/cargos/expandir", {
-        method: "POST",
-        body: JSON.stringify({ cargo: c.nombre, rapido: !tocarNombres }),
-      });
-      // Sesión de prueba (17 nov): los nombres principales entran solos; los afines quedan como fichas para
-      // añadir con un clic (antes entraban todos y había que quitar los que no servían).
-      // Lo que ya tiene el cargo y los nombres principales, que entran solos: no se ofrecen otra vez como fichas.
-      const ya = new Set(
-        [
-          ...c.terminos_exactos,
-          ...c.terminos_similares,
-          ...(tocarNombres ? r.terminos_exactos : []),
-        ].map((x) => x.toLowerCase()),
-      );
-      if (tocarNombres)
-        setC((v) => ({
-          ...v,
-          terminos_exactos: Array.from(
-            new Set([...v.terminos_exactos, ...r.terminos_exactos]),
-          ),
-          terminos_cercanos: r.terminos_cercanos?.length
-            ? r.terminos_cercanos
-            : v.terminos_cercanos || [],
-        }));
-      const es = (r.terminos_es || []).filter((x) => !ya.has(x.toLowerCase()));
-      const enEs = new Set(es.map((x) => x.toLowerCase()));
-      setEnEspanol(es);
-      setSugeridos(
-        r.terminos_similares.filter(
-          (x) => !ya.has(x.toLowerCase()) && !enEs.has(x.toLowerCase()),
+      const r = await pedirSugerencias(false);
+      if (n !== ultimoPedido.current) return;
+      setC((v) => ({
+        ...v,
+        terminos_exactos: Array.from(
+          new Set([...v.terminos_exactos, ...r.terminos_exactos]),
         ),
+        terminos_cercanos: r.terminos_cercanos?.length
+          ? r.terminos_cercanos
+          : v.terminos_cercanos || [],
+      }));
+      mostrar(r, r.terminos_exactos);
+      setNota(
+        r.fuentes.join(" · ") +
+          (r.requiere_revision
+            ? ". No encontramos afines fiables; puedes añadirlos aquí."
+            : ". Revisa y ajusta las sugerencias."),
       );
-      setAmplios(
-        (r.terminos_base || []).filter((x) => !ya.has(x.toLowerCase())),
-      );
-      if (tocarNombres)
-        setNota(
-          r.fuentes.join(" · ") +
-            (r.requiere_revision
-              ? ". No encontramos afines fiables; puedes añadirlos aquí."
-              : ". Revisa y ajusta las sugerencias."),
-        );
     } catch (e) {
-      if (tocarNombres) notify((e as Error).message, true);
+      notify((e as Error).message, true);
     } finally {
-      if (tocarNombres) setBusy(false);
+      setBusy(false);
     }
   }
+  // Al abrir un cargo existente (18 nov, Oscar no veía los grupos nuevos): solo las fichas, sin ESCO, sin cambiar sus
+  // nombres ni bloquear el formulario. Si falla, no molesta: queda el botón.
   useEffect(() => {
-    if (cargo && cargo.nombre.trim().length >= 2) void expandir(false);
+    if (!cargo || cargo.nombre.trim().length < 2) return;
+    const n = ++ultimoPedido.current;
+    pedirSugerencias(true)
+      .then((r) => n === ultimoPedido.current && mostrar(r, []))
+      .catch(() => undefined);
     // Solo al abrir el cargo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
