@@ -378,12 +378,15 @@ def _edad(datos, fecha):
         return 30
 
 
-def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None):
+def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None, todas=None, version=None):
     """Lo que ve el panel: pendientes ordenadas, con nombres de clientes (panel privado) y cuántas tienen la misma
     ubicación (para «aplicar a las iguales»).
     Contrato v29: con `pagina`, todas las pendientes por páginas, con el total real y el filtro por cliente. Se leen sin
-    descripción (ligeras) y la descripción se pide solo para la página. Sin `pagina`, la cola de hoy (`tope`)."""
-    todas = sorted(repo.revisiones(estado="pendiente", ligera=True), key=lambda r: -r.get("prioridad", 0))
+    descripción (ligeras) y la descripción se pide solo para la página. Sin `pagina`, la cola de hoy (`tope`).
+    18 nov (velocidad): el servidor puede pasar `todas` (pendientes ligeras y ordenadas) y `version` desde sus copias en
+    memoria, para no leerlas en cada pantalla."""
+    if todas is None:
+        todas = sorted(repo.revisiones(estado="pendiente", ligera=True), key=lambda r: -(r.get("prioridad") or 0))
     tope = int((repo.ajuste("revision", {}) or {}).get("tope", TOPE))
     utiles = {r["vacante_id"] for r in todas[:tope]}
     filtradas = [r for r in todas if not cliente_id or any(p.get("cliente_id") == cliente_id
@@ -394,21 +397,28 @@ def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None):
         pendientes = filtradas[(pagina - 1) * por_pagina:pagina * por_pagina]
     # Contrato v34: las filas con resumen (guardado de noche, SQL 018) se muestran tal cual; solo las que no lo tienen
     # leen el catálogo con su descripción y se calculan aquí, como antes.
+    pendientes = [dict(r) for r in pendientes]  # la copia en memoria no se modifica
     sin_resumen = [r for r in pendientes if not r.get("resumen")]
     faltan = [r["vacante_id"] for r in sin_resumen if "description_full" not in (r.get("catalogo_vacantes") or {})]
     filas = repo.filas_catalogo(faltan) if faltan else {}
     for r in sin_resumen:
         if r["vacante_id"] in filas:
             r["catalogo_vacantes"] = {**(r.get("catalogo_vacantes") or {}), **filas[r["vacante_id"]]}
-    version = repo.operativa(fecha) or {}
+    version = (version if version is not None else repo.operativa(fecha)) or {}
     clientes = {c["id"]: c["nombre"] for c in (version.get("configuracion") or {}).get("clientes", [])}
     por_ubicacion = {}
     for r in todas:
         if not es_generica(r.get("ubicacion")):
             por_ubicacion[r["ubicacion"]] = por_ubicacion.get(r["ubicacion"], 0) + 1
-    salida = []
+    salida, calculados = [], {}
+    originales = {r["vacante_id"]: r for r in todas}
     for r in pendientes:
-        res = r.get("resumen") or resumen_de(_datos(r.get("catalogo_vacantes")), r.get("motivo", ""))
+        res = r.get("resumen")
+        if not res:
+            res = resumen_de(_datos(r.get("catalogo_vacantes")), r.get("motivo", ""))
+            calculados[r["vacante_id"]] = res
+            if r["vacante_id"] in originales:
+                originales[r["vacante_id"]]["resumen"] = res  # la copia en memoria ya no lo vuelve a calcular
         frase = r.get("pista", "") if r.get("motivo") == FUNCIONES else res.get("frase", "")
         salida.append({**{k: res.get(k, "") for k in ("titulo", "empresa", "ubicacion", "modalidad", "salario",
                                                        "idioma", "publicada", "enlace", "sugerida", "por_que")},
@@ -421,6 +431,8 @@ def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None):
                        "ayuda_faltantes": any(p.get("faltan") for p in r.get("perfiles") or []),
                        "iguales": max(0, por_ubicacion.get(r.get("ubicacion"), 0) - 1),
                        "mas_util": r["vacante_id"] in utiles})
+    if calculados and getattr(repo, "con_resumen", lambda: False)():
+        _guardar_resumenes(repo, calculados)
     if pagina is None:
         return {"pendientes": salida, "total": len(salida), "en_espera": len(todas),
                 "ayudan_faltantes": sum(1 for s in salida if s["ayuda_faltantes"])}
@@ -434,8 +446,24 @@ def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None):
             "ayudan_faltantes": sum(1 for r in filtradas if any(p.get("faltan") for p in r.get("perfiles") or []))}
 
 
-def decidir(repo, vacante_id, decision, codigos=(), aplicar_a_iguales=False, fecha=None, por="operador", comprobar=None):
-    """Aplica una decisión de la bandeja. Devuelve qué pasó (asignaciones creadas, iguales resueltas, regla)."""
+def _guardar_resumenes(repo, resumenes):
+    """18 nov: el resumen calculado al mostrar una pendiente se guarda (SQL 018) en segundo plano, para que la próxima
+    vez no haya que leer su descripción. Si falla, se vuelve a calcular la próxima vez."""
+    import threading
+
+    def guardar():
+        try:
+            repo.resumir_revisiones(resumenes)
+        except Exception as e:  # noqa: BLE001
+            registro.aviso("revision:resumen", e)
+    threading.Thread(target=guardar, daemon=True).start()
+
+
+def decidir(repo, vacante_id, decision, codigos=(), aplicar_a_iguales=False, fecha=None, por="operador", comprobar=None,
+            regenerar=True):
+    """Aplica una decisión de la bandeja. Devuelve qué pasó (asignaciones creadas, iguales resueltas, regla y las filas
+    decididas). Con `regenerar=False` (el servidor del panel, 18 nov) no rehace los borradores aquí: los rehace en
+    segundo plano para que la decisión responda al momento."""
     from panel.repositorio import ErrorRepositorio, hoy
     fecha = fecha or hoy()
     if decision not in DECISIONES:
@@ -470,24 +498,26 @@ def decidir(repo, vacante_id, decision, codigos=(), aplicar_a_iguales=False, fec
         # «No sirve» no archiva: la vacante puede servir a otro cargo.
     else:
         _al_catalogo(repo, rev, decision, codigos, por)
-    iguales, regla = 0, False
+    iguales, regla, decididas = 0, False, [vacante_id]
     if aplicar_a_iguales and decision in ("sirve", "otro_pais") and not es_generica(rev.get("ubicacion")):
         repo.guardar_regla({"texto": rev["ubicacion"], "origen": "operador", "activa": True,
                             "resultado": {"paises": codigos} if decision == "sirve" else {"extranjero": True},
                             "ejemplos": [vacante_id]})
         regla = True
-        for otra in repo.revisiones(estado="pendiente"):
+        # Lista ligera: cada una se vuelve a leer completa al decidirla; los borradores se rehacen una vez al final.
+        for otra in repo.revisiones(estado="pendiente", ligera=True):
             if otra["vacante_id"] != vacante_id and otra.get("ubicacion") == rev["ubicacion"]:
-                r = decidir(repo, otra["vacante_id"], decision, codigos, False, fecha, por, comprobar)
+                r = decidir(repo, otra["vacante_id"], decision, codigos, False, fecha, por, comprobar, regenerar=False)
                 iguales += 1
                 asignadas += r["asignadas"]
-    if decision == "sirve" and asignadas:
+                decididas.append(otra["vacante_id"])
+    if regenerar and decision == "sirve" and asignadas:
         try:  # los borradores pendientes y sin editar se rehacen con la vacante confirmada
             from panel import borradores
             borradores.generar(repo, fecha)
         except Exception as e:  # noqa: BLE001
             registro.aviso("revision:389", e)
-    return {"decision": decision, "asignadas": asignadas, "iguales": iguales, "regla": regla}
+    return {"decision": decision, "asignadas": asignadas, "iguales": iguales, "regla": regla, "decididas": decididas}
 
 
 def _asignar(repo, rev, codigos, fecha, por, comprobar):
@@ -531,7 +561,8 @@ def _asignar(repo, rev, codigos, fecha, por, comprobar):
                        "filtros": p.model_dump(mode="json"), "cargo_configuracion": cargo.model_dump(mode="json")})
     if nuevas:
         repo.crear_asignaciones(nuevas)
-        if comprobar:  # comprobar el enlace ahora, para poder compartirla hoy (vigencia 6 h)
+        if comprobar and not _comprobada_hace_poco(fila_catalogo.get("datos") or {}):
+            # comprobar el enlace ahora, para poder compartirla hoy; si ya se comprobó en las últimas 24 h (v31), no
             enlace = (fila_catalogo.get("datos") or {}).get("enlace", "")
             if enlace:
                 resultado = comprobar(enlace, datos.get("titulo", ""))
@@ -541,6 +572,24 @@ def _asignar(repo, rev, codigos, fecha, por, comprobar):
                                               "enlaces": [resultado]}
                     repo.actualizar_catalogo_datos(rev["vacante_id"], nuevos)
     return len(nuevas)
+
+
+def _comprobada_hace_poco(datos, horas=24):
+    """Si el enlace ya tiene una comprobación positiva de menos de `horas` (contrato v31: 24 h para compartir)."""
+    ver = datos.get("verificacion") or {}
+    if ver.get("estado") != "verificada":
+        return False
+    fechas = [ver.get("comprobada_en") or ""] + [e.get("comprobada_en") or "" for e in ver.get("enlaces") or []
+                                                 if isinstance(e, dict) and e.get("estado") == "verificada"]
+    ahora = datetime.now(timezone.utc)
+    for f in fechas:
+        try:
+            cuando = datetime.fromisoformat(f.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if cuando.tzinfo and 0 <= (ahora - cuando).total_seconds() < horas * 3600:
+            return True
+    return False
 
 
 def aplicar_confirmacion(actual, explicacion):

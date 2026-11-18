@@ -106,23 +106,28 @@ def texto(nombre, grupos, fecha, cliente_id="", mas=0):
     return "\n\n".join(partes)
 
 
-def generar(repo, fecha=None, dias_atras=3):
+def generar(repo, fecha=None, dias_atras=3, resultados=None):
     """Crea o actualiza el borrador del día de cada cliente activo con teléfono y consentimiento.
     Solo vacantes con enlace comprobado para compartir; completa hasta MINIMO con días anteriores sin repetir nada que
     ya le haya ido en otro borrador. No toca borradores abiertos, enviados, descartados o editados a mano."""
     from panel import servicio
+    from concurrent.futures import ThreadPoolExecutor
     fecha = fecha or hoy()
+    # 18 nov (velocidad): el servidor pasa sus copias en memoria de los resultados (cliente, día).
+    resultados = resultados or (lambda cliente_id, f: servicio.resultados(repo, cliente_id, f))
     contactos = {c["cliente_id"]: c for c in repo.contactos() if c.get("consentimiento") and c.get("telefono")}
     # Conteos para explicar un resultado vacío en el panel (13 nov: «Preparar mensajes» no decía por qué).
     resultado = {"generados": 0, "con_pocas": 0, "sin_vacantes": 0, "conservados": 0, "sin_contacto": 0,
                  "por_recomprobar": 0, "clientes_activos": 0}
-    hoy_r = servicio.resultados(repo, None, fecha)
-    clientes = {c["id"]: c for c in hoy_r.get("clientes", []) if c.get("activo", True)}
+    # Solo la lista de clientes de la búsqueda del día: sin leer las vacantes de ninguno.
+    lista = repo.clientes_de(fecha) if hasattr(repo, "clientes_de") else servicio.resultados(repo, None, fecha).get("clientes", [])
+    clientes = {c["id"]: c for c in lista if c.get("activo", True)}
     resultado["clientes_activos"] = len(clientes)
     resultado["sin_contacto"] = sum(1 for cid in clientes if cid not in contactos)
     if not contactos:
         return resultado
     existentes = {b["cliente_id"]: b for b in repo.borradores(fecha=fecha)}
+    por_hacer = []
     for cliente_id, contacto in contactos.items():
         if cliente_id not in clientes:
             continue
@@ -130,39 +135,51 @@ def generar(repo, fecha=None, dias_atras=3):
         if actual and (actual.get("estado") != "pendiente" or actual.get("editado")):
             resultado["conservados"] += 1
             continue
-        ya = {vid for b in repo.borradores(cliente_id=cliente_id) if b.get("fecha") != fecha for vid in b.get("vacantes", [])}
-        elegidas, vistos, sobran, empresas = [], set(ya), set(), {}
-        for dia in range(dias_atras + 1):
-            if len(elegidas) >= MAXIMO or (dia and len(elegidas) >= MINIMO):
-                break
-            f = (date.fromisoformat(fecha) - timedelta(days=dia)).isoformat()
-            for v in servicio.resultados(repo, cliente_id, f)["vacantes"]:
-                if not dia and v["estado"] == "por_confirmar":
-                    resultado["por_recomprobar"] += 1  # del día, con el enlace aún por recomprobar
-                if v["estado"] != "lista" or v["id"] in vistos:
-                    continue
-                vistos.add(v["id"])
-                # Contrato v31: hasta 10 y máximo 2 de la misma empresa; las que quedan fuera se ofrecen («Tengo más…»).
-                if len(elegidas) < MAXIMO and (es_post(v) or empresas.get(_empresa(v), 0) < POR_EMPRESA):
-                    empresas[_empresa(v)] = empresas.get(_empresa(v), 0) + 1
-                    elegidas.append(v)
-                else:
-                    sobran.add(v["id"])
-        elegidas = con_posts(elegidas)
-        if not elegidas:
-            resultado["sin_vacantes"] += 1
-            continue
-        nombres = {}
-        for v in elegidas:
-            nombres.setdefault(v.get("cargo_nombre") or "tu perfil", []).append(v)
-        grupos = list(nombres.items())
-        # Solo el nombre que el operador eligió para saludar: la referencia interna del cliente no va en el mensaje.
-        cuerpo = texto(contacto.get("nombre_saludo") or "", grupos, fecha, cliente_id, mas=len(sobran))
-        repo.guardar_borrador({"fecha": fecha, "cliente_id": cliente_id, "texto": cuerpo,
-                               "vacantes": [v["id"] for v in elegidas], "cargos": [c for c, _ in grupos],
-                               "estado": "pendiente", "editado": False})
-        resultado["generados"] += 1
-        resultado["con_pocas"] += len(elegidas) < MINIMO
+        por_hacer.append((cliente_id, contacto))
+    # Cada cliente es independiente: se arman de a cuatro a la vez (antes uno tras otro).
+    with ThreadPoolExecutor(4) as ex:
+        for parcial in ex.map(lambda par: _uno(repo, fecha, dias_atras, resultados, *par), por_hacer):
+            for k, n in parcial.items():
+                resultado[k] += n
+    return resultado
+
+
+def _uno(repo, fecha, dias_atras, resultados, cliente_id, contacto):
+    """Borrador del día de un cliente. Devuelve los conteos que suma a `generar`."""
+    resultado = {"generados": 0, "con_pocas": 0, "sin_vacantes": 0, "por_recomprobar": 0}
+    ya = {vid for b in repo.borradores(cliente_id=cliente_id) if b.get("fecha") != fecha for vid in b.get("vacantes", [])}
+    elegidas, vistos, sobran, empresas = [], set(ya), set(), {}
+    for dia in range(dias_atras + 1):
+        if len(elegidas) >= MAXIMO or (dia and len(elegidas) >= MINIMO):
+            break
+        f = (date.fromisoformat(fecha) - timedelta(days=dia)).isoformat()
+        for v in resultados(cliente_id, f)["vacantes"]:
+            if not dia and v["estado"] == "por_confirmar":
+                resultado["por_recomprobar"] += 1  # del día, con el enlace aún por recomprobar
+            if v["estado"] != "lista" or v["id"] in vistos:
+                continue
+            vistos.add(v["id"])
+            # Contrato v31: hasta 10 y máximo 2 de la misma empresa; las que quedan fuera se ofrecen («Tengo más…»).
+            if len(elegidas) < MAXIMO and (es_post(v) or empresas.get(_empresa(v), 0) < POR_EMPRESA):
+                empresas[_empresa(v)] = empresas.get(_empresa(v), 0) + 1
+                elegidas.append(v)
+            else:
+                sobran.add(v["id"])
+    elegidas = con_posts(elegidas)
+    if not elegidas:
+        resultado["sin_vacantes"] += 1
+        return resultado
+    nombres = {}
+    for v in elegidas:
+        nombres.setdefault(v.get("cargo_nombre") or "tu perfil", []).append(v)
+    grupos = list(nombres.items())
+    # Solo el nombre que el operador eligió para saludar: la referencia interna del cliente no va en el mensaje.
+    cuerpo = texto(contacto.get("nombre_saludo") or "", grupos, fecha, cliente_id, mas=len(sobran))
+    repo.guardar_borrador({"fecha": fecha, "cliente_id": cliente_id, "texto": cuerpo,
+                           "vacantes": [v["id"] for v in elegidas], "cargos": [c for c, _ in grupos],
+                           "estado": "pendiente", "editado": False})
+    resultado["generados"] += 1
+    resultado["con_pocas"] += len(elegidas) < MINIMO
     return resultado
 
 

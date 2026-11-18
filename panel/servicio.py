@@ -462,8 +462,9 @@ def cobertura(repo, fecha=None):
                     "comprobado, que esa persona nunca recibió; no es una promesa para los próximos días."}
 
 
-def whatsapp(repo, cliente_id, fecha=None):
-    r = resultados(repo, cliente_id, fecha)
+def whatsapp(repo, cliente_id, fecha=None, resultados=None, contactos=None):
+    """El mensaje para copiar. El servidor pasa los `resultados` y `contactos` que ya tiene en memoria (18 nov)."""
+    r = resultados if resultados is not None else globals()["resultados"](repo, cliente_id, fecha)
     from panel import borradores
     listas = borradores.con_posts([v for v in r["vacantes"] if v["estado"] == "lista"])
     if not listas:
@@ -472,7 +473,9 @@ def whatsapp(repo, cliente_id, fecha=None):
     grupos = {}
     for v in listas:
         grupos.setdefault(v.get("cargo_nombre") or "tu perfil", []).append(v)
-    contacto = next((c for c in (repo.contactos() if hasattr(repo, "contactos") else [])
+    if contactos is None:
+        contactos = repo.contactos() if hasattr(repo, "contactos") else []
+    contacto = next((c for c in contactos
                      if c.get("cliente_id") == cliente_id), {})
     nombre = contacto.get("nombre_saludo", "")
     texto = borradores.texto(nombre, list(grupos.items()), (r.get("ejecucion") or {}).get("fecha") or hoy(),
