@@ -5,7 +5,7 @@ Desde la petición del 6 de noviembre, existe un panel de control privado para e
 cargos abiertos y metas diarias por perfil bajo un techo del día (v21; antes cupos por cargo que sumaban 120), filtros por país/modalidad/idioma/publicación/experiencia/inglés,
 y copia manual de WhatsApp. La retirada de la web histórica no prohíbe esta nueva plataforma expresamente solicitada.
 No reintroducir Pages/Cloudflare antiguos, Excel, envío automático de WhatsApp ni seguimiento de candidaturas.
-Panorama vigente y corto: docs/COMO_FUNCIONA_AHORA.md. Leer primero docs/PANEL_CONTROL.md y docs/CONTRATO_DATOS_v6.md. Estos prevalecen sobre restricciones históricas
+Sesión nueva, otra cuenta u otro asistente: empezar por docs/CONTINUAR_TRABAJO.md (preparación, forma de trabajo y estado). Panorama vigente y corto: docs/COMO_FUNCIONA_AHORA.md. Leer primero docs/PANEL_CONTROL.md y docs/CONTRATO_DATOS_v6.md. Estos prevalecen sobre restricciones históricas
 que prohibían filtrar experiencia/inglés o fijaban seis cargos. El acceso real queda cerrado hasta configurar login,
 por decisión del propietario; --demo usa datos ficticios y no toca Supabase. No abrir datos reales sin autorización.
 
