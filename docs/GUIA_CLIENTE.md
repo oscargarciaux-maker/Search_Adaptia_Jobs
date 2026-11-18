@@ -52,6 +52,12 @@ sirvan, o «Añadir todas».
 resaltado. «Cupo diario» es el máximo de vacantes al día entre todos (antes «Techo del día») e «Historial» es lo que
 antes se llamaba «Actividad».
 
+**Confirmar y aplicar (18 nov, contrato v43).** Un solo botón: la configuración vale desde la próxima búsqueda, aunque
+sea dentro de unos minutos. Si la cambias mientras una búsqueda corre, esa búsqueda reparte con la nueva y no se
+detiene. Si la cambias después de que se armó el lote del día, la próxima búsqueda de cada hora completa lo que falte.
+Comunidad recibe después de los clientes reales y solo hasta su meta. Una vacante que sirve a dos cargos les llega a
+los perfiles de los dos.
+
 **Portales de empresas comprobados (18 nov, contrato v42).** Una vacante que el portal de empleo de la propia empresa
 (Greenhouse, Lever, Ashby…) muestra hoy cuenta como comprobada por 24 horas, igual que las de Indeed vistas hoy. Las de
 Computrabajo y Get on Board se siguen comprobando una por una.
@@ -111,9 +117,8 @@ pulsar «Importar». Quien ya está en el panel (mismo nombre, o el de la column
 el nombre) se actualiza: conserva lo que ya recibió y no se le repiten vacantes. Si el cargo ya existe, `nombres_del_cargo` y
 `funciones_del_cargo` le **añaden** nombres y funciones, sin quitar ninguno. Se elige qué hacer con los clientes que no están en el archivo: mantenerlos, archivarlos o borrarlos del todo
 (escribiendo BORRAR). Los clientes importados quedan igual que si se hubieran creado a mano: se editan, se archivan y
-reciben vacantes desde la búsqueda siguiente a «Programar para mañana». Para usarlos **hoy mismo**, en el mismo cuadro
-pulsa «Aplicar hoy»: la próxima búsqueda de hoy (la manual, la de las 8:30 o la de cada hora) ya los usa, y lo que ya
-se entregó hoy no cambia. El cliente marcado «Comunidad» lleva una etiqueta discreta junto a su nombre. Un cliente archivado también se puede
+reciben vacantes desde la búsqueda siguiente a «Confirmar y aplicar» (18 nov, contrato v43): la próxima búsqueda
+(la manual, la de las 8:30 o la de cada hora) ya los usa, y lo que ya se entregó hoy no cambia. El cliente marcado «Comunidad» lleva una etiqueta discreta junto a su nombre. Un cliente archivado también se puede
 «Eliminar definitivamente». Borrar quita al cliente, sus perfiles, su WhatsApp y sus mensajes preparados; las
 vacantes que ya recibió y las versiones ya programadas se conservan en el historial.
 

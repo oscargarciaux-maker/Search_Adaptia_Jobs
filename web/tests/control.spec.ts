@@ -47,10 +47,12 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await expect(page.getByText("Mi espacio de trabajo")).toHaveCount(0);
   await expect(page.getByText("Menos ruido.")).toHaveCount(0);
   // Sección 6: la explicación de Guardar / Programar va en una ayuda (ⓘ), no en una franja.
-  const explicacion = page.getByText(/los guarda y los usa desde la búsqueda/);
+  const explicacion = page.getByText(
+    /los guarda y los usa desde la próxima búsqueda/,
+  );
   await expect(explicacion).toBeHidden();
   const ayuda = page.getByRole("button", {
-    name: "Más información: Guardar y programar",
+    name: "Más información: Guardar y aplicar",
   });
   await ayuda.focus();
   await expect(explicacion).toBeVisible();
@@ -200,7 +202,7 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   // La operadora suma 10 a los 120 de los demás: con techo 120 no se puede programar; con 130, sí.
   await expect(page.getByText(/pasan el cupo diario/)).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Programar para mañana", exact: true }),
+    page.getByRole("button", { name: "Confirmar y aplicar", exact: true }),
   ).toBeDisabled();
   // Lista grande del 16 nov: el techo se puede borrar del todo y se valida al salir del campo.
   const techo = page.getByLabel("Cupo diario", { exact: true });
@@ -259,11 +261,11 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
     page.getByRole("heading", { name: "Bioacoustics Analyst", exact: true }),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Programar para mañana", exact: true })
+    .getByRole("button", { name: "Confirmar y aplicar", exact: true })
     .click();
-  await dialog.getByRole("button", { name: "Confirmar configuración" }).click();
+  await dialog.getByRole("button", { name: "Confirmar y aplicar" }).click();
   await expect(
-    page.getByText("Configuración programada para el", { exact: false }),
+    page.getByText("Configuración aplicada", { exact: false }),
   ).toBeVisible();
   const cfg = await (await request.get("/api/config")).json();
   expect(
@@ -1193,14 +1195,14 @@ test("importar clientes: vista previa con errores, borrar los actuales y program
     lista.getByRole("button", { name: /^Cliente de ejemplo 02:/ }),
   ).toHaveAccessibleName(/: [1-9]\d* de 10/);
   await page
-    .getByRole("button", { name: "Programar para mañana", exact: true })
+    .getByRole("button", { name: "Confirmar y aplicar", exact: true })
     .click();
   await page
     .locator("dialog[open]")
-    .getByRole("button", { name: "Confirmar configuración" })
+    .getByRole("button", { name: "Confirmar y aplicar" })
     .click();
   await expect(page.locator(".flow-pill")).toHaveText(
-    /se usa desde la búsqueda de mañana/,
+    /En uso desde la próxima búsqueda/,
   );
 
   // Eliminar definitivamente un cliente archivado.
@@ -1243,14 +1245,14 @@ test("contrato v27: aplicar hoy, etiquetas de lo que no cumple y distintivo de C
     page.locator(".client-card h3", { hasText: "Cliente de ejemplo 02" }),
   ).toContainText("Comunidad");
   await page
-    .getByRole("button", { name: "Programar para mañana", exact: true })
+    .getByRole("button", { name: "Confirmar y aplicar", exact: true })
     .click();
   await page
     .getByRole("dialog")
-    .getByRole("button", { name: "Aplicar hoy", exact: true })
+    .getByRole("button", { name: "Confirmar y aplicar", exact: true })
     .click();
   await expect(
-    page.getByText("Configuración aplicada desde hoy", { exact: false }),
+    page.getByText("Configuración aplicada", { exact: false }),
   ).toBeVisible();
   const cfg = await (await request.get("/api/config")).json();
   const hoy = new Intl.DateTimeFormat("en-CA", {
