@@ -285,7 +285,33 @@ def test_api_autoriza_solo_operador_confirmado_y_no_confia_en_cookie():
         cabeceras = c.get("/api/config").headers  # PR 1.5: HTTPS obligatorio y cabeceras de seguridad
         assert cabeceras["strict-transport-security"].startswith("max-age=") and cabeceras["x-frame-options"] == "DENY"
         Repo.sesion = SimpleNamespace(get=lambda *a, **k: SimpleNamespace(status_code=401, json=lambda: {}))
+        # 18 nov (velocidad): un acceso válido se recuerda 60 s por su huella; otro token siempre se comprueba.
+        c.cookies.set("adaptia_session", "otro-token")
         assert c.get("/api/config").status_code == 401
+
+
+def test_sesion_valida_se_comprueba_una_vez_por_minuto_y_se_olvida_al_salir():
+    email = "operador" + "@" + "empresa.test"
+    llamadas = []
+
+    def preguntar(*a, **k):
+        llamadas.append(1)
+        return SimpleNamespace(status_code=200, json=lambda: {"email": email, "email_confirmed_at": "2026-01-01"})
+
+    class Repo(RepositorioDemo):
+        url = "https://supabase.example"
+        cabeceras = {}
+        sesion = SimpleNamespace(get=preguntar, post=lambda *a, **k: SimpleNamespace(status_code=204))
+    with TestClient(crear_app(repositorio=Repo(), origen="https://panel.example", operadores=[email])) as c:
+        c.cookies.set("adaptia_session", "token-ficticio")
+        for _ in range(3):
+            assert c.get("/api/config").status_code == 200
+        assert len(llamadas) == 1
+        assert "server-timing" in c.get("/api/config").headers
+        c.post("/api/auth/logout", headers={"origin": "https://panel.example"})
+        c.cookies.set("adaptia_session", "token-ficticio")
+        c.get("/api/config")
+        assert len(llamadas) >= 2  # al salir se olvida la copia y se vuelve a preguntar
 
 
 @pytest.mark.parametrize("estado,horas", [("active", 25), ("closed", 0), ("archived", 0), ("active", -1)])  # v31: 24 h

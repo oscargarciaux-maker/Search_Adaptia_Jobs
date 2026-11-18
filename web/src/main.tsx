@@ -1685,6 +1685,7 @@ function App() {
     }
   }
   const [descargandoBase, setDescargandoBase] = useState(false);
+  const [abriendoWhatsApp, setAbriendoWhatsApp] = useState(false);
   // Reunión del 14 nov: CSV general o de un cliente, del día elegido o de toda la base, con el formato del contrato.
   const [csvFecha, setCsvFecha] = useState(hoyBogota());
   const [csvTodo, setCsvTodo] = useState(false);
@@ -1734,7 +1735,8 @@ function App() {
     }
   }
   async function abrirWhatsApp() {
-    setBusy(true);
+    // 18 nov: la carga se ve en el botón; el resto de la página sigue usable.
+    setAbriendoWhatsApp(true);
     try {
       const r = await api<{ texto: string; vacantes: number }>(
         "/whatsapp/" +
@@ -1751,7 +1753,7 @@ function App() {
     } catch (e) {
       notify((e as Error).message, true);
     } finally {
-      setBusy(false);
+      setAbriendoWhatsApp(false);
     }
   }
   async function copiar() {
@@ -2464,12 +2466,14 @@ function App() {
                       !selectedClient ||
                       !results?.listas ||
                       busy ||
-                      loadingResults
+                      loadingResults ||
+                      abriendoWhatsApp
                     }
+                    aria-busy={abriendoWhatsApp || undefined}
                     onClick={abrirWhatsApp}
                   >
                     <MessageCircle size={18} />
-                    Copiar WhatsApp
+                    {abriendoWhatsApp ? "Preparando…" : "Copiar WhatsApp"}
                   </button>
                 </div>
                 <div className="csv-descarga card">

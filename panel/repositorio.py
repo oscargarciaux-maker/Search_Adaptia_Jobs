@@ -283,12 +283,16 @@ class RepositorioSupabase:
 
     def con_resumen(self):
         """Contrato v34: si la bandeja ya tiene la columna `resumen` (SQL 018). Se pregunta una vez por instancia."""
-        if getattr(self, "_con_resumen", None) is None:
+        # 18 nov: una respuesta negativa se vuelve a preguntar a los 5 min; antes un fallo pasajero dejaba la bandeja en
+        # el camino lento hasta reiniciar el servidor.
+        if getattr(self, "_con_resumen", None) is None or (
+                self._con_resumen is False and time.monotonic() - getattr(self, "_con_resumen_en", 0) > 300):
             try:
                 self.pedir("GET", "panel_revisiones", params={"select": "resumen", "limit": 1})
                 self._con_resumen = True
             except ErrorRepositorio:
                 self._con_resumen = False
+                self._con_resumen_en = time.monotonic()
         return self._con_resumen
 
     def resumir_revisiones(self, resumenes):
@@ -489,6 +493,16 @@ class RepositorioSupabase:
             self._refrescar()
         except Exception as e:  # se conserva la copia anterior; el siguiente uso lo reintenta
             registro.aviso("repositorio:391", e)
+
+    def clientes_de(self, fecha=None):
+        """Clientes de la configuración con la que corrió la búsqueda del día (sin leer vacantes)."""
+        ejecuciones = self.pedir("GET", "panel_ejecuciones", params={**({"fecha": "eq." + fecha} if fecha else {}),
+                                                                     "select": "revision", "order": "fecha.desc", "limit": 1})
+        if not ejecuciones:
+            return []
+        versiones = self.pedir("GET", "panel_versiones", params={"revision": "eq." + str(ejecuciones[0]["revision"]),
+                                                                 "select": "configuracion->clientes", "limit": 1})
+        return (versiones[0].get("clientes") if versiones else None) or []
 
     def resultados(self, cliente_id, fecha=None):
         ejecuciones = self.pedir("GET", "panel_ejecuciones",

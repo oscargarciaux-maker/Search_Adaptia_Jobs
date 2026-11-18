@@ -1,6 +1,7 @@
 """Servidor del operador. Demostración explícita; producción cerrada sin autenticación."""
 import argparse
 from collections import defaultdict, deque
+import hashlib
 import os
 from pathlib import Path
 import time
@@ -86,11 +87,93 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
     # invalida los resultados guardados; la búsqueda nocturna corre en otro proceso y la cubre la vigencia de 2 min.
     sello = [0]
     copias_resultados, copias_fichas = {}, {}
+    # 18 nov (velocidad): copias cortas de lo que se lee en cada pantalla. `sello` cambia con cualquier escritura;
+    # `sello_bandeja` con las escrituras que no son una decisión de la bandeja (una decisión retira su fila de la copia
+    # de pendientes en vez de obligar a leerlas todas otra vez).
+    sello_bandeja = [0]
+    copias, pendientes_copia = {}, {}
+    sesiones = {}  # huella del token → (hasta, usuario); nunca el token en claro
+    VIGENCIA_SESION = 60
+
+    def _copia(nombre, clave, vigencia, fn):
+        guardada = copias.get((nombre, clave))
+        if guardada and guardada[0] == sello[0] and time.monotonic() - guardada[1] < vigencia:
+            return guardada[2]
+        actual = sello[0]
+        valor = fn()
+        if len(copias) > 300:
+            copias.clear()
+        copias[(nombre, clave)] = (actual, time.monotonic(), valor)
+        return valor
+
+    def _pendientes():
+        """Pendientes de la bandeja, ligeras y ordenadas, en una copia de 60 s."""
+        c = pendientes_copia
+        if c and c["sello"] == sello_bandeja[0] and time.monotonic() - c["t"] < 60:
+            return c["filas"]
+        actual = sello_bandeja[0]
+        filas = sorted(repo.revisiones(estado="pendiente", ligera=True), key=lambda r: -(r.get("prioridad") or 0))
+        pendientes_copia.clear()
+        pendientes_copia.update(sello=actual, t=time.monotonic(), filas=filas)
+        return filas
+
+    def _resultados(cliente_id, fecha):
+        """Resultados de un cliente en un día, en copia: 2 min el de hoy y 10 min los días anteriores."""
+        vigencia = 600 if fecha and fecha < hoy() else 120
+        clave = (cliente_id or "", fecha or "")
+        guardado = copias_resultados.get(clave)
+        if guardado and guardado[0] == sello[0] and time.monotonic() - guardado[1] < vigencia:
+            return guardado[2]
+        actual = sello[0]
+        valor = servicio.resultados(repo, cliente_id, fecha)
+        if len(copias_resultados) > 200:
+            copias_resultados.clear()
+        copias_resultados[clave] = (actual, time.monotonic(), valor)
+        return valor
+
+    # Los borradores de WhatsApp se rehacen en segundo plano después de confirmar en la bandeja: la decisión responde
+    # al momento. Un solo hilo; si llegan varias decisiones seguidas, se rehace una vez al final.
+    import threading
+    regenerar = {"pendiente": False, "corriendo": False}
+    cerrojo_regenerar = threading.Lock()
+
+    def _rehacer_borradores():
+        from panel import borradores as b
+        while True:
+            with cerrojo_regenerar:
+                if not regenerar["pendiente"]:
+                    regenerar["corriendo"] = False
+                    return
+                regenerar["pendiente"] = False
+            try:
+                b.generar(repo, resultados=_resultados)
+            except Exception as e:  # noqa: BLE001 — la decisión ya quedó guardada; el borrador se rehace la próxima vez
+                registro.aviso("api:borradores", e)
+            sello[0] += 1
+
+    def pedir_borradores():
+        with cerrojo_regenerar:
+            regenerar["pendiente"] = True
+            if regenerar["corriendo"]:
+                return
+            regenerar["corriendo"] = True
+        threading.Thread(target=_rehacer_borradores, daemon=True).start()
+
+    app.state.pedir_borradores = pedir_borradores
 
     def _usuario(token):
+        huella = hashlib.sha256(token.encode()).hexdigest()
+        guardado = sesiones.get(huella)
+        if guardado and guardado[0] > time.monotonic():
+            return guardado[1]
         r = repo.sesion.get(repo.url + "/auth/v1/user", headers={**repo.cabeceras, "Authorization": "Bearer " + token},
                             timeout=15)
-        return r.json() if r.status_code == 200 else {}
+        usuario = r.json() if r.status_code == 200 else {}
+        if _autorizado(usuario):  # solo se guarda un acceso válido; uno rechazado se vuelve a preguntar
+            if len(sesiones) > 100:
+                sesiones.clear()
+            sesiones[huella] = (time.monotonic() + VIGENCIA_SESION, usuario)
+        return usuario
 
     def _autorizado(usuario):
         return usuario.get("email", "").casefold() in operadores and bool(usuario.get("email_confirmed_at"))
@@ -141,9 +224,20 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
             except (requests.RequestException, ValueError):
                 return JSONResponse({"detail": "No se pudo verificar la sesión."}, status_code=503)
         escribe = request.url.path.startswith("/api/") and request.method not in {"GET", "HEAD", "OPTIONS"}
+        # Una decisión de la bandeja no obliga a releer todas las pendientes: retira sus filas de la copia (abajo).
+        decision = escribe and request.url.path.startswith("/api/revisiones/") and request.url.path.count("/") == 3 \
+            and request.url.path not in {"/api/revisiones/cargar", "/api/revisiones/csv"}
         sello[0] += escribe
+        sello_bandeja[0] += escribe and not decision
+        inicio = time.monotonic()
         response = await siguiente(request)
+        duracion = (time.monotonic() - inicio) * 1000
         sello[0] += escribe
+        sello_bandeja[0] += escribe and not decision
+        if request.url.path.startswith("/api/"):
+            response.headers["Server-Timing"] = f"app;dur={duracion:.0f}"
+            if duracion > 3000:  # solo la ruta y el tiempo: nunca datos de clientes
+                registro.aviso("api:lenta", RuntimeError(f"{request.method} {request.url.path} {duracion:.0f} ms"))
         if renovada:
             _poner_cookies(response, renovada)
         response.headers.update({"X-Content-Type-Options": "nosniff", "Referrer-Policy": "same-origin",
@@ -240,6 +334,9 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
                 registro.aviso("api:logout", e)
             if not anulada:
                 registro.aviso("api:logout", RuntimeError("no se pudo anular la renovación en Supabase"))
+        # La salida anula todas las sesiones del usuario en Supabase («global»): se olvidan todas las copias de acceso,
+        # también la que la comprobación de arriba pudo volver a guardar.
+        sesiones.clear()
         response = JSONResponse({"sesion": False, "anulada": anulada})
         response.delete_cookie(COOKIE_SESION, path="/", secure=not demo, httponly=True, samesite="strict")
         response.delete_cookie(COOKIE_RENOVAR, path="/api/", secure=not demo, httponly=True, samesite="strict")
@@ -365,9 +462,9 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
     def leer_borradores(fecha: str | None = None):
         from panel import borradores as b
         fecha = fecha or hoy()
-        contactos = {c["cliente_id"]: c for c in repo.contactos()}
+        contactos = {c["cliente_id"]: c for c in _copia("contactos", "", 30, repo.contactos)}
         salida = []
-        for x in repo.borradores(fecha=fecha):
+        for x in _copia("borradores", fecha, 20, lambda: repo.borradores(fecha=fecha)):
             c = contactos.get(x["cliente_id"])
             salida.append({**x, "enlace": b.enlace_whatsapp(c["telefono"], x["texto"]) if c else "",
                            "pocas": len(x.get("vacantes", [])) < b.MINIMO})
@@ -394,7 +491,7 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
     @app.post("/api/borradores/generar")
     def generar_borradores():
         from panel import borradores as b
-        return b.generar(repo)
+        return b.generar(repo, resultados=_resultados)
 
     @app.patch("/api/borradores/{borrador_id}")
     def cambiar_borrador(borrador_id: UUID, body: CambioBorrador):
@@ -411,7 +508,9 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
             UUID(cliente_id)
         if pagina is not None and (pagina < 1 or not 1 <= por_pagina <= 100):
             raise HTTPException(422, "Página no válida.")
-        return revision.listar(repo, hoy(), pagina=pagina, por_pagina=por_pagina, cliente_id=cliente_id)
+        return _copia("revisiones", (pagina, por_pagina, cliente_id or ""), 20, lambda: revision.listar(
+            repo, hoy(), pagina=pagina, por_pagina=por_pagina, cliente_id=cliente_id, todas=_pendientes(),
+            version=_copia("operativa", hoy(), 60, lambda: repo.operativa(hoy()))))
 
     @app.post("/api/revisiones/cargar")
     def cargar_revisiones():
@@ -477,16 +576,22 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         if not demo:
             from buscador import verificar_enlaces
             comprobar = verificar_enlaces.comprobar
-        return revision.decidir(repo, vacante_id, body.decision, body.paises, body.aplicar_a_iguales,
-                                comprobar=comprobar)
+        resultado = revision.decidir(repo, vacante_id, body.decision, body.paises, body.aplicar_a_iguales,
+                                     comprobar=comprobar, regenerar=False)
+        decididas = set(resultado.get("decididas") or [vacante_id])
+        if pendientes_copia.get("filas") is not None:  # la copia sigue valiendo sin las filas ya decididas
+            pendientes_copia["filas"] = [r for r in pendientes_copia["filas"] if r["vacante_id"] not in decididas]
+        if body.decision == "sirve" and resultado.get("asignadas"):
+            pedir_borradores()
+        return resultado
 
     @app.get("/api/ejecuciones")
     def ejecuciones():
-        return repo.ejecuciones()
+        return _copia("ejecuciones", "", 30, repo.ejecuciones)
 
     @app.get("/api/resumen-clientes")
     def resumen_clientes():
-        return servicio.resumen_clientes(repo)
+        return _copia("resumen-clientes", "", 60, lambda: servicio.resumen_clientes(repo))
 
     @app.get("/api/resultados")
     def resultados(cliente_id: str | None = None, fecha: str | None = None):
@@ -496,15 +601,7 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         if fecha:
             from datetime import date
             date.fromisoformat(fecha)
-        clave, actual = (cliente_id or "", fecha or ""), sello[0]
-        guardado = copias_resultados.get(clave)
-        if guardado and guardado[0] == actual and time.monotonic() - guardado[1] < 120:
-            return guardado[2]
-        valor = servicio.resultados(repo, cliente_id, fecha)
-        if len(copias_resultados) > 200:
-            copias_resultados.clear()
-        copias_resultados[clave] = (actual, time.monotonic(), valor)
-        return valor
+        return _resultados(cliente_id, fecha)
 
     @app.get("/api/vacantes/{vacante_id}/ficha")
     def ficha_vacante(vacante_id: str):
@@ -527,7 +624,8 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         if fecha:
             from datetime import date
             date.fromisoformat(fecha)
-        return servicio.whatsapp(repo, cliente_id, fecha)
+        contactos = _copia("contactos", "", 30, repo.contactos)
+        return servicio.whatsapp(repo, cliente_id, fecha, resultados=_resultados(cliente_id, fecha), contactos=contactos)
 
     dist = RAIZ / "web" / "dist"
     if dist.exists():
