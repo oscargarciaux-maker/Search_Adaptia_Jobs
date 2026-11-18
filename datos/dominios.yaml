@@ -98,6 +98,8 @@ portales:
   - glassdoor
 
 agregadores:
+  - remotoslatam.com  # v44: solo para descubrir empresas (tableros_latam.py); sus avisos nunca se entregan
+  - weremoto.com      # v44: ídem
   - jooble
   - bebee
   - trabajo.org

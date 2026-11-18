@@ -134,3 +134,9 @@ def test_todo_pais_del_mundo_tiene_al_menos_tres_fuentes_y_los_hispanohablantes_
     for c in hispanos:
         assert len(fuentes_en(c)) >= 4 or c == "CU", (c, fuentes_en(c))  # Cuba: sin Indeed ni portales locales
     assert {"Computrabajo", "Elempleo", "Magneto", "Hireline"} <= set(fuentes_en("CO"))
+
+
+def test_los_avisos_de_los_tableros_nunca_se_entregan():
+    from buscador import enlaces
+    assert not enlaces.sirve("https://remotoslatam.com/empleo/disenador-ux-123")
+    assert not enlaces.sirve("https://www.weremoto.com/trabajos/disenador-ux")
