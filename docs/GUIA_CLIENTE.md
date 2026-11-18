@@ -209,6 +209,16 @@ La captura horaria no consume Apify. La búsqueda nocturna y la profunda pueden 
 hasta USD 5/mes para este programa. Revisar el gasto global de la cuenta, que puede incluir otros trabajos.
 Las fuentes y variantes rotan; no se recorren todos los títulos de todos los países en cada ejecución.
 
+### Personas que solo hablan español (contrato v44)
+
+- Al crear un cargo, «Buscar denominaciones afines» muestra primero los nombres **en español** y, si el cargo es un
+  oficio con un añadido («AI Product Manager»), también el oficio **más amplio** («Product Manager», «Gerente de
+  Producto»). Añade con un clic solo los que le sirvan a la persona.
+- En Historial → «Cobertura por persona», quien no llega a su meta muestra **qué hacer** y cuántas vacantes más le
+  llegarían con cada ajuste. Nada se aplica solo: tú decides en el cliente o en el cargo.
+- Si la persona vive en un país donde casi no hay fuentes, lo dice («Cobertura limitada…»): recibirá sobre todo
+  remotas abiertas a su país.
+
 ### «Buscar ahora» desde el panel (18 nov)
 
 Si la búsqueda del día no arrancó, en el Resumen está **«Buscar ahora»**, junto a «Confirmar y aplicar». Lanza la

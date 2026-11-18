@@ -40,7 +40,7 @@ refuerzo:
   linkedin_busquedas: 18
   linkedin_fichas: 60
   indeed_busquedas: 6
-  getonbrd_busquedas: 6
+  getonbrd_busquedas: 12  # v44: también en español para quien solo habla español
 
 # Apify: crédito gratuito de hasta USD 5 por mes calendario para ofertas formales de LinkedIn.
 # Actor comprobado contra su esquema público; no se envían cookies ni sesión personal.
@@ -71,6 +71,8 @@ presupuestos:
   computrabajo_fichas: 150     # fichas de Computrabajo a las que se les lee la descripción
   elempleo_busquedas: 20       # búsquedas en Elempleo (Colombia; se postula en el mismo portal; PR 1b)
   elempleo_fichas: 80          # fichas de Elempleo que se leen (fecha, salario y modalidad estructurados)
+  hireline_fichas: 60          # v44: fichas de Hireline (México y Colombia, tecnología; sitemap + JobPosting)
+  magneto_fichas: 60           # v44: fichas de Magneto (Colombia; sitemap + JobPosting)
   pausa_linkedin: [1.0, 2.5]   # segundos entre peticiones a LinkedIn
   indeed_busquedas: 90
   apify_busquedas: 60          # solo con APIFY_TOKEN

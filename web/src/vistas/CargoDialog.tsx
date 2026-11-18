@@ -40,6 +40,9 @@ export function CargoDialog({
   );
   const [busy, setBusy] = useState(false);
   const [sugeridos, setSugeridos] = useState<string[]>([]);
+  // Contrato v44: nombres en español (del mapa o armados con el glosario) y el oficio base más amplio, aparte.
+  const [enEspanol, setEnEspanol] = useState<string[]>([]);
+  const [amplios, setAmplios] = useState<string[]>([]);
   function anadir(terminos: string[]) {
     setC((v) => ({
       ...v,
@@ -48,6 +51,8 @@ export function CargoDialog({
       ),
     }));
     setSugeridos((s) => s.filter((x) => !terminos.includes(x)));
+    setEnEspanol((s) => s.filter((x) => !terminos.includes(x)));
+    setAmplios((s) => s.filter((x) => !terminos.includes(x)));
   }
   const [nota, setNota] = useState("");
   async function expandir() {
@@ -57,6 +62,8 @@ export function CargoDialog({
         terminos_exactos: string[];
         terminos_similares: string[];
         terminos_cercanos?: string[];
+        terminos_es?: string[];
+        terminos_base?: string[];
         fuentes: string[];
         requiere_revision: boolean;
       }>("/cargos/expandir", {
@@ -65,10 +72,13 @@ export function CargoDialog({
       });
       // Sesión de prueba (17 nov): los nombres principales entran solos; los afines quedan como fichas para
       // añadir con un clic (antes entraban todos y había que quitar los que no servían).
+      // Lo que ya tiene el cargo y los nombres principales, que entran solos: no se ofrecen otra vez como fichas.
       const ya = new Set(
-        [...c.terminos_exactos, ...c.terminos_similares].map((x) =>
-          x.toLowerCase(),
-        ),
+        [
+          ...c.terminos_exactos,
+          ...c.terminos_similares,
+          ...r.terminos_exactos,
+        ].map((x) => x.toLowerCase()),
       );
       setC((v) => ({
         ...v,
@@ -79,8 +89,16 @@ export function CargoDialog({
           ? r.terminos_cercanos
           : v.terminos_cercanos || [],
       }));
+      const es = (r.terminos_es || []).filter((x) => !ya.has(x.toLowerCase()));
+      const enEs = new Set(es.map((x) => x.toLowerCase()));
+      setEnEspanol(es);
       setSugeridos(
-        r.terminos_similares.filter((x) => !ya.has(x.toLowerCase())),
+        r.terminos_similares.filter(
+          (x) => !ya.has(x.toLowerCase()) && !enEs.has(x.toLowerCase()),
+        ),
+      );
+      setAmplios(
+        (r.terminos_base || []).filter((x) => !ya.has(x.toLowerCase())),
       );
       setNota(
         r.fuentes.join(" · ") +
@@ -201,35 +219,51 @@ export function CargoDialog({
               });
             }}
           />
-          {sugeridos.length > 0 && (
-            <div
-              className="sugeridos"
-              role="group"
-              aria-label="Nombres sugeridos"
-            >
-              <span className="sugeridos-titulo">
-                Sugeridos (toca para añadir):
-              </span>
-              {sugeridos.map((t) => (
-                <button
-                  type="button"
-                  className="chip-sugerido"
-                  key={t}
-                  aria-label={"Añadir " + t}
-                  onClick={() => anadir([t])}
+          {(
+            [
+              [
+                "En español (toca para añadir):",
+                "Nombres en español",
+                enEspanol,
+              ],
+              ["Sugeridos (toca para añadir):", "Nombres sugeridos", sugeridos],
+              [
+                "Más amplio, sin el modificador (añádelos solo si también le sirven):",
+                "Nombres más amplios",
+                amplios,
+              ],
+            ] as const
+          ).map(
+            ([titulo, etiqueta, lista]) =>
+              lista.length > 0 && (
+                <div
+                  key={etiqueta}
+                  className="sugeridos"
+                  role="group"
+                  aria-label={etiqueta}
                 >
-                  <Plus size={12} />
-                  {t}
-                </button>
-              ))}
-              <button
-                type="button"
-                className="text-button"
-                onClick={() => anadir(sugeridos)}
-              >
-                Añadir todas
-              </button>
-            </div>
+                  <span className="sugeridos-titulo">{titulo}</span>
+                  {lista.map((t) => (
+                    <button
+                      type="button"
+                      className="chip-sugerido"
+                      key={t}
+                      aria-label={"Añadir " + t}
+                      onClick={() => anadir([t])}
+                    >
+                      <Plus size={12} />
+                      {t}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className="text-button"
+                    onClick={() => anadir([...lista])}
+                  >
+                    Añadir todas
+                  </button>
+                </div>
+              ),
           )}
           <p className="helper">
             Todas las formas en que las empresas llaman a este cargo, en español

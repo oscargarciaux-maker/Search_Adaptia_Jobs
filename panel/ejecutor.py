@@ -15,7 +15,7 @@ from panel.afinidad import (AMPLIACIONES, MINIMO_POR_PERFIL, TOPE_POSTS_SIN_CONF
 from panel.modelos import Configuracion
 from pydantic import ValidationError
 from panel.repositorio import RepositorioSupabase, hoy
-from panel.terminos import grado, sugerir
+from panel.terminos import en_espanol, espanol_del_mapa, grado, sugerir  # noqa: F401 (en_espanol: compatibilidad)
 
 
 def validar_version(version):
@@ -109,8 +109,30 @@ def paises_de_lugares(lugares):
 # Países con fuentes propias además de LinkedIn e Indeed (Computrabajo, Elempleo, Get on Board): fuera de ellos una
 # persona depende solo de LinkedIn e Indeed y recibe el doble de turnos (contrato v40).
 def _con_fuentes_propias():
-    from buscador.fuentes import computrabajo
-    return set(computrabajo.SITIOS) | {"ES"}
+    from buscador.fuentes import computrabajo, sitemaps_empleo
+    return set(computrabajo.SITIOS) | {"ES"} | {c for s in sitemaps_empleo.SITIOS.values() for c in s["sitemaps"]}
+
+
+# Contrato v44: países de América Latina para las remotas de Get on Board (zona LATAM).
+LATAM = {"AR", "BO", "BR", "CL", "CO", "CR", "CU", "DO", "EC", "GT", "HN", "MX", "NI", "PA", "PE", "PR", "PY", "SV",
+         "UY", "VE"}
+
+
+def fuentes_en(pais):
+    """Contrato v44 (decisión de Oscar: «cualquier persona, en cualquier país»): fuentes que buscan para alguien que
+    vive en `pais`, con títulos en español si solo habla español. LinkedIn y los portales de empresas cubren todo el
+    mundo; Get on Board aporta remotas abiertas a cualquier país (y a LATAM); Indeed, sus 62 países; las locales,
+    donde existen. Sin IA: sale de las listas de cada fuente."""
+    from buscador.fuentes import computrabajo, elempleo, indeed, sitemaps_empleo
+    salida = ["LinkedIn", "Portales de empresas", "Get on Board (remotas)"]
+    if pais in indeed.PAISES:
+        salida.append("Indeed")
+    if pais in computrabajo.SITIOS:
+        salida.append("Computrabajo")
+    if pais in elempleo.PAISES:
+        salida.append("Elempleo")
+    salida += [nombre for nombre, s in sitemaps_empleo.SITIOS.items() if pais in s["sitemaps"]]
+    return salida
 
 
 PESO_CORTO = 2
@@ -136,24 +158,7 @@ def persona_de_busqueda(p, rid, nombres=None, corto=False):
             "corto": bool(corto), "principales": principales}
 
 
-# PR 1b (16 nov): palabras con que empiezan los títulos en español. Sirven para elegir, entre los nombres del cargo y los
-# del mapa, los que se buscan para perfiles que solo aceptan avisos en español. Sin IA: lista editable.
-INICIO_ES = ("diseñador", "diseñadora", "desarrollador", "desarrolladora", "analista", "ingeniero", "ingeniera",
-             "gerente", "jefe", "jefa", "lider", "líder", "coordinador", "coordinadora", "especialista", "gestor",
-             "gestora", "consultor", "consultora", "programador", "programadora", "probador", "redactor", "redactora",
-             "responsable", "director", "directora", "encargado", "encargada", "asistente", "auxiliar", "tester de",
-             "dueño", "administrador", "administradora", "arquitecto", "arquitecta", "experto", "experta")
-
-
-PALABRAS_ES = ("ia", "inteligencia artificial", "de", "del", "y", "con", "para", "datos", "pruebas", "calidad",
-               "producto", "proyectos", "ventas", "mercadeo")
-
-
-def en_espanol(titulo):
-    """Título en español: empieza como uno («Diseñador…») o trae palabras propias («Product Manager IA»)."""
-    t = normalizar.texto(titulo)
-    return any(t == normalizar.texto(x) or t.startswith(normalizar.texto(x) + " ") for x in INICIO_ES) or \
-        any(normalizar.contiene_frase(t, normalizar.texto(x)) for x in PALABRAS_ES)
+# PR 1b (16 nov): `en_espanol` vive en panel.terminos desde v44 (también lo usan las sugerencias y `grado`).
 
 
 def consultas_espanol(cargo, raw, maximo=12):
@@ -223,12 +228,17 @@ def preparar(version, fecha, aprendidos=None, cortos=()):
         # Contrato v25: títulos aprobados desde «Coincide por funciones» cuentan como similares del cargo.
         similares = list(dict.fromkeys(raw["terminos_similares"] + list(aprendidos.get(str(c.id)) or [])))
         raw["terminos_similares"] = similares
+        # Contrato v44: los títulos en español de la familia del mapa también clasifican los avisos (grado ya los acepta;
+        # sin esto, lo que se buscó en español podía quedar sin cargo al limpiar).
+        similares = list(dict.fromkeys(similares + list(espanol_del_mapa(c.nombre))))
         mapa.append({"id": rid, "nombre": c.nombre, "consultas": [c.nombre, *raw["terminos_exactos"], *raw["terminos_similares"]],
             "exactos": raw["terminos_exactos"], "similares": similares, "cercanos": raw.get("terminos_cercanos", []),
             "funciones": raw.get("funciones", []),
             "excluir": raw["terminos_excluidos"], "herramientas": [], "lugares": list(lugares.items()),
             "_control_cargo": raw,
             "consultas_es": consultas_es, "lugares_es": list(lugares_es.items()) if consultas_es else [],
+            # Contrato v44: países de quienes solo hablan español (Indeed y Computrabajo buscan ahí con títulos en español).
+            "paises_es": paises_de_lugares(lugares_es) if consultas_es else [],
             # Contrato v36: también el país donde vive quien acepta remoto (Indeed busca ahí; antes solo oficinas).
             "paises_objetivo": sorted({x for p in perfiles for x in p.paises_oficina} |
                                       {f for p in perfiles for fila in p.filas if "remoto" in fila.modalidades

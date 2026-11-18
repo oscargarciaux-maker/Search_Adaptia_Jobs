@@ -1583,3 +1583,31 @@ test("18 nov: «Buscar ahora» lanza la búsqueda desde el Resumen y se bloquea 
   expect(await page.evaluate(revisarContraste)).toEqual([]);
   expect(errores).toEqual([]);
 });
+
+test("contrato v44: nombres en español compuestos y el oficio base para «AI Product Manager»", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await ir(page, "Cargos y metas");
+  await page.getByRole("button", { name: "Añadir cargo", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Cargo", { exact: true }).fill("AI Product Manager");
+  await dialog
+    .getByRole("button", { name: "Buscar denominaciones afines" })
+    .click();
+  const espanol = dialog.getByRole("group", { name: "Nombres en español" });
+  await expect(
+    espanol.getByRole("button", { name: "Añadir Gerente de Producto de IA" }),
+  ).toBeVisible();
+  const amplios = dialog.getByRole("group", { name: "Nombres más amplios" });
+  await expect(
+    amplios.getByRole("button", { name: "Añadir Gerente de Producto" }),
+  ).toBeVisible();
+  await espanol
+    .getByRole("button", { name: "Añadir Gerente de Producto de IA" })
+    .click();
+  await expect(
+    dialog.getByRole("button", { name: "Quitar Gerente de Producto de IA" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+});

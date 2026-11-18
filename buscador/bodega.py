@@ -18,7 +18,7 @@ from pathlib import Path
 import yaml
 
 from buscador import calidad, contrato, cobertura, enlaces, familias, normalizar, paises, tiempos, vacante
-from buscador.fuentes import (ats, computrabajo, elempleo, getonbrd, indeed, linkedin_apify, linkedin_publico, open_seat,
+from buscador.fuentes import (ats, computrabajo, elempleo, getonbrd, sitemaps_empleo, tableros_latam, indeed, linkedin_apify, linkedin_publico, open_seat,
                               publicaciones_apify, remotos)
 from buscador.http import Cliente
 
@@ -165,6 +165,9 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
 
     def f_getonbrd():
         combinaciones = [(f["id"], cobertura.rotar(cobertura.consultas(f), hoy, 1)[0], "GLOBAL") for f in mapa]
+        # Contrato v44: Get on Board es de LATAM y en español: quien solo habla español también busca ahí en español.
+        combinaciones += [(f["id"], cobertura.rotar(f["consultas_es"], hoy, 1)[0], "GLOBAL:ES") for f in mapa
+                          if f.get("consultas_es")]
         turnos = cobertura.repartir(combinaciones, {}, hoy, prioritarias)
         return getonbrd.buscar(Cliente(pausa=(0.3, 0.8)), [c[1] for c in turnos[:p["getonbrd_busquedas"]]])
 
@@ -182,6 +185,16 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
                                p["elempleo_busquedas"], hoy=hoy, max_fichas=p.get("elempleo_fichas", 80),
                                limite_segundos=limite, prioritarias=prioritarias)
 
+    def f_sitemap(nombre):
+        # Contrato v44: portales en español con sitemap de ofertas y JobPosting (Hireline, Magneto).
+        def f():
+            fichas = p.get(nombre.lower() + "_fichas", 0)
+            if not fichas:
+                return [], {"omitida": "sin presupuesto"}
+            return sitemaps_empleo.buscar(Cliente(pausa=(0.6, 1.4)), nombre, mapa, hoy=hoy, max_fichas=fichas,
+                                          limite_segundos=limite, prioritarias=prioritarias)
+        return f
+
     filas_ats = ats.leer_lista(ats.RUTA, trabajo / "empresas_ats.csv")
     # Open Seat (17 nov): empresas que contratan en LATAM con su portal; se leen con ats.py (ficha completa y cierres).
     de_open_seat = set()
@@ -197,6 +210,20 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
             ats.guardar_lista(ats.leer_lista(trabajo / "empresas_ats.csv") + nuevas_os, trabajo / "empresas_ats.csv")
         except Exception as e:  # noqa: BLE001 — sin Open Seat siguen los portales de siempre
             salud["Open Seat"] = {"error": f"{type(e).__name__}: {e}"[:300]}
+        # Contrato v44: RemotosLatam y WeRemoto, igual que Open Seat: solo las empresas (sus portales), nunca sus avisos.
+        try:
+            t0 = time.monotonic()
+            filas_tl, por_tablero = tableros_latam.tableros(Cliente(pausa=(0.6, 1.2)), hoy)
+            conocidas = {(f["sistema"], f["slug"].lower()) for f in filas_ats}
+            nuevas_tl = [f for f in filas_tl if (f["sistema"], f["slug"].lower()) not in conocidas]
+            filas_ats = filas_ats + nuevas_tl
+            de_open_seat |= {(f["sistema"], f["slug"].lower()) for f in filas_tl}
+            for nombre, datos in por_tablero.items():
+                salud[nombre] = dict(datos, nuevos=sum(1 for f in nuevas_tl if f["origen"] == nombre),
+                                     segundos=round(time.monotonic() - t0))
+            ats.guardar_lista(ats.leer_lista(trabajo / "empresas_ats.csv") + nuevas_tl, trabajo / "empresas_ats.csv")
+        except Exception as e:  # noqa: BLE001 — sin estos tableros siguen los portales de siempre
+            salud["Tableros LATAM"] = {"error": f"{type(e).__name__}: {e}"[:300]}
 
     def f_ats():
         filas = filas_ats
@@ -209,13 +236,15 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
                 return [], set(), {"omitida": "modo dirigido: aún no hay portales asociados a los cargos"}
         return ats.buscar(Cliente(pausa=(0.05, 0.2)), filas, limite_segundos=limite, prioritarias=prioritarias)
 
-    with ThreadPoolExecutor(9) as ex:
+    with ThreadPoolExecutor(11) as ex:
         tareas = {n: ex.submit(correr, n, f) for n, f in [("LinkedIn", f_linkedin), ("Indeed", f_indeed),
                                                             ("LinkedIn (Apify)", f_apify), ("Tableros remotos", f_remotos),
                                                             ("Get on Board", f_getonbrd), ("Portales de empresas", f_ats),
                                                             ("Publicaciones LinkedIn (Apify)", f_publicaciones),
                                                             ("Computrabajo", f_computrabajo),
-                                                            ("Elempleo", f_elempleo)]}
+                                                            ("Elempleo", f_elempleo),
+                                                            ("Hireline", f_sitemap("Hireline")),
+                                                            ("Magneto", f_sitemap("Magneto"))]}
         resultados = {n: t.result() for n, t in tareas.items()}
     crudas, empresas = [], set()
     for n, r in resultados.items():
@@ -328,7 +357,7 @@ def limpiar(previas, crudas, hoy, dias_maximos, enlaces_ats, empresas_leidas, co
 
 PRUEBA = {"minutos_por_fuente": 3, "linkedin_busquedas": 6, "linkedin_fichas": 8, "indeed_busquedas": 2,
           "apify_busquedas": 2, "remotos_paginas": 8, "empresas_por_probar": 5,
-          "getonbrd_busquedas": 3}
+          "getonbrd_busquedas": 3, "hireline_fichas": 4, "magneto_fichas": 4}
 
 
 def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=False):

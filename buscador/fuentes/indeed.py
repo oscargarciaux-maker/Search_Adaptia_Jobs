@@ -85,6 +85,10 @@ def buscar(mapa, paises_activos, estado, presupuesto, hoy=None, max_dias=30, por
                      # El filtro remoto de Indeed casi nunca marca avisos de LATAM (11 nov: 0 frente a 4 sin filtro):
                      # también se busca sin él y la ubicación del aviso decide la modalidad.
                      for sufijo in (":REMOTO", "")]
+    # Contrato v44: para quien solo habla español, también con un título en español en sus países (remoto y no).
+    combinaciones += [(f["id"], cobertura.rotar(f["consultas_es"], hoy, 1, desfase=desfase_terminos)[0], p + sufijo)
+                      for f in mapa if f.get("consultas_es") for p in f.get("paises_es") or [] if p in PAISES
+                      for sufijo in (":ES:REMOTO", ":ES")]
     combinaciones = cobertura.repartir(combinaciones, estado, hoy, prioritarias)
     crudas, hechas, fallidas, seguidas = [], 0, 0, 0
     por_familia, por_pais = {}, {}

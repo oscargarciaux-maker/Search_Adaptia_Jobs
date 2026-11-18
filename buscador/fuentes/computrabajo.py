@@ -94,9 +94,19 @@ def modalidad(texto):
     return None, ""
 
 
-def _primero_es(f):
-    es = list(f.get("consultas_es") or [])
-    return es + [c for c in cobertura.consultas(f) if c not in es] if es else cobertura.consultas(f)
+def combinaciones(mapa, nombres):
+    """(familia, consultas, lugar, {}) por cargo y país. Contrato v44: los títulos en español tienen su propio turno
+    («CO:ES») en los países de quienes solo hablan español; antes compartían la rotación con los de inglés."""
+    salida = []
+    for f in mapa:
+        es = list(f.get("consultas_es") or [])
+        resto = [c for c in cobertura.consultas(f) if c not in es]
+        for codigo in f.get("paises_objetivo", list(nombres)):
+            if codigo in SITIOS:
+                salida.append((f["id"], resto or es, codigo, {}))
+                if es and codigo in (f.get("paises_es") or []):
+                    salida.append((f["id"], es, codigo + ":ES", {}))
+    return salida
 
 
 def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fichas=120, reloj=time.monotonic,
@@ -106,14 +116,12 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
     hoy = hoy or datetime.now(timezone.utc).date().isoformat()
     inicio = reloj()
     nombres = dict(paises_activos)
-    # PR 1b: Computrabajo es en español; si el cargo tiene títulos en español (perfiles solo en español), van primero
-    # y se alternan con el resto día a día.
-    todas = [(f["id"], _primero_es(f), codigo, {}) for f in mapa
-             for codigo in f.get("paises_objetivo", list(nombres)) if codigo in SITIOS]
+    todas = combinaciones(mapa, nombres)
     todas = cobertura.repartir(todas, estado, hoy, prioritarias)
     avisos, vistos = [], set()
     hechas = fallidas = seguidas = 0
-    for familia, consultas, codigo, _ in todas:
+    for familia, consultas, lugar, _ in todas:
+        codigo = lugar.split(":")[0]
         if hechas >= presupuesto or seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
             break
         consulta = cobertura.rotar(consultas, hoy, 1, desfase=desfase_terminos)[0]
@@ -136,7 +144,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
                     avisos.append(dict(f, pais=codigo, familia=familia))
             if len(filas) < 20:
                 break
-        estado[f"{familia}@{codigo}"] = hoy
+        estado[f"{familia}@{lugar}"] = hoy
     avisos.sort(key=lambda a: a["familia"] not in prioritarias)
     crudas, con_ficha, cerradas = [], 0, 0
     for a in avisos:

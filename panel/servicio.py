@@ -11,6 +11,7 @@ from panel.afinidad import (AMPLIACIONES, ETIQUETAS_AMPLIACION, MINIMO_POR_PERFI
                             evaluar_ampliada, evaluar_post, post_ubicacion)
 from panel.repositorio import ErrorRepositorio, hoy
 from panel.terminos import grado, sugerir
+from buscador.normalizar import titulo_base as normalizar_titulo
 
 # Qué puede hacer el operador cuando un filtro, por sí solo, deja fuera vacantes. Sin sugerencia si no depende de él.
 # Desde v27 solo descartan la ubicación, el idioma y las reglas del sistema: años, inglés y restricciones solo ordenan.
@@ -347,6 +348,62 @@ def resumen_clientes(repo, fecha=None, dias=7):
     return {"fecha": fecha, "busqueda_de_hoy": any(d["fecha"] == fecha for d in por_dia), "dias": por_dia}
 
 
+# ── Contrato v44: «Qué hacer» por persona, con cifras ──────────────────────────────────────────────────────────────
+def que_hacer(p, cargo, raw, base, del_cargo, ya, fecha, nombres_pais=None, hoy_n=0):
+    """Para una persona bajo su meta, cuántas vacantes más del catálogo (≈ últimos 30 días) le servirían con cada ajuste.
+    Solo devuelve los ajustes que suman algo; nada se aplica solo. Sin IA: simula con `evaluar` y `grado`."""
+    from panel.modelos import Perfil
+
+    def nuevas(vacantes, perfil, excluir=()):
+        excluir = set(excluir)
+        return sum(1 for v in vacantes if v["id"] not in ya and v["id"] not in excluir
+                   and evaluar(v, perfil, fecha)["compatible"])
+
+    actuales = {v["id"] for v in del_cargo if v["id"] not in ya and evaluar(v, p, fecha)["compatible"]}
+    propios = {normalizar_titulo(x) for x in [cargo.nombre, *raw["terminos_exactos"], *raw["terminos_similares"]]}
+    sug = sugerir(cargo.nombre, consultar_esco=False)
+    salida = []
+    for clave, accion, terminos in (("nombres_es", "Añadir al cargo estos nombres en español", sug.get("terminos_es") or []),
+                                     ("oficio_base", "Aceptar también el oficio general", sug.get("terminos_base") or [])):
+        extra = [x for x in terminos if normalizar_titulo(x) not in propios]
+        if not extra:
+            continue
+        ampliado = dict(raw, terminos_similares=[*raw["terminos_similares"], *extra])
+        mas = nuevas(_del_cargo(base, ampliado), p, actuales)
+        if mas:
+            salida.append({"clave": clave, "accion": accion, "detalle": ", ".join(extra[:4]) + ("…" if len(extra) > 4 else ""),
+                           "mas": mas, "terminos": extra[:20]})
+    filas = p.filas
+    if filas and not ({"hibrido", "presencial"} & set(filas[0].modalidades)):
+        datos = p.model_dump(mode="json")
+        primera = filas[0].model_dump(mode="json")
+        datos["ubicaciones"] = [dict(primera, modalidades=sorted(set(primera["modalidades"]) | {"hibrido", "presencial"})),
+                                *[f.model_dump(mode="json") for f in filas[1:]]]
+        try:
+            ampliado = Perfil.model_validate(datos)
+        except ValueError:
+            ampliado = None
+        if ampliado is not None:
+            mas = nuevas(del_cargo, ampliado, actuales)
+            lugar = ", ".join(primera.get("ciudades") or []) or ", ".join(
+                (nombres_pais or {}).get(x, x) for x in primera.get("paises") or [p.vive_en])
+            if mas:
+                salida.append({"clave": "modalidad", "accion": f"Aceptar híbrido o presencial en {lugar}",
+                               "detalle": "Hoy solo acepta remoto donde vive.", "mas": mas})
+    salida.sort(key=lambda x: -x["mas"])
+    total = len(actuales) + len({v["id"] for v in del_cargo if v["id"] in ya})
+    por_dia = round(total / 30, 1)
+    meta = int(p.meta_diaria or 0)
+    base_dia = max(por_dia, hoy_n)  # lo que de verdad llega: nunca sugerir menos de lo que recibió hoy
+    if meta > MINIMO_POR_PERFIL and base_dia < meta:
+        sugerida = max(MINIMO_POR_PERFIL, int(base_dia + 0.5))
+        if sugerida < meta:
+            salida.append({"clave": "meta", "accion": f"Bajar su meta diaria de {meta} a {sugerida}",
+                           "detalle": f"En los últimos 30 días aparecieron unas {por_dia:g} al día que le sirven.",
+                           "mas": 0})
+    return salida
+
+
 # ── Contrato v37: cobertura por persona ──────────────────────────────────────────────────────────────────────────────
 DIAS_COBERTURA = 14
 DIAS_PARA_MEDIR = 3  # con menos búsquedas medidas, «aún sin datos»
@@ -374,6 +431,8 @@ def cobertura(repo, fecha=None):
     perfiles = [(c, p) for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id))
                 if p.cliente_id in clientes]
     recibidas = repo.recibidas([str(p.id) for _, p in perfiles]) if perfiles else {}
+    from buscador import paises as _paises
+    nombres = {x["codigo"]: x["nombre"] for x in _paises.mundo()["lista"]}
     filas = []
     for cargo, p in perfiles:
         pid = str(p.id)
@@ -424,14 +483,19 @@ def cobertura(repo, fecha=None):
             else:
                 causa = "Pocas vacantes nuevas en las fuentes revisadas para su ubicación e idioma."
             if pocas_fuentes and not listas:
-                causa += (" Donde vive o trabajaría solo buscan LinkedIn e Indeed (no hay Computrabajo, Elempleo ni Get on "
-                          "Board): tiene el doble de turnos en la búsqueda.")
+                from panel.ejecutor import fuentes_en
+                causa += (f" Cobertura limitada donde vive: se busca con {', '.join(fuentes_en(p.vive_en))}; recibe sobre "
+                          "todo remotas abiertas a su país. Tiene el doble de turnos en la búsqueda.")
         seguidos = 0
         for e in dias:
             if conteo.get((str(e["id"]), pid), 0) >= MINIMO_POR_PERFIL:
                 break
             seguidos += 1
+        # Contrato v44: qué hacer, con cifras, para quien no llega a su meta.
+        ajustes = que_hacer(p, cargo, raw, base, del_cargo, ya, fecha, nombres, hoy_n) \
+            if hoy_n < max(MINIMO_POR_PERFIL, int(p.meta_diaria or 0)) else []
         filas.append({"perfil_id": pid, "cliente_id": str(p.cliente_id), "cliente": clientes[p.cliente_id].nombre,
+                      "que_hacer": ajustes,
                       "cargo": cargo.nombre, "vive_en": p.vive_en, "idiomas": list(p.idiomas), "estado": estado,
                       "hoy": hoy_n, "dias_con_minimo": con_minimo, "dias_medidos": len(dias),
                       "dias_seguidos_bajo": seguidos if len(dias) >= DIAS_PARA_MEDIR else 0,

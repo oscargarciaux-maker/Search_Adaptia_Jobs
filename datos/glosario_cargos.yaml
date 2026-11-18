@@ -1,0 +1,29 @@
+# Contrato v44 (18 nov): glosario editable para sugerir nombres en español de cargos compuestos, sin IA.
+# Si el nombre de un cargo no está en el mapa de cargos (por ejemplo «AI Product Manager»), se le quita el
+# modificador (AI), se busca el oficio base en el mapa (Product Manager) y se combinan sus nombres en español con
+# las formas en español del modificador: «Gerente de Producto de IA», «Product Manager IA»…
+# Son SOLO SUGERENCIAS: el operador las añade con un clic en «Buscar denominaciones afines». Nada entra solo.
+#
+# en: cómo aparece el modificador en el nombre del cargo (en minúsculas, sin tildes).
+# es: cómo se escribe en español al final del nombre (sufijo).
+modificadores:
+  - en: [ai, a.i., artificial intelligence, genai, gen ai, generative ai, llm, ia, inteligencia artificial]
+    es: [IA, de IA, de Inteligencia Artificial]
+  - en: [machine learning, ml]
+    es: [de Machine Learning, de Aprendizaje Automático]
+  - en: [data, datos]
+    es: [de Datos]
+  - en: [growth, crecimiento]
+    es: [de Growth, de Crecimiento]
+  - en: [mobile, movil]
+    es: [Mobile, Móvil]
+  - en: [ecommerce, e-commerce]
+    es: [de E-commerce, de Comercio Electrónico]
+  - en: [fintech]
+    es: [Fintech]
+  - en: [saas]
+    es: [SaaS]
+# Palabras que en un nombre en español van en minúscula al armar las sugerencias.
+minusculas: [de, del, la, el, los, las, y, e, en, para, con, a, of, and, the, for, to]
+# Cuántas sugerencias en español se proponen como máximo.
+maximo: 12

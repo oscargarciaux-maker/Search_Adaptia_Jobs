@@ -305,6 +305,8 @@ type FilaCobertura = {
   causa: string;
   busquedas_hoy?: Record<string, number>;
   pocas_fuentes?: boolean;
+  // Contrato v44: qué hacer, con cuántas vacantes más le llegarían (de los últimos 30 días).
+  que_hacer?: { clave: string; accion: string; detalle: string; mas: number }[];
 };
 type Grupo = {
   perfiles: number;
@@ -473,7 +475,26 @@ export function CoberturaPersonas({
                         {f.hoy} / {datos.minimo}
                       </span>
                     </td>
-                    <td className="causa">{f.causa || "—"}</td>
+                    <td className="causa">
+                      {f.causa || "—"}
+                      {(f.que_hacer || []).length > 0 && (
+                        <ul className="que-hacer" aria-label="Qué hacer">
+                          {f.que_hacer!.map((q) => (
+                            <li key={q.clave}>
+                              <strong>{q.accion}</strong>
+                              {q.mas > 0 && (
+                                <span className="pill green">+{q.mas}</span>
+                              )}
+                              {q.detalle && (
+                                <span className="que-hacer-detalle">
+                                  {q.detalle}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

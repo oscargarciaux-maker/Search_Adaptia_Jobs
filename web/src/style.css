@@ -5657,3 +5657,23 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     grid-column: 1 / -1;
   }
 }
+
+/* Contrato v44: «Qué hacer» por persona, con cuántas más le llegarían. */
+.que-hacer {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.que-hacer li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+.que-hacer-detalle {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
