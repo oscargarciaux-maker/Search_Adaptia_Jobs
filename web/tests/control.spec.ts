@@ -1553,3 +1553,33 @@ test("sesión de prueba: nombres afines con un clic y explicación del 0", async
   ).toBeVisible();
   await page.keyboard.press("Escape");
 });
+
+test("18 nov: «Buscar ahora» lanza la búsqueda desde el Resumen y se bloquea mientras corre", async ({
+  page,
+}) => {
+  const errores: string[] = [];
+  page.on("pageerror", (e) => errores.push(e.message));
+  await page.goto("/");
+  await page.getByRole("heading", { level: 1, name: "Resumen" }).waitFor();
+  await page.getByRole("button", { name: "Buscar ahora" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("una hora y media");
+  await expect(dialog).toContainText("Hoy ya hubo una búsqueda"); // la demo tiene la de hoy: completa sin repetir
+  await expect(dialog).toContainText("Demostración");
+  await dialog.getByRole("button", { name: "Buscar ahora" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText("Búsqueda pedida")).toBeVisible();
+  const enCurso = page.getByRole("button", { name: /^(En cola|Buscando)/ });
+  // Bloqueado pero enfocable (aria-disabled): el foco vuelve a él al cerrar el diálogo y explica por qué.
+  await expect(enCurso).toHaveAttribute("aria-disabled", "true");
+  await expect(enCurso).toBeFocused();
+  await enCurso.click({ force: true }); // Playwright no hace clic solo en un botón aria-disabled
+  await expect(page.getByText("Ya hay una búsqueda")).toBeVisible();
+  // Otras pestañas no lo muestran: solo el Resumen.
+  await ir(page, "Cargos y metas");
+  await expect(
+    page.getByRole("button", { name: /Buscar ahora|Buscando|En cola/ }),
+  ).toHaveCount(0);
+  expect(await page.evaluate(revisarContraste)).toEqual([]);
+  expect(errores).toEqual([]);
+});

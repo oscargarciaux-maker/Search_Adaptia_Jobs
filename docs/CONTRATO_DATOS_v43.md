@@ -22,7 +22,7 @@
 2. **Una búsqueda no se cae por un cambio de configuración** (`panel/ejecutor.py`):
    - antes de asignar, vuelve a leer la versión confirmada más nueva (`vigente`) y asigna con ella;
    - `iniciar` lleva la fila del día a la versión más nueva y nunca la regresa a una más vieja.
-3. **La próxima búsqueda completa lo que falta** (sin botón «buscar ahora», decisión de Oscar):
+3. **La próxima búsqueda completa lo que falta** (sin botón «buscar ahora», decisión de Oscar; el mismo 18 nov, tras un día sin horarios de GitHub, pidió «Buscar ahora» en el Resumen: lanza esta misma búsqueda diaria y no cambia ninguna regla de este contrato, ver `docs/GUIA_CLIENTE.md`):
    - la búsqueda que arma el lote guarda `resumen.revision_del_lote`;
    - si una captura horaria encuentra una versión más nueva que la del lote, arma lote solo para lo que falta, con el
      lote del día como punto de partida. Antes lee lo ya entregado en Supabase y no repite nada;

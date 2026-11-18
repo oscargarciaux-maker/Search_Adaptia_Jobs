@@ -19,6 +19,7 @@ from buscador import paises
 from buscador.fuentes.publicaciones_apify import PREFIJOS
 from buscador import registro
 from panel import servicio
+from panel.acciones import desde_entorno as conexion_github
 from panel.modelos import AjusteOperador, BorrarCliente, ImportarClientes, CambioBorrador, Configuracion, Contacto, DecisionRevision, EstadoRegla, SubirRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia, explicar, parcial, solo_perfil
 from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase, hoy
 from panel.terminos import sugerir
@@ -65,7 +66,7 @@ def a_v8(estado):
     return estado
 
 
-def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
+def crear_app(demo=False, repositorio=None, origen=None, operadores=None, acciones=None):
     app = FastAPI(title="Adaptia · Control de búsqueda", docs_url=None, redoc_url=None, openapi_url=None)
     origen = (origen or os.environ.get("PANEL_ORIGIN", "")).rstrip("/")
     operadores = operadores if operadores is not None else [x.strip().casefold() for x in os.environ.get("PANEL_OPERATOR_EMAILS", "").split(",") if x.strip()]
@@ -83,6 +84,8 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         import threading
         threading.Thread(target=precargar, daemon=True).start()
     app.state.repo, app.state.demo = repo, demo
+    # «Buscar ahora»: la conexión con GitHub (o None, sin botón). Por defecto se lee del alojamiento.
+    app.state.acciones = acciones if acciones is not None else conexion_github(demo)
     # Contrato v29: copias cortas en memoria. Cualquier escritura del panel (POST/PUT/PATCH/DELETE) sube el sello e
     # invalida los resultados guardados; la búsqueda nocturna corre en otro proceso y la cubre la vigencia de 2 min.
     sello = [0]
@@ -584,6 +587,23 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None):
         if body.decision == "sirve" and resultado.get("asignadas"):
             pedir_borradores()
         return resultado
+
+    @app.get("/api/busqueda")
+    def busqueda():
+        """«Buscar ahora»: si el panel puede lanzar la búsqueda y si hay una en cola o corriendo."""
+        if not app.state.acciones:
+            return {"disponible": False}
+        try:
+            return {"disponible": True, **app.state.acciones.estado()}
+        except ErrorRepositorio as e:  # el botón queda visible y dice por qué no se puede (el mensaje no lleva la llave)
+            registro.aviso("api:busqueda", RuntimeError(e.mensaje))
+            return {"disponible": True, "en_curso": None, "ocupado": e.mensaje, "ultima_pedida": None}
+
+    @app.post("/api/busqueda")
+    def buscar_ahora():
+        if not app.state.acciones:
+            raise ErrorRepositorio("Falta la llave de GitHub en el alojamiento del panel (GITHUB_ACCIONES_TOKEN).", 409)
+        return app.state.acciones.lanzar()
 
     @app.get("/api/ejecuciones")
     def ejecuciones():
