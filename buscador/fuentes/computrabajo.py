@@ -129,9 +129,14 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
         codigo = lugar.split(":")[0]
         if hechas >= presupuesto or seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
             break
-        consulta = cobertura.rotar(consultas, hoy, 1, desfase=desfase_terminos)[0]
+        clave = f"{familia}@{lugar}"
+        siguiente = cobertura.siguiente_busqueda(consultas, hoy, 1, clave, estado, desfase=desfase_terminos)
+        if siguiente is None:  # contrato v47: ya se buscó hoy y no queda nada nuevo ahí
+            continue
+        (consulta,), desde, _ = siguiente
+        clave_terminos = cobertura.clave_consulta(clave, [consulta])
         sitio = SITIOS[codigo]
-        for pagina in range(1, max_paginas + 1):
+        for pagina in range(desde + 1, desde + max_paginas + 1):
             if hechas >= presupuesto:
                 break
             url = f"https://{sitio}.computrabajo.com/trabajo-de-{slug(consulta)}" + (f"?p={pagina}" if pagina > 1 else "")
@@ -147,9 +152,11 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
                 if f["id"] not in vistos:
                     vistos.add(f["id"])
                     avisos.append(dict(f, pais=codigo, familia=familia))
+            cobertura.anotar_paginas(estado, clave_terminos, hoy, pagina, len(filas) < 20, None)
             if len(filas) < 20:
                 break
-        estado[f"{familia}@{lugar}"] = hoy
+        estado[clave] = hoy
+        estado[clave_terminos] = hoy
     avisos.sort(key=lambda a: a["familia"] not in prioritarias)
     crudas, con_ficha, cerradas = [], 0, 0
     for a in avisos:

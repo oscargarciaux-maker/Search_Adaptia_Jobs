@@ -111,13 +111,54 @@ def sirve_a_corta(v):
                for p in _PERSONAS)
 
 
-# Contrato v45 («Buscar ahora» para quien falta): los lugares de quienes no llegan a su meta piden los días completos.
-_A_FONDO = False
+# Contrato v47 («Buscar ahora» para quien falta, decisión de Oscar del 18 nov): búsqueda corta y sin repetir. Solo
+# las combinaciones de quienes faltan (sin el resto) y, si una ya se buscó hoy con los mismos términos, los términos
+# siguientes del cargo o la página siguiente. Si cambian las condiciones del perfil, cambian las claves y se busca.
+_FALTANTES = False
+PAGINAS = "~paginas"  # {clave con términos: [fecha, siguiente página, agotada, días pedidos]} en el estado de la fuente
+TOPE_PAGINAS_DIA = 10
 
 
-def configurar_a_fondo(activo=False):
-    global _A_FONDO
-    _A_FONDO = bool(activo)
+def configurar_faltantes(activo=False):
+    global _FALTANTES
+    _FALTANTES = bool(activo)
+
+
+def modo_faltantes():
+    return _FALTANTES
+
+
+def familias_personas():
+    """Los cargos de las personas de esta búsqueda (en modo faltantes, solo los de quienes faltan)."""
+    return {p["familia"] for p in _PERSONAS}
+
+
+def siguiente_busqueda(consultas, hoy, cantidad, clave, estado, desfase=0):
+    """(términos, página desde la que leer, días que pidió esa búsqueda o None) o None si no queda nada nuevo por buscar
+    hoy en ese lugar. Fuera del modo faltantes, la de siempre: la rotación del día desde la primera página.
+    En modo faltantes: la primera rotación de términos que no se buscó hoy ahí; si ya se buscaron todas, la del día
+    desde la página donde quedó, con los mismos días (si no se agotó y no pasó del tope del día)."""
+    terminos = rotar(consultas, hoy, cantidad, desfase=desfase)
+    if not _FALTANTES or not terminos:
+        return terminos, 0, None
+    vueltas = max(1, -(-len(consultas) // max(1, cantidad)))
+    for k in range(vueltas):
+        otra = rotar(consultas, hoy, cantidad, desfase=desfase + k * cantidad)
+        if estado.get(clave_consulta(clave, otra)) != hoy:
+            return otra, 0, None
+    fecha, desde, agotada, dias = ((estado.get(PAGINAS) or {}).get(clave_consulta(clave, terminos))
+                                   or ("", 0, True, None))
+    if fecha != hoy or agotada or desde >= TOPE_PAGINAS_DIA:
+        return None  # sin saber dónde quedó (o ya no hay más páginas), no se repite
+    return terminos, desde, dias
+
+
+def anotar_paginas(estado, clave_terminos, hoy, siguiente, agotada, dias):
+    """Hasta dónde se leyó hoy esa búsqueda y con cuántos días (solo se guardan las de hoy)."""
+    paginas = {k: v for k, v in (estado.get(PAGINAS) or {}).items() if v and v[0] == hoy}
+    previa = paginas.get(clave_terminos) or (hoy, 0, False, dias)
+    paginas[clave_terminos] = (hoy, max(previa[1], siguiente), bool(agotada or previa[2]), previa[3] or dias)
+    estado[PAGINAS] = paginas
 
 
 def dias_busqueda(clave, ultima, hoy, max_dias):
@@ -125,8 +166,6 @@ def dias_busqueda(clave, ultima, hoy, max_dias):
     nada útil (`ceros`), los `max_dias` completos: lo que trajo pudo perderse (17 nov, caso Danna: la limpieza
     archivaba lo de fuera de LATAM y, al repetir, Chicago solo pedía el último día)."""
     if not ultima or (_RENDIMIENTO.get(clave) or {}).get("ceros"):
-        return max_dias
-    if _A_FONDO and "@" in clave and va_primero(*clave.split("#")[0].split("@", 1)):
         return max_dias
     from datetime import datetime
     return min(max_dias, max(1, (datetime.fromisoformat(hoy) - datetime.fromisoformat(ultima)).days + 1))
@@ -188,6 +227,8 @@ def _por_personas(combinaciones, estado, hoy, prioritarias):
         for j in sirve[id(c)]:  # una búsqueda compartida es un turno para cada persona a la que sirve
             if j in pase:
                 pase[j] += 1 / _PERSONAS[j]["peso"]
+    if _FALTANTES:  # contrato v47: solo lo de quienes faltan
+        return salida
     resto = [c for c in combinaciones if id(c) not in tomadas]
     return salida + (_repartir_familias(resto, estado, hoy, prioritarias) if resto else [])
 

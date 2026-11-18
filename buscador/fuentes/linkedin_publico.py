@@ -109,11 +109,15 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
         if hechas >= presupuesto or seguidas >= 4 or (limite_busqueda is not None and reloj() - inicio >= limite_busqueda):
             break
         clave = f"{familia}@{lugar}"
-        terminos = cobertura.rotar(consultas, hoy, 4, desfase=desfase_terminos)
+        # Contrato v47: en modo faltantes, lo ya buscado hoy no se repite (otros términos o la página siguiente).
+        siguiente = cobertura.siguiente_busqueda(consultas, hoy, 4, clave, estado, desfase=desfase_terminos)
+        if siguiente is None:
+            continue
+        terminos, desde, dias = siguiente
         clave_terminos = cobertura.clave_consulta(clave, terminos)
-        ultima = estado.get(clave_terminos)
-        dias = cobertura.dias_busqueda(clave, ultima, hoy, max_dias)  # completo si la vez anterior no dejó nada útil
-        for pagina in range(max_paginas):
+        # Completo si la vez anterior no dejó nada útil; al seguir en otra página, los mismos días que esa búsqueda.
+        dias = dias or cobertura.dias_busqueda(clave, estado.get(clave_terminos), hoy, max_dias)
+        for pagina in range(desde, desde + max_paginas):
             if hechas >= presupuesto or (limite_busqueda is not None and reloj() - inicio >= limite_busqueda):
                 break
             r = cliente.get(BUSQUEDA, params=dict(params, keywords=consulta_or(terminos), f_TPR=f"r{dias * 86400}",
@@ -134,6 +138,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
                     f["lugar_busqueda"] = lugar
                     f["familia"] = familia
                     avisos.append(f)
+            cobertura.anotar_paginas(estado, clave_terminos, hoy, pagina + 1, len(filas) < 10, dias)
             if len(filas) < 10:
                 break
         if seguidas == 0:

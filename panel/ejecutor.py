@@ -181,16 +181,17 @@ def objetivo_mundo(cfg):
     return sorted(salida), acepta
 
 
-# Contrato v45: con «Buscar ahora» para quien falta, las fuentes tienen el doble de presupuesto.
-FACTOR_A_FONDO = 2
+# Contrato v47: «Buscar ahora» para quien falta es corta: minutos por fuente y segundos de los pasos después de buscar.
+MINUTOS_FALTANTES = 12
+SEGUNDOS_FALTANTES = {"verificacion": 240, "ubicacion": 150}
 
 
 def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
     """`cortos` (contrato v37): ids de perfiles que en la última búsqueda quedaron bajo el mínimo (o no recibieron
     nada, como los nuevos). Sus lugares van primero en cada fuente y sus avisos reciben ficha primero.
-    `enfocar` (contrato v45, «Buscar ahora» para quien falta): ids de los perfiles que hoy no llegan a su meta. Solo
-    ellos tienen turnos de búsqueda, sus lugares van primero y piden los 30 días, y las fuentes tienen el doble de
-    presupuesto. El mapa y los cargos son los de siempre (la clasificación y el lote del día no cambian)."""
+    `enfocar` (contrato v45/v47, «Buscar ahora» para quien falta): ids de los perfiles que hoy no llegan a su meta. Solo
+    ellos tienen turnos de búsqueda y sus lugares van primero; lo ya buscado hoy no se repite y la búsqueda es corta
+    (`MINUTOS_FALTANTES`). El mapa y los cargos son los de siempre: la clasificación y el lote del día no cambian."""
     cfg = validar_version(version)
     # Con `enfocar`, solo ellos van primero y piden 30 días (no los cortos de la última búsqueda que ya cumplen).
     enfocar = None if enfocar is None else {str(x) for x in enfocar}
@@ -270,13 +271,13 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
         apify_busquedas=0,  # contrato v11: Apify solo para perfiles bajo el mínimo (rescate dirigido)
         empresas_por_probar=20, remotos_paginas=24)
     if enfocar is not None:
-        pres = motor["presupuestos"]
-        for clave in ("linkedin_busquedas", "linkedin_fichas", "indeed_busquedas", "getonbrd_busquedas",
-                      "computrabajo_busquedas", "computrabajo_fichas", "elempleo_busquedas", "elempleo_fichas",
-                      "hireline_fichas", "magneto_fichas"):
-            if pres.get(clave):
-                pres[clave] = int(pres[clave] * FACTOR_A_FONDO)
-        motor["a_fondo"] = True
+        # Contrato v47 (decisión de Oscar, 18 nov): corta y sin repetir lo ya buscado hoy; lo que importa es que les
+        # lleguen vacantes. Presupuestos de siempre, con tope de tiempo, y una sola ronda de refuerzo.
+        motor["faltantes"] = True
+        motor["presupuestos"]["minutos_por_fuente"] = MINUTOS_FALTANTES
+        motor.setdefault("verificacion_enlaces", {})["segundos_corrida"] = SEGUNDOS_FALTANTES["verificacion"]
+        motor.setdefault("confirmar_ubicacion", {})["segundos"] = SEGUNDOS_FALTANTES["ubicacion"]
+        motor.setdefault("refuerzo", {})["rondas"] = min(1, motor["refuerzo"].get("rondas", 1))
     return mapa, configuracion, motor
 
 
@@ -286,7 +287,7 @@ def activar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
     from buscador import cobertura, contrato
     cobertura.configurar_primero(motor.get("lugares_primero"))
     cobertura.configurar_personas(motor.get("personas_busqueda"))
-    cobertura.configurar_a_fondo(motor.get("a_fondo"))
+    cobertura.configurar_faltantes(motor.get("faltantes"))
     anterior_e, anterior_b, anterior_c = entrega._config_operativa, bodega._config_operativa, contrato._PANEL
     familias.configurar(mapa)
     entrega._config_operativa, bodega._config_operativa, contrato._PANEL = cfg, motor, True
@@ -296,7 +297,7 @@ def activar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
         familias.configurar()
         cobertura.configurar_primero()
         cobertura.configurar_personas()
-        cobertura.configurar_a_fondo()
+        cobertura.configurar_faltantes()
         entrega._config_operativa, bodega._config_operativa, contrato._PANEL = anterior_e, anterior_b, anterior_c
 
 
