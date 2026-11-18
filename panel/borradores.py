@@ -4,7 +4,6 @@ import argparse
 from datetime import date, timedelta
 import hashlib
 import hmac
-import os
 import re
 import secrets
 from urllib.parse import quote
@@ -202,7 +201,8 @@ _LLAVE_AL_AZAR = secrets.token_bytes(32)  # sin la credencial de servicio (demos
 def _llave():
     """Llave de las firmas, derivada en el servidor de la credencial de servicio (no hay variable nueva). Nunca sale
     del servidor: ni al navegador, ni a los registros, ni a los enlaces (solo su firma)."""
-    secreto = os.environ.get("SUPABASE_SECRET_KEY", "")
+    from buscador.supabase import credenciales
+    secreto = credenciales()[1] or ""  # la misma credencial que usa el panel (también SUPABASE_SERVICE_ROLE_KEY)
     return hashlib.sha256(b"adaptia-whatsapp-corto:" + secreto.encode()).digest() if secreto else _LLAVE_AL_AZAR
 
 
@@ -215,42 +215,43 @@ def ficha_corta(borrador_id, fecha):
     return f"{borrador_id}.{firma(borrador_id, fecha)}"
 
 
-def abrir_corto(repo, ficha, fecha=None):
+FIRMA = re.compile(r"^[0-9a-f]{16}$")
+
+
+def abrir_corto(repo, ficha, fecha=None, marcar=True):
     """El enlace wa.me del cliente con su mensaje actual (lo editado en el panel cuenta), o None si la ficha no es
-    válida, no es de hoy, el mensaje ya se envió o descartó, o el cliente no tiene WhatsApp. Marca «abierto»."""
+    válida, no es de hoy, el mensaje ya se envió o descartó, o el cliente no tiene WhatsApp o retiró su consentimiento.
+    Con `marcar`, lo deja «abierto» (no cuando quien pide es la vista previa de WhatsApp)."""
     fecha = fecha or hoy()
     borrador_id, _, recibida = str(ficha or "").partition(".")
-    if not borrador_id or len(recibida) != 16 or not hmac.compare_digest(recibida, firma(borrador_id, fecha)):
+    if not borrador_id or not FIRMA.match(recibida) or not hmac.compare_digest(recibida, firma(borrador_id, fecha)):
         return None
     b = next((x for x in repo.borradores(fecha=fecha) if str(x.get("id")) == borrador_id), None)
     if not b or b.get("estado") not in ("pendiente", "abierto"):
         return None
     c = next((x for x in repo.contactos() if x.get("cliente_id") == b["cliente_id"]), None)
-    if not c or not c.get("telefono"):
+    if not c or not c.get("telefono") or not c.get("consentimiento"):
         return None
-    if b.get("estado") == "pendiente":
+    if marcar and b.get("estado") == "pendiente":
         repo.actualizar_borrador(borrador_id, {"estado": "abierto"})
     return enlace_whatsapp(c["telefono"], b["texto"])
 
 
-def para_operador(repo, base, fecha=None, contactos=None, borradores=None, nombres=None):
+def para_operador(repo, base, fecha, contactos, borradores, nombres):
     """Contrato v46 (decisión de Oscar, 18 nov): «Mandarme todos a mi WhatsApp» en UN solo mensaje al número del
     operador, con un enlace corto por cliente (`base` + /w/<ficha>) que abre su chat con el mensaje escrito. Antes
     (v31) cada cliente llevaba su mensaje completo dentro del enlace y había que partirlo. No envía nada: el operador
-    envía su mensaje y, desde su teléfono, toca cada cliente."""
+    envía su mensaje y, desde su teléfono, toca cada cliente. `contactos`, `borradores` y `nombres` los pasa la API
+    desde sus copias."""
     from panel.repositorio import ErrorRepositorio
-    fecha = fecha or hoy()
     operador = (repo.ajuste("operador", {}) or {}).get("telefono", "")
     if not operador:
         raise ErrorRepositorio("Guarda primero tu número de WhatsApp en «Mi número».", 422)
-    contactos = {c["cliente_id"]: c for c in (contactos if contactos is not None else repo.contactos())}
-    if nombres is None:
-        version = repo.operativa(fecha) or {}
-        nombres = {c["id"]: c["nombre"] for c in (version.get("configuracion") or {}).get("clientes", [])}
+    contactos = {c["cliente_id"]: c for c in contactos}
     lineas = []
-    for b in (borradores if borradores is not None else repo.borradores(fecha=fecha)):
+    for b in borradores:
         c = contactos.get(b["cliente_id"])
-        if b.get("estado") not in ("pendiente", "abierto") or not c or not c.get("telefono"):
+        if b.get("estado") not in ("pendiente", "abierto") or not c or not c.get("telefono") or not c.get("consentimiento"):
             continue
         nombre = " ".join((nombres.get(b["cliente_id"]) or c.get("nombre_saludo") or "Cliente").split())
         n = len(b.get("vacantes", []))

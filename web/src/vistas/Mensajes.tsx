@@ -9,7 +9,7 @@ import {
   Send,
 } from "lucide-react";
 import { api } from "../api";
-import { Ayuda, Empty } from "../comunes";
+import { Ayuda, Empty, origenMensaje } from "../comunes";
 import type { Cliente, Borrador } from "../types";
 
 export const estadosMensaje: Record<Borrador["estado"], string> = {
@@ -29,6 +29,8 @@ export function Mensajes({
   const [lista, setLista] = useState<Borrador[] | null>(null);
   const [soloPendientes, setSoloPendientes] = useState(true);
   const [ocupado, setOcupado] = useState(false);
+  // Sube cuando el servidor ya guardó un cambio: «Mandarme todos» se rehace con lo guardado (no antes).
+  const [guardados, setGuardados] = useState(0);
   async function cargar() {
     try {
       const r = await api<{ borradores: Borrador[] }>("/borradores");
@@ -55,6 +57,7 @@ export function Mensajes({
       });
       // El enlace de WhatsApp lo calcula la lista; la respuesta del cambio no lo trae.
       poner({ ...r, enlace: b.enlace, pocas: b.pocas });
+      setGuardados((n) => n + 1);
     } catch (e) {
       poner(b);
       notify((e as Error).message, true);
@@ -143,7 +146,9 @@ export function Mensajes({
       </div>
       <ParaMi
         notify={notify}
-        cambios={(lista || []).map((b) => b.id + b.estado).join()}
+        cambios={
+          guardados + ":" + (lista || []).map((b) => b.id + b.estado).join()
+        }
       />
       {!!lista?.some((b) => b.estado !== "descartado") && (
         <fieldset className="enviados">
@@ -192,10 +197,7 @@ export function Mensajes({
                       {b.cargos.join(" · ")} · {b.vacantes.length}{" "}
                       {b.vacantes.length === 1 ? "vacante" : "vacantes"}
                       {/* Contrato v46: de qué día son (caso Juan: «0 de 10» en el Resumen y 7 aquí). */}
-                      {(b.anteriores ?? 0) > 0 &&
-                        (b.de_hoy
-                          ? ` · ${b.de_hoy} de hoy y ${b.anteriores} de días anteriores`
-                          : " · de días anteriores (hoy no llegó ninguna nueva)")}
+                      {origenMensaje(b) && ` · ${origenMensaje(b)}`}
                       {b.pocas && !b.anteriores && " · hoy hubo menos de 5"}
                     </p>
                   </div>
@@ -306,7 +308,11 @@ function ParaMi({
         setParaMi(r);
         setError("");
       })
-      .catch((e) => vigente && setError((e as Error).message));
+      .catch((e) => {
+        if (!vigente) return;
+        setParaMi(null); // sin enlace viejo: dice por qué
+        setError((e as Error).message);
+      });
     return () => {
       vigente = false;
     };

@@ -216,8 +216,8 @@ export type Borrador = {
   enlace: string;
   pocas: boolean;
   // Contrato v46: cuántas vacantes del mensaje son de la búsqueda de hoy y cuántas de días anteriores.
-  de_hoy?: number;
-  anteriores?: number;
+  de_hoy: number;
+  anteriores: number;
 };
 
 // Contrato v16: bandeja «Por confirmar».

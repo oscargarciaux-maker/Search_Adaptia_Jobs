@@ -3171,12 +3171,6 @@ button.tarjeta-resumen:hover {
   padding: 18px 22px;
   animation-delay: 70ms;
 }
-.cupos-fila {
-  display: flex;
-  align-items: baseline;
-  gap: 14px;
-  flex-wrap: wrap;
-}
 .tarjeta-cupos .tarjeta-numero {
   font-size: 40px;
   letter-spacing: -1.2px;
@@ -3848,7 +3842,7 @@ select.margen {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: -4px 0 12px;
+  margin: 0;
 }
 .revision-funciones {
   margin: 4px 0 10px;
@@ -3860,7 +3854,7 @@ select.margen {
 }
 /* Paso 7: cargo con una sola lista visible y opciones avanzadas plegadas. */
 .opciones-cargo {
-  margin: 4px 0 12px;
+  margin: 10px 0 0;
 }
 /* El botón sol/luna conserva su tamaño también cuando las acciones se reparten la fila (celular). */
 .heading-actions .boton-tema {
@@ -4582,19 +4576,6 @@ select.margen {
   display: flex;
   gap: 8px;
 }
-.para-mi-partes {
-  flex-basis: 100%;
-  margin: 4px 0 0;
-  padding-left: 18px;
-  display: grid;
-  gap: 6px;
-}
-.para-mi-partes li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-}
 .enviados {
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -5020,14 +5001,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   flex-wrap: wrap;
 }
 
-/* La dona ya dice cuánto se usa del techo: la cifra grande no se repite en esa tarjeta. */
-.resumen-b .tarjeta-cupos .cupos-fila .tarjeta-numero {
-  display: none;
-}
-.resumen-b .tarjeta-cupos .cupos-fila .tarjeta-detalle {
-  margin: 0;
-}
-
 /* Contrato v37: cobertura por persona en Actividad. */
 .cobertura-alerta {
   margin: 0 0 10px;
@@ -5336,8 +5309,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   margin: 8px 0 4px;
 }
 .sugeridos-titulo {
-  font-size: 12px;
-  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--contenido);
 }
 .chip-sugerido {
   display: inline-flex;
@@ -5364,7 +5338,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     "fecha texto"
     "estado estado"
     "accion accion";
-  align-content: start;
+  /* 18 nov (Oscar): «Ver historial» al pie, alineado con «Editar cargos y metas» y «Ver vacantes». */
+  grid-template-rows: auto auto 1fr;
+  align-content: stretch;
   align-items: start;
   gap: 10px 12px;
   padding: 16px;
@@ -5384,6 +5360,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 .resumen-arriba > .tarjeta-actividad .tarjeta-accion {
   grid-area: accion;
+  align-self: end;
 }
 .cliente-texto .cliente-alerta {
   color: #1f1a10;
@@ -5724,7 +5701,7 @@ select,
   display: grid;
   gap: 14px;
 }
-/* Solo los hijos directos de la sección: los campos dentro de los plegables conservan su espacio. */
+/* Solo los hijos directos de la sección; dentro de «Opciones avanzadas» el espacio lo da su propia cuadrícula. */
 .form-cargo fieldset > .info-line,
 .form-cargo fieldset > .helper.note,
 .form-cargo fieldset > .sugeridos,
@@ -5751,11 +5728,6 @@ select,
 .form-cargo fieldset > .sugeridos-grupo + .sugeridos-grupo {
   margin-top: 2px;
 }
-.form-cargo .sugeridos-titulo {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--contenido);
-}
 .form-cargo .sugeridos-grupo .sugeridos {
   margin: 0;
 }
@@ -5775,9 +5747,6 @@ select,
 .cargo-nombres > .helper {
   margin: 0;
 }
-.form-cargo .opciones-cargo {
-  margin: 10px 0 0;
-}
 .form-cargo .plegable-contenido {
   display: grid;
   gap: 14px;
@@ -5786,17 +5755,6 @@ select,
 .form-cargo .plegable-contenido > .field,
 .form-cargo .plegable-contenido > .helper {
   margin: 0;
-}
-.form-cargo .funciones-acciones {
-  margin: 0;
-}
-/* 18 nov (Oscar): «Ver historial» al pie de su tarjeta, alineado con «Editar cargos y metas» y «Ver vacantes». */
-.resumen-arriba > .tarjeta-actividad {
-  grid-template-rows: auto auto 1fr;
-  align-content: stretch;
-}
-.resumen-arriba > .tarjeta-actividad .tarjeta-accion {
-  align-self: end;
 }
 /* 18 nov: «Cupo diario · 130 a clientes · Comunidad hasta 20» en una sola línea. */
 .cupos-cabeza {
@@ -5815,7 +5773,7 @@ select,
   display: block;
   margin-top: 6px;
   font-size: 12px;
-  color: #c9d6ea; /* la tarjeta de clientes es oscura en los dos temas, como .cliente-texto span */
+  color: #c9d6ea; /* el mismo de .cliente-texto span: la tarjeta de clientes es oscura en los dos temas */
 }
 .cliente-mini.es-comunidad .cliente-por-enviar {
   color: inherit;

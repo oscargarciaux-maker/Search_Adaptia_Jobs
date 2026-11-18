@@ -431,3 +431,11 @@ export function horaBogota(iso: string) {
     return "";
   }
 }
+
+// Contrato v46: de qué día son las vacantes del mensaje de un cliente (la misma frase en Resumen y Mensajes).
+export function origenMensaje(b: { de_hoy: number; anteriores: number }) {
+  if (!b.anteriores) return "";
+  return b.de_hoy
+    ? `${b.de_hoy} de hoy y ${b.anteriores} de días anteriores`
+    : "de días anteriores";
+}

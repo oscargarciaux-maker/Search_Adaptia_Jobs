@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from buscador import entrega, normalizar, paises, vacante
 from buscador import registro
 from panel.afinidad import MINIMO_POR_PERFIL, evaluar
+from panel.repositorio import nombres as nombres_de
 from panel.terminos import grado
 
 TOPE = 10  # las que se muestran a la vez en el panel
@@ -416,8 +417,7 @@ def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None, todas=None,
         if r["vacante_id"] in filas:
             r["catalogo_vacantes"] = {**(r.get("catalogo_vacantes") or {}), **filas[r["vacante_id"]]}
     version = (version if version is not None else repo.operativa(fecha)) or {}
-    clientes = {c["id"]: c["nombre"] for c in (version.get("configuracion") or {}).get("clientes", [])}
-    nombres_cargo = {c["id"]: c["nombre"] for c in (version.get("configuracion") or {}).get("cargos", [])}
+    clientes, nombres_cargo = nombres_de(version), nombres_de(version, "cargos")
     por_ubicacion = {}
     for r in todas:
         if not es_generica(r.get("ubicacion")):
@@ -634,7 +634,7 @@ def exportar_csv(repo, fecha):
     import csv
     import io
     version = repo.operativa(fecha) or {}
-    clientes = {c["id"]: c["nombre"] for c in (version.get("configuracion") or {}).get("clientes", [])}
+    clientes = nombres_de(version)
     from panel.sugerir import ETIQUETA, sugerir
     salida = io.StringIO()
     escritor = csv.writer(salida)

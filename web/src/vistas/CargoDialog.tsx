@@ -59,6 +59,7 @@ export function CargoDialog({
   const [estadoSug, setEstadoSug] = useState<
     "cargando" | "error" | "listo" | null
   >(null);
+  const fallo = useRef<"abrir" | "completa">("abrir"); // qué pedido repetir con «Reintentar»
   const [conocidos, setConocidos] = useState({ es: 0, base: 0 }); // cuántos sabe el servidor (para el «ya los tiene»)
   function anadir(terminos: string[]) {
     setC((v) => ({
@@ -126,7 +127,10 @@ export function CargoDialog({
       );
     } catch (e) {
       notify((e as Error).message, true);
-      if (n === ultimoPedido.current) setEstadoSug("error");
+      if (n === ultimoPedido.current) {
+        fallo.current = "completa";
+        setEstadoSug("error");
+      }
     } finally {
       setBusy(false);
     }
@@ -138,7 +142,11 @@ export function CargoDialog({
     setEstadoSug("cargando");
     pedirSugerencias(true)
       .then((r) => n === ultimoPedido.current && mostrar(r, []))
-      .catch(() => n === ultimoPedido.current && setEstadoSug("error"));
+      .catch(() => {
+        if (n !== ultimoPedido.current) return;
+        fallo.current = "abrir";
+        setEstadoSug("error");
+      });
   }
   useEffect(() => {
     if (cargo && cargo.nombre.trim().length >= 2) cargarAlAbrir();
@@ -249,7 +257,9 @@ export function CargoDialog({
               <button
                 type="button"
                 className="text-button"
-                onClick={cargarAlAbrir}
+                onClick={() =>
+                  fallo.current === "completa" ? expandir() : cargarAlAbrir()
+                }
               >
                 Reintentar
               </button>

@@ -58,7 +58,8 @@ def test_un_solo_mensaje_aunque_sean_muchos_clientes():
         def ajuste(self, clave, defecto=None):
             return {"telefono": "+573112223344"} if clave == "operador" else defecto
 
-    contactos = [{"cliente_id": f"c{i}", "telefono": "+57300000000" + str(i % 10), "nombre_saludo": f"C{i}"}
+    contactos = [{"cliente_id": f"c{i}", "telefono": "+57300000000" + str(i % 10), "nombre_saludo": f"C{i}",
+                  "consentimiento": True}
                  for i in range(30)]
     filas = [{"id": f"b{i:02d}" + "0" * 30, "cliente_id": f"c{i}", "estado": "pendiente", "vacantes": ["v"] * 10,
               "texto": "x" * 3000} for i in range(30)]
@@ -97,3 +98,24 @@ def test_escribir_un_mensaje_no_vacia_las_demas_copias():
     api.patch(f"/api/borradores/{b['id']}", json={"estado": "abierto"}, headers=H)
     api.get("/api/ejecuciones")
     assert len(llamadas) == antes  # la copia del historial sigue
+
+
+def test_vista_previa_de_whatsapp_no_marca_abierto_ni_firma_rara_ensucia_el_registro(capsys):
+    api = _api()
+    corto = _cortos(api)[0]
+    borrador_id = corto.split("/w/")[1].split(".")[0]
+    r = api.get(corto, headers={"user-agent": "WhatsApp/2.24.1 A"})
+    assert r.status_code == 302 and r.headers["cache-control"] == "no-store"
+    assert next(x for x in api.get("/api/borradores").json()["borradores"] if x["id"] == borrador_id)["estado"] == "pendiente"
+    assert api.get(f"/w/{borrador_id}." + "ñ" * 16).status_code == 404
+    assert "api:enlace-corto" not in capsys.readouterr().err
+
+
+def test_sin_consentimiento_no_va_en_mandarme_todos():
+    class Repo(RepositorioDemo):
+        def ajuste(self, clave, defecto=None):
+            return {"telefono": "+573112223344"} if clave == "operador" else defecto
+    b = {"id": "b1" + "0" * 34, "cliente_id": "c1", "estado": "pendiente", "texto": "hola", "vacantes": []}
+    sin = [{"cliente_id": "c1", "telefono": "+573000000000", "consentimiento": False}]
+    assert borradores.para_operador(Repo(), "https://p.example", hoy(), contactos=sin, borradores=[b],
+                                    nombres={})["clientes"] == 0
