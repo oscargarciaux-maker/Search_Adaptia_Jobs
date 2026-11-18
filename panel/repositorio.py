@@ -559,6 +559,11 @@ def configuracion_demo():
     return Configuracion(clientes=clientes, cargos=cargos, perfiles=perfiles).model_dump(mode="json")
 
 
+def nombres(version, tipo="clientes"):
+    """{id: nombre} de los clientes (o cargos) de una versión del panel; vacío si no hay versión."""
+    return {c["id"]: c["nombre"] for c in ((version or {}).get("configuracion") or {}).get(tipo, [])}
+
+
 class RepositorioDemo:
     def __init__(self, archivo=None):
         self.archivo = Path(archivo) if archivo else None

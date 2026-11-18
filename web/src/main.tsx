@@ -64,6 +64,7 @@ import {
   fijarMundo,
   horaBogota,
   hoyBogota,
+  origenMensaje,
   modos,
   nombrePais,
 } from "./comunes";
@@ -664,7 +665,7 @@ function TarjetasResumen({
                   (b.estado === "pendiente" || b.estado === "abierto"),
               );
               const porEnviar = borrador?.vacantes.length || 0;
-              const anteriores = Math.min(porEnviar, borrador?.anteriores ?? 0);
+              const origen = borrador ? origenMensaje(borrador) : "";
               return (
                 <li key={c.id}>
                   <button
@@ -726,10 +727,7 @@ function TarjetasResumen({
                       <span className="cliente-por-enviar">
                         <span className="sr-only">, </span>
                         {porEnviar} por enviar
-                        {anteriores > 0 &&
-                          (anteriores === porEnviar
-                            ? " (de días anteriores)"
-                            : ` (${anteriores} de días anteriores)`)}
+                        {origen && ` (${origen})`}
                       </span>
                     )}
                   </button>

@@ -9,7 +9,7 @@ import {
   Send,
 } from "lucide-react";
 import { api } from "../api";
-import { Ayuda, Empty } from "../comunes";
+import { Ayuda, Empty, origenMensaje } from "../comunes";
 import type { Cliente, Borrador } from "../types";
 
 export const estadosMensaje: Record<Borrador["estado"], string> = {
@@ -192,10 +192,7 @@ export function Mensajes({
                       {b.cargos.join(" · ")} · {b.vacantes.length}{" "}
                       {b.vacantes.length === 1 ? "vacante" : "vacantes"}
                       {/* Contrato v46: de qué día son (caso Juan: «0 de 10» en el Resumen y 7 aquí). */}
-                      {(b.anteriores ?? 0) > 0 &&
-                        (b.de_hoy
-                          ? ` · ${b.de_hoy} de hoy y ${b.anteriores} de días anteriores`
-                          : " · de días anteriores (hoy no llegó ninguna nueva)")}
+                      {origenMensaje(b) && ` · ${origenMensaje(b)}`}
                       {b.pocas && !b.anteriores && " · hoy hubo menos de 5"}
                     </p>
                   </div>

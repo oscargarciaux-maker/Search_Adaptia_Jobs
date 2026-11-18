@@ -21,7 +21,7 @@ from buscador import registro
 from panel import servicio
 from panel.acciones import ENFOQUE_COMPLETO, ENFOQUE_FALTANTES, desde_entorno as conexion_github
 from panel.modelos import AjusteOperador, BorrarCliente, ImportarClientes, CambioBorrador, Configuracion, Contacto, DecisionRevision, EstadoRegla, SubirRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia, explicar, parcial, solo_perfil
-from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase, hoy
+from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase, hoy, nombres
 from panel.terminos import sugerir
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -516,11 +516,9 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         from panel import borradores as b
         fecha = hoy()  # los enlaces cortos valen solo el día de hoy
         base = str(request.base_url) if demo else origen
-        nombres = {c["id"]: c["nombre"] for c in
-                   ((_copia("operativa", fecha, 30, lambda: repo.operativa(fecha)) or {}).get("configuracion") or {}).get("clientes", [])}
         return b.para_operador(repo, base, fecha, contactos=_copia("contactos", "", 30, repo.contactos),
                                borradores=_copia("borradores", fecha, 20, lambda: repo.borradores(fecha=fecha)),
-                               nombres=nombres)
+                               nombres=nombres(_copia("operativa", fecha, 30, lambda: repo.operativa(fecha))))
 
     @app.post("/api/borradores/generar")
     def generar_borradores():

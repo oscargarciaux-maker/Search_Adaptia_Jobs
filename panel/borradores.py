@@ -233,22 +233,19 @@ def abrir_corto(repo, ficha, fecha=None):
     return enlace_whatsapp(c["telefono"], b["texto"])
 
 
-def para_operador(repo, base, fecha=None, contactos=None, borradores=None, nombres=None):
+def para_operador(repo, base, fecha, contactos, borradores, nombres):
     """Contrato v46 (decisión de Oscar, 18 nov): «Mandarme todos a mi WhatsApp» en UN solo mensaje al número del
     operador, con un enlace corto por cliente (`base` + /w/<ficha>) que abre su chat con el mensaje escrito. Antes
     (v31) cada cliente llevaba su mensaje completo dentro del enlace y había que partirlo. No envía nada: el operador
-    envía su mensaje y, desde su teléfono, toca cada cliente."""
+    envía su mensaje y, desde su teléfono, toca cada cliente. `contactos`, `borradores` y `nombres` los pasa la API
+    desde sus copias."""
     from panel.repositorio import ErrorRepositorio
-    fecha = fecha or hoy()
     operador = (repo.ajuste("operador", {}) or {}).get("telefono", "")
     if not operador:
         raise ErrorRepositorio("Guarda primero tu número de WhatsApp en «Mi número».", 422)
-    contactos = {c["cliente_id"]: c for c in (contactos if contactos is not None else repo.contactos())}
-    if nombres is None:
-        version = repo.operativa(fecha) or {}
-        nombres = {c["id"]: c["nombre"] for c in (version.get("configuracion") or {}).get("clientes", [])}
+    contactos = {c["cliente_id"]: c for c in contactos}
     lineas = []
-    for b in (borradores if borradores is not None else repo.borradores(fecha=fecha)):
+    for b in borradores:
         c = contactos.get(b["cliente_id"])
         if b.get("estado") not in ("pendiente", "abierto") or not c or not c.get("telefono"):
             continue
