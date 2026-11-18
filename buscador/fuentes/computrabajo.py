@@ -13,6 +13,8 @@ from datetime import date, datetime, timedelta, timezone
 
 from buscador import cobertura
 
+POR_PAGINA = 20  # avisos por página de la búsqueda
+
 NOMBRE = "Computrabajo"
 SITIOS = {"AR": "ar", "BO": "bo", "CL": "cl", "CO": "co", "CR": "cr", "DO": "do", "EC": "ec", "GT": "gt", "HN": "hn",
           "MX": "mx", "NI": "ni", "PA": "pa", "PE": "pe", "PR": "pr", "PY": "py", "SV": "sv", "UY": "uy", "VE": "ve"}
@@ -129,14 +131,12 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
         codigo = lugar.split(":")[0]
         if hechas >= presupuesto or seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
             break
-        clave = f"{familia}@{lugar}"
-        siguiente = cobertura.siguiente_busqueda(consultas, hoy, 1, clave, estado, desfase=desfase_terminos)
-        if siguiente is None:  # contrato v47: ya se buscó hoy y no queda nada nuevo ahí
+        b = cobertura.siguiente_busqueda(consultas, hoy, 1, f"{familia}@{lugar}", estado, desfase=desfase_terminos)
+        if b is None:  # contrato v47: ya se buscó hoy y no queda nada nuevo ahí
             continue
-        (consulta,), desde, _ = siguiente
-        clave_terminos = cobertura.clave_consulta(clave, [consulta])
+        consulta = b.terminos[0]
         sitio = SITIOS[codigo]
-        for pagina in range(desde + 1, desde + max_paginas + 1):
+        for pagina in range(b.desde + 1, b.desde + max_paginas + 1):  # en Computrabajo las páginas empiezan en 1
             if hechas >= presupuesto:
                 break
             url = f"https://{sitio}.computrabajo.com/trabajo-de-{slug(consulta)}" + (f"?p={pagina}" if pagina > 1 else "")
@@ -152,11 +152,10 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
                 if f["id"] not in vistos:
                     vistos.add(f["id"])
                     avisos.append(dict(f, pais=codigo, familia=familia))
-            cobertura.anotar_paginas(estado, clave_terminos, hoy, pagina, len(filas) < 20, None)
-            if len(filas) < 20:
+            cobertura.anotar_paginas(estado, b, hoy, pagina, len(filas) < POR_PAGINA)
+            if len(filas) < POR_PAGINA:
                 break
-        estado[clave] = hoy
-        estado[clave_terminos] = hoy
+        cobertura.anotar_hecha(estado, b, hoy)
     avisos.sort(key=lambda a: a["familia"] not in prioritarias)
     crudas, con_ficha, cerradas = [], 0, 0
     for a in avisos:

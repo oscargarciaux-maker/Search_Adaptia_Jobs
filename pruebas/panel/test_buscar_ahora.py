@@ -356,23 +356,26 @@ def test_no_repite_lo_ya_buscado_hoy_y_sigue_con_otros_nombres_o_la_pagina_sigui
     hoy, nombres, clave = "2026-11-18", ["A", "B", "C", "D", "E", "F"], "cargo:x@REMOTO_CO"
     estado = {}
     primera = cobertura.rotar(nombres, hoy, 4)
-    assert cobertura.siguiente_busqueda(nombres, hoy, 4, clave, estado) == (primera, 0, None)  # fuera del modo
+    b = cobertura.siguiente_busqueda(nombres, hoy, 4, clave, estado)
+    assert (b.terminos, b.desde, b.dias) == (primera, 0, 30)  # fuera del modo: la de siempre
     cobertura.configurar_faltantes(True)
     try:
-        estado[cobertura.clave_consulta(clave, primera)] = hoy
-        otros, desde, _ = cobertura.siguiente_busqueda(nombres, hoy, 4, clave, estado)
-        assert otros != primera and desde == 0  # otros nombres del cargo
-        estado[cobertura.clave_consulta(clave, otros)] = hoy
+        cobertura.anotar_hecha(estado, b, hoy)
+        otra = cobertura.siguiente_busqueda(nombres, hoy, 4, clave, estado)
+        assert otra.terminos != primera and otra.desde == 0  # otros nombres del cargo
+        cobertura.anotar_hecha(estado, otra, hoy)
         assert cobertura.siguiente_busqueda(nombres, hoy, 4, clave, estado) is None  # sin saber dónde quedó, no repite
-        cobertura.anotar_paginas(estado, cobertura.clave_consulta(clave, primera), hoy, 3, False, 2)
-        assert cobertura.siguiente_busqueda(nombres, hoy, 4, clave, estado) == (primera, 3, 2)  # sigue en la página 4
-        cobertura.anotar_paginas(estado, cobertura.clave_consulta(clave, primera), hoy, 4, True, 2)
+        cobertura.anotar_paginas(estado, b._replace(dias=2), hoy, 3, False)
+        sigue = cobertura.siguiente_busqueda(nombres, hoy, 4, clave, estado)
+        assert (sigue.terminos, sigue.desde, sigue.dias) == (primera, 3, 2)  # la página 4, con los mismos días
+        assert cobertura.siguiente_busqueda(nombres, hoy, 4, clave, estado, paginada=False) is None
+        cobertura.anotar_paginas(estado, b, hoy, 4, True)
         assert cobertura.siguiente_busqueda(nombres, hoy, 4, clave, estado) is None  # ya no hay más páginas
         # Si cambian las condiciones del perfil (otro lugar u otros nombres), la clave es otra y sí se busca.
-        assert cobertura.siguiente_busqueda(nombres, hoy, 4, "cargo:x@REMOTO_MX", estado) == (primera, 0, None)
-        assert cobertura.siguiente_busqueda(["G", "H"], hoy, 4, clave, estado)[1] == 0
+        assert cobertura.siguiente_busqueda(nombres, hoy, 4, "cargo:x@REMOTO_MX", estado).desde == 0
+        assert cobertura.siguiente_busqueda(["G", "H"], hoy, 4, clave, estado).desde == 0
         # Ayer no cuenta: hoy se busca de nuevo.
-        assert cobertura.siguiente_busqueda(nombres, "2026-11-19", 4, clave, estado)[1] == 0
+        assert cobertura.siguiente_busqueda(nombres, "2026-11-19", 4, clave, estado).desde == 0
     finally:
         cobertura.configurar_faltantes()
 
@@ -410,12 +413,47 @@ def test_en_faltantes_no_se_leen_los_portales_ni_las_listas(monkeypatch, tmp_pat
     for modulo, nombre in ((ats, "buscar"), (ats, "descubrir"), (open_seat, "tableros"),
                            (tableros_latam, "tableros"), (remotos, "buscar"), (sitemaps_empleo, "buscar")):
         monkeypatch.setattr(modulo, nombre, lambda *a, _n=f"{modulo.__name__}.{nombre}", **k: llamadas.append(_n))
+    from buscador import cobertura
+    from buscador.fuentes import computrabajo, elempleo, getonbrd, indeed, linkedin_apify, linkedin_publico
+    for modulo in (linkedin_publico, indeed, linkedin_apify, computrabajo, elempleo, getonbrd):  # sin red
+        monkeypatch.setattr(modulo, "buscar", lambda *a, **k: ([], {}))
     cfg = bodega.config()
-    cfg["faltantes"] = True
     for clave in list(cfg["presupuestos"]):
         if clave.endswith("busquedas") or clave.endswith("fichas"):
             cfg["presupuestos"][clave] = 0
     cfg["presupuestos"]["minutos_por_fuente"] = 0
-    _, _, _, salud = bodega.recoger(cfg, {}, "2026-11-18", tmp_path)
+    cobertura.configurar_faltantes(True)
+    try:
+        _, _, _, salud = bodega.recoger(cfg, {}, "2026-11-18", tmp_path)
+    finally:
+        cobertura.configurar_faltantes()
     assert llamadas == []
-    assert "omitida" in salud["Portales de empresas"] and "omitida" in salud["Descubrir portales"]
+    assert all("omitida" in salud[n] for n in ("Portales de empresas", "Descubrir portales", "Open Seat",
+                                                "Tableros LATAM", "Tableros remotos", "Hireline", "Magneto"))
+
+
+def test_get_on_board_anota_lo_que_busca_y_en_faltantes_no_lo_repite(monkeypatch):
+    from buscador import bodega, cobertura
+    from buscador.fuentes import (ats, computrabajo, elempleo, getonbrd, indeed, linkedin_apify, linkedin_publico,
+                                  remotos, sitemaps_empleo)
+    pedidas = []
+    monkeypatch.setattr(getonbrd, "buscar", lambda cliente, consultas: (pedidas.append(list(consultas)) or ([], {})))
+    for modulo in (linkedin_publico, indeed, linkedin_apify, computrabajo, elempleo, sitemaps_empleo):  # sin red
+        monkeypatch.setattr(modulo, "buscar", lambda *a, **k: ([], {}))
+    monkeypatch.setattr(remotos, "buscar", lambda *a, **k: ([], [], {}))
+    monkeypatch.setattr(ats, "buscar", lambda *a, **k: ([], set(), {}))
+    monkeypatch.setattr(ats, "descubrir", lambda *a, **k: ([], 0))
+    cfg = bodega.config()
+    for clave in list(cfg["presupuestos"]):
+        if clave.endswith("busquedas") or clave.endswith("fichas"):
+            cfg["presupuestos"][clave] = 0
+    cfg["presupuestos"].update(getonbrd_busquedas=1, minutos_por_fuente=0)
+    mapa = [{"id": "cargo:x", "consultas": ["A", "B"], "exactos": [], "similares": [], "lugares": []}]
+    estado = {}
+    bodega.recoger(cfg, estado, "2026-11-18", __import__("pathlib").Path("/tmp"), solo_mapa=mapa)  # la de la noche
+    cobertura.configurar_faltantes(True)
+    try:
+        bodega.recoger(cfg, estado, "2026-11-18", __import__("pathlib").Path("/tmp"), solo_mapa=mapa)
+    finally:
+        cobertura.configurar_faltantes()
+    assert pedidas[0] and pedidas[1] and pedidas[0] != pedidas[1]  # el segundo pase busca otro nombre

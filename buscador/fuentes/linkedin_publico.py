@@ -83,6 +83,9 @@ def combinaciones(mapa, paises_activos):
     return salida
 
 
+POR_PAGINA = 10  # avisos por página de la búsqueda pública
+
+
 def consulta_or(consultas, maximo=4):
     """Las primeras consultas de la familia unidas por OR, entre comillas."""
     return " OR ".join(f'"{c}"' for c in consultas[:maximo])
@@ -108,19 +111,15 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
     for familia, consultas, lugar, params in todas:
         if hechas >= presupuesto or seguidas >= 4 or (limite_busqueda is not None and reloj() - inicio >= limite_busqueda):
             break
-        clave = f"{familia}@{lugar}"
         # Contrato v47: en modo faltantes, lo ya buscado hoy no se repite (otros términos o la página siguiente).
-        siguiente = cobertura.siguiente_busqueda(consultas, hoy, 4, clave, estado, desfase=desfase_terminos)
-        if siguiente is None:
+        b = cobertura.siguiente_busqueda(consultas, hoy, 4, f"{familia}@{lugar}", estado, desfase=desfase_terminos,
+                                         max_dias=max_dias)
+        if b is None:
             continue
-        terminos, desde, dias = siguiente
-        clave_terminos = cobertura.clave_consulta(clave, terminos)
-        # Completo si la vez anterior no dejó nada útil; al seguir en otra página, los mismos días que esa búsqueda.
-        dias = dias or cobertura.dias_busqueda(clave, estado.get(clave_terminos), hoy, max_dias)
-        for pagina in range(desde, desde + max_paginas):
+        for pagina in range(b.desde, b.desde + max_paginas):
             if hechas >= presupuesto or (limite_busqueda is not None and reloj() - inicio >= limite_busqueda):
                 break
-            r = cliente.get(BUSQUEDA, params=dict(params, keywords=consulta_or(terminos), f_TPR=f"r{dias * 86400}",
+            r = cliente.get(BUSQUEDA, params=dict(params, keywords=consulta_or(b.terminos), f_TPR=f"r{b.dias * 86400}",
                                                   start=str(pagina * 10)))
             hechas += 1
             por_familia[familia] = por_familia.get(familia, 0) + 1
@@ -138,12 +137,11 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
                     f["lugar_busqueda"] = lugar
                     f["familia"] = familia
                     avisos.append(f)
-            cobertura.anotar_paginas(estado, clave_terminos, hoy, pagina + 1, len(filas) < 10, dias)
-            if len(filas) < 10:
+            cobertura.anotar_paginas(estado, b, hoy, pagina + 1, len(filas) < POR_PAGINA)
+            if len(filas) < POR_PAGINA:
                 break
         if seguidas == 0:
-            estado[clave] = hoy
-            estado[clave_terminos] = hoy
+            cobertura.anotar_hecha(estado, b, hoy)
     # Descripción completa y estado de los avisos: primero los de las familias prioritarias (la entrega diaria solo usa
     # avisos con descripción) y los remotos (ahí la descripción decide el país)
     # Contrato v36: por turnos entre los lugares buscados (la 1.ª de cada lugar, luego la 2.ª…), para que las búsquedas

@@ -60,10 +60,10 @@ def buscar(cliente, mapa, estado, presupuesto, hoy=None, max_fichas=80, reloj=ti
     for familia, consultas, _, _ in todas:
         if hechas >= presupuesto or seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
             break
-        siguiente = cobertura.siguiente_busqueda(consultas, hoy, 1, f"{familia}@CO", estado)
-        if siguiente is None or siguiente[1]:  # contrato v47: ya se buscaron hoy todos sus nombres (lee una página)
+        b = cobertura.siguiente_busqueda(consultas, hoy, 1, f"{familia}@CO", estado, paginada=False)
+        if b is None:  # contrato v47: ya se buscaron hoy todos sus nombres (lee una sola página)
             continue
-        consulta = siguiente[0][0]
+        consulta = b.terminos[0]
         r = cliente.get(f"{BASE}/co/ofertas-empleo/trabajo-{slug(consulta)}")
         hechas += 1
         if r is None or r.status_code != 200:
@@ -75,8 +75,7 @@ def buscar(cliente, mapa, estado, presupuesto, hoy=None, max_fichas=80, reloj=ti
             if enlace not in vistos:
                 vistos.add(enlace)
                 avisos.append({"enlace": enlace, "titulo": titulo, "familia": familia})
-        estado[f"{familia}@CO"] = hoy
-        estado[cobertura.clave_consulta(f"{familia}@CO", [consulta])] = hoy
+        cobertura.anotar_hecha(estado, b, hoy)
     avisos.sort(key=lambda a: a["familia"] not in prioritarias)
     crudas, leidas = jobposting.leer_fichas(cliente, [(a["enlace"], a["titulo"], "CO") for a in avisos], hoy, NOMBRE,
                                             max_fichas, reloj, inicio, limite_segundos)

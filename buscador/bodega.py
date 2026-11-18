@@ -88,8 +88,9 @@ def _fecha_de(v):
     return v.get("fecha_publicacion") or v.get("visto_primera_vez") or ""
 
 
-class _Omitida(Exception):
-    """Un paso que la búsqueda para quien falta no hace (contrato v47)."""
+# Contrato v47: fuentes que «Buscar ahora» para quien falta no lee (recorren todos los cargos o ya se leyeron hoy).
+MOTIVO_FALTANTES = "búsqueda para quien falta: no hace falta releerla (contrato v47)"
+OMITIDAS_FALTANTES = {"Tableros remotos", "Portales de empresas", *sitemaps_empleo.SITIOS}
 
 
 def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previas=None):
@@ -110,8 +111,8 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
     salud = {}
     # Contrato v47: «Buscar ahora» para quien falta. Sin los pasos fijos que no le sirven a esas personas: los portales
     # de empresas ya se leyeron hoy (cuentan 24 h, v42), y las listas de empresas, los tableros remotos y los sitemaps
-    # recorren todos los cargos.
-    faltantes = bool(cfg.get("faltantes"))
+    # recorren todos los cargos. El modo lo fija el panel (`panel.ejecutor.activar`).
+    faltantes = cobertura.modo_faltantes()
     for clave in ("linkedin", "indeed", "apify", "ats_probadas", "remotos_cache"):
         estado.setdefault(clave, {})
 
@@ -167,36 +168,28 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
                                           maximo=maximo, control_gasto=control_apify)
 
     def f_remotos():
-        if faltantes:
-            return [], [], {"omitida": "búsqueda para quien falta (contrato v47)"}
         consultas = sorted({c for f in mapa for c in f["consultas"][:1]})
         return remotos.buscar(Cliente(pausa=(0.3, 0.8)), consultas, estado["remotos_cache"],
                               max_paginas=p["remotos_paginas"])
 
     def f_getonbrd():
-        if faltantes:
-            return _getonbrd_faltantes()
-        combinaciones = [(f["id"], cobertura.rotar(cobertura.consultas(f), hoy, 1)[0], "GLOBAL") for f in mapa]
         # Contrato v44: Get on Board es de LATAM y en español: quien solo habla español también busca ahí en español.
-        combinaciones += [(f["id"], cobertura.rotar(f["consultas_es"], hoy, 1)[0], "GLOBAL:ES") for f in mapa
-                          if f.get("consultas_es")]
-        turnos = cobertura.repartir(combinaciones, {}, hoy, prioritarias)
-        return getonbrd.buscar(Cliente(pausa=(0.3, 0.8)), [c[1] for c in turnos[:p["getonbrd_busquedas"]]])
-
-    def _getonbrd_faltantes():
-        """Contrato v47: solo los cargos de quienes faltan y solo nombres que no se buscaron hoy en Get on Board."""
+        # Contrato v47: anota lo que buscó (también de noche), así «Buscar ahora» para quien falta no lo repite.
         vistos = estado.setdefault("getonbrd", {})
-        foco = cobertura.familias_personas()
-        consultas = []
-        for f in mapa:
-            if f["id"] not in foco:
-                continue
-            for lugar, lista in (("GLOBAL", cobertura.consultas(f)), ("GLOBAL:ES", f.get("consultas_es") or [])):
-                siguiente = cobertura.siguiente_busqueda(lista, hoy, 1, f"{f['id']}@{lugar}", vistos) if lista else None
-                if siguiente and not siguiente[1]:
-                    consultas.append(siguiente[0][0])
-                    vistos[cobertura.clave_consulta(f"{f['id']}@{lugar}", siguiente[0])] = hoy
-        return getonbrd.buscar(Cliente(pausa=(0.3, 0.8)), consultas[:p["getonbrd_busquedas"]])
+        combinaciones = [(f["id"], lista, lugar) for f in mapa
+                         for lugar, lista in (("GLOBAL", cobertura.consultas(f)), ("GLOBAL:ES", f.get("consultas_es")))
+                         if lista]
+        busquedas = []
+        for familia, lista, lugar in cobertura.repartir(combinaciones, vistos, hoy, prioritarias):
+            if len(busquedas) >= p["getonbrd_busquedas"]:
+                break
+            b = cobertura.siguiente_busqueda(lista, hoy, 1, f"{familia}@{lugar}", vistos, paginada=False)
+            if b is not None:
+                busquedas.append(b)
+        resultado = getonbrd.buscar(Cliente(pausa=(0.3, 0.8)), [b.terminos[0] for b in busquedas])
+        for b in busquedas:
+            cobertura.anotar_hecha(vistos, b, hoy)
+        return resultado
 
     def f_computrabajo():
         if not p.get("computrabajo_busquedas", 0):
@@ -216,8 +209,6 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
         # Contrato v44: portales en español con sitemap de ofertas y JobPosting (Hireline, Magneto).
         def f():
             fichas = p.get(sitemaps_empleo.SITIOS[nombre]["presupuesto"], 0)
-            if faltantes:
-                return [], {"omitida": "búsqueda para quien falta (contrato v47)"}
             if not fichas:
                 return [], {"omitida": "sin presupuesto"}
             return sitemaps_empleo.buscar(Cliente(pausa=(0.6, 1.4)), nombre, mapa, hoy=hoy, max_fichas=fichas,
@@ -228,7 +219,10 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
     # Open Seat (17 nov) y, desde v44, RemotosLatam y WeRemoto: listas de empresas que contratan en LATAM con su portal.
     # Solo se toman las empresas (sus avisos nunca); sus portales se leen con ats.py (ficha completa y cierres).
     de_listas = set()
-    if not solo_mapa and not faltantes:
+    if faltantes:
+        for etiqueta in ("Open Seat", "Tableros LATAM"):
+            salud[etiqueta] = {"omitida": MOTIVO_FALTANTES}
+    elif not solo_mapa:
         def lista_open_seat():
             filas, stats = open_seat.tableros(Cliente(pausa=(0, 0)), hoy)
             return filas, {"Open Seat": stats}
@@ -255,8 +249,6 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
             ats.guardar_lista(ats.leer_lista(trabajo / "empresas_ats.csv") + nuevas_todas, trabajo / "empresas_ats.csv")
 
     def f_ats():
-        if faltantes:
-            return [], set(), {"omitida": "búsqueda para quien falta: los portales ya se leyeron hoy (contrato v47)"}
         filas = filas_ats
         if cfg.get("control_dirigido"):
             empresas = {normalizar.empresa(x) for x in cfg.get("empresas_objetivo",[])}
@@ -267,14 +259,16 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
                 return [], set(), {"omitida": "modo dirigido: aún no hay portales asociados a los cargos"}
         return ats.buscar(Cliente(pausa=(0.05, 0.2)), filas, limite_segundos=limite, prioritarias=prioritarias)
 
+    fuentes = [("LinkedIn", f_linkedin), ("Indeed", f_indeed), ("LinkedIn (Apify)", f_apify),
+               ("Tableros remotos", f_remotos), ("Get on Board", f_getonbrd), ("Portales de empresas", f_ats),
+               ("Publicaciones LinkedIn (Apify)", f_publicaciones), ("Computrabajo", f_computrabajo),
+               ("Elempleo", f_elempleo), *[(n, f_sitemap(n)) for n in sitemaps_empleo.SITIOS]]
+    if faltantes:
+        for n in OMITIDAS_FALTANTES:
+            salud[n] = {"omitida": MOTIVO_FALTANTES}
+        fuentes = [(n, f) for n, f in fuentes if n not in OMITIDAS_FALTANTES]
     with ThreadPoolExecutor(11) as ex:
-        tareas = {n: ex.submit(correr, n, f) for n, f in [("LinkedIn", f_linkedin), ("Indeed", f_indeed),
-                                                            ("LinkedIn (Apify)", f_apify), ("Tableros remotos", f_remotos),
-                                                            ("Get on Board", f_getonbrd), ("Portales de empresas", f_ats),
-                                                            ("Publicaciones LinkedIn (Apify)", f_publicaciones),
-                                                            ("Computrabajo", f_computrabajo),
-                                                            ("Elempleo", f_elempleo),
-                                                            *[(n, f_sitemap(n)) for n in sitemaps_empleo.SITIOS]]}
+        tareas = {n: ex.submit(correr, n, f) for n, f in fuentes}
         resultados = {n: t.result() for n, t in tareas.items()}
     crudas, empresas = [], set()
     for n, r in resultados.items():
@@ -293,15 +287,14 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
     # Descubrir portales nuevos con los nombres de empresas que trajeron las demás fuentes
     nuevos = []
     try:
-        if faltantes:
-            raise _Omitida
         t0 = time.monotonic()
-        nuevos, probadas = ats.descubrir(Cliente(pausa=(0.05, 0.15)), sorted(empresas), estado["ats_probadas"],
-                                         p["empresas_por_probar"], hoy, filas_ats)
-        salud["Descubrir portales"] = {"empresas_probadas": probadas, "portales_nuevos": len(nuevos),
-                                       "segundos": round(time.monotonic() - t0)}
-    except _Omitida:
-        salud["Descubrir portales"] = {"omitida": "búsqueda para quien falta (contrato v47)"}
+        if faltantes:
+            salud["Descubrir portales"] = {"omitida": MOTIVO_FALTANTES}
+        else:
+            nuevos, probadas = ats.descubrir(Cliente(pausa=(0.05, 0.15)), sorted(empresas), estado["ats_probadas"],
+                                             p["empresas_por_probar"], hoy, filas_ats)
+            salud["Descubrir portales"] = {"empresas_probadas": probadas, "portales_nuevos": len(nuevos),
+                                           "segundos": round(time.monotonic() - t0)}
     except Exception as e:  # noqa: BLE001
         salud["Descubrir portales"] = {"error": str(e)[:300]}
     ats.guardar_lista(ats.leer_lista(trabajo / "empresas_ats.csv") + nuevos, trabajo / "empresas_ats.csv")
