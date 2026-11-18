@@ -431,21 +431,22 @@ function TarjetasResumen({
           }
           onClick={() => go("Cargos y metas")}
         >
-          <span className="tarjeta-cabeza">
+          {/* 18 nov: título y cifras en una sola línea para que la dona suba. Contrato v43: Comunidad recibe de lo
+              que sobra y hasta su meta, aunque no ocupe cupo. */}
+          <span className="tarjeta-cabeza cupos-cabeza">
             <SlidersHorizontal size={17} />
             Cupo diario
-          </span>
-          <div className="cupos-fila">
-            <strong className="tarjeta-numero">
-              {total}
-              <small> / {techo}</small>
-            </strong>
-            <span className="tarjeta-detalle">
-              {/* Contrato v43: Comunidad recibe de lo que sobra y hasta su meta, aunque no ocupe cupo. */}
-              {reales} a clientes
-              {comunidad > 0 && ` · Comunidad hasta ${comunidad}`}
+            <span className="cupos-cifras">
+              {"· "}
+              <b>{reales}</b> a clientes
+              {comunidad > 0 && (
+                <>
+                  {" "}
+                  · Comunidad hasta <b>{comunidad}</b>
+                </>
+              )}
             </span>
-          </div>
+          </span>
           <span className="cupos-dona-fila">
             <DonaTecho
               partes={conCupo.map((c, i) => ({
@@ -655,6 +656,15 @@ function TarjetasResumen({
                   ? `— de ${c.meta}`
                   : `${c.recibidas} de ${c.meta}`;
               const pendiente = `${c.porConfirmar} por confirmar`;
+              // 18 nov (caso Juan: «0 de 10» y 7 en Mensajes): su mensaje de hoy puede llevar vacantes de días
+              // anteriores que nunca recibió; la tarjeta lo dice para que las dos pantallas cuadren.
+              const borrador = (borradores || []).find(
+                (b) =>
+                  b.cliente_id === c.id &&
+                  (b.estado === "pendiente" || b.estado === "abierto"),
+              );
+              const porEnviar = borrador?.vacantes.length || 0;
+              const anteriores = Math.min(porEnviar, borrador?.anteriores ?? 0);
               return (
                 <li key={c.id}>
                   <button
@@ -712,6 +722,16 @@ function TarjetasResumen({
                     <span className="cliente-barra" aria-hidden="true">
                       <span style={{ width: pct + "%" }} />
                     </span>
+                    {porEnviar > 0 && (
+                      <span className="cliente-por-enviar">
+                        <span className="sr-only">, </span>
+                        {porEnviar} por enviar
+                        {anteriores > 0 &&
+                          (anteriores === porEnviar
+                            ? " (de días anteriores)"
+                            : ` (${anteriores} de días anteriores)`)}
+                      </span>
+                    )}
                   </button>
                 </li>
               );
@@ -1622,9 +1642,11 @@ function App() {
       if (turno === peticionResultados.current) setLoadingResults(false);
     }
   }
+  // Contrato v46 (velocidad): las vacantes solo se piden en su pestaña; antes, entrar por #mensajes también las pedía.
+  const enVacantes = tab === "Vacantes";
   useEffect(() => {
-    cargarResultados();
-  }, [selectedClient, resultDate, sesion?.sesion]);
+    if (enVacantes) cargarResultados();
+  }, [selectedClient, resultDate, sesion?.sesion, enVacantes]);
   function cambiar(v: Configuracion) {
     setDraft(v);
     setDirty(true);

@@ -94,15 +94,23 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
     # `sello_bandeja` con las escrituras que no son una decisión de la bandeja (una decisión retira su fila de la copia
     # de pendientes en vez de obligar a leerlas todas otra vez).
     sello_bandeja = [0]
+    # Contrato v46 (velocidad de Mensajes): escribir un mensaje, un contacto o «Mi número» solo renueva las copias de
+    # Mensajes, no los resultados, la configuración ni el historial (antes cada clic los vaciaba todos).
+    sello_mensajes = [0]
+    MENSAJES = {"borradores", "contactos", "operador", "asignadas"}
+    RUTAS_MENSAJES = ("/api/borradores", "/api/contactos", "/api/ajustes/operador")
     copias, pendientes_copia = {}, {}
     sesiones = {}  # huella del token → (hasta, usuario); nunca el token en claro
     VIGENCIA_SESION = 60
 
+    def _marca(nombre):
+        return (sello[0], sello_mensajes[0]) if nombre in MENSAJES else sello[0]
+
     def _copia(nombre, clave, vigencia, fn):
         guardada = copias.get((nombre, clave))
-        if guardada and guardada[0] == sello[0] and time.monotonic() - guardada[1] < vigencia:
+        if guardada and guardada[0] == _marca(nombre) and time.monotonic() - guardada[1] < vigencia:
             return guardada[2]
-        actual = sello[0]
+        actual = _marca(nombre)
         valor = fn()
         if len(copias) > 300:
             copias.clear()
@@ -152,7 +160,7 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
                 b.generar(repo, resultados=_resultados)
             except Exception as e:  # noqa: BLE001 — la decisión ya quedó guardada; el borrador se rehace la próxima vez
                 registro.aviso("api:borradores", e)
-            sello[0] += 1
+            sello_mensajes[0] += 1
 
     def pedir_borradores():
         with cerrojo_regenerar:
@@ -230,13 +238,17 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         # Una decisión de la bandeja no obliga a releer todas las pendientes: retira sus filas de la copia (abajo).
         decision = escribe and request.url.path.startswith("/api/revisiones/") and request.url.path.count("/") == 3 \
             and request.url.path not in {"/api/revisiones/cargar", "/api/revisiones/csv"}
-        sello[0] += escribe
-        sello_bandeja[0] += escribe and not decision
+        mensajes = escribe and request.url.path.startswith(RUTAS_MENSAJES)
+        general = escribe and not mensajes
+        sello[0] += general
+        sello_mensajes[0] += mensajes
+        sello_bandeja[0] += general and not decision
         inicio = time.monotonic()
         response = await siguiente(request)
         duracion = (time.monotonic() - inicio) * 1000
-        sello[0] += escribe
-        sello_bandeja[0] += escribe and not decision
+        sello[0] += general
+        sello_mensajes[0] += mensajes
+        sello_bandeja[0] += general and not decision
         if request.url.path.startswith("/api/"):
             response.headers["Server-Timing"] = f"app;dur={duracion:.0f}"
             if duracion > 3000:  # solo la ruta y el tiempo: nunca datos de clientes
@@ -466,17 +478,32 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         from panel import borradores as b
         fecha = fecha or hoy()
         contactos = {c["cliente_id"]: c for c in _copia("contactos", "", 30, repo.contactos)}
+        de_hoy = _asignadas_hoy(fecha)
         salida = []
         for x in _copia("borradores", fecha, 20, lambda: repo.borradores(fecha=fecha)):
             c = contactos.get(x["cliente_id"])
+            ids = x.get("vacantes", [])
+            # Contrato v46: cuántas son de la búsqueda de hoy y cuántas de días anteriores (caso Juan, 18 nov).
+            hoy_n = len(set(ids) & de_hoy.get(x["cliente_id"], set())) if de_hoy is not None else len(ids)
             salida.append({**x, "enlace": b.enlace_whatsapp(c["telefono"], x["texto"]) if c else "",
-                           "pocas": len(x.get("vacantes", [])) < b.MINIMO})
+                           "pocas": len(ids) < b.MINIMO, "de_hoy": hoy_n, "anteriores": len(ids) - hoy_n})
         return {"fecha": fecha, "borradores": salida}
+
+    def _asignadas_hoy(fecha):
+        """{cliente: vacantes asignadas en la búsqueda de ese día}, o None si no se puede saber (todas cuentan de hoy)."""
+        try:
+            ejecucion = next((e for e in _copia("ejecuciones", "", 30, repo.ejecuciones) if e.get("fecha") == fecha), None)
+            if not ejecucion:
+                return {}
+            return _copia("asignadas", str(ejecucion["id"]), 60, lambda: repo.vacantes_por_cliente(str(ejecucion["id"])))
+        except Exception as e:  # noqa: BLE001 — el dato solo aclara; sin él, la lista sigue igual
+            registro.aviso("api:asignadas", e)
+            return None
 
     # Contrato v31: el número del operador y «Mandarme todos a mi WhatsApp».
     @app.get("/api/ajustes/operador")
     def leer_operador():
-        return {"telefono": (repo.ajuste("operador", {}) or {}).get("telefono", "")}
+        return {"telefono": (_copia("operador", "", 20, lambda: repo.ajuste("operador", {})) or {}).get("telefono", "")}
 
     @app.put("/api/ajustes/operador")
     def guardar_operador(body: AjusteOperador):
@@ -484,12 +511,16 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         return body.model_dump()
 
     @app.get("/api/borradores/para-mi")
-    def borradores_para_mi(fecha: str | None = None):
+    def borradores_para_mi(request: Request):
+        """Contrato v46: un solo mensaje a «Mi número», con un enlace corto por cliente."""
         from panel import borradores as b
-        if fecha:
-            from datetime import date
-            date.fromisoformat(fecha)
-        return b.para_operador(repo, fecha)
+        fecha = hoy()  # los enlaces cortos valen solo el día de hoy
+        base = str(request.base_url) if demo else origen
+        nombres = {c["id"]: c["nombre"] for c in
+                   ((_copia("operativa", fecha, 30, lambda: repo.operativa(fecha)) or {}).get("configuracion") or {}).get("clientes", [])}
+        return b.para_operador(repo, base, fecha, contactos=_copia("contactos", "", 30, repo.contactos),
+                               borradores=_copia("borradores", fecha, 20, lambda: repo.borradores(fecha=fecha)),
+                               nombres=nombres)
 
     @app.post("/api/borradores/generar")
     def generar_borradores():
@@ -665,10 +696,34 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         return servicio.whatsapp(repo, cliente_id, fecha, resultados=_resultados(cliente_id, fecha), contactos=contactos,
                                  cuantas=cuantas)
 
+    # Contrato v46: enlace corto de «Mandarme todos». Se abre desde el teléfono del operador, sin sesión: la firma
+    # (HMAC con la llave del servidor, válida solo hoy) es la que da acceso. No registra datos del cliente.
+    @app.get("/w/{ficha}")
+    def abrir_mensaje(ficha: str):
+        from fastapi.responses import HTMLResponse, RedirectResponse
+        from panel import borradores as b
+        try:
+            enlace = b.abrir_corto(repo, ficha[:80])
+        except Exception as e:  # noqa: BLE001 — sin el dato, la página de «ya no sirve»
+            registro.aviso("api:enlace-corto", e)
+            enlace = None
+        if not enlace:
+            return HTMLResponse(PAGINA_ENLACE_VENCIDO, status_code=404)
+        sello_mensajes[0] += 1  # quedó «abierto»
+        return RedirectResponse(enlace, status_code=302)
+
     dist = RAIZ / "web" / "dist"
     if dist.exists():
         app.mount("/", StaticFiles(directory=dist, html=True), name="panel")
     return app
+
+
+PAGINA_ENLACE_VENCIDO = """<!doctype html><html lang="es"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Enlace vencido</title>
+<body style="font-family:system-ui,sans-serif;max-width:32rem;margin:3rem auto;padding:0 16px;line-height:1.5">
+<h1 style="font-size:1.25rem">Este enlace ya no sirve</h1>
+<p>Los enlaces de «Mandarme todos a mi WhatsApp» valen solo el día en que se crearon y mientras el mensaje no se haya
+enviado. Abre el panel, en «Mensajes», para mandarlo de nuevo.</p></body></html>"""
 
 
 def main():

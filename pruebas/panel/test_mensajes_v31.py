@@ -40,7 +40,8 @@ def test_enlace_comprobado_hace_menos_de_24_horas_se_comparte():
     assert enlace_utilizable(fila(20)) and not enlace_utilizable(fila(25))
 
 
-def test_mandarme_todos_a_mi_whatsapp_en_partes():
+def test_mandarme_todos_a_mi_whatsapp_en_un_solo_mensaje():
+    # Contrato v46: un solo mensaje con un enlace corto por cliente (antes, v31, se partía en varios).
     api = TestClient(crear_app(demo=True, repositorio=RepositorioDemo()))
     h = {"origin": "http://testserver"}
     sin_numero = api.get("/api/borradores/para-mi")
@@ -51,13 +52,11 @@ def test_mandarme_todos_a_mi_whatsapp_en_partes():
     assert api.get("/api/ajustes/operador").json()["telefono"] == "+573112223344"
     assert api.post("/api/borradores/generar", headers=h).status_code == 200
     r = api.get("/api/borradores/para-mi").json()
-    assert r["clientes"] >= 1 and r["partes"]
-    for parte in r["partes"]:
-        assert parte["enlace"].startswith("https://wa.me/573112223344?text=")
-        assert len(parte["enlace"]) <= borradores.LARGO_ENLACE or parte["clientes"] == 1
-        texto = parse_qs(urlparse(parte["enlace"]).query)["text"][0]
-        assert texto == parte["texto"] and "https://wa.me/" in texto
-    assert sum(p["clientes"] for p in r["partes"]) == r["clientes"]
+    assert r["clientes"] >= 1 and "partes" not in r
+    assert r["enlace"].startswith("https://wa.me/573112223344?text=")
+    texto = parse_qs(urlparse(r["enlace"]).query)["text"][0]
+    assert texto == r["texto"] and "https://wa.me/" not in texto
+    assert texto.count("http://testserver/w/") == r["clientes"]
 
 
 def test_sesion_se_renueva_sola_con_el_token_de_renovacion():

@@ -54,6 +54,12 @@ export function CargoDialog({
   // Contrato v44: nombres en español (del mapa o armados con el glosario) y el oficio base más amplio, aparte.
   const [enEspanol, setEnEspanol] = useState<string[]>([]);
   const [amplios, setAmplios] = useState<string[]>([]);
+  // 18 nov (Oscar seguía sin ver los grupos): se muestran siempre que hay sugerencias pedidas, y si un grupo queda
+  // vacío dice por qué (ya los tiene / no hay uno más amplio). Si la carga falla, se dice y se puede reintentar.
+  const [estadoSug, setEstadoSug] = useState<
+    "cargando" | "error" | "listo" | null
+  >(null);
+  const [conocidos, setConocidos] = useState({ es: 0, base: 0 }); // cuántos sabe el servidor (para el «ya los tiene»)
   function anadir(terminos: string[]) {
     setC((v) => ({
       ...v,
@@ -90,7 +96,10 @@ export function CargoDialog({
         (x) => !ya.has(x.toLowerCase()) && !enEs.has(x.toLowerCase()),
       ),
     );
-    setAmplios((r.terminos_base || []).filter((x) => !ya.has(x.toLowerCase())));
+    const base = r.terminos_base || [];
+    setAmplios(base.filter((x) => !ya.has(x.toLowerCase())));
+    setConocidos({ es: (r.terminos_es || []).length, base: base.length });
+    setEstadoSug("listo");
   }
   // «Buscar denominaciones afines»: añade los nombres principales y muestra las fichas.
   async function expandir() {
@@ -117,18 +126,22 @@ export function CargoDialog({
       );
     } catch (e) {
       notify((e as Error).message, true);
+      if (n === ultimoPedido.current) setEstadoSug("error");
     } finally {
       setBusy(false);
     }
   }
   // Al abrir un cargo existente (18 nov, Oscar no veía los grupos nuevos): solo las fichas, sin ESCO, sin cambiar sus
-  // nombres ni bloquear el formulario. Si falla, no molesta: queda el botón.
-  useEffect(() => {
-    if (!cargo || cargo.nombre.trim().length < 2) return;
+  // nombres ni bloquear el formulario. Si falla, lo dice con «Reintentar».
+  function cargarAlAbrir() {
     const n = ++ultimoPedido.current;
+    setEstadoSug("cargando");
     pedirSugerencias(true)
       .then((r) => n === ultimoPedido.current && mostrar(r, []))
-      .catch(() => undefined);
+      .catch(() => n === ultimoPedido.current && setEstadoSug("error"));
+  }
+  useEffect(() => {
+    if (cargo && cargo.nombre.trim().length >= 2) cargarAlAbrir();
     // Solo al abrir el cargo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -224,45 +237,63 @@ export function CargoDialog({
             Buscar denominaciones afines
           </button>
           {nota && <p className="helper note">{nota}</p>}
-          {/* Paso 7 (reunión 14 nov): una sola lista visible. Por dentro se conserva la diferencia: lo que ya era
-              principal sigue siéndolo y lo nuevo entra como afín. */}
-          <TagInput
-            label="Nombres del cargo"
-            values={Array.from(
-              new Set([...c.terminos_exactos, ...c.terminos_similares]),
-            )}
-            onChange={(v) => {
-              const exactos = c.terminos_exactos.filter((x) => v.includes(x));
-              setC({
-                ...c,
-                terminos_exactos: exactos,
-                terminos_similares: v.filter((x) => !exactos.includes(x)),
-              });
-            }}
-          />
-          {(
-            [
-              ["En español", "Nombres en español", enEspanol],
-              ["Sugeridos", "Nombres sugeridos", sugeridos],
+          {estadoSug === "cargando" && (
+            <p className="helper note" role="status">
+              <Loader2 className="spin" size={14} /> Cargando nombres en español
+              y sugeridos…
+            </p>
+          )}
+          {estadoSug === "error" && (
+            <p className="helper note" role="alert">
+              No se pudieron cargar las sugerencias.{" "}
+              <button
+                type="button"
+                className="text-button"
+                onClick={cargarAlAbrir}
+              >
+                Reintentar
+              </button>
+            </p>
+          )}
+          {estadoSug === "listo" &&
+            (
               [
-                "Más amplio, sin el modificador: solo si también le sirven",
-                "Nombres más amplios",
-                amplios,
-              ],
-            ] as const
-          ).map(
-            ([titulo, etiqueta, lista]) =>
-              lista.length > 0 && (
-                <div
-                  key={etiqueta}
-                  className="sugeridos-grupo"
-                  role="group"
-                  aria-label={etiqueta}
-                >
-                  <div className="sugeridos-cabeza">
-                    <span className="sugeridos-titulo">
-                      {titulo} · toca para añadir
-                    </span>
+                [
+                  "En español",
+                  "Nombres en español",
+                  enEspanol,
+                  conocidos.es
+                    ? `Ya tiene los ${conocidos.es} nombres en español que conocemos.`
+                    : "No conocemos nombres en español para este cargo: escríbelos abajo en «Nombres del cargo».",
+                ],
+                [
+                  "Sugeridos",
+                  "Nombres sugeridos",
+                  sugeridos,
+                  "Ya tiene todos los nombres sugeridos.",
+                ],
+                [
+                  "Más amplio, sin el modificador: solo si también le sirven",
+                  "Nombres más amplios",
+                  amplios,
+                  conocidos.base
+                    ? "Ya tiene el oficio más amplio."
+                    : "Es el oficio general: no hay uno más amplio.",
+                ],
+              ] as const
+            ).map(([titulo, etiqueta, lista, vacio]) => (
+              <div
+                key={etiqueta}
+                className="sugeridos-grupo"
+                role="group"
+                aria-label={etiqueta}
+              >
+                <div className="sugeridos-cabeza">
+                  <span className="sugeridos-titulo">
+                    {titulo}
+                    {lista.length > 0 && " · toca para añadir"}
+                  </span>
+                  {lista.length > 0 && (
                     <button
                       type="button"
                       className="text-button"
@@ -270,7 +301,9 @@ export function CargoDialog({
                     >
                       Añadir todas
                     </button>
-                  </div>
+                  )}
+                </div>
+                {lista.length > 0 ? (
                   <div className="sugeridos">
                     {lista.map((t) => (
                       <button
@@ -285,14 +318,34 @@ export function CargoDialog({
                       </button>
                     ))}
                   </div>
-                </div>
-              ),
-          )}
-          <p className="helper">
-            Todas las formas en que las empresas llaman a este cargo, en español
-            o inglés. Escríbelas una a una con Enter o pégalas separadas por
-            comas.
-          </p>
+                ) : (
+                  <p className="sugeridos-vacio">{vacio}</p>
+                )}
+              </div>
+            ))}
+          {/* Paso 7 (reunión 14 nov): una sola lista visible. Por dentro se conserva la diferencia: lo que ya era
+              principal sigue siéndolo y lo nuevo entra como afín. */}
+          <div className="cargo-nombres">
+            <TagInput
+              label="Nombres del cargo"
+              values={Array.from(
+                new Set([...c.terminos_exactos, ...c.terminos_similares]),
+              )}
+              onChange={(v) => {
+                const exactos = c.terminos_exactos.filter((x) => v.includes(x));
+                setC({
+                  ...c,
+                  terminos_exactos: exactos,
+                  terminos_similares: v.filter((x) => !exactos.includes(x)),
+                });
+              }}
+            />
+            <p className="helper">
+              Todas las formas en que las empresas llaman a este cargo, en
+              español o inglés. Escríbelas una a una con Enter o pégalas
+              separadas por comas.
+            </p>
+          </div>
           <Plegable
             className="opciones-cargo"
             inicial={Boolean(
