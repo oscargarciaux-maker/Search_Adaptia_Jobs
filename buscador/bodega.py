@@ -435,6 +435,8 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     from buscador.fuentes import linkedin_publico
     fichas_incorporadas = verificar_enlaces.incorporar(vacantes, cache_enlaces, linkedin_publico.FICHAS)
     indeed_incorporadas = verificar_enlaces.incorporar(vacantes, cache_enlaces, indeed.VISTAS)  # contrato v41
+    portales_incorporadas = verificar_enlaces.incorporar(  # contrato v42: listado hoy en el portal de la empresa
+        vacantes, cache_enlaces, verificar_enlaces.vistas_en_portales(enlaces_ats))
     entregadas_revision = _leer_json(trabajo / "entregadas.json", {})
     entregadas_revision.update(memoria_db)
     cfg_revision = dict(cfg.get("verificacion_enlaces", {}))
@@ -637,6 +639,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     resumen_revision["rechazos_en_corrida"] = {m: n for m, n in descartes.items() if m in verificar_enlaces.RECHAZOS}
     resumen_revision["fichas_linkedin_incorporadas"] = fichas_incorporadas
     resumen_revision["vistas_indeed_incorporadas"] = indeed_incorporadas
+    resumen_revision["vistas_portales_incorporadas"] = portales_incorporadas
     seleccion_actual = {"fecha": lote_actual.get("fecha"), "roles": {}}
     por_id_vigente = {v["id"]: v for v in vacantes}
     estados_catalogo = {v["id"]: estado for v, estado, _ in retiradas}

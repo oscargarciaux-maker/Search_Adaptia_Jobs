@@ -52,6 +52,10 @@ sirvan, o «Añadir todas».
 resaltado. «Cupo diario» es el máximo de vacantes al día entre todos (antes «Techo del día») e «Historial» es lo que
 antes se llamaba «Actividad».
 
+**Portales de empresas comprobados (18 nov, contrato v42).** Una vacante que el portal de empleo de la propia empresa
+(Greenhouse, Lever, Ashby…) muestra hoy cuenta como comprobada por 24 horas, igual que las de Indeed vistas hoy. Las de
+Computrabajo y Get on Board se siguen comprobando una por una.
+
 **Búsqueda por persona (17 nov, contrato v40).** El sistema lee las filas de «¿Dónde trabajaría?» de cada perfil y
 busca en esos países, ciudades y regiones, para cualquier cargo. Quien va corto, o vive donde solo hay LinkedIn e
 Indeed, recibe más búsquedas. En Historial → «Cobertura por persona», la columna «Búsquedas hoy» dice cuántas se
