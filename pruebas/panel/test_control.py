@@ -162,7 +162,7 @@ def test_archivar_y_guardar_preservan_version_programada(tmp_path):
     r.guardar(1, config)
     assert r.config()["publicada"]["configuracion"]["clientes"][0]["activo"]
     assert RepositorioDemo(tmp_path / "demo.json").config()["revision"] == 2
-    assert programada["vigente_desde"] > hoy()
+    assert programada["vigente_desde"] == hoy()  # contrato v43: confirmar rige desde hoy
     with pytest.raises(ErrorRepositorio) as e:
         r.guardar(1, config)
     assert e.value.estado == 409
@@ -389,8 +389,12 @@ def test_registro_diario_reintentable_preserva_filtros_y_version(cfg):
     assert repo.ejecucion["estado"] == "parcial"
     assert repo.ejecucion["resumen"]["vacantes"] == 1
     assert next(iter(repo.asignaciones.values()))["cargo_configuracion"]["nombre"] == "Product Designer"
-    with pytest.raises(RuntimeError, match="conserva otra versión"):
-        ejecutor.iniciar(repo,{**version,"revision":8},hoy())
+    # Contrato v43: una versión confirmada a mitad del día ya no tumba la búsqueda; la fila pasa a la más nueva y
+    # anota la anterior. Una versión más vieja que la de la fila no la cambia.
+    revision = repo.ejecucion["revision"]
+    assert ejecutor.iniciar(repo, {**version, "revision": revision + 7}, hoy())["revision"] == revision + 7
+    assert repo.ejecucion["resumen"]["revisiones_anteriores"] == [revision]
+    assert ejecutor.iniciar(repo, version, hoy())["revision"] == revision + 7
 
 
 def test_captura_fallida_queda_visible_sin_exponer_clientes(cfg,monkeypatch,tmp_path):

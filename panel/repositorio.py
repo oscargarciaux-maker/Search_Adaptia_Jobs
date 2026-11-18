@@ -418,12 +418,8 @@ class RepositorioSupabase:
         return self.pedir("POST", "rpc/panel_publicar", json={"p_revision": revision})
 
     def publicar_hoy(self, revision):
-        """Contrato v27: el borrador rige desde hoy para las búsquedas que faltan hoy (SQL 016)."""
-        actual = self.config()
-        if actual["revision"] != revision:
-            raise ErrorRepositorio("La configuración cambió. Recarga antes de aplicar.", 409)
-        Configuracion.model_validate(actual["borrador"]).validar_publicacion()
-        return self.pedir("POST", "rpc/panel_publicar_hoy", json={"p_revision": revision})
+        """Contrato v43: «Aplicar hoy» y «Confirmar» son lo mismo (SQL 019): rige desde hoy."""
+        return self.publicar(revision)
 
     def operativa(self, fecha):
         filas = self.pedir("GET", "panel_versiones", params={"vigente_desde": "lte." + fecha, "order": "vigente_desde.desc,revision.desc", "limit": 1})
@@ -903,11 +899,11 @@ class RepositorioDemo:
             Configuracion.model_validate(self.estado["borrador"]).validar_publicacion()
             if self.estado["publicada"] and self.estado["publicada"]["revision"] == revision:
                 return {k:self.estado["publicada"][k] for k in ("revision","vigente_desde")}
-            manana = (datetime.fromisoformat(hoy()) + timedelta(days=1)).date().isoformat()
-            self.estado["publicada"] = {"revision": revision, "vigente_desde": manana,
+            # Contrato v43: confirmar deja la configuración vigente desde hoy (la próxima búsqueda ya la usa).
+            self.estado["publicada"] = {"revision": revision, "vigente_desde": hoy(),
                                         "configuracion": deepcopy(self.estado["borrador"])}
             self._guardar()
-            return {"revision": revision, "vigente_desde": manana}
+            return {"revision": revision, "vigente_desde": hoy()}
 
     def publicar_hoy(self, revision):
         with self.lock:

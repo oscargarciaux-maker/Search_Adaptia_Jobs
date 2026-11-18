@@ -32,7 +32,6 @@ import {
   Target,
   Users,
   X,
-  Zap,
 } from "lucide-react";
 import { api } from "./api";
 import { delSistema, guardarTema, temaElegido, type Tema } from "./tema";
@@ -98,18 +97,13 @@ function hoyBogota() {
     timeZone: "America/Bogota",
   }).format(new Date());
 }
-function manana() {
-  const d = new Date(hoyBogota() + "T12:00:00Z");
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
 // Por qué no hay vacantes: sin configuración, a la espera de la primera búsqueda o sin coincidencias.
 function vacioVacantes(estado: EstadoConfig | null, r: Resultados | null) {
   if (!estado?.publicada)
     return {
       title: "Programa la configuración para empezar",
       texto:
-        "Las vacantes de cada cliente aparecen después de la primera búsqueda (6:30 a. m.) con su configuración. Ve a «Cargos y metas» y pulsa «Programar para mañana».",
+        "Las vacantes de cada cliente aparecen después de la primera búsqueda (6:30 a. m.) con su configuración. Ve a «Cargos y metas» y pulsa «Confirmar y aplicar».",
     };
   const desde = estado.publicada.vigente_desde;
   if (!r?.ejecucion || r.ejecucion.fecha < desde)
@@ -1090,7 +1084,7 @@ function ImportarClientes({
         `${r.actualizados} ${r.actualizados === 1 ? "cliente actualizado" : "clientes actualizados"} (conservan lo que recibieron), ${r.nuevos} ${r.nuevos === 1 ? "nuevo" : "nuevos"}` +
           (r.borrados ? `, ${r.borrados} borrados` : "") +
           (r.archivados ? `, ${r.archivados} archivados` : "") +
-          ". Revísalos y pulsa «Programar para mañana».",
+          ". Revísalos y pulsa «Confirmar y aplicar».",
       );
     } catch (e) {
       notify((e as Error).message, true);
@@ -1658,14 +1652,14 @@ function App() {
       setBusy(false);
     }
   }
-  async function programar(hoyMismo = false) {
+  async function programar() {
     setBusy(true);
     try {
       const e = dirty ? await guardar() : estado;
       if (!e) return;
-      // Contrato v27: «Aplicar hoy» rige para las búsquedas que faltan hoy; lo ya entregado no cambia.
+      // Contrato v43: «Confirmar y aplicar» rige desde hoy: la próxima búsqueda ya la usa; lo entregado no cambia.
       const r = await api<{ revision: number; vigente_desde: string }>(
-        hoyMismo ? "/config/aplicar-hoy" : "/config/publicar",
+        "/config/publicar",
         { method: "POST", body: JSON.stringify({ revision: e.revision }) },
       );
       setEstado({
@@ -1674,9 +1668,9 @@ function App() {
       });
       setModal(null);
       notify(
-        hoyMismo
-          ? "Configuración aplicada desde hoy. La próxima búsqueda de hoy ya la usa."
-          : "Configuración programada para el " + fecha(r.vigente_desde) + ".",
+        r.vigente_desde > hoyBogota()
+          ? "Configuración programada para el " + fecha(r.vigente_desde) + "."
+          : "Configuración aplicada. La próxima búsqueda ya la usa.",
       );
     } catch (e) {
       notify((e as Error).message, true);
@@ -1947,14 +1941,12 @@ function App() {
                   >
                     {textoProgramacion(estado, dirty)}
                   </span>
-                  <Ayuda etiqueta="Guardar y programar">
+                  <Ayuda etiqueta="Guardar y aplicar">
                     <strong>Guardar borrador</strong> conserva tus cambios sin
                     tocar la próxima búsqueda.{" "}
-                    <strong>Programar para mañana</strong> los guarda y los usa
-                    desde la búsqueda de las 6:30 a. m. (hora Colombia); en ese
-                    mismo cuadro, <strong>Aplicar hoy</strong> los usa desde la
-                    próxima búsqueda de hoy. Las búsquedas que ya empezaron
-                    siguen con la configuración anterior.
+                    <strong>Confirmar y aplicar</strong> los guarda y los usa
+                    desde la próxima búsqueda, aunque sea dentro de unos
+                    minutos. Lo que ya se entregó hoy no cambia.
                   </Ayuda>
                   <button
                     className="button secondary"
@@ -1970,7 +1962,7 @@ function App() {
                     disabled={busy || total < 1 || excede}
                   >
                     <CalendarClock size={16} />
-                    Programar para mañana
+                    Confirmar y aplicar
                   </button>
                 </>
               )}
@@ -2724,7 +2716,7 @@ function App() {
               (nuevo
                 ? "Cargo añadido al borrador."
                 : "Cargo actualizado en el borrador.") +
-                " Prográmalo para que se aplique desde mañana.",
+                " Pulsa «Confirmar y aplicar» para usarlo en la próxima búsqueda.",
             );
           }}
         />
@@ -2763,14 +2755,14 @@ function App() {
               (nuevo
                 ? "Cliente añadido al borrador."
                 : "Cliente actualizado en el borrador.") +
-                " Prográmalo para que se aplique desde mañana.",
+                " Pulsa «Confirmar y aplicar» para usarlo en la próxima búsqueda.",
             );
           }}
         />
       )}
       {modal === "publicar" && (
         <Dialog
-          titulo="Preparar la búsqueda de mañana"
+          titulo="Confirmar y aplicar"
           subtitulo="Se confirmará esta distribución y los filtros actuales de los clientes."
           onClose={() => !busy && setModal(null)}
         >
@@ -2794,31 +2786,18 @@ function App() {
               {total} / {metas.techo}
             </strong>
           </div>
-          {/* Sesión de prueba (17 nov): cada opción dice desde qué búsqueda y a qué hora rige. */}
-          <div className="opciones-programar">
-            <div>
-              <strong>Confirmar configuración</strong>
-              <span>
-                Se usa desde la búsqueda de mañana,{" "}
-                <b>{fecha(manana())} a las 6:30 a. m.</b> (hora Colombia).
-              </span>
-            </div>
-            <div>
-              <strong>Aplicar hoy</strong>
-              <span>
-                Se usa desde la próxima búsqueda de hoy:{" "}
-                <b>{textoProximaDeHoy()}</b>. Lo que ya se entregó hoy no
-                cambia.
-              </span>
-            </div>
-          </div>
-          <p className="helper note">
-            {!estado?.publicada &&
-              "Es tu primera configuración: desde entonces dejan de buscarse los seis cargos fijos anteriores; solo se buscarán los cargos de esta lista. "}
-            Si las fuentes no ofrecen suficientes vacantes válidas, verás el
-            faltante; no se rellena con duplicados ni con vacantes fuera de los
-            filtros.
+          {/* Contrato v43: una sola opción; rige desde la próxima búsqueda. */}
+          <p className="helper">
+            Se usa desde la próxima búsqueda: <b>{textoProximaDeHoy()}</b>. Lo
+            que ya se entregó hoy no cambia.
           </p>
+          {!estado?.publicada && (
+            <p className="helper note">
+              Es tu primera configuración: desde entonces dejan de buscarse los
+              seis cargos fijos anteriores; solo se buscarán los cargos de esta
+              lista.
+            </p>
+          )}
           {sesion.demo && (
             <p className="demo-inline">
               Demostración: esta acción no programa una búsqueda real.
@@ -2833,14 +2812,6 @@ function App() {
               Revisar
             </button>
             <button
-              className="button secondary"
-              disabled={busy}
-              onClick={() => programar(true)}
-            >
-              <Zap size={16} />
-              Aplicar hoy
-            </button>
-            <button
               className="button primary"
               disabled={busy}
               onClick={() => programar()}
@@ -2850,7 +2821,7 @@ function App() {
               ) : (
                 <CalendarClock size={16} />
               )}
-              Confirmar configuración
+              Confirmar y aplicar
             </button>
           </div>
         </Dialog>
@@ -3094,7 +3065,7 @@ function textoProgramacion(estado: EstadoConfig | null, dirty: boolean) {
   if (!p || p.revision !== estado.revision) return "Hay cambios sin programar";
   return p.vigente_desde > hoyBogota()
     ? "Lista: se usa desde la búsqueda de mañana"
-    : "En uso desde el " + fecha(p.vigente_desde);
+    : "En uso desde la próxima búsqueda";
 }
 function ClientCard({
   c,

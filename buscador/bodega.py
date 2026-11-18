@@ -382,7 +382,10 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     control_central = central.control_apify(hoy, cfg["apify"].get("tope_mensual_usd", 5),
         cfg["apify"].get("tope_por_corrida_usd", 3)) if central else None
     argumentos_central = {"control_apify": control_central} if central else {}
-    if usar_catalogo and not prueba and not consulta and modo != "incremental":
+    # Contrato v43: una pasada horaria arma lote solo si el panel lo pide (configuración confirmada hoy después del
+    # lote); entonces lee también lo entregado hoy en Supabase, como la diaria, para no repetir nada.
+    completar_lote = modo == "incremental" and bool((_config_operativa or {}).get("completar_lote"))
+    if usar_catalogo and not prueba and not consulta and (modo != "incremental" or completar_lote):
         from buscador import supabase
         memoria_db, lote_db = supabase.leer_entregas(hoy)
         for rol, lista in lote_previo.get("elegidas", {}).items() if lote_previo.get("fecha") == hoy else []:
@@ -592,7 +595,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     # Entrega diaria en el formato del contrato (no en una búsqueda profunda; en una prueba no se marca nada ni se sube)
     resumen_entrega = salud_anterior.get("entrega") if modo == "incremental" else None
     historico_entregas = salud_anterior.get("historico_entregas", []) if modo == "incremental" else []
-    if not consulta and modo != "incremental":
+    if not consulta and (modo != "incremental" or completar_lote):
         from buscador import entrega, supabase
         entregadas = _leer_json(trabajo / "entregadas.json", {})
         entregadas.update(memoria_db)

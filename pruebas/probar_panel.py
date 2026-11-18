@@ -37,7 +37,8 @@ def main():
             guardar = c.execute("select public.panel_guardar(0,%s::jsonb)", (json.dumps(cfg),)).fetchone()[0]
             assert guardar["revision"] == 1
             publicada = c.execute("select public.panel_publicar(1)").fetchone()[0]
-            assert c.execute("select vigente_desde > (now() at time zone 'America/Bogota')::date from public.panel_versiones").fetchone()[0]
+            # SQL 019 (contrato v43): confirmar deja la versión vigente desde hoy en Bogotá.
+            assert c.execute("select vigente_desde = (now() at time zone 'America/Bogota')::date from public.panel_versiones").fetchone()[0]
             assert c.execute("select public.panel_publicar(1)").fetchone()[0] == publicada
             mala = json.loads(json.dumps(cfg))
             mala["techo_diario"] = 0
@@ -98,11 +99,10 @@ def main():
                 raise AssertionError("Se programó una suma mayor que el techo")
             except psycopg.errors.RaiseException:
                 pass
-            # SQL 016 (contrato v27): «Aplicar hoy». Con la búsqueda de hoy corriendo se rechaza; al terminar, la
-            # ejecución de hoy pasa a la versión nueva (anotando la anterior) y la versión rige desde hoy en Bogotá.
+            # «Aplicar hoy» (016, hoy alias de panel_publicar por SQL 019) también rechaza lo que supera el techo.
             try:
                 c.execute("select public.panel_publicar_hoy(%s)", (r + 2,))
-                raise AssertionError("Se aplicó hoy con una búsqueda en curso")
+                raise AssertionError("Se aplicó hoy una suma mayor que el techo")
             except psycopg.errors.RaiseException:
                 pass
             c.execute("reset role")
@@ -118,7 +118,8 @@ def main():
             c.execute("reset role")
             revision, anteriores = c.execute("select revision,resumen->'revisiones_anteriores' from "
                                              "public.panel_ejecuciones where id=%s", (ejecucion,)).fetchone()
-            assert revision == r + 3 and anteriores == [1]
+            # SQL 019: cada confirmación del día anota la versión anterior (la primera fue la 1).
+            assert revision == r + 3 and anteriores[0] == 1 and anteriores[-1] != r + 3
             assert c.execute("select count(*) from public.panel_asignaciones").fetchone()[0] == 1  # nada se borra
             # Importar clientes (15 nov): el borrador resultante de «borrar del todo» lo acepta el SQL real y se programa.
             from panel import importar

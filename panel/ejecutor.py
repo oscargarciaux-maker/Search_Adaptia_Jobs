@@ -292,16 +292,32 @@ def perfiles_cortos(repo, version, fecha):
 
 
 def iniciar(repo, version, fecha):
-    """Fija una versión diaria y permite releer la misma ejecución al reintentar."""
+    """Fija una versión diaria y permite releer la misma ejecución al reintentar.
+    Contrato v43: si la configuración se confirmó mientras la búsqueda corría, la fila del día pasa a la versión más
+    nueva y anota la anterior (como SQL 019); antes la búsqueda se caía al final y se perdía todo lo encontrado."""
     e = repo.pedir("GET", "panel_ejecuciones", params={"fecha": "eq." + fecha, "limit": 1})
     if not e:
         e = repo.pedir("POST", "panel_ejecuciones", json={"fecha": fecha, "revision": version["revision"]},
                        params={"on_conflict": "fecha"}, headers={"Prefer":"resolution=ignore-duplicates"})  # repositorio aplica cabeceras comunes
         e = repo.pedir("GET", "panel_ejecuciones", params={"fecha": "eq." + fecha, "limit": 1})
     ejecucion = e[0]
-    if ejecucion["revision"] != version["revision"]:
-        raise RuntimeError("La captura de hoy conserva otra versión; no se reasigna el historial.")
+    if ejecucion["revision"] < version["revision"]:
+        resumen = dict(ejecucion.get("resumen") or {})
+        resumen["revisiones_anteriores"] = [*(resumen.get("revisiones_anteriores") or []), ejecucion["revision"]]
+        repo.pedir("PATCH", "panel_ejecuciones", params={"id": "eq." + ejecucion["id"]},
+                   json={"revision": version["revision"], "resumen": resumen})
+        ejecucion = {**ejecucion, "revision": version["revision"], "resumen": resumen}
     return ejecucion
+
+
+def vigente(repo, version, fecha):
+    """Contrato v43: la versión confirmada más nueva para hoy; si no se puede leer, la que ya se tiene."""
+    try:
+        nueva = repo.operativa(fecha) if hasattr(repo, "operativa") else None
+    except Exception as e:  # noqa: BLE001 — sin la lectura se asigna con la versión con la que empezó la búsqueda
+        registro.aviso("ejecutor:vigente", e)
+        return version
+    return nueva if nueva and nueva.get("revision", 0) > version.get("revision", 0) else version
 
 
 def _embudo_por_nombre(reporte):
@@ -535,10 +551,20 @@ def _posts(repo, cfg, fecha, estrictas, filas, fila):
 
 
 def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=None, cache_enlaces=None,
-              limites_rescate=(MAX_COMPROBAR_RESCATE, SEGUNDOS_RESCATE)):
-    """Reconstruible desde la selección confirmada, incluso tras perder el proceso anterior."""
+              limites_rescate=(MAX_COMPROBAR_RESCATE, SEGUNDOS_RESCATE), revision_lote=None):
+    """Reconstruible desde la selección confirmada, incluso tras perder el proceso anterior.
+    Contrato v43: asigna con la versión confirmada más nueva (aunque la búsqueda empezara con otra); una vacante del
+    lote llega también a perfiles de otros cargos que la aceptan; Comunidad recibe después de los clientes reales,
+    prefiere lo que ellos no recibieron y se corta en su meta diaria."""
+    version = vigente(repo, version, fecha)
     ejecucion = iniciar(repo, version, fecha)
     cfg = validar_version(version)
+    clientes = {str(c.id): c for c in cfg.clientes}
+
+    def de_comunidad(p):
+        return bool(getattr(clientes.get(str(p.cliente_id)), "comunidad", False))
+    activos = [c for c in cfg.cargos if c.activo]
+    cargos_json = {str(c.id): c.model_dump(mode="json") for c in activos}
     seleccionadas = repo.pedir("GET", "entregas_diarias", params={"delivery_date": "eq." + fecha, "select": "*", "limit": 500})
     filas, conteos, estrictas, ampliables = [], {}, {}, []
     def fila(row, p, cargo_id, pruebas, extra=()):
@@ -548,22 +574,40 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
                 "perfil_id": str(p.id), "cargo_id": cargo_id, "vacante_id": row["vacante_id"],
                 "match_grade": row["match_grade"], "explicacion": [*pruebas, evidencia or {"regla": "similitud textual"}, *extra],
                 "filtros": p.model_dump(mode="json"), "cargo_configuracion": c.model_dump(mode="json")}
+    comunidad, de_reales = [], set()
     for row in seleccionadas:
         if not row["role_id"].startswith("cargo:"):
             continue
         cargo_id = row["role_id"].split(":", 1)[1]
         conteos[cargo_id] = conteos.get(cargo_id, 0) + 1
-        for p in cfg.perfiles_activos(cargo_id):
+        candidatos = [(p, cargo_id) for p in cfg.perfiles_activos(cargo_id)] if cargo_id in cargos_json else []
+        # Contrato v43: si la vacante también es del otro cargo (exacto o similar; nunca solo «cercano»), llega a sus
+        # perfiles sin ocupar su cupo.
+        for otro, cargo in cargos_json.items():
+            if otro != cargo_id and grado(row["snapshot"].get("titulo", ""), cargo)[0]:
+                candidatos += [(p, otro) for p in cfg.perfiles_activos(otro)]
+        for p, cid in candidatos:
             match = evaluar(row["snapshot"], p, fecha)
             if match["compatible"]:
+                if de_comunidad(p):  # después de los clientes reales (abajo)
+                    comunidad.append((row, p, cid, match["pruebas"]))
+                    continue
                 estrictas[p.id] = estrictas.get(p.id, 0) + 1
-                filas.append(fila(row, p, cargo_id, match["pruebas"]))
-            elif row["snapshot"].get("_ampliacion") in AMPLIACIONES:
+                filas.append(fila(row, p, cid, match["pruebas"]))
+                de_reales.add(row["vacante_id"])
+            elif cid == cargo_id and row["snapshot"].get("_ampliacion") in AMPLIACIONES:
                 ampliables.append((row, p, cargo_id))
+    # Contrato v43 (decisión de Oscar): Comunidad hasta su meta, primero con lo que no recibió ningún cliente real.
+    comunidad.sort(key=lambda x: x[0]["vacante_id"] in de_reales)
+    for row, p, cid, pruebas in comunidad:
+        if estrictas.get(p.id, 0) >= (p.meta_diaria or 0):
+            continue
+        estrictas[p.id] = estrictas.get(p.id, 0) + 1
+        filas.append(fila(row, p, cid, pruebas))
     # Contrato v9: lo ampliado solo se asigna a perfiles que no llegaron al mínimo con vacantes que cumplen todo.
     for row, p, cargo_id in ampliables:
         nivel = row["snapshot"]["_ampliacion"]
-        if estrictas.get(p.id, 0) >= MINIMO_POR_PERFIL:
+        if estrictas.get(p.id, 0) >= MINIMO_POR_PERFIL or (de_comunidad(p) and estrictas.get(p.id, 0) >= (p.meta_diaria or 0)):
             continue
         match = evaluar_ampliada(row["snapshot"], p, fecha, nivel)
         if match["compatible"]:
@@ -603,6 +647,14 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
     repo.pedir("PATCH", "panel_ejecuciones", params={"id": "eq." + ejecucion["id"]},
         json={"estado": "parcial" if any(faltantes.values()) or not confirmado else "completa",
               "resumen": {"vacantes": sum(conteos.values()), "meta": cfg.total, "techo": cfg.techo_diario,
+                          # Contrato v43: cifras que no se contradicen en el Resumen.
+                          "vacantes_vigentes": sum(n for c, n in conteos.items() if c in cargos_json),
+                          "vacantes_anteriores": sum(n for c, n in conteos.items() if c not in cargos_json),
+                          "asignaciones_comunidad": sum(1 for f in filas if getattr(clientes.get(f["cliente_id"]), "comunidad", False)),
+                          "revision_del_lote": revision_lote if revision_lote is not None else
+                                               (ejecucion.get("resumen") or {}).get("revision_del_lote"),
+                          **({"revisiones_anteriores": (ejecucion.get("resumen") or {})["revisiones_anteriores"]}
+                             if (ejecucion.get("resumen") or {}).get("revisiones_anteriores") else {}),
                           "metas": cfg.metas(), "faltantes": faltantes,
                           "asignaciones": len(filas),
                           "ampliadas": sum(any(isinstance(e, dict) and e.get("ampliacion") for e in f["explicacion"]) for f in filas),
@@ -640,7 +692,13 @@ def correr(salida, modo="diario", prueba=False, repo=None):
                 aprendidos = repo.ajuste("titulos_aprendidos", {}) or {}
             except Exception:  # noqa: BLE001 — sin ellos la búsqueda sigue igual
                 aprendidos = {}
+        # Contrato v43 (decisión de Oscar, 18 nov): si la configuración se confirmó hoy después de armar el lote, la
+        # siguiente pasada horaria también arma lote para lo que falte (excepción a «la captura horaria no entrega»).
+        lote_de = (ejecucion.get("resumen") or {}).get("revision_del_lote")
+        completar = modo == "incremental" and lote_de is not None and lote_de != version["revision"]
         with activar(version, fecha, aprendidos, perfiles_cortos(repo, version, fecha)):
+            if completar:
+                bodega._config_operativa["completar_lote"] = True
             if hasattr(repo, "decisiones_ubicacion"):
                 try:  # contrato v17: cada decisión de la bandeja vale en esta búsqueda
                     from panel.revision import decisiones_para_busqueda
@@ -666,7 +724,8 @@ def correr(salida, modo="diario", prueba=False, repo=None):
             registrar(repo, version, fecha, dict(reporte or {}, busquedas_por_perfil=busquedas), reglas_info,
                       vacantes=bodega._leer_json(trabajo / "bodega.json.gz", []),
                       cache_enlaces=bodega._leer_json(trabajo / "verificacion_enlaces.json", {}),
-                      limites_rescate=(30, 60) if modo == "incremental" else (MAX_COMPROBAR_RESCATE, SEGUNDOS_RESCATE))
+                      limites_rescate=(30, 60) if modo == "incremental" else (MAX_COMPROBAR_RESCATE, SEGUNDOS_RESCATE),
+                      revision_lote=version["revision"] if modo != "incremental" or completar else None)
             if modo != "incremental":
                 try:  # borradores de WhatsApp listos para revisar; un fallo aquí nunca tumba la búsqueda
                     from panel import borradores
