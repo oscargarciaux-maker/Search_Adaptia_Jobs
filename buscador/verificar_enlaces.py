@@ -75,10 +75,23 @@ def sin_comprobacion_directa(url):
     return any(h == d or h.endswith("." + d) for d in SIN_COMPROBACION_DIRECTA)
 
 
+def vistas_en_portales(enlaces_vistos, ahora=None):
+    """Contrato v42: los avisos que el portal de empleo de la propia empresa (Greenhouse, Lever, Ashby, Workable,
+    SmartRecruiters, Recruitee) listó en esta corrida cuentan como abiertos 24 h. Esas API públicas solo listan avisos
+    activos y son el mismo sitio donde se postula. Computrabajo y Get on Board no entran: sus listados pueden traer
+    avisos viejos. Devuelve {enlace: comprobación} para `incorporar`."""
+    hora = (ahora or datetime.now(timezone.utc)).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return {u: {"estado": "verificada", "motivo": "vista hoy en el portal de la empresa", "comprobada_en": hora,
+                "destino": u}
+            for u in enlaces_vistos
+            if u and enlaces.sirve(u) and not enlaces.es_linkedin(u) and not sin_comprobacion_directa(u)}
+
+
 def incorporar(vacantes, cache, fichas):
     """Contrato v39: las fichas de LinkedIn que la búsqueda ya leyó hoy valen como comprobación (abierta o cerrada) del
     enlace, sin volver a preguntar. Contrato v41: también los avisos que la búsqueda de Indeed mostró hoy (Indeed solo
-    lista avisos activos y responde 401 a cualquier comprobación directa). Solo reemplaza una comprobación más
+    lista avisos activos y responde 401 a cualquier comprobación directa). Contrato v42: y los que listó hoy el portal de
+    la propia empresa (`vistas_en_portales`). Solo reemplaza una comprobación más
     antigua. Devuelve cuántas incorporó."""
     n = 0
     for v in vacantes:
