@@ -75,7 +75,9 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await expect(dialog.getByLabel("Número", { exact: true })).toHaveCount(0);
   await dialog.getByLabel("Aceptó recibir vacantes por WhatsApp").check();
   await expect(dialog.getByLabel("Número", { exact: true })).toBeVisible();
-  await expect(dialog.getByLabel("País", { exact: true })).toHaveValue("CO");
+  await expect(dialog.getByLabel("País", { exact: true })).toHaveValue(
+    /Colombia \+57/,
+  );
   await dialog.getByLabel("Aceptó recibir vacantes por WhatsApp").uncheck();
   // Sección 8: crear un cargo sin salir del cliente; el formulario conserva lo escrito.
   await dialog
@@ -1450,9 +1452,10 @@ test("contrato v30: bandera del WhatsApp, contacto precargado y guardado sin esp
   if (!(await consentimiento.isChecked())) await consentimiento.check();
   // Contrato v35: el país del número se elige en la lista y se escribe solo el número.
   const telefono = dialog.getByLabel("Número", { exact: true });
-  await dialog.getByLabel("País", { exact: true }).selectOption("ES");
+  // 18 nov: el país se escribe («esp», «+57») y aparece con su bandera y su código.
+  await dialog.getByLabel("País", { exact: true }).fill("españa");
   await telefono.fill("600 111 222");
-  await dialog.getByLabel("País", { exact: true }).selectOption("CO");
+  await dialog.getByLabel("País", { exact: true }).fill("+57");
   await telefono.fill("300 111 2233");
   await dialog.getByRole("button", { name: "Aplicar cambios" }).click();
   await expect(dialog).toHaveCount(0, { timeout: 1500 });
@@ -1462,7 +1465,9 @@ test("contrato v30: bandera del WhatsApp, contacto precargado y guardado sin esp
     "300 111 2233",
     { timeout: 1000 },
   );
-  await expect(dialog.getByLabel("País", { exact: true })).toHaveValue("CO");
+  await expect(dialog.getByLabel("País", { exact: true })).toHaveValue(
+    /Colombia \+57/,
+  );
   await expect.poll(() => guardado, { timeout: 5000 }).toBe("+57 300 111 2233");
   expect(await page.evaluate(revisarContraste)).toEqual([]);
   expect(errores).toEqual([]);

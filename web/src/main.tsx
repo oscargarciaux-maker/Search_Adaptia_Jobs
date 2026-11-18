@@ -20,16 +20,17 @@ import {
   Globe2,
   Loader2,
   LogOut,
-  MapPin,
   MessageCircle,
   Pencil,
   Plus,
   RefreshCw,
+  RotateCcw,
   Save,
   Search,
   ShieldCheck,
   SlidersHorizontal,
   Target,
+  Trash2,
   Users,
   X,
 } from "lucide-react";
@@ -378,11 +379,13 @@ function TarjetasResumen({
   cargos,
   total,
   techo,
+  reales,
   comunidad,
   ultima,
   porConfirmar,
   borradores,
   go,
+  onNuevoCliente,
 }: {
   clientes: ResumenCliente[];
   diaConteo?: string;
@@ -391,11 +394,13 @@ function TarjetasResumen({
   cargos: Cargo[];
   total: number;
   techo: number;
+  reales: number;
   comunidad: number;
   ultima?: Ejecucion;
   porConfirmar: number;
   borradores: Borrador[] | null;
   go: (t: string) => void;
+  onNuevoCliente: () => void;
 }) {
   const r = ultima?.resumen || {};
   const vivos = (borradores || []).filter((b) => b.estado !== "descartado");
@@ -418,71 +423,6 @@ function TarjetasResumen({
   const deHoy = diaConteo === hoyBogota();
   return (
     <section className="resumen-grid resumen-b" aria-label="Resumen del panel">
-      {/* Sesión de prueba (17 nov): arriba, las 3 tareas del día en orden y numeradas (sin flechas). */}
-      <ol className="pasos-dia" aria-label="Tu día en 3 pasos">
-        <li>
-          <button
-            type="button"
-            className={"paso-dia" + (porConfirmar ? " pendiente" : "")}
-            onClick={() => go("Por confirmar")}
-          >
-            <span className="paso-numero" aria-hidden="true">
-              1
-            </span>
-            <span className="paso-texto">
-              <strong>Revisa las dudosas</strong>
-              <span>
-                {porConfirmar
-                  ? `${porConfirmar} por confirmar`
-                  : "Nada por confirmar"}
-              </span>
-            </span>
-          </button>
-        </li>
-        <li>
-          <button
-            type="button"
-            className={
-              "paso-dia" +
-              (vivos.length && enviados < vivos.length ? " pendiente" : "")
-            }
-            onClick={() => go("Mensajes")}
-          >
-            <span className="paso-numero" aria-hidden="true">
-              2
-            </span>
-            <span className="paso-texto">
-              <strong>Envía los mensajes</strong>
-              <span>
-                {!borradores
-                  ? "Ábrelos para prepararlos"
-                  : vivos.length
-                    ? `${vivos.length - enviados} por enviar de ${vivos.length}`
-                    : "Aún no hay mensajes de hoy"}
-              </span>
-            </span>
-          </button>
-        </li>
-        <li>
-          <button
-            type="button"
-            className={"paso-dia" + (bajos ? " pendiente" : "")}
-            onClick={() => go("Clientes")}
-          >
-            <span className="paso-numero" aria-hidden="true">
-              3
-            </span>
-            <span className="paso-texto">
-              <strong>Ajusta clientes y cargos</strong>
-              <span>
-                {diaConteo && bajos
-                  ? `${bajos} ${bajos === 1 ? "cliente bajo su meta" : "clientes bajo su meta"}`
-                  : "Solo cuando haga falta"}
-              </span>
-            </span>
-          </button>
-        </li>
-      </ol>
       <div className="resumen-arriba">
         <button
           type="button"
@@ -502,7 +442,9 @@ function TarjetasResumen({
               <small> / {techo}</small>
             </strong>
             <span className="tarjeta-detalle">
-              {total - comunidad} a clientes · {comunidad} a Comunidad
+              {/* Contrato v43: Comunidad recibe de lo que sobra y hasta su meta, aunque no ocupe cupo. */}
+              {reales} a clientes
+              {comunidad > 0 && ` · Comunidad hasta ${comunidad}`}
             </span>
           </div>
           <span className="cupos-dona-fila">
@@ -539,16 +481,22 @@ function TarjetasResumen({
             Vacantes
           </span>
           <strong className="tarjeta-numero">
-            {ultima ? (r.vacantes ?? 0) : "—"}
+            {ultima ? (r.vacantes_vigentes ?? r.vacantes ?? 0) : "—"}
+            {ultima && r.meta ? <small> / {r.meta}</small> : null}
           </strong>
           <span className="tarjeta-detalle">
             {ultima
-              ? `Entregadas en la búsqueda del ${fecha(ultima.fecha)}` +
+              ? `Del cupo, en la búsqueda del ${fecha(ultima.fecha)}` +
                 (ultima.terminada_en
                   ? ` · actualizada ${horaBogota(ultima.terminada_en)}`
                   : "")
               : "Sin búsquedas aún"}
           </span>
+          {ultima && (r.vacantes_anteriores ?? 0) > 0 && (
+            <span className="tarjeta-detalle">
+              +{r.vacantes_anteriores} de cargos que ya cambiaste hoy
+            </span>
+          )}
           <span className="tarjeta-accion">
             Ver vacantes
             <ArrowRight size={14} />
@@ -574,7 +522,7 @@ function TarjetasResumen({
             </span>
             <span className="tarjeta-detalle">
               {ultima
-                ? `Última, del ${fecha(ultima.fecha)}: ${r.vacantes ?? 0} vacantes` +
+                ? `Última, del ${fecha(ultima.fecha)}: ${r.vacantes_vigentes ?? r.vacantes ?? 0} vacantes` +
                   (diaConteo && bajos
                     ? ` · ${bajos} ${bajos === 1 ? "cliente" : "clientes"} bajo su meta`
                     : "")
@@ -595,11 +543,86 @@ function TarjetasResumen({
             <ArrowRight size={14} />
           </span>
         </button>
+        {/* 18 nov: los 3 pasos del día, uno sobre otro, a la derecha del historial. */}
+        <ol className="pasos-dia" aria-label="Tu día en 3 pasos">
+          <li>
+            <button
+              type="button"
+              className={"paso-dia" + (porConfirmar ? " pendiente" : "")}
+              onClick={() => go("Por confirmar")}
+            >
+              <span className="paso-numero" aria-hidden="true">
+                1
+              </span>
+              <span className="paso-texto">
+                <strong>Revisa las dudosas</strong>
+                <span>
+                  {porConfirmar
+                    ? `${porConfirmar} por confirmar`
+                    : "Nada por confirmar"}
+                </span>
+              </span>
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              className={
+                "paso-dia" +
+                (vivos.length && enviados < vivos.length ? " pendiente" : "")
+              }
+              onClick={() => go("Mensajes")}
+            >
+              <span className="paso-numero" aria-hidden="true">
+                2
+              </span>
+              <span className="paso-texto">
+                <strong>Envía los mensajes</strong>
+                <span>
+                  {!borradores
+                    ? "Ábrelos para prepararlos"
+                    : vivos.length
+                      ? `${vivos.length - enviados} por enviar de ${vivos.length}`
+                      : "Aún no hay mensajes de hoy"}
+                </span>
+              </span>
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              className={"paso-dia" + (bajos ? " pendiente" : "")}
+              onClick={() => go("Clientes")}
+            >
+              <span className="paso-numero" aria-hidden="true">
+                3
+              </span>
+              <span className="paso-texto">
+                <strong>Ajusta clientes y cargos</strong>
+                <span>
+                  {diaConteo && bajos
+                    ? `${bajos} ${bajos === 1 ? "cliente bajo su meta" : "clientes bajo su meta"}`
+                    : "Solo cuando haga falta"}
+                </span>
+              </span>
+            </button>
+          </li>
+        </ol>
       </div>
       <div className="tarjeta-resumen tarjeta-clientes">
-        <span className="tarjeta-cabeza">
-          <Users size={18} />
-          Clientes
+        <span className="tarjeta-cabeza clientes-cabeza">
+          <span>
+            <Users size={18} />
+            Clientes
+          </span>
+          <button
+            type="button"
+            className="button secondary nuevo-cliente"
+            onClick={onNuevoCliente}
+          >
+            <Plus size={16} />
+            Nuevo cliente
+          </button>
         </span>
         <strong className="tarjeta-numero">
           {clientes.length}
@@ -653,30 +676,31 @@ function TarjetasResumen({
                     }
                     onClick={() => onCliente(c.id)}
                   >
-                    <span className="cliente-texto">
-                      <strong>
-                        {c.nombre}
-                        {c.comunidad && <DistintivoComunidad />}
-                      </strong>
-                      <span>{c.cargo}</span>
-                    </span>
-                    {/* Sesión de prueba: el «3 de 17» encima de la barra y «por confirmar» como ícono discreto. */}
-                    <span className="cliente-avance" aria-hidden="true">
-                      <span className="cliente-cifra">{cifra}</span>
-                      <span className="cliente-barra">
-                        <span style={{ width: pct + "%" }} />
+                    {/* 18 nov: la cifra grande arriba a la derecha; «por confirmar» como alerta con su número. */}
+                    <span className="cliente-arriba">
+                      <span className="cliente-texto">
+                        <strong>
+                          {c.nombre}
+                          {c.porConfirmar > 0 && (
+                            <span
+                              className="cliente-alerta"
+                              title={pendiente}
+                              aria-hidden="true"
+                            >
+                              {c.porConfirmar}
+                            </span>
+                          )}
+                          {c.comunidad && <DistintivoComunidad />}
+                        </strong>
+                        <span>{c.cargo}</span>
+                      </span>
+                      <span className="cliente-cifra" aria-hidden="true">
+                        {cifra}
                       </span>
                     </span>
-                    {c.porConfirmar > 0 && (
-                      <span
-                        className="cliente-alerta"
-                        title={pendiente}
-                        aria-hidden="true"
-                      >
-                        <MapPin size={14} />
-                        {c.porConfirmar}
-                      </span>
-                    )}
+                    <span className="cliente-barra" aria-hidden="true">
+                      <span style={{ width: pct + "%" }} />
+                    </span>
                   </button>
                 </li>
               );
@@ -1415,6 +1439,7 @@ function App() {
     >(null),
     [editCliente, setEditCliente] = useState<Cliente | null>(null),
     [editCargo, setEditCargo] = useState<Cargo | null>(null),
+    [borrarCargo, setBorrarCargo] = useState<Cargo | null>(null),
     [archive, setArchive] = useState<{
       tipo: "cliente" | "cargo";
       id: string;
@@ -1434,7 +1459,6 @@ function App() {
   const [errorResultados, setErrorResultados] = useState(false);
   const [porConfirmar, setPorConfirmar] = useState(0);
   // Sesión de prueba (17 nov): quién inició sesión, visible arriba.
-  const [yo, setYo] = useState<{ nombre: string; correo: string } | null>(null);
   // Contrato v30: los WhatsApp se cargan con el panel para que el formulario del cliente abra sin esperar.
   const [contactos, setContactos] = useState<Record<string, Contacto>>({});
   function cargarContactos() {
@@ -1511,9 +1535,6 @@ function App() {
       setSesion(s);
       if (s.sesion) {
         cargarContactos();
-        api<{ nombre: string; correo: string }>("/yo")
-          .then(setYo)
-          .catch(() => setYo(null));
         api<Revisiones>(PENDIENTES_RESUMEN)
           .then((r) => {
             setPorConfirmar(r.en_espera ?? r.total);
@@ -1966,27 +1987,7 @@ function App() {
                   </button>
                 </>
               )}
-              {tab === "Resumen" && (
-                <button
-                  className="button secondary"
-                  onClick={() => {
-                    setEditCliente(null);
-                    setModal("cliente");
-                  }}
-                >
-                  <Plus size={16} />
-                  Nuevo cliente
-                </button>
-              )}
               <BotonTema />
-              {yo && (
-                <span className="operador-chip" title={yo.correo || yo.nombre}>
-                  <span className="operador-inicial" aria-hidden="true">
-                    {yo.nombre.trim().charAt(0).toUpperCase() || "·"}
-                  </span>
-                  {yo.nombre}
-                </span>
-              )}
               {!sesion.demo && (
                 <button
                   className="button secondary boton-tema cerrar-sesion"
@@ -2023,11 +2024,16 @@ function App() {
                 cargos={cargos}
                 total={total}
                 techo={metas.techo}
-                comunidad={metas.cabe}
+                reales={metas.reales}
+                comunidad={metas.comunidad}
                 ultima={runs?.[0]}
                 porConfirmar={porConfirmar}
                 borradores={borradoresHoy}
                 go={go}
+                onNuevoCliente={() => {
+                  setEditCliente(null);
+                  setModal("cliente");
+                }}
               />
               {detalle &&
                 (() => {
@@ -2213,15 +2219,18 @@ function App() {
                   />
                 </div>
                 <p className="allocation-texto">
-                  <strong>{metas.reales}</strong> a clientes · {metas.cabe} a
-                  Comunidad · {metas.libre} libres
+                  <strong>{metas.reales}</strong> a clientes
+                  {metas.comunidad > 0 &&
+                    ` · Comunidad hasta ${metas.comunidad}`}{" "}
+                  · {metas.libre} libres
                   {excede &&
                     " · Las metas de los clientes pasan el cupo diario: baja metas o sube el cupo"}
                 </p>
                 <Ayuda etiqueta="Cupo diario">
                   Máximo de vacantes al día entre todos, para cuidar los
-                  consumos. Primero se llenan las metas de los clientes; lo que
-                  sobre va al grupo «Comunidad».
+                  consumos. Primero se llenan las metas de los clientes; el
+                  grupo «Comunidad» recibe después, de lo que sobre, y solo
+                  hasta su meta.
                 </Ayuda>
                 <div className="allocation-track">
                   <span
@@ -2380,36 +2389,48 @@ function App() {
                     }
                   }}
                 >
-                  {/* Lista grande (17 nov): una franja baja bajo los cargos, con cada archivado como ficha pequeña. */}
-                  <span className="archivados-titulo">
+                  {/* 18 nov: cuarta columna a la derecha; arriba «Archivados» y debajo una tarjeta por cargo. */}
+                  <div className="archivados-titulo">
                     <Archive size={15} />
                     Archivados ({draft.cargos.filter((c) => !c.activo).length})
-                  </span>
+                    <span className="archivados-ayuda">
+                      Arrastra un cargo aquí para archivarlo.
+                    </span>
+                  </div>
                   {draft.cargos
                     .filter((c) => !c.activo)
                     .map((c) => (
-                      <span className="archivado-ficha" key={c.id}>
-                        {c.nombre}
-                        <button
-                          type="button"
-                          className="text-button"
-                          aria-label={"Reactivar " + c.nombre}
-                          onClick={() =>
-                            cambiar({
-                              ...draft,
-                              cargos: draft.cargos.map((x) =>
-                                x.id === c.id ? { ...x, activo: true } : x,
-                              ),
-                            })
-                          }
-                        >
-                          Reactivar
-                        </button>
-                      </span>
+                      <div className="archivado-ficha" key={c.id}>
+                        <strong>{c.nombre}</strong>
+                        <span className="archivado-acciones">
+                          <button
+                            type="button"
+                            className="button secondary"
+                            aria-label={"Reactivar " + c.nombre}
+                            onClick={() =>
+                              cambiar({
+                                ...draft,
+                                cargos: draft.cargos.map((x) =>
+                                  x.id === c.id ? { ...x, activo: true } : x,
+                                ),
+                              })
+                            }
+                          >
+                            <RotateCcw size={14} />
+                            Reactivar
+                          </button>
+                          <button
+                            type="button"
+                            className="button secondary peligro"
+                            aria-label={"Eliminar definitivamente " + c.nombre}
+                            onClick={() => setBorrarCargo(c)}
+                          >
+                            <Trash2 size={14} />
+                            Eliminar
+                          </button>
+                        </span>
+                      </div>
                     ))}
-                  <span className="archivados-ayuda">
-                    Arrastra un cargo aquí para archivarlo.
-                  </span>
                 </aside>
               </div>
               {previaCargos.datos?.nota && (
@@ -2826,6 +2847,51 @@ function App() {
           </div>
         </Dialog>
       )}
+      {borrarCargo && (
+        <Dialog
+          titulo={"Eliminar " + borrarCargo.nombre}
+          subtitulo="Se quita del borrador para siempre. Lo ya entregado y el historial se conservan."
+          onClose={() => setBorrarCargo(null)}
+        >
+          {(() => {
+            const suyos = draft.perfiles.filter(
+              (p) => p.cargo_id === borrarCargo.id,
+            ).length;
+            return (
+              <p className="helper">
+                {suyos
+                  ? `También se quitan ${suyos} ${suyos === 1 ? "perfil de cliente que buscaba" : "perfiles de clientes que buscaban"} este cargo; sus clientes conservan los demás perfiles.`
+                  : "Ningún cliente busca este cargo."}{" "}
+                Se aplica al pulsar «Confirmar y aplicar».
+              </p>
+            );
+          })()}
+          <div className="dialog-actions">
+            <button
+              className="button secondary"
+              onClick={() => setBorrarCargo(null)}
+            >
+              Cancelar
+            </button>
+            <button
+              className="button danger-button"
+              onClick={() => {
+                const id = borrarCargo.id;
+                cambiar({
+                  ...draft,
+                  cargos: draft.cargos.filter((x) => x.id !== id),
+                  perfiles: draft.perfiles.filter((p) => p.cargo_id !== id),
+                });
+                notify(`«${borrarCargo.nombre}» se eliminó del borrador.`);
+                setBorrarCargo(null);
+              }}
+            >
+              <Trash2 size={16} />
+              Eliminar definitivamente
+            </button>
+          </div>
+        </Dialog>
+      )}
       {modal === "archivo" && archive && (
         <Dialog
           titulo={"Archivar " + archive.tipo}
@@ -3060,9 +3126,9 @@ function CifrasCargo({
 // Lista grande del 16 nov: «Programado desde» confundía. Se dice qué pasa con la próxima búsqueda, en palabras.
 function textoProgramacion(estado: EstadoConfig | null, dirty: boolean) {
   if (dirty) return "Cambios sin guardar";
-  if (!estado?.revision) return "Sin configuración programada";
+  if (!estado?.revision) return "Sin configuración confirmada";
   const p = estado.publicada;
-  if (!p || p.revision !== estado.revision) return "Hay cambios sin programar";
+  if (!p || p.revision !== estado.revision) return "Hay cambios sin confirmar";
   return p.vigente_desde > hoyBogota()
     ? "Lista: se usa desde la búsqueda de mañana"
     : "En uso desde la próxima búsqueda";

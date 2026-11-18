@@ -77,6 +77,10 @@ export type Ejecucion = {
   terminada_en: string | null;
   resumen: {
     vacantes?: number;
+    // Contrato v43: del lote, de los cargos activos / de cargos que ya cambiaron.
+    vacantes_vigentes?: number;
+    vacantes_anteriores?: number;
+    asignaciones_comunidad?: number;
     meta?: number;
     faltantes?: Record<string, number>;
     asignaciones?: number;
