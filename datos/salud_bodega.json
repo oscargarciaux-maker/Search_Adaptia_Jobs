@@ -1,0 +1,5343 @@
+{
+ "fecha": "2026-11-21",
+ "hora_utc": "19:50",
+ "modo": "diario",
+ "codigo_commit": "57a154867cb65eb84a68ff56c3a61d271b76707d",
+ "ejecucion_id": "44933734927",
+ "consulta": "",
+ "pais": "",
+ "minutos": 102.4,
+ "vacantes_en_bodega": 9681,
+ "crudas_hoy": 47699,
+ "nuevas_hoy": 274,
+ "fuentes": {
+  "Open Seat": {
+   "empresas": 176,
+   "portales": 170,
+   "omitidas": 6,
+   "nuevos": 0,
+   "segundos": 0
+  },
+  "RemotosLatam": {
+   "paginas": 8,
+   "fallidas": 0,
+   "portales": 118,
+   "nuevos": 22,
+   "segundos": 39
+  },
+  "WeRemoto": {
+   "paginas": 6,
+   "fallidas": 0,
+   "portales": 16,
+   "nuevos": 0,
+   "segundos": 39
+  },
+  "Publicaciones LinkedIn (Apify)": {
+   "omitida": "crédito de Apify reservado a ofertas formales de LinkedIn",
+   "segundos": 0
+  },
+  "LinkedIn (Apify)": {
+   "busquedas": 0,
+   "avisos": 0,
+   "descartadas": {},
+   "por_familia": {},
+   "por_lugar": {},
+   "ejecuciones": [],
+   "reserva_corrida_usd": 0.0,
+   "tope_mes_usd": 5.0,
+   "tope_diario_usd": 0.166667,
+   "omitida": "presupuesto diario/mensual reservado o tiempo agotado",
+   "segundos": 0
+  },
+  "Get on Board": {
+   "busquedas": 12,
+   "avisos": 51,
+   "segundos": 9
+  },
+  "Indeed": {
+   "busquedas": 72,
+   "fallidas": 0,
+   "avisos": 452,
+   "combinaciones_total": 98,
+   "por_familia": {
+    "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": 14,
+    "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": 2,
+    "cargo:2bbfa3e7-da74-4e4e-8fe7-4282b89d6657": 2,
+    "cargo:11654f3a-7ede-47fb-bf61-50c29d149c3b": 2,
+    "cargo:4322235e-ac1d-4b99-a627-e8a6a452f6c1": 2,
+    "cargo:51f696b8-733b-4035-b1c2-f36b0bcd74fd": 4,
+    "cargo:8f61b903-ae7b-4b87-965d-1174fab0c7cc": 12,
+    "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": 18,
+    "cargo:d051de26-fd6b-40f7-828e-2469aacf38ee": 8,
+    "cargo:bf65f5e0-8d15-4d33-aeff-87a007ffa194": 8
+   },
+   "por_lugar": {
+    "CO:ES:REMOTO": 2,
+    "MX:ES:REMOTO": 1,
+    "PE": 3,
+    "US:REMOTO": 2,
+    "CR": 1,
+    "CO": 8,
+    "CO:REMOTO": 8,
+    "DE:REMOTO": 2,
+    "AE": 2,
+    "MX": 4,
+    "MX:REMOTO": 4,
+    "CO:ES": 2,
+    "MX:ES": 1,
+    "PE:REMOTO": 4,
+    "US": 2,
+    "CR:REMOTO": 1,
+    "GB:REMOTO": 2,
+    "GB": 2,
+    "CL": 2,
+    "AE:REMOTO": 1,
+    "DE": 2,
+    "AR": 2,
+    "FR": 1,
+    "IE": 1,
+    "AR:REMOTO": 3,
+    "NL": 1,
+    "PL": 2,
+    "NL:REMOTO": 1,
+    "IE:REMOTO": 1,
+    "CL:REMOTO": 2,
+    "ES": 1,
+    "FR:REMOTO": 1
+   },
+   "segundos": 16
+  },
+  "Hireline": {
+   "sitemaps_fallidos": 0,
+   "candidatas": 15,
+   "con_descripcion": 15,
+   "cerradas": 0,
+   "errores": 0,
+   "avisos": 15,
+   "segundos": 22
+  },
+  "Magneto": {
+   "sitemaps_fallidos": 0,
+   "candidatas": 16,
+   "con_descripcion": 16,
+   "cerradas": 4,
+   "errores": 0,
+   "avisos": 12,
+   "segundos": 30
+  },
+  "Tableros remotos": {
+   "con_pagina": 35,
+   "paginas_abiertas": 0,
+   "con_original": 9,
+   "empresas_para_portales": 208,
+   "segundos": 34
+  },
+  "Elempleo": {
+   "busquedas": 9,
+   "fallidas": 0,
+   "avisos": 129,
+   "con_descripcion": 78,
+   "cerradas": 0,
+   "errores": 0,
+   "combinaciones_total": 9,
+   "segundos": 154
+  },
+  "Computrabajo": {
+   "busquedas": 90,
+   "fallidas": 0,
+   "avisos": 865,
+   "con_descripcion": 150,
+   "cerradas": 0,
+   "combinaciones_total": 80,
+   "segundos": 293
+  },
+  "LinkedIn": {
+   "busquedas": 61,
+   "fallidas": 5,
+   "avisos": 495,
+   "con_descripcion": 59,
+   "cerradas": 0,
+   "combinaciones_revisadas": 25,
+   "combinaciones_total": 88,
+   "por_familia": {
+    "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": 19,
+    "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": 4,
+    "cargo:2bbfa3e7-da74-4e4e-8fe7-4282b89d6657": 4,
+    "cargo:11654f3a-7ede-47fb-bf61-50c29d149c3b": 6,
+    "cargo:4322235e-ac1d-4b99-a627-e8a6a452f6c1": 6,
+    "cargo:51f696b8-733b-4035-b1c2-f36b0bcd74fd": 5,
+    "cargo:8f61b903-ae7b-4b87-965d-1174fab0c7cc": 6,
+    "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": 6,
+    "cargo:d051de26-fd6b-40f7-828e-2469aacf38ee": 3,
+    "cargo:bf65f5e0-8d15-4d33-aeff-87a007ffa194": 2
+   },
+   "por_lugar": {
+    "REMOTO": 15,
+    "CIUDAD_CHICAGO": 6,
+    "REMOTO_CO": 13,
+    "CO": 3,
+    "REMOTO_REGION_EUROPA": 6,
+    "REMOTO:ES": 3,
+    "REMOTO_CO:ES": 3,
+    "REMOTO_MX:ES": 3,
+    "REMOTO_PE": 1,
+    "US": 3,
+    "CIUDAD_BOGOTA": 5
+   },
+   "relectura": {
+    "pendientes": 1355,
+    "peticiones": 49,
+    "con_descripcion": 43,
+    "cerradas": 0,
+    "bloqueos_seguidos": 0
+   },
+   "segundos": 3000
+  },
+  "Portales de empresas": {
+   "tableros": 306,
+   "fallidos": 3,
+   "avisos": 45679,
+   "detalles_consultados": 423,
+   "descripciones_completadas": 377,
+   "segundos": 3029
+  },
+  "Descubrir portales": {
+   "empresas_probadas": 20,
+   "portales_nuevos": 1,
+   "segundos": 5
+  },
+  "Decisiones del operador": {
+   "aplicadas": 16
+  },
+  "Ubicación desde la ficha": {
+   "candidatas": 55,
+   "leidas": 8,
+   "confirmadas": 0,
+   "extranjeras": 2,
+   "sin_datos": 51,
+   "desde_memoria": 47
+  },
+  "LinkedIn (Apify) rescate": {
+   "perfiles_con_deficit": 8,
+   "faltan_para_minimo": 29,
+   "busquedas": 4,
+   "avisos": 37
+  },
+  "LinkedIn (Apify) posts": {
+   "perfiles_con_deficit": 8,
+   "consultas": 8,
+   "publicaciones": 22,
+   "fichas_formales": 0,
+   "posts": 2,
+   "descartadas": {
+    "lista de vacantes de terceros": 4,
+    "busca empleo, curso o evento": 3,
+    "elegibilidad regional por confirmar": 4,
+    "sin cargo del mapa": 4,
+    "no pide postular ni escribir": 1,
+    "sin empresa": 2,
+    "sin forma de contacto": 1,
+    "repetido": 1
+   },
+   "ubicacion_deducida": {},
+   "ubicacion_sin_confirmar": 2
+  }
+ },
+ "descartes": {
+  "sin familia en el mapa": 41039,
+  "no se puede aplicar desde LATAM": 1683,
+  "cerrada en el portal de la empresa": 15,
+  "más de 30 días": 2480,
+  "vacante cerrada": 9
+ },
+ "por_familia": {
+  "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": 1728,
+  "cargo:bf65f5e0-8d15-4d33-aeff-87a007ffa194": 1623,
+  "cargo:2bbfa3e7-da74-4e4e-8fe7-4282b89d6657": 1318,
+  "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": 1155,
+  "cargo:d051de26-fd6b-40f7-828e-2469aacf38ee": 1116,
+  "cargo:8f61b903-ae7b-4b87-965d-1174fab0c7cc": 886,
+  "cargo:51f696b8-733b-4035-b1c2-f36b0bcd74fd": 847,
+  "cargo:4322235e-ac1d-4b99-a627-e8a6a452f6c1": 635,
+  "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": 607,
+  "cargo:11654f3a-7ede-47fb-bf61-50c29d149c3b": 298
+ },
+ "por_pais": {
+  "ES": 1735,
+  "MX": 1615,
+  "CO": 1534,
+  "CL": 1168,
+  "AR": 1052,
+  "PE": 875,
+  "CR": 709,
+  "UY": 662,
+  "GT": 646,
+  "SV": 623,
+  "EC": 617,
+  "HN": 600,
+  "BO": 593,
+  "VE": 593,
+  "PY": 588,
+  "PR": 570,
+  "NI": 562,
+  "PA": 554,
+  "DO": 526,
+  "CU": 516
+ },
+ "por_fuente": {
+  "LinkedIn": 4484,
+  "Indeed": 2018,
+  "Portales de empresas (greenhouse)": 670,
+  "Computrabajo": 589,
+  "Portales de empresas (ashby)": 550,
+  "Portales de empresas (lever)": 526,
+  "Portales de empresas (smartrecruiters)": 487,
+  "Get on Board": 197,
+  "LinkedIn (Apify)": 146,
+  "Portales de empresas (workable)": 125,
+  "Elempleo": 69,
+  "Portales de empresas (recruitee)": 9,
+  "Hireline": 5,
+  "Working Nomads": 4,
+  "Magneto": 4,
+  "Remotive": 1
+ },
+ "por_modalidad": {
+  "hibrido": 1857,
+  "presencial": 2850,
+  "remoto": 4974
+ },
+ "ubicacion_por_confirmar": 144,
+ "entrega": {
+  "roles": {
+   "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": {
+    "nombre": "Product Designer",
+    "candidatas": 95,
+    "entregadas": 52,
+    "unicas": 52,
+    "duplicadas": 0,
+    "faltan": 18,
+    "idiomas": {
+     "en": 49,
+     "es": 3
+    },
+    "niveles": {
+     "sin nivel": 22,
+     "senior": 22,
+     "lead": 6,
+     "junior": 2
+    },
+    "paises": {
+     "varios": 37,
+     "MX": 5,
+     "CR": 2,
+     "CL": 4,
+     "AR": 2,
+     "CO": 2
+    },
+    "fuentes": {
+     "LinkedIn": 36,
+     "Indeed": 12,
+     "Portales de empresas (workable)": 2,
+     "Portales de empresas (lever)": 1,
+     "Portales de empresas (ashby)": 1
+    },
+    "remotas": 44,
+    "remotas_amplias": 2,
+    "descartadas": {
+     "ya entregada": 456,
+     "enlaces sin comprobar o rechazados": 65
+    },
+    "empresas_disponibles": 44,
+    "capacidad_con_tope_empresa": 48,
+    "limitadas_por_empresa": 47,
+    "reserva_sin_entregar": 43,
+    "ampliadas": {
+     "empresa_4": 2
+    },
+    "perfiles_bajo_minimo": 3,
+    "faltan_para_minimo": 11
+   },
+   "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": {
+    "nombre": "Product Owner",
+    "candidatas": 2,
+    "entregadas": 2,
+    "unicas": 2,
+    "duplicadas": 0,
+    "faltan": 8,
+    "idiomas": {
+     "en": 1,
+     "es": 1
+    },
+    "niveles": {
+     "senior": 1,
+     "sin nivel": 1
+    },
+    "paises": {
+     "varios": 1,
+     "CO": 1
+    },
+    "fuentes": {
+     "LinkedIn": 1,
+     "Elempleo": 1
+    },
+    "remotas": 1,
+    "remotas_amplias": 1,
+    "descartadas": {
+     "ya entregada": 49,
+     "enlaces sin comprobar o rechazados": 3
+    },
+    "empresas_disponibles": 2,
+    "capacidad_con_tope_empresa": 2,
+    "limitadas_por_empresa": 0,
+    "reserva_sin_entregar": 0,
+    "ampliadas": {},
+    "perfiles_bajo_minimo": 1,
+    "faltan_para_minimo": 3
+   },
+   "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": {
+    "nombre": "Product Manager",
+    "candidatas": 246,
+    "entregadas": 44,
+    "unicas": 44,
+    "duplicadas": 0,
+    "faltan": 0,
+    "idiomas": {
+     "es": 13,
+     "en": 31
+    },
+    "niveles": {
+     "sin nivel": 25,
+     "senior": 15,
+     "lead": 4
+    },
+    "paises": {
+     "PE": 2,
+     "varios": 5,
+     "ES": 1,
+     "MX": 16,
+     "AR": 2,
+     "CL": 13,
+     "UY": 1,
+     "CO": 4
+    },
+    "fuentes": {
+     "LinkedIn": 32,
+     "Indeed": 3,
+     "Portales de empresas (lever)": 4,
+     "Portales de empresas (greenhouse)": 4,
+     "Portales de empresas (smartrecruiters)": 1
+    },
+    "remotas": 44,
+    "remotas_amplias": 2,
+    "descartadas": {
+     "ya entregada": 224,
+     "enlaces sin comprobar o rechazados": 116
+    },
+    "empresas_disponibles": 84,
+    "capacidad_con_tope_empresa": 98,
+    "limitadas_por_empresa": 148,
+    "reserva_sin_entregar": 202,
+    "ampliadas": {},
+    "perfiles_bajo_minimo": 1,
+    "faltan_para_minimo": 2
+   },
+   "cargo:d051de26-fd6b-40f7-828e-2469aacf38ee": {
+    "nombre": "QA",
+    "candidatas": 137,
+    "entregadas": 5,
+    "unicas": 5,
+    "duplicadas": 0,
+    "faltan": 0,
+    "idiomas": {
+     "en": 3,
+     "es": 2
+    },
+    "niveles": {
+     "sin nivel": 4,
+     "senior": 1
+    },
+    "paises": {
+     "varios": 2,
+     "CO": 2,
+     "MX": 1
+    },
+    "fuentes": {
+     "LinkedIn": 4,
+     "Indeed": 1
+    },
+    "remotas": 5,
+    "remotas_amplias": 2,
+    "descartadas": {
+     "ya entregada": 93,
+     "enlaces sin comprobar o rechazados": 53
+    },
+    "empresas_disponibles": 93,
+    "capacidad_con_tope_empresa": 106,
+    "limitadas_por_empresa": 31,
+    "reserva_sin_entregar": 132,
+    "ampliadas": {},
+    "perfiles_bajo_minimo": 0,
+    "faltan_para_minimo": 0
+   },
+   "cargo:2bbfa3e7-da74-4e4e-8fe7-4282b89d6657": {
+    "nombre": "AI Product Manager",
+    "candidatas": 1,
+    "entregadas": 5,
+    "unicas": 5,
+    "duplicadas": 0,
+    "faltan": 5,
+    "idiomas": {
+     "en": 4,
+     "es": 1
+    },
+    "niveles": {
+     "sin nivel": 4,
+     "senior": 1
+    },
+    "paises": {
+     "CO": 3,
+     "varios": 2
+    },
+    "fuentes": {
+     "LinkedIn": 2,
+     "Indeed": 1,
+     "Elempleo": 1,
+     "Portales de empresas (lever)": 1
+    },
+    "remotas": 4,
+    "remotas_amplias": 0,
+    "descartadas": {
+     "ya entregada": 25
+    },
+    "empresas_disponibles": 1,
+    "capacidad_con_tope_empresa": 1,
+    "limitadas_por_empresa": 0,
+    "reserva_sin_entregar": 0,
+    "ampliadas": {
+     "empresa_4": 4
+    },
+    "perfiles_bajo_minimo": 0,
+    "faltan_para_minimo": 0
+   },
+   "cargo:11654f3a-7ede-47fb-bf61-50c29d149c3b": {
+    "nombre": "QA Lead",
+    "candidatas": 0,
+    "entregadas": 0,
+    "unicas": 0,
+    "duplicadas": 0,
+    "faltan": 5,
+    "idiomas": {},
+    "niveles": {},
+    "paises": {},
+    "fuentes": {},
+    "remotas": 0,
+    "remotas_amplias": 0,
+    "descartadas": {
+     "ya entregada": 5
+    },
+    "empresas_disponibles": 0,
+    "capacidad_con_tope_empresa": 0,
+    "limitadas_por_empresa": 0,
+    "reserva_sin_entregar": 0,
+    "ampliadas": {},
+    "perfiles_bajo_minimo": 1,
+    "faltan_para_minimo": 5
+   },
+   "cargo:4322235e-ac1d-4b99-a627-e8a6a452f6c1": {
+    "nombre": "Product Design Lead",
+    "candidatas": 2,
+    "entregadas": 2,
+    "unicas": 2,
+    "duplicadas": 0,
+    "faltan": 3,
+    "idiomas": {
+     "en": 2
+    },
+    "niveles": {
+     "sin nivel": 2
+    },
+    "paises": {
+     "CO": 1,
+     "varios": 1
+    },
+    "fuentes": {
+     "LinkedIn": 2
+    },
+    "remotas": 2,
+    "remotas_amplias": 0,
+    "descartadas": {
+     "ya entregada": 1
+    },
+    "empresas_disponibles": 2,
+    "capacidad_con_tope_empresa": 2,
+    "limitadas_por_empresa": 0,
+    "reserva_sin_entregar": 0,
+    "ampliadas": {},
+    "perfiles_bajo_minimo": 1,
+    "faltan_para_minimo": 3
+   },
+   "cargo:51f696b8-733b-4035-b1c2-f36b0bcd74fd": {
+    "nombre": "Desarrollador Fullstack",
+    "candidatas": 14,
+    "entregadas": 10,
+    "unicas": 10,
+    "duplicadas": 0,
+    "faltan": 0,
+    "idiomas": {
+     "es": 10
+    },
+    "niveles": {
+     "junior": 2,
+     "sin nivel": 4,
+     "senior": 4
+    },
+    "paises": {
+     "CO": 9,
+     "varios": 1
+    },
+    "fuentes": {
+     "Computrabajo": 2,
+     "Elempleo": 3,
+     "Indeed": 2,
+     "LinkedIn": 3
+    },
+    "remotas": 3,
+    "remotas_amplias": 1,
+    "descartadas": {
+     "ya entregada": 54,
+     "enlaces sin comprobar o rechazados": 12
+    },
+    "empresas_disponibles": 11,
+    "capacidad_con_tope_empresa": 14,
+    "limitadas_por_empresa": 0,
+    "reserva_sin_entregar": 4,
+    "ampliadas": {},
+    "perfiles_bajo_minimo": 0,
+    "faltan_para_minimo": 0
+   },
+   "cargo:8f61b903-ae7b-4b87-965d-1174fab0c7cc": {
+    "nombre": "Growth Marketing",
+    "candidatas": 198,
+    "entregadas": 10,
+    "unicas": 10,
+    "duplicadas": 0,
+    "faltan": 0,
+    "idiomas": {
+     "en": 10
+    },
+    "niveles": {
+     "sin nivel": 5,
+     "senior": 4,
+     "lead": 1
+    },
+    "paises": {
+     "varios": 7,
+     "ES": 3
+    },
+    "fuentes": {
+     "LinkedIn": 2,
+     "Portales de empresas (lever)": 2,
+     "Portales de empresas (ashby)": 1,
+     "Indeed": 3,
+     "Portales de empresas (greenhouse)": 1,
+     "Portales de empresas (workable)": 1
+    },
+    "remotas": 10,
+    "remotas_amplias": 0,
+    "descartadas": {
+     "ya entregada": 45,
+     "enlaces sin comprobar o rechazados": 150
+    },
+    "empresas_disponibles": 79,
+    "capacidad_con_tope_empresa": 102,
+    "limitadas_por_empresa": 96,
+    "reserva_sin_entregar": 188,
+    "ampliadas": {},
+    "perfiles_bajo_minimo": 0,
+    "faltan_para_minimo": 0
+   },
+   "cargo:bf65f5e0-8d15-4d33-aeff-87a007ffa194": {
+    "nombre": "Desarrollador de software",
+    "candidatas": 223,
+    "entregadas": 0,
+    "unicas": 0,
+    "duplicadas": 0,
+    "faltan": 0,
+    "idiomas": {},
+    "niveles": {},
+    "paises": {},
+    "fuentes": {},
+    "remotas": 0,
+    "remotas_amplias": 0,
+    "descartadas": {
+     "ya entregada": 4,
+     "enlaces sin comprobar o rechazados": 97
+    },
+    "empresas_disponibles": 105,
+    "capacidad_con_tope_empresa": 141,
+    "limitadas_por_empresa": 82,
+    "reserva_sin_entregar": 223,
+    "ampliadas": {},
+    "perfiles_bajo_minimo": 1,
+    "faltan_para_minimo": 5
+   }
+  },
+  "descartadas": {
+   "ya entregada": 956,
+   "enlaces sin comprobar o rechazados": 496
+  },
+  "vacantes": 130,
+  "vacantes_unicas": 130,
+  "copias_en_lote": 0,
+  "enlaces_comprobados": true,
+  "filas": 130,
+  "archivos": false,
+  "meta_por_rol": null,
+  "metas_por_rol": {
+   "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": 70,
+   "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": 10,
+   "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": 5,
+   "cargo:d051de26-fd6b-40f7-828e-2469aacf38ee": 5,
+   "cargo:2bbfa3e7-da74-4e4e-8fe7-4282b89d6657": 10,
+   "cargo:11654f3a-7ede-47fb-bf61-50c29d149c3b": 5,
+   "cargo:4322235e-ac1d-4b99-a627-e8a6a452f6c1": 5,
+   "cargo:51f696b8-733b-4035-b1c2-f36b0bcd74fd": 10,
+   "cargo:8f61b903-ae7b-4b87-965d-1174fab0c7cc": 10,
+   "cargo:bf65f5e0-8d15-4d33-aeff-87a007ffa194": 0
+  },
+  "meta_cumplida": false,
+  "supabase": {
+   "filas": 130,
+   "enviadas": 130,
+   "errores": [],
+   "pendientes": 0
+  },
+  "registro_seleccion": {
+   "filas": 130,
+   "enviadas": 130,
+   "errores": [],
+   "pendientes": 0
+  },
+  "fecha": "2026-11-21",
+  "embudo": {
+   "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": {
+    "nombre": "Product Designer",
+    "encontradas": 1155,
+    "con_descripcion": 1003,
+    "entregables": 988,
+    "nuevas": 468,
+    "cumplen_filtros": 162,
+    "enlace_comprobado": 97,
+    "entregadas": 52,
+    "ampliadas": 2,
+    "de_su_busqueda": 36,
+    "de_la_amplia": 16,
+    "principal_perdida": "ya entregadas antes o vistas hace demasiado",
+    "filtros_que_cortan": {
+     "país": 306,
+     "modalidad": 226,
+     "idioma del aviso": 214,
+     "otros": 92,
+     "antigüedad": 2
+    }
+   },
+   "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": {
+    "nombre": "Product Owner",
+    "encontradas": 607,
+    "con_descripcion": 484,
+    "entregables": 441,
+    "nuevas": 333,
+    "cumplen_filtros": 5,
+    "enlace_comprobado": 2,
+    "entregadas": 2,
+    "ampliadas": 0,
+    "de_su_busqueda": 1,
+    "de_la_amplia": 1,
+    "principal_perdida": "no cumplen los filtros de los clientes del cargo (sobre todo: país)",
+    "filtros_que_cortan": {
+     "país": 317,
+     "otros": 11
+    }
+   },
+   "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": {
+    "nombre": "Product Manager",
+    "encontradas": 1728,
+    "con_descripcion": 1457,
+    "entregables": 1360,
+    "nuevas": 1045,
+    "cumplen_filtros": 362,
+    "enlace_comprobado": 246,
+    "entregadas": 44,
+    "ampliadas": 0,
+    "de_su_busqueda": 32,
+    "de_la_amplia": 12,
+    "principal_perdida": "no cumplen los filtros de los clientes del cargo (sobre todo: país)",
+    "filtros_que_cortan": {
+     "país": 682,
+     "modalidad": 477,
+     "antigüedad": 15
+    }
+   },
+   "cargo:d051de26-fd6b-40f7-828e-2469aacf38ee": {
+    "nombre": "QA",
+    "encontradas": 1116,
+    "con_descripcion": 854,
+    "entregables": 837,
+    "nuevas": 710,
+    "cumplen_filtros": 189,
+    "enlace_comprobado": 137,
+    "entregadas": 5,
+    "ampliadas": 0,
+    "de_su_busqueda": 4,
+    "de_la_amplia": 1,
+    "principal_perdida": "no cumplen los filtros de los clientes del cargo (sobre todo: modalidad)",
+    "filtros_que_cortan": {
+     "modalidad": 436,
+     "país": 414,
+     "antigüedad": 7
+    }
+   },
+   "cargo:2bbfa3e7-da74-4e4e-8fe7-4282b89d6657": {
+    "nombre": "AI Product Manager",
+    "encontradas": 1313,
+    "con_descripcion": 1091,
+    "entregables": 1022,
+    "nuevas": 776,
+    "cumplen_filtros": 1,
+    "enlace_comprobado": 1,
+    "entregadas": 5,
+    "ampliadas": 4,
+    "de_su_busqueda": 2,
+    "de_la_amplia": 3,
+    "principal_perdida": "no cumplen los filtros de los clientes del cargo (sobre todo: país)",
+    "filtros_que_cortan": {
+     "país": 752,
+     "antigüedad": 7,
+     "otros": 2
+    }
+   },
+   "cargo:11654f3a-7ede-47fb-bf61-50c29d149c3b": {
+    "nombre": "QA Lead",
+    "encontradas": 295,
+    "con_descripcion": 229,
+    "entregables": 223,
+    "nuevas": 168,
+    "cumplen_filtros": 0,
+    "enlace_comprobado": 0,
+    "entregadas": 0,
+    "ampliadas": 0,
+    "de_su_busqueda": 0,
+    "de_la_amplia": 0,
+    "principal_perdida": "no cumplen los filtros de los clientes del cargo (sobre todo: país)",
+    "filtros_que_cortan": {
+     "país": 154,
+     "modalidad": 84
+    }
+   },
+   "cargo:4322235e-ac1d-4b99-a627-e8a6a452f6c1": {
+    "nombre": "Product Design Lead",
+    "encontradas": 605,
+    "con_descripcion": 517,
+    "entregables": 510,
+    "nuevas": 237,
+    "cumplen_filtros": 4,
+    "enlace_comprobado": 2,
+    "entregadas": 2,
+    "ampliadas": 0,
+    "de_su_busqueda": 2,
+    "de_la_amplia": 0,
+    "principal_perdida": "ya entregadas antes o vistas hace demasiado",
+    "filtros_que_cortan": {
+     "país": 232,
+     "modalidad": 124,
+     "antigüedad": 2
+    }
+   },
+   "cargo:51f696b8-733b-4035-b1c2-f36b0bcd74fd": {
+    "nombre": "Desarrollador Fullstack",
+    "encontradas": 747,
+    "con_descripcion": 529,
+    "entregables": 528,
+    "nuevas": 473,
+    "cumplen_filtros": 26,
+    "enlace_comprobado": 14,
+    "entregadas": 10,
+    "ampliadas": 0,
+    "de_su_busqueda": 3,
+    "de_la_amplia": 7,
+    "principal_perdida": "no cumplen los filtros de los clientes del cargo (sobre todo: país)",
+    "filtros_que_cortan": {
+     "país": 310,
+     "idioma del aviso": 293,
+     "otros": 23,
+     "antigüedad": 4
+    }
+   },
+   "cargo:8f61b903-ae7b-4b87-965d-1174fab0c7cc": {
+    "nombre": "Growth Marketing",
+    "encontradas": 819,
+    "con_descripcion": 725,
+    "entregables": 650,
+    "nuevas": 595,
+    "cumplen_filtros": 348,
+    "enlace_comprobado": 198,
+    "entregadas": 10,
+    "ampliadas": 0,
+    "de_su_busqueda": 2,
+    "de_la_amplia": 8,
+    "principal_perdida": "no cumplen los filtros de los clientes del cargo (sobre todo: país)",
+    "filtros_que_cortan": {
+     "país": 246,
+     "modalidad": 170,
+     "otros": 66,
+     "antigüedad": 1
+    }
+   },
+   "cargo:bf65f5e0-8d15-4d33-aeff-87a007ffa194": {
+    "nombre": "Desarrollador de software",
+    "encontradas": 1623,
+    "con_descripcion": 1224,
+    "entregables": 1208,
+    "nuevas": 1194,
+    "cumplen_filtros": 323,
+    "enlace_comprobado": 225,
+    "entregadas": 0,
+    "ampliadas": 0,
+    "de_su_busqueda": 0,
+    "de_la_amplia": 0,
+    "principal_perdida": "no cumplen los filtros de los clientes del cargo (sobre todo: país)",
+    "filtros_que_cortan": {
+     "país": 788,
+     "modalidad": 552,
+     "antigüedad": 8
+    }
+   }
+  }
+ },
+ "seleccion_actual": {
+  "fecha": "2026-11-21",
+  "roles": {
+   "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": {
+    "nombre": "Product Designer",
+    "meta": 70,
+    "vacantes": [
+     {
+      "id": "fabc613b86d9ee23",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4491945033",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T02:37:01Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4491945033",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4491945033",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4491945033",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T02:37:01Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4491945033"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "3eaed9fc407a45e7",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492556331",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:43:23Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492556331",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492556331",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4492556331",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:43:23Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492556331"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "dd49cef33a974a4f",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://ats.rippling.com/infotrust-llc/jobs/c190929f-443b-465b-a0ee-2da96a641587?jobSite=Indeed",
+      "enlace_directo": "https://www.indeed.com/viewjob?jk=7675d683cb784f3b",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://ats.rippling.com/infotrust-llc/jobs/c190929f-443b-465b-a0ee-2da96a641587?jobSite=Indeed",
+       "enlaces": [
+        {
+         "url": "https://ats.rippling.com/infotrust-llc/jobs/c190929f-443b-465b-a0ee-2da96a641587?jobSite=Indeed",
+         "destino": "https://ats.rippling.com/infotrust-llc/jobs/c190929f-443b-465b-a0ee-2da96a641587?jobSite=Indeed",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://ats.rippling.com/infotrust-llc/jobs/c190929f-443b-465b-a0ee-2da96a641587?jobSite=Indeed"
+         ]
+        },
+        {
+         "url": "https://www.indeed.com/viewjob?jk=7675d683cb784f3b",
+         "estado": "pendiente",
+         "motivo": "sin comprobación vigente",
+         "comprobada_en": "",
+         "destino": "",
+         "http": null,
+         "saltos": 0,
+         "ruta": []
+        }
+       ]
+      }
+     },
+     {
+      "id": "8229242a2ddd9654",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492843163",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T22:03:14Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492843163",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492843163",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4492843163",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-20T22:03:14Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492843163"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "bce7f1ea41690b3c",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492841559",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T02:36:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492841559",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492841559",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4492841559",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T02:36:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492841559"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "57080a73bc11770d",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.indeed.com/viewjob?jk=c8291dbacad1e407",
+      "enlace_directo": "https://www.indeed.com/viewjob?jk=41d9f666da018bdc",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T02:35:10Z",
+       "motivo": "vista hoy en la búsqueda de Indeed",
+       "url_utilizable": "https://www.indeed.com/viewjob?jk=c8291dbacad1e407",
+       "enlaces": [
+        {
+         "url": "https://www.indeed.com/viewjob?jk=c8291dbacad1e407",
+         "destino": "https://www.indeed.com/viewjob?jk=c8291dbacad1e407",
+         "estado": "verificada",
+         "motivo": "vista hoy en la búsqueda de Indeed",
+         "comprobada_en": "2026-11-21T02:35:10Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.indeed.com/viewjob?jk=c8291dbacad1e407"
+         ]
+        },
+        {
+         "url": "https://www.indeed.com/viewjob?jk=41d9f666da018bdc",
+         "estado": "pendiente",
+         "motivo": "sin comprobación vigente",
+         "comprobada_en": "",
+         "destino": "",
+         "http": null,
+         "saltos": 0,
+         "ruta": []
+        }
+       ]
+      }
+     },
+     {
+      "id": "df882a5b91e808a1",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4491909200",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T22:04:27Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4491909200",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4491909200",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4491909200",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-20T22:04:27Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4491909200"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "c51caa4c976c4794",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4489621819",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4489621819",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4489621819",
+         "destino": "https://www.linkedin.com/jobs/view/4489621819",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4489621819"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "d3fe041215fae0d6",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://careers.clarkassociatesinc.biz/careerdetail/?id=104450",
+      "enlace_directo": "https://www.indeed.com/viewjob?jk=cec4f28aef005104",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://careers.clarkassociatesinc.biz/careerdetail/?id=104450",
+       "enlaces": [
+        {
+         "url": "https://careers.clarkassociatesinc.biz/careerdetail/?id=104450",
+         "destino": "https://careers.clarkassociatesinc.biz/application/?j=47690",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 1,
+         "ruta": [
+          "https://careers.clarkassociatesinc.biz/careerdetail/?id=104450",
+          "https://careers.clarkassociatesinc.biz/application/?j=47690"
+         ]
+        },
+        {
+         "url": "https://www.indeed.com/viewjob?jk=cec4f28aef005104",
+         "estado": "pendiente",
+         "motivo": "sin comprobación vigente",
+         "comprobada_en": "",
+         "destino": "",
+         "http": null,
+         "saltos": 0,
+         "ruta": []
+        }
+       ]
+      }
+     },
+     {
+      "id": "15c1392a554875ab",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4489979877",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4489979877",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4489979877",
+         "destino": "https://www.linkedin.com/jobs/view/4489979877",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4489979877"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "95f3713ec4e3afd8",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492727481",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T21:55:00Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492727481",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492727481",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4492727481",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-20T21:55:00Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492727481"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "3bd571bbf838f6a6",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://jobs.ashbyhq.com/temporal/255057fe-6618-4d6a-8b80-090ce34b7228?utm_source=2dWNn1o1Ra",
+      "enlace_directo": "https://www.indeed.com/viewjob?jk=67cf726300b946eb",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://jobs.ashbyhq.com/temporal/255057fe-6618-4d6a-8b80-090ce34b7228?utm_source=2dWNn1o1Ra",
+       "enlaces": [
+        {
+         "url": "https://jobs.ashbyhq.com/temporal/255057fe-6618-4d6a-8b80-090ce34b7228?utm_source=2dWNn1o1Ra",
+         "destino": "https://jobs.ashbyhq.com/temporal/255057fe-6618-4d6a-8b80-090ce34b7228?utm_source=2dWNn1o1Ra",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://jobs.ashbyhq.com/temporal/255057fe-6618-4d6a-8b80-090ce34b7228?utm_source=2dWNn1o1Ra"
+         ]
+        },
+        {
+         "url": "https://www.indeed.com/viewjob?jk=67cf726300b946eb",
+         "estado": "pendiente",
+         "motivo": "sin comprobación vigente",
+         "comprobada_en": "",
+         "destino": "",
+         "http": null,
+         "saltos": 0,
+         "ruta": []
+        }
+       ]
+      }
+     },
+     {
+      "id": "b9ece4889715aa15",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4491978272",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T02:36:55Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4491978272",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4491978272",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4491978272",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T02:36:55Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4491978272"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "27059215e2b14665",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://jobs.ashbyhq.com/quo/53c8fc5d-e301-435a-a760-fbe431e17e62",
+      "enlace_directo": "https://www.indeed.com/viewjob?jk=7b4456989a8f5a77",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://jobs.ashbyhq.com/quo/53c8fc5d-e301-435a-a760-fbe431e17e62",
+       "enlaces": [
+        {
+         "url": "https://jobs.ashbyhq.com/quo/53c8fc5d-e301-435a-a760-fbe431e17e62",
+         "destino": "https://jobs.ashbyhq.com/quo/53c8fc5d-e301-435a-a760-fbe431e17e62",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://jobs.ashbyhq.com/quo/53c8fc5d-e301-435a-a760-fbe431e17e62"
+         ]
+        },
+        {
+         "url": "https://www.indeed.com/viewjob?jk=7b4456989a8f5a77",
+         "estado": "pendiente",
+         "motivo": "sin comprobación vigente",
+         "comprobada_en": "",
+         "destino": "",
+         "http": null,
+         "saltos": 0,
+         "ruta": []
+        }
+       ]
+      }
+     },
+     {
+      "id": "2fe983c85e3b316d",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4491965990",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T02:36:18Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4491965990",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4491965990",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4491965990",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T02:36:18Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4491965990"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "885378ea704462ca",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4469505356",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:32:17Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4469505356",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4469505356",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4469505356",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:32:17Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4469505356"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "98328263cb1b5eb0",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4470931768",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T22:09:10Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4470931768",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4470931768",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4470931768",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-20T22:09:10Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4470931768"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "dcf9d8f896225213",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.indeed.com/viewjob?jk=84f4277c5313159b",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T02:35:10Z",
+       "motivo": "vista hoy en la búsqueda de Indeed",
+       "url_utilizable": "https://www.indeed.com/viewjob?jk=84f4277c5313159b",
+       "enlaces": [
+        {
+         "url": "https://www.indeed.com/viewjob?jk=84f4277c5313159b",
+         "destino": "https://www.indeed.com/viewjob?jk=84f4277c5313159b",
+         "estado": "verificada",
+         "motivo": "vista hoy en la búsqueda de Indeed",
+         "comprobada_en": "2026-11-21T02:35:10Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.indeed.com/viewjob?jk=84f4277c5313159b"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "af5db6ea7569afd8",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492963259",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T02:36:15Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492963259",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492963259",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4492963259",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T02:36:15Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492963259"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "3757a389767a272f",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4491940148",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:37:08Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4491940148",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4491940148",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4491940148",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:37:08Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4491940148"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "435a3d7ddb45e5af",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4467749269",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T02:36:59Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4467749269",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4467749269",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4467749269",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T02:36:59Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4467749269"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "ba14f7238cb03339",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4467175183",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T02:37:00Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4467175183",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4467175183",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4467175183",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T02:37:00Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4467175183"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "fc1d8702b89f67a5",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4491889857",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T22:03:15Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4491889857",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4491889857",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4491889857",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-20T22:03:15Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4491889857"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "7c73a10ce7522ea4",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4493114015",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:31:17Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4493114015",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4493114015",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4493114015",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:31:17Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4493114015"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "0f4a155c26e920a7",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4485203289",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:38:23Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4485203289",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4485203289",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4485203289",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:38:23Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4485203289"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "67189dc526e4291f",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492783174",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T21:20:30Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492783174",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492783174",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4492783174",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-20T21:20:30Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492783174"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "d28cf626e1311682",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492769982",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T21:21:34Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492769982",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492769982",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4492769982",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-20T21:21:34Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492769982"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "a039b15f8e6c1cff",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4467593417",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:46:40Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4467593417",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4467593417",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4467593417",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:46:40Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4467593417"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "31344d7283ef6c0a",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4484806091",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:46:41Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4484806091",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4484806091",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4484806091",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:46:41Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4484806091"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "0ebb30dc44253e7f",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492974150",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:28:49Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492974150",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492974150",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4492974150",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T11:28:49Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492974150"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "c940a9e5028082e8",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4493201820",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:54:25Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4493201820",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4493201820",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4493201820",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:54:25Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4493201820"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "21f6b73faa71e4be",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4491955866",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:55:34Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4491955866",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4491955866",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4491955866",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:55:34Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4491955866"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "755e42825ec7fccb",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492848974",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:43:28Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492848974",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492848974",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4492848974",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:43:28Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492848974"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "600aecd14f4e54b5",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://careers.epam.com/en/vacancy/bltriega8gnoqzx8pt2_en?country=Mexico&utm_source=indeed&utm_medium=xml-job-feed&utm_campaign=ta",
+      "enlace_directo": "https://mx.indeed.com/viewjob?jk=2b49889ee369485e",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://careers.epam.com/en/vacancy/bltriega8gnoqzx8pt2_en?country=Mexico&utm_source=indeed&utm_medium=xml-job-feed&utm_campaign=ta",
+       "enlaces": [
+        {
+         "url": "https://careers.epam.com/en/vacancy/bltriega8gnoqzx8pt2_en?country=Mexico&utm_source=indeed&utm_medium=xml-job-feed&utm_campaign=ta",
+         "destino": "https://careers.epam.com/en/vacancy/bltriega8gnoqzx8pt2_en?country=Mexico&utm_source=indeed&utm_medium=xml-job-feed&utm_campaign=ta",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://careers.epam.com/en/vacancy/bltriega8gnoqzx8pt2_en?country=Mexico&utm_source=indeed&utm_medium=xml-job-feed&utm_campaign=ta"
+         ]
+        },
+        {
+         "url": "https://mx.indeed.com/viewjob?jk=2b49889ee369485e",
+         "destino": "https://mx.indeed.com/viewjob?jk=2b49889ee369485e",
+         "estado": "verificada",
+         "motivo": "vista hoy en la búsqueda de Indeed",
+         "comprobada_en": "2026-11-21T11:27:14Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://mx.indeed.com/viewjob?jk=2b49889ee369485e"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "ec2b66eb646e3479",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://careers.epam.com/en/vacancy/blt8gqi0ijad5hlrpm8_en?country=Mexico&utm_source=indeed&utm_medium=xml-job-feed&utm_campaign=ta",
+      "enlace_directo": "https://mx.indeed.com/viewjob?jk=99460801762bfc11",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://careers.epam.com/en/vacancy/blt8gqi0ijad5hlrpm8_en?country=Mexico&utm_source=indeed&utm_medium=xml-job-feed&utm_campaign=ta",
+       "enlaces": [
+        {
+         "url": "https://careers.epam.com/en/vacancy/blt8gqi0ijad5hlrpm8_en?country=Mexico&utm_source=indeed&utm_medium=xml-job-feed&utm_campaign=ta",
+         "destino": "https://careers.epam.com/en/vacancy/blt8gqi0ijad5hlrpm8_en?country=Mexico&utm_source=indeed&utm_medium=xml-job-feed&utm_campaign=ta",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://careers.epam.com/en/vacancy/blt8gqi0ijad5hlrpm8_en?country=Mexico&utm_source=indeed&utm_medium=xml-job-feed&utm_campaign=ta"
+         ]
+        },
+        {
+         "url": "https://mx.indeed.com/viewjob?jk=99460801762bfc11",
+         "destino": "https://mx.indeed.com/viewjob?jk=99460801762bfc11",
+         "estado": "verificada",
+         "motivo": "vista hoy en la búsqueda de Indeed",
+         "comprobada_en": "2026-11-21T11:27:14Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://mx.indeed.com/viewjob?jk=99460801762bfc11"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "f1f965eae14d4033",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.indeed.com/viewjob?jk=7a75b34d42587dcb",
+      "enlace_directo": "https://globenet-consulting-corp.careerplug.com/j/037j135",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T21:19:43Z",
+       "motivo": "vista hoy en la búsqueda de Indeed",
+       "url_utilizable": "https://www.indeed.com/viewjob?jk=7a75b34d42587dcb",
+       "enlaces": [
+        {
+         "url": "https://www.indeed.com/viewjob?jk=7a75b34d42587dcb",
+         "destino": "https://www.indeed.com/viewjob?jk=7a75b34d42587dcb",
+         "estado": "verificada",
+         "motivo": "vista hoy en la búsqueda de Indeed",
+         "comprobada_en": "2026-11-20T21:19:43Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.indeed.com/viewjob?jk=7a75b34d42587dcb"
+         ]
+        },
+        {
+         "url": "https://globenet-consulting-corp.careerplug.com/j/037j135",
+         "destino": "https://globenet-consulting-corp.careerplug.com/jobs/3701041/apps/new",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 2,
+         "ruta": [
+          "https://globenet-consulting-corp.careerplug.com/j/037j135",
+          "https://globenet-consulting-corp.careerplug.com/jobs/3701041",
+          "https://globenet-consulting-corp.careerplug.com/jobs/3701041/apps/new"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "a5f3da456c60919a",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://apply.workable.com/j/F62A6E101B",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:07:56Z",
+       "motivo": "vista hoy en el portal de la empresa",
+       "url_utilizable": "https://apply.workable.com/j/F62A6E101B",
+       "enlaces": [
+        {
+         "url": "https://apply.workable.com/j/F62A6E101B",
+         "destino": "https://apply.workable.com/j/F62A6E101B",
+         "estado": "verificada",
+         "motivo": "vista hoy en el portal de la empresa",
+         "comprobada_en": "2026-11-21T19:07:56Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://apply.workable.com/j/F62A6E101B"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "a4615541058cf84a",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://jobs.lever.co/jobgether/4bb5580b-a508-4873-81e4-36dbd2a9e625",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T22:30:59Z",
+       "motivo": "vista hoy en el portal de la empresa",
+       "url_utilizable": "https://jobs.lever.co/jobgether/4bb5580b-a508-4873-81e4-36dbd2a9e625",
+       "enlaces": [
+        {
+         "url": "https://jobs.lever.co/jobgether/4bb5580b-a508-4873-81e4-36dbd2a9e625",
+         "destino": "https://jobs.lever.co/jobgether/4bb5580b-a508-4873-81e4-36dbd2a9e625",
+         "estado": "verificada",
+         "motivo": "vista hoy en el portal de la empresa",
+         "comprobada_en": "2026-11-20T22:30:59Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://jobs.lever.co/jobgether/4bb5580b-a508-4873-81e4-36dbd2a9e625"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "28fa2e20c3a89340",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://apply.workable.com/j/43E8661D6C",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:07:56Z",
+       "motivo": "vista hoy en el portal de la empresa",
+       "url_utilizable": "https://apply.workable.com/j/43E8661D6C",
+       "enlaces": [
+        {
+         "url": "https://apply.workable.com/j/43E8661D6C",
+         "destino": "https://apply.workable.com/j/43E8661D6C",
+         "estado": "verificada",
+         "motivo": "vista hoy en el portal de la empresa",
+         "comprobada_en": "2026-11-21T19:07:56Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://apply.workable.com/j/43E8661D6C"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "9d48b197ead6fb53",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://jobs.ashbyhq.com/harvey/e46cea47-7901-4b8d-ad80-ec31223fefed",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:07:56Z",
+       "motivo": "vista hoy en el portal de la empresa",
+       "url_utilizable": "https://jobs.ashbyhq.com/harvey/e46cea47-7901-4b8d-ad80-ec31223fefed",
+       "enlaces": [
+        {
+         "url": "https://jobs.ashbyhq.com/harvey/e46cea47-7901-4b8d-ad80-ec31223fefed",
+         "destino": "https://jobs.ashbyhq.com/harvey/e46cea47-7901-4b8d-ad80-ec31223fefed",
+         "estado": "verificada",
+         "motivo": "vista hoy en el portal de la empresa",
+         "comprobada_en": "2026-11-21T19:07:56Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://jobs.ashbyhq.com/harvey/e46cea47-7901-4b8d-ad80-ec31223fefed"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "9ac466f693d31da9",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://careers.avalara.com/jobs/17761/job?utm_source=indeed_integration&iis=Job%20Board&iisn=Indeed&indeed-apply-token=73a2d2b2a8d6d5c0a62696875eaebd669103652d3f0c2cd5445d3e66b1592b0f",
+      "enlace_directo": "https://www.indeed.com/viewjob?jk=6630828bde3e955b",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://careers.avalara.com/jobs/17761/job?utm_source=indeed_integration&iis=Job%20Board&iisn=Indeed&indeed-apply-token=73a2d2b2a8d6d5c0a62696875eaebd669103652d3f0c2cd5445d3e66b1592b0f",
+       "enlaces": [
+        {
+         "url": "https://careers.avalara.com/jobs/17761/job?utm_source=indeed_integration&iis=Job%20Board&iisn=Indeed&indeed-apply-token=73a2d2b2a8d6d5c0a62696875eaebd669103652d3f0c2cd5445d3e66b1592b0f",
+         "destino": "https://careers.avalara.com/careers-home/jobs/17761/job?utm_source=indeed_integration&iis=Job%20Board&iisn=Indeed&indeed-apply-token=73a2d2b2a8d6d5c0a62696875eaebd669103652d3f0c2cd5445d3e66b1592b0f",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 1,
+         "ruta": [
+          "https://careers.avalara.com/jobs/17761/job?utm_source=indeed_integration&iis=Job%20Board&iisn=Indeed&indeed-apply-token=73a2d2b2a8d6d5c0a62696875eaebd669103652d3f0c2cd5445d3e66b1592b0f",
+          "https://careers.avalara.com/careers-home/jobs/17761/job?utm_source=indeed_integration&iis=Job%20Board&iisn=Indeed&indeed-apply-token=73a2d2b2a8d6d5c0a62696875eaebd669103652d3f0c2cd5445d3e66b1592b0f"
+         ]
+        },
+        {
+         "url": "https://www.indeed.com/viewjob?jk=6630828bde3e955b",
+         "estado": "pendiente",
+         "motivo": "sin comprobación vigente",
+         "comprobada_en": "",
+         "destino": "",
+         "http": null,
+         "saltos": 0,
+         "ruta": []
+        }
+       ]
+      }
+     },
+     {
+      "id": "37425baea0815e0a",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://jobs.lever.co/findem/854a3193-8087-465f-8857-c1a2e4ff1eae",
+      "enlace_directo": "https://www.indeed.com/viewjob?jk=c86ddca5df7e932b",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://jobs.lever.co/findem/854a3193-8087-465f-8857-c1a2e4ff1eae",
+       "enlaces": [
+        {
+         "url": "https://jobs.lever.co/findem/854a3193-8087-465f-8857-c1a2e4ff1eae",
+         "destino": "https://jobs.lever.co/findem/854a3193-8087-465f-8857-c1a2e4ff1eae/apply",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 1,
+         "ruta": [
+          "https://jobs.lever.co/findem/854a3193-8087-465f-8857-c1a2e4ff1eae",
+          "https://jobs.lever.co/findem/854a3193-8087-465f-8857-c1a2e4ff1eae/apply"
+         ]
+        },
+        {
+         "url": "https://www.indeed.com/viewjob?jk=c86ddca5df7e932b",
+         "estado": "pendiente",
+         "motivo": "sin comprobación vigente",
+         "comprobada_en": "",
+         "destino": "",
+         "http": null,
+         "saltos": 0,
+         "ruta": []
+        }
+       ]
+      }
+     },
+     {
+      "id": "e6b3d4f39efe4e96",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://workiva.wd503.myworkdayjobs.com/en-US/careers/job/USA---Remote/Principal-Product-Designer_R12757",
+      "enlace_directo": "https://www.indeed.com/viewjob?jk=72102efbb3a5489f",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://workiva.wd503.myworkdayjobs.com/en-US/careers/job/USA---Remote/Principal-Product-Designer_R12757",
+       "enlaces": [
+        {
+         "url": "https://workiva.wd503.myworkdayjobs.com/en-US/careers/job/USA---Remote/Principal-Product-Designer_R12757",
+         "destino": "https://workiva.wd503.myworkdayjobs.com/en-US/careers/job/USA---Remote/Principal-Product-Designer_R12757",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://workiva.wd503.myworkdayjobs.com/en-US/careers/job/USA---Remote/Principal-Product-Designer_R12757"
+         ]
+        },
+        {
+         "url": "https://www.indeed.com/viewjob?jk=72102efbb3a5489f",
+         "estado": "pendiente",
+         "motivo": "sin comprobación vigente",
+         "comprobada_en": "",
+         "destino": "",
+         "http": null,
+         "saltos": 0,
+         "ruta": []
+        }
+       ]
+      }
+     },
+     {
+      "id": "80115995fc25752b",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4491618964",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T21:21:30Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4491618964",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4491618964",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4491618964",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-20T21:21:30Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4491618964"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "614af1d50492c55b",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492824207",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:54:23Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492824207",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492824207",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4492824207",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:54:23Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492824207"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "b1311f06495dc864",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492927264",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T22:06:57Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492927264",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492927264",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4492927264",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-20T22:06:57Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492927264"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "1511b0565192435a",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4476213422",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:55:31Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4476213422",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4476213422",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4476213422",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:55:31Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4476213422"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "867b69405c902192",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4493214919",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:55:38Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4493214919",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4493214919",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4493214919",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:55:38Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4493214919"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "e94e59a7913014c5",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492984364",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:43:19Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492984364",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492984364",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4492984364",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:43:19Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492984364"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "6406ea85fd7103f7",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4489990566",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4489990566",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4489990566",
+         "destino": "https://www.linkedin.com/jobs/view/4489990566",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4489990566"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "aba501845e09a85a",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492993042",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T22:00:34Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492993042",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492993042",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4492993042",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-20T22:00:34Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492993042"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "c71a67f28753e840",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492986163",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:45:43Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492986163",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492986163",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4492986163",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:45:43Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492986163"
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": {
+    "nombre": "Product Owner",
+    "meta": 10,
+    "vacantes": [
+     {
+      "id": "7bbbe8ed7040f981",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4487019728",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T22:34:22Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4487019728",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4487019728",
+         "destino": "https://www.linkedin.com/jobs/view/4487019728",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-20T22:34:22Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4487019728"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "5702562c6e218ea3",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.elempleo.com/co/ofertas-trabajo/product-owner-sector-it-1886789569",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T22:34:22Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://www.elempleo.com/co/ofertas-trabajo/product-owner-sector-it-1886789569",
+       "enlaces": [
+        {
+         "url": "https://www.elempleo.com/co/ofertas-trabajo/product-owner-sector-it-1886789569",
+         "destino": "https://www.elempleo.com/co/ofertas-trabajo/product-owner-sector-it-1886789569",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-20T22:34:22Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.elempleo.com/co/ofertas-trabajo/product-owner-sector-it-1886789569"
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": {
+    "nombre": "Product Manager",
+    "meta": 5,
+    "vacantes": [
+     {
+      "id": "7d38b48d4319ac4f",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4491966126",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:54:19Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4491966126",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4491966126",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4491966126",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:54:19Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4491966126"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "9bf1beff97b0da62",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://de.indeed.com/viewjob?jk=5c6b36427c1db321",
+      "enlace_directo": "https://fr.indeed.com/viewjob?jk=0a3540482fc85ff1",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T21:29:35Z",
+       "motivo": "vista hoy en la búsqueda de Indeed",
+       "url_utilizable": "https://de.indeed.com/viewjob?jk=5c6b36427c1db321",
+       "enlaces": [
+        {
+         "url": "https://de.indeed.com/viewjob?jk=5c6b36427c1db321",
+         "destino": "https://de.indeed.com/viewjob?jk=5c6b36427c1db321",
+         "estado": "verificada",
+         "motivo": "vista hoy en la búsqueda de Indeed",
+         "comprobada_en": "2026-11-20T21:29:35Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://de.indeed.com/viewjob?jk=5c6b36427c1db321"
+         ]
+        },
+        {
+         "url": "https://fr.indeed.com/viewjob?jk=0a3540482fc85ff1",
+         "destino": "https://fr.indeed.com/viewjob?jk=0a3540482fc85ff1",
+         "estado": "verificada",
+         "motivo": "vista hoy en la búsqueda de Indeed",
+         "comprobada_en": "2026-11-20T21:29:42Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://fr.indeed.com/viewjob?jk=0a3540482fc85ff1"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "8f66875134e78c46",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://jobs.lever.co/jobgether/51a89b3f-bae3-453d-9e7c-b685fe5706e3",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T22:30:59Z",
+       "motivo": "vista hoy en el portal de la empresa",
+       "url_utilizable": "https://jobs.lever.co/jobgether/51a89b3f-bae3-453d-9e7c-b685fe5706e3",
+       "enlaces": [
+        {
+         "url": "https://jobs.lever.co/jobgether/51a89b3f-bae3-453d-9e7c-b685fe5706e3",
+         "destino": "https://jobs.lever.co/jobgether/51a89b3f-bae3-453d-9e7c-b685fe5706e3",
+         "estado": "verificada",
+         "motivo": "vista hoy en el portal de la empresa",
+         "comprobada_en": "2026-11-20T22:30:59Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://jobs.lever.co/jobgether/51a89b3f-bae3-453d-9e7c-b685fe5706e3"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "64ba2a4f0e241e89",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4491788946",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:28:59Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4491788946",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4491788946",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4491788946",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:28:59Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4491788946"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "c379a836cd973d9e",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://jobs.lever.co/jobgether/4dfb2519-17d4-4cd8-8c3d-2b060722da45",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T22:30:59Z",
+       "motivo": "vista hoy en el portal de la empresa",
+       "url_utilizable": "https://jobs.lever.co/jobgether/4dfb2519-17d4-4cd8-8c3d-2b060722da45",
+       "enlaces": [
+        {
+         "url": "https://jobs.lever.co/jobgether/4dfb2519-17d4-4cd8-8c3d-2b060722da45",
+         "destino": "https://jobs.lever.co/jobgether/4dfb2519-17d4-4cd8-8c3d-2b060722da45",
+         "estado": "verificada",
+         "motivo": "vista hoy en el portal de la empresa",
+         "comprobada_en": "2026-11-20T22:30:59Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://jobs.lever.co/jobgether/4dfb2519-17d4-4cd8-8c3d-2b060722da45"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "bdeffc30ed78c92b",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492911316",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T22:08:14Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492911316",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492911316",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4492911316",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-20T22:08:14Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492911316"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "798b5d453ed2304d",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://jobs.lever.co/jobgether/39085b1d-ea7b-4d4f-a78c-1f2519bafd6f",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T22:30:59Z",
+       "motivo": "vista hoy en el portal de la empresa",
+       "url_utilizable": "https://jobs.lever.co/jobgether/39085b1d-ea7b-4d4f-a78c-1f2519bafd6f",
+       "enlaces": [
+        {
+         "url": "https://jobs.lever.co/jobgether/39085b1d-ea7b-4d4f-a78c-1f2519bafd6f",
+         "destino": "https://jobs.lever.co/jobgether/39085b1d-ea7b-4d4f-a78c-1f2519bafd6f",
+         "estado": "verificada",
+         "motivo": "vista hoy en el portal de la empresa",
+         "comprobada_en": "2026-11-20T22:30:59Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://jobs.lever.co/jobgether/39085b1d-ea7b-4d4f-a78c-1f2519bafd6f"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "ab0c00f5572d7ac7",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4474284658",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4474284658",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4474284658",
+         "destino": "https://www.linkedin.com/jobs/view/4474284658",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4474284658"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "af9d16f51bec6e85",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492930504",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:54:26Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492930504",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492930504",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4492930504",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:54:26Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492930504"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "8da39fa8d0e8a84b",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.indeed.com/viewjob?jk=0f7bbbb7d899845d",
+      "enlace_directo": "https://grnh.se/k5gaq8m37us",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://grnh.se/k5gaq8m37us",
+       "enlaces": [
+        {
+         "url": "https://www.indeed.com/viewjob?jk=0f7bbbb7d899845d",
+         "estado": "pendiente",
+         "motivo": "sin comprobación vigente",
+         "comprobada_en": "",
+         "destino": "",
+         "http": null,
+         "saltos": 0,
+         "ruta": []
+        },
+        {
+         "url": "https://grnh.se/k5gaq8m37us",
+         "destino": "https://job-boards.greenhouse.io/banyansoftware/jobs/5253365007?gh_src=k5gaq8m37us",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 1,
+         "ruta": [
+          "https://grnh.se/k5gaq8m37us",
+          "https://job-boards.greenhouse.io/banyansoftware/jobs/5253365007?gh_src=k5gaq8m37us"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "4f351695d326014a",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4491889680",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4491889680",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4491889680",
+         "destino": "https://www.linkedin.com/jobs/view/4491889680",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4491889680"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "1ed8f395de7ab4fb",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://job-boards.greenhouse.io/mitratech/jobs/8367900",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:07:56Z",
+       "motivo": "vista hoy en el portal de la empresa",
+       "url_utilizable": "https://job-boards.greenhouse.io/mitratech/jobs/8367900",
+       "enlaces": [
+        {
+         "url": "https://job-boards.greenhouse.io/mitratech/jobs/8367900",
+         "destino": "https://job-boards.greenhouse.io/mitratech/jobs/8367900",
+         "estado": "verificada",
+         "motivo": "vista hoy en el portal de la empresa",
+         "comprobada_en": "2026-11-21T19:07:56Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://job-boards.greenhouse.io/mitratech/jobs/8367900"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "c825e6282b9cc5d8",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4478954107",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4478954107",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4478954107",
+         "destino": "https://www.linkedin.com/jobs/view/4478954107",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4478954107"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "9f0d1a0c652956b6",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://jobs.lever.co/jobgether/143f59bc-1544-41ee-8c8b-0d778ffaec0d",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T22:30:59Z",
+       "motivo": "vista hoy en el portal de la empresa",
+       "url_utilizable": "https://jobs.lever.co/jobgether/143f59bc-1544-41ee-8c8b-0d778ffaec0d",
+       "enlaces": [
+        {
+         "url": "https://jobs.lever.co/jobgether/143f59bc-1544-41ee-8c8b-0d778ffaec0d",
+         "destino": "https://jobs.lever.co/jobgether/143f59bc-1544-41ee-8c8b-0d778ffaec0d",
+         "estado": "verificada",
+         "motivo": "vista hoy en el portal de la empresa",
+         "comprobada_en": "2026-11-20T22:30:59Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://jobs.lever.co/jobgether/143f59bc-1544-41ee-8c8b-0d778ffaec0d"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "cb4e380aca66bda3",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4472317284",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4472317284",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4472317284",
+         "destino": "https://www.linkedin.com/jobs/view/4472317284",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4472317284"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "734f08c2e3957923",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4478954109",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4478954109",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4478954109",
+         "destino": "https://www.linkedin.com/jobs/view/4478954109",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4478954109"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "d5c95b634775233c",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4489143320",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4489143320",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4489143320",
+         "destino": "https://www.linkedin.com/jobs/view/4489143320",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4489143320"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "6c9b949c7af9827d",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4489745590",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4489745590",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4489745590",
+         "destino": "https://www.linkedin.com/jobs/view/4489745590",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4489745590"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "966b453c0c9f3294",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4491886463",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4491886463",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4491886463",
+         "destino": "https://www.linkedin.com/jobs/view/4491886463",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4491886463"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "f66f81e76d1715de",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4489151085",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4489151085",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4489151085",
+         "destino": "https://www.linkedin.com/jobs/view/4489151085",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4489151085"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "d74bd834a33f1ede",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492143787",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492143787",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492143787",
+         "destino": "https://www.linkedin.com/jobs/view/4492143787",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492143787"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "d12a28b98fa20c07",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492274766",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492274766",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492274766",
+         "destino": "https://www.linkedin.com/jobs/view/4492274766",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492274766"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "7fb27a1b73117706",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4490469059",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4490469059",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4490469059",
+         "destino": "https://www.linkedin.com/jobs/view/4490469059",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4490469059"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "3018e225b8a18565",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4491594230",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4491594230",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4491594230",
+         "destino": "https://www.linkedin.com/jobs/view/4491594230",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4491594230"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "e099a7ea9ca6a227",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4491194076",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4491194076",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4491194076",
+         "destino": "https://www.linkedin.com/jobs/view/4491194076",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4491194076"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "7e42ef769423d2df",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4489745582",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4489745582",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4489745582",
+         "destino": "https://www.linkedin.com/jobs/view/4489745582",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4489745582"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "adfc004747500b9f",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4489512717",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4489512717",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4489512717",
+         "destino": "https://www.linkedin.com/jobs/view/4489512717",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4489512717"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "9e0299fb84cad411",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4479392119",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4479392119",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4479392119",
+         "destino": "https://www.linkedin.com/jobs/view/4479392119",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4479392119"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "0b6f56ecbc5114fa",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://careers.cookunity.com/open-roles?gh_jid=8105415003",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:07:56Z",
+       "motivo": "vista hoy en el portal de la empresa",
+       "url_utilizable": "https://careers.cookunity.com/open-roles?gh_jid=8105415003",
+       "enlaces": [
+        {
+         "url": "https://careers.cookunity.com/open-roles?gh_jid=8105415003",
+         "destino": "https://careers.cookunity.com/open-roles?gh_jid=8105415003",
+         "estado": "verificada",
+         "motivo": "vista hoy en el portal de la empresa",
+         "comprobada_en": "2026-11-21T19:07:56Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://careers.cookunity.com/open-roles?gh_jid=8105415003"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "a664d1043a801917",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://job-boards.greenhouse.io/quintoandar/jobs/4417101009",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:07:56Z",
+       "motivo": "vista hoy en el portal de la empresa",
+       "url_utilizable": "https://job-boards.greenhouse.io/quintoandar/jobs/4417101009",
+       "enlaces": [
+        {
+         "url": "https://job-boards.greenhouse.io/quintoandar/jobs/4417101009",
+         "destino": "https://job-boards.greenhouse.io/quintoandar/jobs/4417101009",
+         "estado": "verificada",
+         "motivo": "vista hoy en el portal de la empresa",
+         "comprobada_en": "2026-11-21T19:07:56Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://job-boards.greenhouse.io/quintoandar/jobs/4417101009"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "118a648e00ccb916",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4489273369",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4489273369",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4489273369",
+         "destino": "https://www.linkedin.com/jobs/view/4489273369",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4489273369"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "429691d48a3b4f36",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://mx.indeed.com/viewjob?jk=f8bf01004017297b",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T21:29:29Z",
+       "motivo": "vista hoy en la búsqueda de Indeed",
+       "url_utilizable": "https://mx.indeed.com/viewjob?jk=f8bf01004017297b",
+       "enlaces": [
+        {
+         "url": "https://mx.indeed.com/viewjob?jk=f8bf01004017297b",
+         "destino": "https://mx.indeed.com/viewjob?jk=f8bf01004017297b",
+         "estado": "verificada",
+         "motivo": "vista hoy en la búsqueda de Indeed",
+         "comprobada_en": "2026-11-20T21:29:29Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://mx.indeed.com/viewjob?jk=f8bf01004017297b"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "3f7fa9f3736d2fee",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4486447411",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4486447411",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4486447411",
+         "destino": "https://www.linkedin.com/jobs/view/4486447411",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4486447411"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "95bd46cdda653ca9",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492200409",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492200409",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492200409",
+         "destino": "https://www.linkedin.com/jobs/view/4492200409",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492200409"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "32e316df35e1d4c7",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4487636381",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4487636381",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4487636381",
+         "destino": "https://www.linkedin.com/jobs/view/4487636381",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4487636381"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "f7b9f946b915c6f4",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4490015839",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4490015839",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4490015839",
+         "destino": "https://www.linkedin.com/jobs/view/4490015839",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4490015839"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "cf39f22b2870ef5f",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4480131680",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4480131680",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4480131680",
+         "destino": "https://www.linkedin.com/jobs/view/4480131680",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4480131680"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "3c6298654d77a377",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4487023912",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4487023912",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4487023912",
+         "destino": "https://www.linkedin.com/jobs/view/4487023912",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4487023912"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "0f8994ac7ee0d3f2",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4486447282",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4486447282",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4486447282",
+         "destino": "https://www.linkedin.com/jobs/view/4486447282",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4486447282"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "37741ec26bd9b143",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4485363554",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4485363554",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4485363554",
+         "destino": "https://www.linkedin.com/jobs/view/4485363554",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4485363554"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "e025495ecce7e3c3",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4484750283",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4484750283",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4484750283",
+         "destino": "https://www.linkedin.com/jobs/view/4484750283",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4484750283"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "4e438b83fcef9262",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://jobs.smartrecruiters.com/NielsenIQ/744000158799544",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:07:56Z",
+       "motivo": "vista hoy en el portal de la empresa",
+       "url_utilizable": "https://jobs.smartrecruiters.com/NielsenIQ/744000158799544",
+       "enlaces": [
+        {
+         "url": "https://jobs.smartrecruiters.com/NielsenIQ/744000158799544",
+         "destino": "https://jobs.smartrecruiters.com/NielsenIQ/744000158799544",
+         "estado": "verificada",
+         "motivo": "vista hoy en el portal de la empresa",
+         "comprobada_en": "2026-11-21T19:07:56Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://jobs.smartrecruiters.com/NielsenIQ/744000158799544"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "19fb73fb4a4afdb0",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4482288993",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4482288993",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4482288993",
+         "destino": "https://www.linkedin.com/jobs/view/4482288993",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4482288993"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "1b685658fbb54cea",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://job-boards.greenhouse.io/karat/jobs/8942124002",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://job-boards.greenhouse.io/karat/jobs/8942124002",
+       "enlaces": [
+        {
+         "url": "https://job-boards.greenhouse.io/karat/jobs/8942124002",
+         "destino": "https://job-boards.greenhouse.io/karat/jobs/8942124002",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://job-boards.greenhouse.io/karat/jobs/8942124002"
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "cargo:d051de26-fd6b-40f7-828e-2469aacf38ee": {
+    "nombre": "QA",
+    "meta": 5,
+    "vacantes": [
+     {
+      "id": "7e49df880c499b2a",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4491713383",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:53:05Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4491713383",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4491713383",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4491713383",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:53:05Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4491713383"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "432ca28495925a6b",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4490653406",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4490653406",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4490653406",
+         "destino": "https://www.linkedin.com/jobs/view/4490653406",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4490653406"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "0152468f923f2d64",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492945407",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:45:42Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492945407",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492945407",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4492945407",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T18:45:42Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492945407"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "a48bb9982e7fb520",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://jobs.ashbyhq.com/siftstack/3094713a-00e4-4798-a0fc-474569c6fe2e?utm_source=Bk48XZDKm7",
+      "enlace_directo": "https://mx.indeed.com/viewjob?jk=047f4602f6db84bc",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://jobs.ashbyhq.com/siftstack/3094713a-00e4-4798-a0fc-474569c6fe2e?utm_source=Bk48XZDKm7",
+       "enlaces": [
+        {
+         "url": "https://jobs.ashbyhq.com/siftstack/3094713a-00e4-4798-a0fc-474569c6fe2e?utm_source=Bk48XZDKm7",
+         "destino": "https://jobs.ashbyhq.com/siftstack/3094713a-00e4-4798-a0fc-474569c6fe2e?utm_source=Bk48XZDKm7",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://jobs.ashbyhq.com/siftstack/3094713a-00e4-4798-a0fc-474569c6fe2e?utm_source=Bk48XZDKm7"
+         ]
+        },
+        {
+         "url": "https://mx.indeed.com/viewjob?jk=047f4602f6db84bc",
+         "destino": "https://mx.indeed.com/viewjob?jk=047f4602f6db84bc",
+         "estado": "verificada",
+         "motivo": "vista hoy en la búsqueda de Indeed",
+         "comprobada_en": "2026-11-20T21:29:29Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://mx.indeed.com/viewjob?jk=047f4602f6db84bc"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "89623a08d964714f",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492926995",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T22:13:37Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492926995",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492926995",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4492926995",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-20T22:13:37Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492926995"
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "cargo:2bbfa3e7-da74-4e4e-8fe7-4282b89d6657": {
+    "nombre": "AI Product Manager",
+    "meta": 10,
+    "vacantes": [
+     {
+      "id": "795f40828ac29f4f",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4490144915",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4490144915",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4490144915",
+         "destino": "https://www.linkedin.com/jobs/view/4490144915",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4490144915"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "70e07916071d2ab4",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.indeed.com/viewjob?jk=caa0dbb5c3c5e2ab",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T21:29:28Z",
+       "motivo": "vista hoy en la búsqueda de Indeed",
+       "url_utilizable": "https://www.indeed.com/viewjob?jk=caa0dbb5c3c5e2ab",
+       "enlaces": [
+        {
+         "url": "https://www.indeed.com/viewjob?jk=caa0dbb5c3c5e2ab",
+         "destino": "https://www.indeed.com/viewjob?jk=caa0dbb5c3c5e2ab",
+         "estado": "verificada",
+         "motivo": "vista hoy en la búsqueda de Indeed",
+         "comprobada_en": "2026-11-20T21:29:28Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.indeed.com/viewjob?jk=caa0dbb5c3c5e2ab"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "95063f99a8d519dd",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.elempleo.com/co/ofertas-trabajo/product-manager-de-lineas-de-salida-o-lineas-emergentes-1886801148",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://www.elempleo.com/co/ofertas-trabajo/product-manager-de-lineas-de-salida-o-lineas-emergentes-1886801148",
+       "enlaces": [
+        {
+         "url": "https://www.elempleo.com/co/ofertas-trabajo/product-manager-de-lineas-de-salida-o-lineas-emergentes-1886801148",
+         "destino": "https://www.elempleo.com/co/ofertas-trabajo/product-manager-de-lineas-de-salida-o-lineas-emergentes-1886801148",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.elempleo.com/co/ofertas-trabajo/product-manager-de-lineas-de-salida-o-lineas-emergentes-1886801148"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "0ccee4ec6f9bf5ec",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4489757095",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4489757095",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4489757095",
+         "destino": "https://www.linkedin.com/jobs/view/4489757095",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4489757095"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "8432f1c81071c2a9",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://jobs.lever.co/jobgether/2364c694-9e85-4143-a0e8-87315d8fb907",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T22:30:59Z",
+       "motivo": "vista hoy en el portal de la empresa",
+       "url_utilizable": "https://jobs.lever.co/jobgether/2364c694-9e85-4143-a0e8-87315d8fb907",
+       "enlaces": [
+        {
+         "url": "https://jobs.lever.co/jobgether/2364c694-9e85-4143-a0e8-87315d8fb907",
+         "destino": "https://jobs.lever.co/jobgether/2364c694-9e85-4143-a0e8-87315d8fb907",
+         "estado": "verificada",
+         "motivo": "vista hoy en el portal de la empresa",
+         "comprobada_en": "2026-11-20T22:30:59Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://jobs.lever.co/jobgether/2364c694-9e85-4143-a0e8-87315d8fb907"
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "cargo:11654f3a-7ede-47fb-bf61-50c29d149c3b": {
+    "nombre": "QA Lead",
+    "meta": 5,
+    "vacantes": []
+   },
+   "cargo:4322235e-ac1d-4b99-a627-e8a6a452f6c1": {
+    "nombre": "Product Design Lead",
+    "meta": 5,
+    "vacantes": [
+     {
+      "id": "436f95d251096d75",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492989079",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T02:36:19Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492989079",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492989079",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4492989079",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T02:36:19Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492989079"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "7f4740387207f70b",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4491955325",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T02:36:47Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4491955325",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4491955325",
+         "destino": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4491955325",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T02:36:47Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4491955325"
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "cargo:51f696b8-733b-4035-b1c2-f36b0bcd74fd": {
+    "nombre": "Desarrollador Fullstack",
+    "meta": 10,
+    "vacantes": [
+     {
+      "id": "85799cb85599b2ff",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://co.computrabajo.com/ofertas-de-trabajo/oferta-de-trabajo-de-desarrolladora-full-stack-junior-en-bogota-dc-D79EBCBE6BE5076261373E686DCF3405",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://co.computrabajo.com/ofertas-de-trabajo/oferta-de-trabajo-de-desarrolladora-full-stack-junior-en-bogota-dc-D79EBCBE6BE5076261373E686DCF3405",
+       "enlaces": [
+        {
+         "url": "https://co.computrabajo.com/ofertas-de-trabajo/oferta-de-trabajo-de-desarrolladora-full-stack-junior-en-bogota-dc-D79EBCBE6BE5076261373E686DCF3405",
+         "destino": "https://co.computrabajo.com/ofertas-de-trabajo/oferta-de-trabajo-de-desarrolladora-full-stack-junior-en-bogota-dc-D79EBCBE6BE5076261373E686DCF3405",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://co.computrabajo.com/ofertas-de-trabajo/oferta-de-trabajo-de-desarrolladora-full-stack-junior-en-bogota-dc-D79EBCBE6BE5076261373E686DCF3405"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "0b3a1b79f24fcaad",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.elempleo.com/co/ofertas-trabajo/desarrolladora-fullstack-nivel-ii-macrom-1886800898",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://www.elempleo.com/co/ofertas-trabajo/desarrolladora-fullstack-nivel-ii-macrom-1886800898",
+       "enlaces": [
+        {
+         "url": "https://www.elempleo.com/co/ofertas-trabajo/desarrolladora-fullstack-nivel-ii-macrom-1886800898",
+         "destino": "https://www.elempleo.com/co/ofertas-trabajo/desarrolladora-fullstack-nivel-ii-macrom-1886800898",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.elempleo.com/co/ofertas-trabajo/desarrolladora-fullstack-nivel-ii-macrom-1886800898"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "5a164c2178027994",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://co.indeed.com/viewjob?jk=5e9067be398b6809",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T18:08:41Z",
+       "motivo": "vista hoy en la búsqueda de Indeed",
+       "url_utilizable": "https://co.indeed.com/viewjob?jk=5e9067be398b6809",
+       "enlaces": [
+        {
+         "url": "https://co.indeed.com/viewjob?jk=5e9067be398b6809",
+         "destino": "https://co.indeed.com/viewjob?jk=5e9067be398b6809",
+         "estado": "verificada",
+         "motivo": "vista hoy en la búsqueda de Indeed",
+         "comprobada_en": "2026-11-21T18:08:41Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://co.indeed.com/viewjob?jk=5e9067be398b6809"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "e2e735b7f9c9ee06",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4487051309",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T11:32:33Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4487051309",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4487051309",
+         "destino": "https://www.linkedin.com/jobs/view/4487051309",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T11:32:33Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4487051309"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "76480b7df633024b",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://co.computrabajo.com/ofertas-de-trabajo/oferta-de-trabajo-de-desarrollador-full-stack-especialista-en-inteligencia-artificial-en-bogota-dc-C4E5EDF5BF1CE51861373E686DCF3405",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://co.computrabajo.com/ofertas-de-trabajo/oferta-de-trabajo-de-desarrollador-full-stack-especialista-en-inteligencia-artificial-en-bogota-dc-C4E5EDF5BF1CE51861373E686DCF3405",
+       "enlaces": [
+        {
+         "url": "https://co.computrabajo.com/ofertas-de-trabajo/oferta-de-trabajo-de-desarrollador-full-stack-especialista-en-inteligencia-artificial-en-bogota-dc-C4E5EDF5BF1CE51861373E686DCF3405",
+         "destino": "https://co.computrabajo.com/ofertas-de-trabajo/oferta-de-trabajo-de-desarrollador-full-stack-especialista-en-inteligencia-artificial-en-bogota-dc-C4E5EDF5BF1CE51861373E686DCF3405",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://co.computrabajo.com/ofertas-de-trabajo/oferta-de-trabajo-de-desarrollador-full-stack-especialista-en-inteligencia-artificial-en-bogota-dc-C4E5EDF5BF1CE51861373E686DCF3405"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "afa3a9f28d0793cc",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4485252113",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4485252113",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4485252113",
+         "destino": "https://www.linkedin.com/jobs/view/4485252113",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4485252113"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "2e6b3e7dd8e91205",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.elempleo.com/co/ofertas-trabajo/desarrollador-full-stack-1886784564",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://www.elempleo.com/co/ofertas-trabajo/desarrollador-full-stack-1886784564",
+       "enlaces": [
+        {
+         "url": "https://www.elempleo.com/co/ofertas-trabajo/desarrollador-full-stack-1886784564",
+         "destino": "https://www.elempleo.com/co/ofertas-trabajo/desarrollador-full-stack-1886784564",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.elempleo.com/co/ofertas-trabajo/desarrollador-full-stack-1886784564"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "683e478e64b1a451",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://jobs.lever.co/coderio/5057a0ef-22e0-46fc-bddb-d75b470a6af7?lever-source=Indeed",
+      "enlace_directo": "https://jobs.lever.co/coderio/5057a0ef-22e0-46fc-bddb-d75b470a6af7",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://jobs.lever.co/coderio/5057a0ef-22e0-46fc-bddb-d75b470a6af7?lever-source=Indeed",
+       "enlaces": [
+        {
+         "url": "https://jobs.lever.co/coderio/5057a0ef-22e0-46fc-bddb-d75b470a6af7?lever-source=Indeed",
+         "destino": "https://jobs.lever.co/coderio/5057a0ef-22e0-46fc-bddb-d75b470a6af7/apply",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 1,
+         "ruta": [
+          "https://jobs.lever.co/coderio/5057a0ef-22e0-46fc-bddb-d75b470a6af7?lever-source=Indeed",
+          "https://jobs.lever.co/coderio/5057a0ef-22e0-46fc-bddb-d75b470a6af7/apply"
+         ]
+        },
+        {
+         "url": "https://jobs.lever.co/coderio/5057a0ef-22e0-46fc-bddb-d75b470a6af7",
+         "destino": "https://jobs.lever.co/coderio/5057a0ef-22e0-46fc-bddb-d75b470a6af7",
+         "estado": "verificada",
+         "motivo": "vista hoy en el portal de la empresa",
+         "comprobada_en": "2026-11-21T19:07:56Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://jobs.lever.co/coderio/5057a0ef-22e0-46fc-bddb-d75b470a6af7"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "efdbe97ae16fa16d",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4482707196",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4482707196",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4482707196",
+         "destino": "https://www.linkedin.com/jobs/view/4482707196",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4482707196"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "c31a0bcd4fce8afb",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.elempleo.com/co/ofertas-trabajo/desarrollador-fullstack-junior-bilingue-1886787852",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://www.elempleo.com/co/ofertas-trabajo/desarrollador-fullstack-junior-bilingue-1886787852",
+       "enlaces": [
+        {
+         "url": "https://www.elempleo.com/co/ofertas-trabajo/desarrollador-fullstack-junior-bilingue-1886787852",
+         "destino": "https://www.elempleo.com/co/ofertas-trabajo/desarrollador-fullstack-junior-bilingue-1886787852",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.elempleo.com/co/ofertas-trabajo/desarrollador-fullstack-junior-bilingue-1886787852"
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "cargo:8f61b903-ae7b-4b87-965d-1174fab0c7cc": {
+    "nombre": "Growth Marketing",
+    "meta": 10,
+    "vacantes": [
+     {
+      "id": "d13daffb6a3cf23a",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4492197892",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4492197892",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4492197892",
+         "destino": "https://www.linkedin.com/jobs/view/4492197892",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4492197892"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "692e5adda331a82f",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://jobs.lever.co/jobgether/6475661e-f7c1-4126-8db6-1274874037b1",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T22:30:59Z",
+       "motivo": "vista hoy en el portal de la empresa",
+       "url_utilizable": "https://jobs.lever.co/jobgether/6475661e-f7c1-4126-8db6-1274874037b1",
+       "enlaces": [
+        {
+         "url": "https://jobs.lever.co/jobgether/6475661e-f7c1-4126-8db6-1274874037b1",
+         "destino": "https://jobs.lever.co/jobgether/6475661e-f7c1-4126-8db6-1274874037b1",
+         "estado": "verificada",
+         "motivo": "vista hoy en el portal de la empresa",
+         "comprobada_en": "2026-11-20T22:30:59Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://jobs.lever.co/jobgether/6475661e-f7c1-4126-8db6-1274874037b1"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "6f427cc062b22343",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://jobs.lever.co/jobgether/ad7e755b-88bc-4cb7-ac52-831ca9d3eeca",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T22:30:59Z",
+       "motivo": "vista hoy en el portal de la empresa",
+       "url_utilizable": "https://jobs.lever.co/jobgether/ad7e755b-88bc-4cb7-ac52-831ca9d3eeca",
+       "enlaces": [
+        {
+         "url": "https://jobs.lever.co/jobgether/ad7e755b-88bc-4cb7-ac52-831ca9d3eeca",
+         "destino": "https://jobs.lever.co/jobgether/ad7e755b-88bc-4cb7-ac52-831ca9d3eeca",
+         "estado": "verificada",
+         "motivo": "vista hoy en el portal de la empresa",
+         "comprobada_en": "2026-11-20T22:30:59Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://jobs.lever.co/jobgether/ad7e755b-88bc-4cb7-ac52-831ca9d3eeca"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "762de196531708a4",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://jobs.ashbyhq.com/reacher/84ef72a2-4bb9-4eab-b249-793380fa75c9",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-20T22:30:59Z",
+       "motivo": "vista hoy en el portal de la empresa",
+       "url_utilizable": "https://jobs.ashbyhq.com/reacher/84ef72a2-4bb9-4eab-b249-793380fa75c9",
+       "enlaces": [
+        {
+         "url": "https://jobs.ashbyhq.com/reacher/84ef72a2-4bb9-4eab-b249-793380fa75c9",
+         "destino": "https://jobs.ashbyhq.com/reacher/84ef72a2-4bb9-4eab-b249-793380fa75c9",
+         "estado": "verificada",
+         "motivo": "vista hoy en el portal de la empresa",
+         "comprobada_en": "2026-11-20T22:30:59Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://jobs.ashbyhq.com/reacher/84ef72a2-4bb9-4eab-b249-793380fa75c9"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "3bc74656817ec31a",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://careers.lmp-group.co.uk/jobs/8752728-partnerships-marketing-manager",
+      "enlace_directo": "https://uk.indeed.com/viewjob?jk=713a154287c984bc",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://careers.lmp-group.co.uk/jobs/8752728-partnerships-marketing-manager",
+       "enlaces": [
+        {
+         "url": "https://careers.lmp-group.co.uk/jobs/8752728-partnerships-marketing-manager",
+         "destino": "https://careers.lmp-group.co.uk/jobs/8752728-partnerships-marketing-manager",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://careers.lmp-group.co.uk/jobs/8752728-partnerships-marketing-manager"
+         ]
+        },
+        {
+         "url": "https://uk.indeed.com/viewjob?jk=713a154287c984bc",
+         "estado": "pendiente",
+         "motivo": "sin comprobación vigente",
+         "comprobada_en": "",
+         "destino": "",
+         "http": null,
+         "saltos": 0,
+         "ruta": []
+        }
+       ]
+      }
+     },
+     {
+      "id": "faed7e6d6f804e0b",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://job-boards.greenhouse.io/mitratech/jobs/8378644",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:07:56Z",
+       "motivo": "vista hoy en el portal de la empresa",
+       "url_utilizable": "https://job-boards.greenhouse.io/mitratech/jobs/8378644",
+       "enlaces": [
+        {
+         "url": "https://job-boards.greenhouse.io/mitratech/jobs/8378644",
+         "destino": "https://job-boards.greenhouse.io/mitratech/jobs/8378644",
+         "estado": "verificada",
+         "motivo": "vista hoy en el portal de la empresa",
+         "comprobada_en": "2026-11-21T19:07:56Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://job-boards.greenhouse.io/mitratech/jobs/8378644"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "9117817e865bf0e3",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://eworgmbh.teamtailor.com/jobs/8772665-semiconductor-co-founder-head-of-growth-100-remote-m-f-d",
+      "enlace_directo": "https://es.indeed.com/viewjob?jk=4c8e1aef72b19dea",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://eworgmbh.teamtailor.com/jobs/8772665-semiconductor-co-founder-head-of-growth-100-remote-m-f-d",
+       "enlaces": [
+        {
+         "url": "https://eworgmbh.teamtailor.com/jobs/8772665-semiconductor-co-founder-head-of-growth-100-remote-m-f-d",
+         "destino": "https://eworgmbh.teamtailor.com/jobs/8772665-semiconductor-co-founder-head-of-growth-100-remote-m-f-d",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://eworgmbh.teamtailor.com/jobs/8772665-semiconductor-co-founder-head-of-growth-100-remote-m-f-d"
+         ]
+        },
+        {
+         "url": "https://es.indeed.com/viewjob?jk=4c8e1aef72b19dea",
+         "destino": "https://es.indeed.com/viewjob?jk=4c8e1aef72b19dea",
+         "estado": "verificada",
+         "motivo": "vista hoy en la búsqueda de Indeed",
+         "comprobada_en": "2026-11-20T21:29:39Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://es.indeed.com/viewjob?jk=4c8e1aef72b19dea"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "70ea4da4ff28ac7f",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://healthy-gamer.breezy.hr/p/3ca9d20ca191-marketing-manager-hgi?source=indeed",
+      "enlace_directo": "https://www.indeed.com/viewjob?jk=8b099c55c91fc9f1",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha específica accesible",
+       "url_utilizable": "https://healthy-gamer.breezy.hr/p/3ca9d20ca191-marketing-manager-hgi?source=indeed",
+       "enlaces": [
+        {
+         "url": "https://healthy-gamer.breezy.hr/p/3ca9d20ca191-marketing-manager-hgi?source=indeed",
+         "destino": "https://healthy-gamer.breezy.hr/p/3ca9d20ca191-marketing-manager-hgi?source=indeed",
+         "estado": "verificada",
+         "motivo": "ficha específica accesible",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://healthy-gamer.breezy.hr/p/3ca9d20ca191-marketing-manager-hgi?source=indeed"
+         ]
+        },
+        {
+         "url": "https://www.indeed.com/viewjob?jk=8b099c55c91fc9f1",
+         "estado": "pendiente",
+         "motivo": "sin comprobación vigente",
+         "comprobada_en": "",
+         "destino": "",
+         "http": null,
+         "saltos": 0,
+         "ruta": []
+        }
+       ]
+      }
+     },
+     {
+      "id": "313c731643ac4a57",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://www.linkedin.com/jobs/view/4491175896",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:12:46Z",
+       "motivo": "ficha de LinkedIn abierta",
+       "url_utilizable": "https://www.linkedin.com/jobs/view/4491175896",
+       "enlaces": [
+        {
+         "url": "https://www.linkedin.com/jobs/view/4491175896",
+         "destino": "https://www.linkedin.com/jobs/view/4491175896",
+         "estado": "verificada",
+         "motivo": "ficha de LinkedIn abierta",
+         "comprobada_en": "2026-11-21T19:12:46Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://www.linkedin.com/jobs/view/4491175896"
+         ]
+        }
+       ]
+      }
+     },
+     {
+      "id": "e13fdae88300c80d",
+      "catalog_status": "active",
+      "afinidad_vigente": true,
+      "enlace": "https://apply.workable.com/j/1790C02ABD",
+      "enlace_directo": "",
+      "verificacion": {
+       "estado": "verificada",
+       "comprobada_en": "2026-11-21T19:07:56Z",
+       "motivo": "vista hoy en el portal de la empresa",
+       "url_utilizable": "https://apply.workable.com/j/1790C02ABD",
+       "enlaces": [
+        {
+         "url": "https://apply.workable.com/j/1790C02ABD",
+         "destino": "https://apply.workable.com/j/1790C02ABD",
+         "estado": "verificada",
+         "motivo": "vista hoy en el portal de la empresa",
+         "comprobada_en": "2026-11-21T19:07:56Z",
+         "http": 200,
+         "saltos": 0,
+         "ruta": [
+          "https://apply.workable.com/j/1790C02ABD"
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "cargo:bf65f5e0-8d15-4d33-aeff-87a007ffa194": {
+    "nombre": "Desarrollador de software",
+    "meta": 0,
+    "vacantes": []
+   }
+  }
+ },
+ "refuerzos": [
+  {
+   "ronda": 1,
+   "faltantes_antes": {
+    "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": 18,
+    "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": 8,
+    "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": 2,
+    "cargo:2bbfa3e7-da74-4e4e-8fe7-4282b89d6657": 5,
+    "cargo:11654f3a-7ede-47fb-bf61-50c29d149c3b": 5,
+    "cargo:4322235e-ac1d-4b99-a627-e8a6a452f6c1": 3,
+    "cargo:bf65f5e0-8d15-4d33-aeff-87a007ffa194": 5
+   },
+   "crudas": 144,
+   "fuentes": {
+    "LinkedIn": {
+     "busquedas": 12,
+     "fallidas": 0,
+     "avisos": 107,
+     "con_descripcion": 1,
+     "cerradas": 0,
+     "combinaciones_revisadas": 21,
+     "combinaciones_total": 57,
+     "por_familia": {
+      "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": 6,
+      "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": 3,
+      "cargo:2bbfa3e7-da74-4e4e-8fe7-4282b89d6657": 3
+     },
+     "por_lugar": {
+      "REMOTO": 3,
+      "CIUDAD_CHICAGO": 3,
+      "REMOTO_CO": 6
+     }
+    },
+    "Indeed": {
+     "busquedas": 6,
+     "fallidas": 0,
+     "avisos": 29,
+     "combinaciones_total": 64,
+     "por_familia": {
+      "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": 5,
+      "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": 1
+     },
+     "por_lugar": {
+      "CO:REMOTO": 2,
+      "MX:REMOTO": 1,
+      "PE:REMOTO": 1,
+      "US:REMOTO": 1,
+      "CR:REMOTO": 1
+     }
+    },
+    "Get on Board": {
+     "busquedas": 6,
+     "avisos": 8,
+     "respondidas": [
+      "conversational designer",
+      "diseñador conversacional",
+      "dueño de producto",
+      "po",
+      "cpo",
+      "chief product officer"
+     ]
+    }
+   }
+  },
+  {
+   "ronda": 2,
+   "faltantes_antes": {
+    "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": 18,
+    "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": 8,
+    "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": 2,
+    "cargo:2bbfa3e7-da74-4e4e-8fe7-4282b89d6657": 5,
+    "cargo:11654f3a-7ede-47fb-bf61-50c29d149c3b": 5,
+    "cargo:4322235e-ac1d-4b99-a627-e8a6a452f6c1": 3,
+    "cargo:bf65f5e0-8d15-4d33-aeff-87a007ffa194": 5
+   },
+   "crudas": 112,
+   "fuentes": {
+    "LinkedIn": {
+     "busquedas": 6,
+     "fallidas": 1,
+     "avisos": 50,
+     "con_descripcion": 3,
+     "cerradas": 0,
+     "combinaciones_revisadas": 21,
+     "combinaciones_total": 57,
+     "por_familia": {
+      "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": 6
+     },
+     "por_lugar": {
+      "REMOTO:ES": 3,
+      "CIUDAD_CHICAGO": 3
+     }
+    },
+    "Indeed": {
+     "busquedas": 6,
+     "fallidas": 0,
+     "avisos": 50,
+     "combinaciones_total": 64,
+     "por_familia": {
+      "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": 5,
+      "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": 1
+     },
+     "por_lugar": {
+      "CO:REMOTO": 2,
+      "MX:REMOTO": 1,
+      "PE:REMOTO": 1,
+      "US:REMOTO": 1,
+      "CR:REMOTO": 1
+     }
+    },
+    "Get on Board": {
+     "busquedas": 6,
+     "avisos": 12,
+     "respondidas": [
+      "ux architect",
+      "ux strategist",
+      "digital product owner",
+      "proxy product owner",
+      "gerente de producto",
+      "product management"
+     ]
+    }
+   }
+  }
+ ],
+ "historico_entregas": [
+  {
+   "fecha": "2026-11-15",
+   "meta_cumplida": false,
+   "pendientes_supabase": 0,
+   "registro_confirmado": true,
+   "enlaces_comprobados": true,
+   "roles": {
+    "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": {
+     "candidatas": 32,
+     "entregadas": 31,
+     "faltan": 29,
+     "reserva_sin_entregar": 1
+    },
+    "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": {
+     "candidatas": 19,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 9
+    },
+    "cargo:d051de26-fd6b-40f7-828e-2469aacf38ee": {
+     "candidatas": 40,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 30
+    },
+    "cargo:2bbfa3e7-da74-4e4e-8fe7-4282b89d6657": {
+     "candidatas": 1,
+     "entregadas": 1,
+     "faltan": 9,
+     "reserva_sin_entregar": 0
+    },
+    "cargo:11654f3a-7ede-47fb-bf61-50c29d149c3b": {
+     "candidatas": 0,
+     "entregadas": 0,
+     "faltan": 10,
+     "reserva_sin_entregar": 0
+    },
+    "cargo:4322235e-ac1d-4b99-a627-e8a6a452f6c1": {
+     "candidatas": 5,
+     "entregadas": 5,
+     "faltan": 5,
+     "reserva_sin_entregar": 0
+    },
+    "cargo:51f696b8-733b-4035-b1c2-f36b0bcd74fd": {
+     "candidatas": 22,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 12
+    }
+   }
+  },
+  {
+   "fecha": "2026-11-16",
+   "meta_cumplida": false,
+   "pendientes_supabase": 0,
+   "registro_confirmado": true,
+   "enlaces_comprobados": true,
+   "roles": {
+    "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": {
+     "candidatas": 74,
+     "entregadas": 43,
+     "faltan": 27,
+     "reserva_sin_entregar": 31
+    },
+    "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": {
+     "candidatas": 155,
+     "entregadas": 40,
+     "faltan": 0,
+     "reserva_sin_entregar": 115
+    },
+    "cargo:d051de26-fd6b-40f7-828e-2469aacf38ee": {
+     "candidatas": 66,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 56
+    },
+    "cargo:2bbfa3e7-da74-4e4e-8fe7-4282b89d6657": {
+     "candidatas": 2,
+     "entregadas": 2,
+     "faltan": 8,
+     "reserva_sin_entregar": 0
+    },
+    "cargo:11654f3a-7ede-47fb-bf61-50c29d149c3b": {
+     "candidatas": 0,
+     "entregadas": 5,
+     "faltan": 0,
+     "reserva_sin_entregar": 0
+    },
+    "cargo:4322235e-ac1d-4b99-a627-e8a6a452f6c1": {
+     "candidatas": 1,
+     "entregadas": 1,
+     "faltan": 4,
+     "reserva_sin_entregar": 0
+    },
+    "cargo:51f696b8-733b-4035-b1c2-f36b0bcd74fd": {
+     "candidatas": 17,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 7
+    },
+    "cargo:8f61b903-ae7b-4b87-965d-1174fab0c7cc": {
+     "candidatas": 9,
+     "entregadas": 9,
+     "faltan": 1,
+     "reserva_sin_entregar": 0
+    },
+    "cargo:bf65f5e0-8d15-4d33-aeff-87a007ffa194": {
+     "candidatas": 38,
+     "entregadas": 0,
+     "faltan": 0,
+     "reserva_sin_entregar": 38
+    }
+   }
+  },
+  {
+   "fecha": "2026-11-17",
+   "meta_cumplida": false,
+   "pendientes_supabase": 0,
+   "registro_confirmado": true,
+   "enlaces_comprobados": true,
+   "roles": {
+    "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": {
+     "candidatas": 154,
+     "entregadas": 70,
+     "faltan": 0,
+     "reserva_sin_entregar": 84
+    },
+    "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": {
+     "candidatas": 41,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 31
+    },
+    "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": {
+     "candidatas": 181,
+     "entregadas": 67,
+     "faltan": 0,
+     "reserva_sin_entregar": 114
+    },
+    "cargo:d051de26-fd6b-40f7-828e-2469aacf38ee": {
+     "candidatas": 75,
+     "entregadas": 13,
+     "faltan": 0,
+     "reserva_sin_entregar": 62
+    },
+    "cargo:2bbfa3e7-da74-4e4e-8fe7-4282b89d6657": {
+     "candidatas": 4,
+     "entregadas": 5,
+     "faltan": 5,
+     "reserva_sin_entregar": 0
+    },
+    "cargo:11654f3a-7ede-47fb-bf61-50c29d149c3b": {
+     "candidatas": 8,
+     "entregadas": 5,
+     "faltan": 0,
+     "reserva_sin_entregar": 3
+    },
+    "cargo:4322235e-ac1d-4b99-a627-e8a6a452f6c1": {
+     "candidatas": 6,
+     "entregadas": 5,
+     "faltan": 0,
+     "reserva_sin_entregar": 1
+    },
+    "cargo:51f696b8-733b-4035-b1c2-f36b0bcd74fd": {
+     "candidatas": 23,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 13
+    },
+    "cargo:8f61b903-ae7b-4b87-965d-1174fab0c7cc": {
+     "candidatas": 103,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 93
+    },
+    "cargo:bf65f5e0-8d15-4d33-aeff-87a007ffa194": {
+     "candidatas": 89,
+     "entregadas": 0,
+     "faltan": 0,
+     "reserva_sin_entregar": 89
+    }
+   }
+  },
+  {
+   "pasadas": 2,
+   "fecha": "2026-11-18",
+   "meta_cumplida": true,
+   "pendientes_supabase": 0,
+   "registro_confirmado": true,
+   "enlaces_comprobados": true,
+   "roles": {
+    "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": {
+     "candidatas": 192,
+     "entregadas": 75,
+     "faltan": 0,
+     "reserva_sin_entregar": 117
+    },
+    "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": {
+     "candidatas": 16,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 6
+    },
+    "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": {
+     "candidatas": 303,
+     "entregadas": 9,
+     "faltan": 0,
+     "reserva_sin_entregar": 294
+    },
+    "cargo:d051de26-fd6b-40f7-828e-2469aacf38ee": {
+     "candidatas": 142,
+     "entregadas": 5,
+     "faltan": 0,
+     "reserva_sin_entregar": 137
+    },
+    "cargo:2bbfa3e7-da74-4e4e-8fe7-4282b89d6657": {
+     "candidatas": 21,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 11
+    },
+    "cargo:11654f3a-7ede-47fb-bf61-50c29d149c3b": {
+     "candidatas": 5,
+     "entregadas": 5,
+     "faltan": 0,
+     "reserva_sin_entregar": 0
+    },
+    "cargo:4322235e-ac1d-4b99-a627-e8a6a452f6c1": {
+     "candidatas": 11,
+     "entregadas": 5,
+     "faltan": 0,
+     "reserva_sin_entregar": 6
+    },
+    "cargo:51f696b8-733b-4035-b1c2-f36b0bcd74fd": {
+     "candidatas": 41,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 31
+    },
+    "cargo:8f61b903-ae7b-4b87-965d-1174fab0c7cc": {
+     "candidatas": 273,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 263
+    },
+    "cargo:bf65f5e0-8d15-4d33-aeff-87a007ffa194": {
+     "candidatas": 233,
+     "entregadas": 0,
+     "faltan": 0,
+     "reserva_sin_entregar": 233
+    }
+   }
+  },
+  {
+   "pasadas": 3,
+   "fecha": "2026-11-19",
+   "meta_cumplida": false,
+   "pendientes_supabase": 0,
+   "registro_confirmado": true,
+   "enlaces_comprobados": true,
+   "roles": {
+    "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": {
+     "candidatas": 141,
+     "entregadas": 70,
+     "faltan": 0,
+     "reserva_sin_entregar": 71
+    },
+    "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": {
+     "candidatas": 15,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 5
+    },
+    "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": {
+     "candidatas": 238,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 228
+    },
+    "cargo:d051de26-fd6b-40f7-828e-2469aacf38ee": {
+     "candidatas": 72,
+     "entregadas": 5,
+     "faltan": 0,
+     "reserva_sin_entregar": 67
+    },
+    "cargo:2bbfa3e7-da74-4e4e-8fe7-4282b89d6657": {
+     "candidatas": 14,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 4
+    },
+    "cargo:11654f3a-7ede-47fb-bf61-50c29d149c3b": {
+     "candidatas": 3,
+     "entregadas": 4,
+     "faltan": 1,
+     "reserva_sin_entregar": 0
+    },
+    "cargo:4322235e-ac1d-4b99-a627-e8a6a452f6c1": {
+     "candidatas": 7,
+     "entregadas": 5,
+     "faltan": 0,
+     "reserva_sin_entregar": 2
+    },
+    "cargo:51f696b8-733b-4035-b1c2-f36b0bcd74fd": {
+     "candidatas": 19,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 9
+    },
+    "cargo:8f61b903-ae7b-4b87-965d-1174fab0c7cc": {
+     "candidatas": 225,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 215
+    },
+    "cargo:bf65f5e0-8d15-4d33-aeff-87a007ffa194": {
+     "candidatas": 182,
+     "entregadas": 0,
+     "faltan": 0,
+     "reserva_sin_entregar": 182
+    }
+   }
+  },
+  {
+   "pasadas": 2,
+   "fecha": "2026-11-20",
+   "meta_cumplida": false,
+   "pendientes_supabase": 0,
+   "registro_confirmado": true,
+   "enlaces_comprobados": true,
+   "roles": {
+    "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": {
+     "candidatas": 128,
+     "entregadas": 72,
+     "faltan": 0,
+     "reserva_sin_entregar": 56
+    },
+    "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": {
+     "candidatas": 12,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 2
+    },
+    "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": {
+     "candidatas": 234,
+     "entregadas": 15,
+     "faltan": 0,
+     "reserva_sin_entregar": 219
+    },
+    "cargo:d051de26-fd6b-40f7-828e-2469aacf38ee": {
+     "candidatas": 105,
+     "entregadas": 5,
+     "faltan": 0,
+     "reserva_sin_entregar": 100
+    },
+    "cargo:2bbfa3e7-da74-4e4e-8fe7-4282b89d6657": {
+     "candidatas": 7,
+     "entregadas": 7,
+     "faltan": 3,
+     "reserva_sin_entregar": 0
+    },
+    "cargo:11654f3a-7ede-47fb-bf61-50c29d149c3b": {
+     "candidatas": 2,
+     "entregadas": 3,
+     "faltan": 2,
+     "reserva_sin_entregar": 0
+    },
+    "cargo:4322235e-ac1d-4b99-a627-e8a6a452f6c1": {
+     "candidatas": 6,
+     "entregadas": 5,
+     "faltan": 0,
+     "reserva_sin_entregar": 1
+    },
+    "cargo:51f696b8-733b-4035-b1c2-f36b0bcd74fd": {
+     "candidatas": 22,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 12
+    },
+    "cargo:8f61b903-ae7b-4b87-965d-1174fab0c7cc": {
+     "candidatas": 210,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 200
+    },
+    "cargo:bf65f5e0-8d15-4d33-aeff-87a007ffa194": {
+     "candidatas": 177,
+     "entregadas": 0,
+     "faltan": 0,
+     "reserva_sin_entregar": 177
+    }
+   }
+  },
+  {
+   "pasadas": 1,
+   "fecha": "2026-11-21",
+   "meta_cumplida": false,
+   "pendientes_supabase": 0,
+   "registro_confirmado": true,
+   "enlaces_comprobados": true,
+   "roles": {
+    "cargo:c6c97242-ab4b-46a4-a437-cd52494b590a": {
+     "candidatas": 95,
+     "entregadas": 52,
+     "faltan": 18,
+     "reserva_sin_entregar": 43
+    },
+    "cargo:7d62134a-327e-4a32-86cd-7a157eaf27bd": {
+     "candidatas": 2,
+     "entregadas": 2,
+     "faltan": 8,
+     "reserva_sin_entregar": 0
+    },
+    "cargo:3858a8c9-0c64-4419-a783-f0e58e36180f": {
+     "candidatas": 246,
+     "entregadas": 44,
+     "faltan": 0,
+     "reserva_sin_entregar": 202
+    },
+    "cargo:d051de26-fd6b-40f7-828e-2469aacf38ee": {
+     "candidatas": 137,
+     "entregadas": 5,
+     "faltan": 0,
+     "reserva_sin_entregar": 132
+    },
+    "cargo:2bbfa3e7-da74-4e4e-8fe7-4282b89d6657": {
+     "candidatas": 1,
+     "entregadas": 5,
+     "faltan": 5,
+     "reserva_sin_entregar": 0
+    },
+    "cargo:11654f3a-7ede-47fb-bf61-50c29d149c3b": {
+     "candidatas": 0,
+     "entregadas": 0,
+     "faltan": 5,
+     "reserva_sin_entregar": 0
+    },
+    "cargo:4322235e-ac1d-4b99-a627-e8a6a452f6c1": {
+     "candidatas": 2,
+     "entregadas": 2,
+     "faltan": 3,
+     "reserva_sin_entregar": 0
+    },
+    "cargo:51f696b8-733b-4035-b1c2-f36b0bcd74fd": {
+     "candidatas": 14,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 4
+    },
+    "cargo:8f61b903-ae7b-4b87-965d-1174fab0c7cc": {
+     "candidatas": 198,
+     "entregadas": 10,
+     "faltan": 0,
+     "reserva_sin_entregar": 188
+    },
+    "cargo:bf65f5e0-8d15-4d33-aeff-87a007ffa194": {
+     "candidatas": 223,
+     "entregadas": 0,
+     "faltan": 0,
+     "reserva_sin_entregar": 223
+    }
+   }
+  }
+ ],
+ "catalogo": {
+  "filas": 7735,
+  "enviadas": 7735,
+  "errores": [],
+  "pendientes": 0,
+  "activas_elegibles": 7013,
+  "sin_cambios": 4470,
+  "identidad": {
+   "archivadas": 0,
+   "filas_unicas": 1486,
+   "sin_identificar": 4
+  },
+  "posts": {
+   "enviados": 2,
+   "confirmados": 0,
+   "errores": 1
+  }
+ },
+ "capturada_en": "2026-11-21T19:50:08Z",
+ "frescura": {
+  "con_hora_publicacion": 2233,
+  "sin_hora_publicacion": 7448,
+  "publicadas_24h_confirmadas": 22,
+  "observadas_2h": 2365,
+  "muestras_retardo": 2211,
+  "retardo_publicacion_deteccion_p90_min": 30322.3
+ },
+ "verificacion_enlaces": {
+  "vacantes": 9681,
+  "estados": {
+   "pendiente": 6608,
+   "verificada": 3073
+  },
+  "motivos": {
+   "sin comprobación vigente": 6608
+  },
+  "candidatas_programadas": 0,
+  "seleccion_del_dia": {
+   "vacantes": 130,
+   "estados": {
+    "verificada": 130
+   },
+   "motivos": {}
+  },
+  "rechazos_en_corrida": {
+   "vacante cerrada": 9
+  },
+  "fichas_linkedin_incorporadas": 77,
+  "vistas_indeed_incorporadas": 160,
+  "vistas_portales_incorporadas": 1620
+ },
+ "estado_operativo": {
+  "activo": true,
+  "pendientes": {
+   "catalogo": 0,
+   "ofertas": 0,
+   "registro": 0
+  },
+  "lotes_pendientes": 0,
+  "reintentos": {}
+ }
+}
