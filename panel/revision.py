@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 from buscador import entrega, normalizar, paises, vacante
 from buscador import registro
 from panel.afinidad import MINIMO_POR_PERFIL, evaluar
-from panel.repositorio import nombres as nombres_de
+from panel.repositorio import nombres as nombres_de, numeros
 from panel.terminos import grado
 
 TOPE = 10  # las que se muestran a la vez en el panel
@@ -446,7 +446,6 @@ def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None, todas=None,
                        "ayuda_faltantes": any(p.get("faltan") for p in r.get("perfiles") or []),
                        "iguales": max(0, por_ubicacion.get(r.get("ubicacion"), 0) - 1),
                        "mas_util": r["vacante_id"] in utiles})
-    from panel.servicio import numeros
     por_id = numeros(repo, [s["vacante_id"] for s in salida])  # contrato v48: «ID 1234»
     for s in salida:
         s["numero"] = por_id.get(s["vacante_id"])
@@ -645,20 +644,19 @@ def exportar_csv(repo, fecha):
     escritor.writerow(COLUMNAS_CSV)
     escritor.writerow(["", "", PREGUNTA] + [""] * (len(COLUMNAS_CSV) - 3))  # sin vacante_id: al subir se ignora
     filas = []
-    for r in repo.revisiones(estado="pendiente"):
-        if r.get("motivo") == FUNCIONES:  # contrato v25: el CSV es de ubicaciones; estas se deciden en el panel
-            continue
+    # Contrato v25: el CSV es de ubicaciones; las de funciones se deciden en el panel.
+    pendientes = [r for r in repo.revisiones(estado="pendiente") if r.get("motivo") != FUNCIONES]
+    por_id = numeros(repo, [r["vacante_id"] for r in pendientes])  # contrato v48: «ID 1234»
+    for r in pendientes:
         datos = _datos_ligeros(r.get("catalogo_vacantes"))
         s = sugerir(datos)
         nombres = sorted({clientes.get(p["cliente_id"], "") for p in r.get("perfiles") or []} - {""})
         filas.append(((s["grupo"], -r.get("prioridad", 0)), [
             ETIQUETA[s["decision"]], texto_paises(s["paises"]), s["motivo"], datos.get("titulo", ""),
             datos.get("empresa", ""), datos.get("ubicacion", ""), datos.get("modalidad", ""), s["frase"],
-            datos.get("enlace", ""), ", ".join(nombres), "", "", r["vacante_id"]]))
-    from panel.servicio import numeros
-    por_id = numeros(repo, [fila[-1] for _, fila in filas])  # contrato v48: «ID 1234»
+            datos.get("enlace", ""), ", ".join(nombres), "", "", por_id.get(r["vacante_id"], ""), r["vacante_id"]]))
     for _, fila in sorted(filas, key=lambda x: x[0]):
-        escritor.writerow(fila[:-1] + [por_id.get(fila[-1], ""), fila[-1]])
+        escritor.writerow(fila)
     return "﻿" + salida.getvalue()  # BOM: Excel lo abre con tildes correctas
 
 
@@ -892,7 +890,6 @@ def exportar_base(repo, fecha=None, cliente_id=None, todo=False):
     filas = list(unicas.values())
     incluidas = [f for f in filas if not sin_confirmar(f)]
     columnas = contrato.COLUMNAS + contrato.EXTRAS
-    from panel.servicio import numeros
     por_id = numeros(repo, [f.get("vacante_id") for f in incluidas])
     salida = io.StringIO()
     escritor = csv.writer(salida)

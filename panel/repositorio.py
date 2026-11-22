@@ -576,6 +576,12 @@ def configuracion_demo():
     return Configuracion(clientes=clientes, cargos=cargos, perfiles=perfiles).model_dump(mode="json")
 
 
+def numeros(repo, ids):
+    """Contrato v48: {id: número corto («ID 1234»)} de las vacantes; {} si el repositorio no lo tiene."""
+    leer = getattr(repo, "numeros", None)
+    return leer(list(ids)) if leer and ids else {}
+
+
 def nombres(version, tipo="clientes"):
     """{id: nombre} de los clientes (o cargos) de una versión del panel; vacío si no hay versión."""
     return {c["id"]: c["nombre"] for c in ((version or {}).get("configuracion") or {}).get(tipo, [])}

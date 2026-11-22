@@ -45,7 +45,6 @@ _CERRADA_LINKEDIN = re.compile(r"closed-job|Ya no se aceptan solicitudes", re.I)
 # Indeed responde 401 a cualquier comprobación: no se le pregunta; su vacante vale si el enlace directo está comprobado.
 SIN_COMPROBACION_DIRECTA = ("indeed.com",)
 PAUSA_LINKEDIN = 1.5  # segundos entre comprobaciones de LinkedIn
-RESERVA_REFUERZO = 60  # contrato v48: segundos que la primera comprobación de «Buscar ahora» deja al refuerzo
 BLOQUEOS_LINKEDIN = 3  # tras tantos 429 seguidos, LinkedIn descansa el resto de la ronda
 
 

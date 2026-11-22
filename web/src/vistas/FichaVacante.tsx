@@ -227,7 +227,7 @@ export function FichaVacante({
         <div>
           <span className="company-name">
             {v.empresa}
-            <IdVacante numero={v.numero ?? ficha?.numero} />
+            <IdVacante numero={v.numero} />
           </span>
           <h2 id={"ficha-" + v.id}>{v.titulo}</h2>
         </div>

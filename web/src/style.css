@@ -5798,7 +5798,7 @@ select,
   padding: 0 6px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 18px;
   color: var(--muted);

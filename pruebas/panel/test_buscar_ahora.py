@@ -331,6 +331,8 @@ def test_faltantes_solo_reparte_entre_quienes_faltan_y_es_corta():
     # Contrato v48: el tope de la comprobación incluye ordenar, solo en «Buscar ahora».
     assert foco["verificacion_enlaces"]["contar_orden"] and not normal["verificacion_enlaces"].get("contar_orden")
     assert foco["verificacion_enlaces"]["segundos_corrida"] == ejecutor.SEGUNDOS_FALTANTES["verificacion"]
+    assert foco["verificacion_enlaces"]["reserva_segundos"] == ejecutor.RESERVA_REFUERZO
+    assert not normal["verificacion_enlaces"].get("reserva_segundos")
     persona = foco["personas_busqueda"][0]
     suyas = [(persona["familia"], ["x"], sorted(persona["lugares"])[0], {})]
     otras = [("cargo:otro", ["y"], "REMOTO_CO", {})]

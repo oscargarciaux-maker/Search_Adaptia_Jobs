@@ -129,6 +129,14 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         pendientes_copia.update(sello=actual, t=time.monotonic(), filas=filas)
         return filas
 
+    def _comprobador():
+        """Comprobar un enlace al momento (confirmar, subir el CSV de la bandeja, WhatsApp de un día anterior); la
+        demostración no sale a internet."""
+        if demo:
+            return None
+        from buscador import verificar_enlaces
+        return verificar_enlaces.comprobar
+
     def _resultados(cliente_id, fecha):
         """Resultados de un cliente en un día, en copia: 2 min el de hoy y 10 min los días anteriores."""
         vigencia = 600 if fecha and fecha < hoy() else 120
@@ -584,11 +592,7 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
     @app.post("/api/revisiones/csv")
     def subir_revisiones(body: SubirRevision):
         from panel import revision
-        comprobar = None
-        if not demo:
-            from buscador import verificar_enlaces
-            comprobar = verificar_enlaces.comprobar
-        return revision.importar_csv(repo, body.contenido, comprobar=comprobar)
+        return revision.importar_csv(repo, body.contenido, comprobar=_comprobador())
 
     @app.get("/api/reglas")
     def leer_reglas():
@@ -605,12 +609,8 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         from panel import revision
         if not 3 <= len(vacante_id) <= 80:
             raise HTTPException(422, "Vacante no reconocida.")
-        comprobar = None
-        if not demo:
-            from buscador import verificar_enlaces
-            comprobar = verificar_enlaces.comprobar
         resultado = revision.decidir(repo, vacante_id, body.decision, body.paises, body.aplicar_a_iguales,
-                                     comprobar=comprobar, regenerar=False)
+                                     comprobar=_comprobador(), regenerar=False)
         decididas = set(resultado.get("decididas") or [vacante_id])
         if pendientes_copia.get("filas") is not None:  # la copia sigue valiendo sin las filas ya decididas
             pendientes_copia["filas"] = [r for r in pendientes_copia["filas"] if r["vacante_id"] not in decididas]
@@ -692,12 +692,9 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         contactos = _copia("contactos", "", 30, repo.contactos)
         if not 1 <= cuantas <= 500:
             raise HTTPException(422, "Elige entre 1 y 500 vacantes.")
-        comprobar = None
-        if not demo:  # contrato v48: un día anterior comprueba al momento los enlaces sin comprobación de 24 h
-            from buscador import verificar_enlaces
-            comprobar = verificar_enlaces.comprobar
+        # Contrato v48: un día anterior comprueba al momento los enlaces sin comprobación de 24 h.
         return servicio.whatsapp(repo, cliente_id, fecha, resultados=_resultados(cliente_id, fecha), contactos=contactos,
-                                 cuantas=cuantas, comprobar=comprobar)
+                                 cuantas=cuantas, comprobar=_comprobador())
 
     # Contrato v46: enlace corto de «Mandarme todos». Se abre desde el teléfono del operador, sin sesión: la firma
     # (HMAC con la llave del servidor, válida solo hoy) es la que da acceso. No registra datos del cliente.

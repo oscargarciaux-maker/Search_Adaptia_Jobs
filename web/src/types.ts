@@ -127,6 +127,10 @@ export type Resultados = {
   clientes: Cliente[];
   vacantes: Vacante[];
   listas: number;
+  // Contrato v48: si la búsqueda es de un día anterior y cuántas se pueden copiar (de un día anterior, también las ya
+  // entregadas, que se comprueban al copiar).
+  dia_anterior?: boolean;
+  para_copiar?: number;
 };
 export type Sesion = {
   demo: boolean;
@@ -271,7 +275,6 @@ export type Revisiones = {
 export type BloqueFicha = { tipo: "p" | "li" | "h"; texto: string };
 export type FichaVacante = {
   id: string;
-  numero?: number | null;
   titulo: string;
   empresa: string;
   ubicacion: string;

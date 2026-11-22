@@ -184,6 +184,7 @@ def objetivo_mundo(cfg):
 # Contrato v47: «Buscar ahora» para quien falta es corta: minutos por fuente y segundos de los pasos después de buscar.
 MINUTOS_FALTANTES = 12
 SEGUNDOS_FALTANTES = {"verificacion": 240, "ubicacion": 150}
+RESERVA_REFUERZO = 60  # contrato v48: segundos de la comprobación que la primera pasada deja al refuerzo y al rescate
 
 
 def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
@@ -277,7 +278,7 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
         motor["presupuestos"]["minutos_por_fuente"] = MINUTOS_FALTANTES
         # Contrato v48: el tope incluye el tiempo de ordenar las candidatas (antes se alargaba y tardó 19 min).
         motor.setdefault("verificacion_enlaces", {}).update(segundos_corrida=SEGUNDOS_FALTANTES["verificacion"],
-                                                            contar_orden=True)
+                                                            contar_orden=True, reserva_segundos=RESERVA_REFUERZO)
         motor.setdefault("confirmar_ubicacion", {})["segundos"] = SEGUNDOS_FALTANTES["ubicacion"]
         motor.setdefault("refuerzo", {})["rondas"] = min(1, motor["refuerzo"].get("rondas", 1))
     return mapa, configuracion, motor

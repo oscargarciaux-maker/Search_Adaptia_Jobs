@@ -290,9 +290,9 @@ def test_produccion_audita_antes_de_nueva_seleccion(monkeypatch, tmp_path):
     assert r["verificacion_enlaces"]["estados"] == {"pendiente": 1}
 
 
-@pytest.mark.parametrize("contar_orden", [True, False])
-def test_buscar_ahora_deja_segundos_para_el_refuerzo(monkeypatch, tmp_path, contar_orden):
-    # Contrato v48: la primera comprobación de «Buscar ahora» deja RESERVA_REFUERZO s; la noche usa todo su plazo.
+@pytest.mark.parametrize("reserva", [60, 0])
+def test_buscar_ahora_deja_segundos_para_el_refuerzo(monkeypatch, tmp_path, reserva):
+    # Contrato v48: la primera comprobación de «Buscar ahora» deja `reserva_segundos`; la noche usa todo su plazo.
     from buscador import supabase
     monkeypatch.setattr(supabase, "exigir_conexion", lambda: None)
     monkeypatch.setattr(supabase, "subir", lambda filas: {"filas": len(filas), "enviadas": 0, "confirmadas": []})
@@ -304,11 +304,12 @@ def test_buscar_ahora_deja_segundos_para_el_refuerzo(monkeypatch, tmp_path, cont
     monkeypatch.setattr(ve, "comprobar", lambda *a, **k: None)
     cfg = bodega.config()
     cfg["refuerzo"]["rondas"] = 0
-    cfg["verificacion_enlaces"].update(segundos_corrida=240, contar_orden=contar_orden)
+    cfg["verificacion_enlaces"].update(segundos_corrida=240, reserva_segundos=reserva)
     monkeypatch.setattr(bodega, "config", lambda: cfg)
     monkeypatch.delenv("CATALOGO_ACTIVO", raising=False)
     bodega.correr(tmp_path, hoy="2026-11-05")
-    assert pedidos[0]["segundos_corrida"] == (240 - ve.RESERVA_REFUERZO if contar_orden else 240)
+    assert pedidos[0]["segundos_corrida"] == 240 - reserva
+    assert "reserva_segundos" not in pedidos[0]
 
 
 def test_validacion_no_aprueba_historial_si_sus_enlaces_actuales_fallaron():

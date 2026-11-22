@@ -511,15 +511,14 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     from buscador import entrega
     config_entrega = entrega.config()
     roles_actuales = config_entrega["roles"]
-    reserva = {"pendiente": bool(cfg_revision.get("contar_orden"))}
+    # Contrato v48: en «Buscar ahora» la primera comprobación deja estos segundos a lo que traigan refuerzo y rescate.
+    reserva = cfg_revision.pop("reserva_segundos", 0)
 
     def comprobar_destinos(lista):
-        nonlocal resumen_revision
+        nonlocal resumen_revision, reserva
         t0 = time.monotonic()
-        usar = cfg_revision
-        if reserva.pop("pendiente", False):
-            # Contrato v48: en «Buscar ahora» la primera comprobación deja segundos para lo que traigan refuerzo y rescate.
-            usar = dict(cfg_revision, **{clave_s: max(0, cfg_revision[clave_s] - verificar_enlaces.RESERVA_REFUERZO)})
+        usar = dict(cfg_revision, **{clave_s: max(0, cfg_revision[clave_s] - reserva)}) if reserva else cfg_revision
+        reserva = 0
         resumen_revision = verificar_enlaces.preparar(lista, entregadas_revision, hoy, cache_enlaces,
             lote=lote_previo, incremental=modo == "incremental", cfg=usar)
         cfg_revision[clave_n] = max(0, cfg_revision[clave_n] - resumen_revision["candidatas_programadas"])

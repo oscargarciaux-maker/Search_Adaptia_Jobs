@@ -63,6 +63,7 @@ import {
   fijarLugares,
   fijarMundo,
   horaBogota,
+  diaCorto,
   hoyBogota,
   origenMensaje,
   modos,
@@ -761,7 +762,6 @@ function ClienteDetalle({
   onCerrar,
   onCambio,
   onVacantes,
-  onTomar,
   onRevisar,
   onCsv,
   onEditar,
@@ -774,9 +774,8 @@ function ClienteDetalle({
   notify: (s: string, error?: boolean) => void;
   onCerrar: () => void;
   onCambio: () => void;
-  onVacantes: () => void;
-  // Contrato v48: abrir Vacantes con este cliente y ese día, para copiar su mensaje de WhatsApp.
-  onTomar: (fecha: string) => void;
+  // Contrato v48: con `dia`, abre Vacantes en ese día para copiar su mensaje de WhatsApp.
+  onVacantes: (dia?: string) => void;
   onRevisar: () => void;
   onCsv: () => void;
   onEditar: () => void;
@@ -887,14 +886,7 @@ function ClienteDetalle({
                       className={"barra" + (d.n < c.meta / 2 ? " bajo" : "")}
                       style={{ height: Math.max(4, (d.n / tope) * 100) + "%" }}
                     />
-                    <span>
-                      {new Date(d.fecha + "T12:00:00")
-                        .toLocaleDateString("es-CO", {
-                          weekday: "short",
-                          day: "numeric",
-                        })
-                        .replace(/[.,]/g, "")}
-                    </span>
+                    <span>{diaCorto(d.fecha)}</span>
                   </div>
                 ))}
               </div>
@@ -912,16 +904,10 @@ function ClienteDetalle({
                         type="button"
                         className="button secondary"
                         aria-label={`Tomar las ${d.n} vacantes del ${fecha(d.fecha)}`}
-                        onClick={() => onTomar(d.fecha)}
+                        onClick={() => onVacantes(d.fecha)}
                       >
                         <MessageCircle size={14} aria-hidden="true" />
-                        Tomar vacantes ·{" "}
-                        {new Date(d.fecha + "T12:00:00")
-                          .toLocaleDateString("es-CO", {
-                            weekday: "short",
-                            day: "numeric",
-                          })
-                          .replace(/[.,]/g, "")}
+                        Tomar vacantes · {diaCorto(d.fecha)}
                       </button>
                     ))}
                 </div>
@@ -970,7 +956,7 @@ function ClienteDetalle({
             <button
               type="button"
               className="button primary"
-              onClick={onVacantes}
+              onClick={() => onVacantes()}
             >
               <BriefcaseBusiness size={16} />
               Ver sus vacantes
@@ -1483,6 +1469,8 @@ function App() {
   const peticionResultados = useRef(0);
   // Contrato v48: al llegar desde «Tomar vacantes» del detalle, el foco queda en «Copiar WhatsApp».
   const enfocarWhatsApp = useRef(false);
+  const botonWhatsApp = useRef<HTMLButtonElement>(null);
+  const [focoWhatsApp, setFocoWhatsApp] = useState(0);
   const [notaWhats, setNotaWhats] = useState("");
   const [loadingResults, setLoadingResults] = useState(false);
   const [errorResultados, setErrorResultados] = useState(false);
@@ -1664,14 +1652,21 @@ function App() {
             ...(resultDate ? { fecha: resultDate } : {}),
           }),
       );
-      if (turno === peticionResultados.current) setResults(r);
+      if (turno === peticionResultados.current) {
+        setResults(r);
+        // Contrato v48: al llegar desde «Tomar vacantes», el foco va a «Copiar WhatsApp» con los datos de ese día.
+        if (enfocarWhatsApp.current) setFocoWhatsApp((n) => n + 1);
+      }
     } catch (e) {
       if (turno === peticionResultados.current) {
         setErrorResultados(true);
         notify((e as Error).message, true);
       }
     } finally {
-      if (turno === peticionResultados.current) setLoadingResults(false);
+      if (turno === peticionResultados.current) {
+        setLoadingResults(false);
+        enfocarWhatsApp.current = false;
+      }
     }
   }
   // Contrato v46 (velocidad): las vacantes solo se piden en su pestaña; antes, entrar por #mensajes también las pedía.
@@ -1680,19 +1675,12 @@ function App() {
     if (enVacantes) cargarResultados();
   }, [selectedClient, resultDate, sesion?.sesion, enVacantes]);
   useEffect(() => {
-    if (enfocarWhatsApp.current && results && !loadingResults) {
-      enfocarWhatsApp.current = false;
-      document.getElementById("copiar-whatsapp")?.focus();
-    }
-  }, [results, loadingResults]);
-  // Contrato v48: de un día anterior también se copian las ya entregadas (sus enlaces se comprueban al copiar).
+    if (focoWhatsApp) botonWhatsApp.current?.focus();
+  }, [focoWhatsApp]);
+  // Contrato v48: el servidor dice si es de un día anterior y cuántas se pueden copiar.
   const diaResultados = (results?.ejecucion?.fecha || "").slice(0, 10);
-  const diaAnterior = Boolean(diaResultados) && diaResultados < hoyBogota();
-  const paraCopiar = diaAnterior
-    ? (results?.vacantes || []).filter(
-        (v) => v.estado === "lista" || v.estado === "entregada",
-      ).length
-    : results?.listas || 0;
+  const diaAnterior = Boolean(results?.dia_anterior);
+  const paraCopiar = results?.para_copiar ?? results?.listas ?? 0;
   function cambiar(v: Configuracion) {
     setDraft(v);
     setDirty(true);
@@ -1811,8 +1799,6 @@ function App() {
         vacantes: number;
         partes?: string[];
         nota?: string;
-        dia_anterior?: boolean;
-        quitadas?: { cerradas: number; sin_comprobar: number };
       }>("/whatsapp/" + selectedClient + "?" + consulta.toString());
       if (!r.texto) {
         notify(
@@ -1821,18 +1807,7 @@ function App() {
         );
         return;
       }
-      const q = r.quitadas;
-      setNotaWhats(
-        r.dia_anterior
-          ? `Vacantes del ${fecha(diaResultados)}: se comprobaron sus enlaces ahora.` +
-              (q?.cerradas
-                ? ` Se quitaron ${q.cerradas} que ya cerraron.`
-                : "") +
-              (q?.sin_comprobar
-                ? ` ${q.sin_comprobar} no se pudieron comprobar y no van.`
-                : "")
-          : "",
-      );
+      setNotaWhats(r.nota || "");
       setMensaje(r.texto);
       setPartesWhats(r.partes?.length ? r.partes : [r.texto]);
       setParteCopiada(null);
@@ -2132,17 +2107,14 @@ function App() {
                       notify={notify}
                       onCerrar={() => setDetalle("")}
                       onCambio={recargarResumen}
-                      onVacantes={() => {
+                      onVacantes={(dia) => {
                         setDetalle("");
                         setSelectedClient(c.id);
+                        if (dia) {
+                          setResultDate(dia);
+                          enfocarWhatsApp.current = true;
+                        }
                         go("Vacantes");
-                      }}
-                      onTomar={(dia) => {
-                        setDetalle("");
-                        setSelectedClient(c.id);
-                        setResultDate(dia);
-                        go("Vacantes");
-                        enfocarWhatsApp.current = true;
                       }}
                       onRevisar={() => {
                         setDetalle("");
@@ -2577,7 +2549,7 @@ function App() {
                     />
                   </label>
                   <button
-                    id="copiar-whatsapp"
+                    ref={botonWhatsApp}
                     className="button whatsapp"
                     disabled={
                       !selectedClient ||
@@ -2669,7 +2641,7 @@ function App() {
                     <input
                       type="date"
                       aria-label="Día de la búsqueda"
-                      value={resultDate || runs[0]?.fecha || hoyBogota()}
+                      value={resultDate || diaResultados}
                       max={hoyBogota()}
                       onChange={(e) => setResultDate(e.target.value)}
                     />

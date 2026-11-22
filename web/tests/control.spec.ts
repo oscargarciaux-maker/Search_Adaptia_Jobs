@@ -1144,6 +1144,72 @@ test("paso 9: modo oscuro con botón, recordado, por la dirección o por el sist
 });
 
 // Va al final: reemplaza a los clientes de la demostración.
+test("contrato v48: tomar las vacantes de un día desde el detalle y copiarlas con su ID", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  // Un cliente con vacantes en los últimos días (otros recorridos cambian la lista de la demostración).
+  const resumen = await (
+    await page.request.get("/api/resumen-clientes")
+  ).json();
+  const cfg = await (await page.request.get("/api/config")).json();
+  const conVacantes = new Set(
+    resumen.dias.flatMap((d: { clientes: Record<string, number> }) =>
+      Object.keys(d.clientes).filter((id) => d.clientes[id] > 0),
+    ),
+  );
+  const cliente = cfg.borrador.clientes.find(
+    (c: { id: string; activo: boolean }) => c.activo && conVacantes.has(c.id),
+  );
+  await page.goto("/");
+  const lista = page.getByRole("list", { name: "Clientes y su avance" });
+  await lista
+    .getByRole("button", { name: new RegExp("^" + cliente.nombre + "\\s*:") })
+    .click();
+  const detalle = page.locator("dialog[open]");
+  const tomar = detalle
+    .getByRole("group", { name: /Tomar las vacantes de un día/ })
+    .getByRole("button");
+  await expect(tomar.first()).toBeVisible();
+  const nombre = (await tomar.first().getAttribute("aria-label")) || "";
+  expect(nombre).toMatch(/^Tomar las \d+ vacantes del /);
+  await tomar.first().click();
+  await expect(page).toHaveURL(/#vacantes/);
+  const dia = page.getByLabel("Día de la búsqueda");
+  await expect(dia).toHaveAttribute("type", "date");
+  // El calendario queda en el día del botón (el primero es el más antiguo con vacantes).
+  const esperado = resumen.dias.find(
+    (d: { clientes: Record<string, number> }) => d.clientes[cliente.id] > 0,
+  ).fecha;
+  await expect(dia).toHaveValue(esperado);
+  const copiar = page.getByRole("button", {
+    name: "Copiar WhatsApp",
+    exact: true,
+  });
+  await expect(copiar).toBeFocused();
+  // El número corto también se ve en la lista de vacantes.
+  await expect(page.getByText(/^ID \d+$/).first()).toBeVisible();
+  await copiar.click();
+  const dialogo = page.locator("dialog[open]");
+  await expect(dialogo.getByLabel("Mensaje de WhatsApp")).toHaveValue(
+    /\(ID \d+\)/,
+  );
+  // Otro día en el calendario: si no hubo búsqueda, lo dice.
+  await dialogo
+    .getByRole("button", { name: "Cerrar", exact: true })
+    .last()
+    .click();
+  // (La demostración tiene una sola muestra: se simula un día sin búsqueda.)
+  await page.route(/\/api\/resultados\?.*fecha=2020-01-01/, (route) =>
+    route.fulfill({
+      json: { ejecucion: null, clientes: [], vacantes: [], listas: 0 },
+    }),
+  );
+  await dia.fill("2020-01-01");
+  await expect(page.getByText("Ese día no hubo búsqueda.")).toBeVisible();
+  await expect(copiar).toBeDisabled();
+});
+
 test("importar clientes: vista previa con errores, borrar los actuales y programar con los nuevos", async ({
   page,
 }) => {
@@ -1682,50 +1748,4 @@ test("18 nov: Cupo diario en una línea y «Ver historial» al pie de su tarjeta
   expect(
     Math.abs((await pie("Ver historial")) - (await pie("Ver vacantes"))),
   ).toBeLessThan(6);
-});
-
-test("contrato v48: tomar las vacantes de un día desde el detalle y copiarlas con su ID", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto("/");
-  const lista = page.getByRole("list", { name: "Clientes y su avance" });
-  await lista
-    .getByRole("button", { name: /^Cliente de ejemplo 02\s*:/ })
-    .click();
-  const detalle = page.locator("dialog[open]");
-  const tomar = detalle
-    .getByRole("group", { name: /Tomar las vacantes de un día/ })
-    .getByRole("button");
-  await expect(tomar.first()).toBeVisible();
-  const nombre = (await tomar.first().getAttribute("aria-label")) || "";
-  expect(nombre).toMatch(/^Tomar las \d+ vacantes del /);
-  await tomar.first().click();
-  await expect(page).toHaveURL(/#vacantes/);
-  const dia = page.getByLabel("Día de la búsqueda");
-  await expect(dia).toHaveAttribute("type", "date");
-  const elegido = await dia.inputValue();
-  expect(elegido).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-  await expect(page.locator("#copiar-whatsapp")).toBeFocused();
-  // El número corto también se ve en la lista de vacantes.
-  await expect(page.locator(".id-vacante").first()).toHaveText(/^ID \d+$/);
-  await page.locator("#copiar-whatsapp").click();
-  const dialogo = page.locator("dialog[open]");
-  await expect(dialogo.getByLabel("Mensaje de WhatsApp")).toHaveValue(
-    /\(ID \d+\)/,
-  );
-  // Otro día en el calendario: si no hubo búsqueda, lo dice.
-  await dialogo
-    .getByRole("button", { name: "Cerrar", exact: true })
-    .last()
-    .click();
-  // (La demostración tiene una sola muestra: se simula un día sin búsqueda.)
-  await page.route(/\/api\/resultados\?.*fecha=2020-01-01/, (route) =>
-    route.fulfill({
-      json: { ejecucion: null, clientes: [], vacantes: [], listas: 0 },
-    }),
-  );
-  await dia.fill("2020-01-01");
-  await expect(page.getByText("Ese día no hubo búsqueda.")).toBeVisible();
-  await expect(page.locator("#copiar-whatsapp")).toBeDisabled();
 });
