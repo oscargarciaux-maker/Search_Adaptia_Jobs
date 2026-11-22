@@ -56,6 +56,13 @@ antes se llamaba «Actividad».
 WhatsApp». Van 2 por empresa como máximo; las demás se mencionan con «Tengo N más…». Si eliges más de 10, el mensaje
 sale en partes de 10: copia y pega una parte, y vuelve por la siguiente.
 
+**Mensaje de otro día y número de cada vacante (22 nov, contrato v48).** En el Resumen, abre un cliente: bajo «Últimos
+7 días» cada día con vacantes tiene «Tomar vacantes». Te lleva a Vacantes con ese cliente y ese día; también puedes
+elegir cualquier día en el calendario. Pulsa «Copiar WhatsApp»: si son de un día anterior, el panel comprueba en ese
+momento que sus enlaces sigan abiertos (unos segundos) y quita las que cerraron. Cada vacante lleva su número entre
+paréntesis, por ejemplo «(ID 1234)»: es el mismo en el panel, en «Por confirmar» y en la columna «numero» del CSV, para
+que tú y el cliente puedan nombrarla.
+
 **Confirmar y aplicar (18 nov, contrato v43).** Un solo botón: la configuración vale desde la próxima búsqueda, aunque
 sea dentro de unos minutos. Si la cambias mientras una búsqueda corre, esa búsqueda reparte con la nueva y no se
 detiene. Si la cambias después de que se armó el lote del día, la próxima búsqueda de cada hora completa lo que falte.

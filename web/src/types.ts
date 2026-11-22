@@ -113,6 +113,8 @@ export type Vacante = {
   cargo_id: string;
   enlace: string;
   estado: string;
+  // Contrato v48: número corto de la vacante («ID 1234»); falta si la base aún no aplicó la SQL 020.
+  numero?: number | null;
   motivos: string[];
   avisos?: string[];
   ampliacion?: string;
@@ -125,6 +127,10 @@ export type Resultados = {
   clientes: Cliente[];
   vacantes: Vacante[];
   listas: number;
+  // Contrato v48: si la búsqueda es de un día anterior y cuántas se pueden copiar (de un día anterior, también las ya
+  // entregadas, que se comprueban al copiar).
+  dia_anterior?: boolean;
+  para_copiar?: number;
 };
 export type Sesion = {
   demo: boolean;
@@ -223,6 +229,7 @@ export type Borrador = {
 // Contrato v16: bandeja «Por confirmar».
 export type Revision = {
   vacante_id: string;
+  numero?: number | null;
   titulo: string;
   empresa: string;
   ubicacion: string;

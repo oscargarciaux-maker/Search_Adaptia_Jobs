@@ -63,6 +63,7 @@ import {
   fijarLugares,
   fijarMundo,
   horaBogota,
+  diaCorto,
   hoyBogota,
   origenMensaje,
   modos,
@@ -773,7 +774,8 @@ function ClienteDetalle({
   notify: (s: string, error?: boolean) => void;
   onCerrar: () => void;
   onCambio: () => void;
-  onVacantes: () => void;
+  // Contrato v48: con `dia`, abre Vacantes en ese día para copiar su mensaje de WhatsApp.
+  onVacantes: (dia?: string) => void;
   onRevisar: () => void;
   onCsv: () => void;
   onEditar: () => void;
@@ -884,17 +886,32 @@ function ClienteDetalle({
                       className={"barra" + (d.n < c.meta / 2 ? " bajo" : "")}
                       style={{ height: Math.max(4, (d.n / tope) * 100) + "%" }}
                     />
-                    <span>
-                      {new Date(d.fecha + "T12:00:00")
-                        .toLocaleDateString("es-CO", {
-                          weekday: "short",
-                          day: "numeric",
-                        })
-                        .replace(/[.,]/g, "")}
-                    </span>
+                    <span>{diaCorto(d.fecha)}</span>
                   </div>
                 ))}
               </div>
+              {serie.some((d) => d.n > 0) && (
+                <div
+                  className="dias-tomar"
+                  role="group"
+                  aria-label="Tomar las vacantes de un día para enviarlas por WhatsApp"
+                >
+                  {serie
+                    .filter((d) => d.n > 0)
+                    .map((d) => (
+                      <button
+                        key={d.fecha}
+                        type="button"
+                        className="button secondary"
+                        aria-label={`Tomar las ${d.n} vacantes del ${fecha(d.fecha)}`}
+                        onClick={() => onVacantes(d.fecha)}
+                      >
+                        <MessageCircle size={14} aria-hidden="true" />
+                        Tomar vacantes · {diaCorto(d.fecha)}
+                      </button>
+                    ))}
+                </div>
+              )}
             </section>
           )}
 
@@ -939,7 +956,7 @@ function ClienteDetalle({
             <button
               type="button"
               className="button primary"
-              onClick={onVacantes}
+              onClick={() => onVacantes()}
             >
               <BriefcaseBusiness size={16} />
               Ver sus vacantes
@@ -1450,6 +1467,11 @@ function App() {
     [email, setEmail] = useState(""),
     [password, setPassword] = useState("");
   const peticionResultados = useRef(0);
+  // Contrato v48: al llegar desde «Tomar vacantes» del detalle, el foco queda en «Copiar WhatsApp».
+  const enfocarWhatsApp = useRef(false);
+  const botonWhatsApp = useRef<HTMLButtonElement>(null);
+  const [focoWhatsApp, setFocoWhatsApp] = useState(0);
+  const [notaWhats, setNotaWhats] = useState("");
   const [loadingResults, setLoadingResults] = useState(false);
   const [errorResultados, setErrorResultados] = useState(false);
   const [porConfirmar, setPorConfirmar] = useState(0);
@@ -1630,14 +1652,21 @@ function App() {
             ...(resultDate ? { fecha: resultDate } : {}),
           }),
       );
-      if (turno === peticionResultados.current) setResults(r);
+      if (turno === peticionResultados.current) {
+        setResults(r);
+        // Contrato v48: al llegar desde «Tomar vacantes», el foco va a «Copiar WhatsApp» con los datos de ese día.
+        if (enfocarWhatsApp.current) setFocoWhatsApp((n) => n + 1);
+      }
     } catch (e) {
       if (turno === peticionResultados.current) {
         setErrorResultados(true);
         notify((e as Error).message, true);
       }
     } finally {
-      if (turno === peticionResultados.current) setLoadingResults(false);
+      if (turno === peticionResultados.current) {
+        setLoadingResults(false);
+        enfocarWhatsApp.current = false;
+      }
     }
   }
   // Contrato v46 (velocidad): las vacantes solo se piden en su pestaña; antes, entrar por #mensajes también las pedía.
@@ -1645,6 +1674,13 @@ function App() {
   useEffect(() => {
     if (enVacantes) cargarResultados();
   }, [selectedClient, resultDate, sesion?.sesion, enVacantes]);
+  useEffect(() => {
+    if (focoWhatsApp) botonWhatsApp.current?.focus();
+  }, [focoWhatsApp]);
+  // Contrato v48: el servidor dice si es de un día anterior y cuántas se pueden copiar.
+  const diaResultados = (results?.ejecucion?.fecha || "").slice(0, 10);
+  const diaAnterior = Boolean(results?.dia_anterior);
+  const paraCopiar = results?.para_copiar ?? results?.listas ?? 0;
   function cambiar(v: Configuracion) {
     setDraft(v);
     setDirty(true);
@@ -1762,11 +1798,16 @@ function App() {
         texto: string;
         vacantes: number;
         partes?: string[];
+        nota?: string;
       }>("/whatsapp/" + selectedClient + "?" + consulta.toString());
       if (!r.texto) {
-        notify("No hay vacantes con comprobación vigente para copiar.", true);
+        notify(
+          r.nota || "No hay vacantes con comprobación vigente para copiar.",
+          true,
+        );
         return;
       }
+      setNotaWhats(r.nota || "");
       setMensaje(r.texto);
       setPartesWhats(r.partes?.length ? r.partes : [r.texto]);
       setParteCopiada(null);
@@ -2066,9 +2107,13 @@ function App() {
                       notify={notify}
                       onCerrar={() => setDetalle("")}
                       onCambio={recargarResumen}
-                      onVacantes={() => {
+                      onVacantes={(dia) => {
                         setDetalle("");
                         setSelectedClient(c.id);
+                        if (dia) {
+                          setResultDate(dia);
+                          enfocarWhatsApp.current = true;
+                        }
                         go("Vacantes");
                       }}
                       onRevisar={() => {
@@ -2485,25 +2530,30 @@ function App() {
                     </select>
                   </div>
                   <div className="results-count">
-                    <strong>{results?.listas || 0}</strong>
-                    <span>listas para compartir</span>
+                    <strong>{paraCopiar}</strong>
+                    <span>
+                      {diaAnterior
+                        ? "de ese día (se comprueban al copiar)"
+                        : "listas para compartir"}
+                    </span>
                   </div>
                   <label className="cuantas-whatsapp">
                     Cuántas
                     <input
                       type="number"
                       min={1}
-                      max={Math.max(1, results?.listas || 1)}
+                      max={Math.max(1, paraCopiar || 1)}
                       value={cuantasWhats}
                       // Thermos (18 nov): el campo se puede vaciar mientras se escribe; vacío vale 10.
                       onChange={(e) => setCuantasWhats(e.target.value)}
                     />
                   </label>
                   <button
+                    ref={botonWhatsApp}
                     className="button whatsapp"
                     disabled={
                       !selectedClient ||
-                      !results?.listas ||
+                      !paraCopiar ||
                       busy ||
                       loadingResults ||
                       abriendoWhatsApp
@@ -2512,7 +2562,11 @@ function App() {
                     onClick={abrirWhatsApp}
                   >
                     <MessageCircle size={18} />
-                    {abriendoWhatsApp ? "Preparando…" : "Copiar WhatsApp"}
+                    {abriendoWhatsApp
+                      ? diaAnterior
+                        ? "Comprobando enlaces…"
+                        : "Preparando…"
+                      : "Copiar WhatsApp"}
                   </button>
                 </div>
                 <div className="csv-descarga card">
@@ -2581,18 +2635,25 @@ function App() {
                   />
                 </div>
                 <div className="results-tools">
-                  <select
-                    aria-label="Fecha de la captura"
-                    value={resultDate}
-                    onChange={(e) => setResultDate(e.target.value)}
-                  >
-                    <option value="">Última captura</option>
-                    {runs.map((r) => (
-                      <option key={r.id} value={r.fecha}>
-                        {fecha(r.fecha)}
-                      </option>
-                    ))}
-                  </select>
+                  {/* Contrato v48: cualquier día en un calendario, como en la descarga del CSV. */}
+                  <label className="fecha-resultados">
+                    <span className="visually-hidden">Día de la búsqueda</span>
+                    <input
+                      type="date"
+                      aria-label="Día de la búsqueda"
+                      value={resultDate || diaResultados}
+                      max={hoyBogota()}
+                      onChange={(e) => setResultDate(e.target.value)}
+                    />
+                  </label>
+                  {resultDate &&
+                    results &&
+                    !loadingResults &&
+                    !results.ejecucion && (
+                      <span className="fecha-sin-busqueda" role="status">
+                        Ese día no hubo búsqueda.
+                      </span>
+                    )}
                   <button
                     className="button secondary"
                     onClick={cargarResultados}
@@ -2996,6 +3057,11 @@ function App() {
           subtitulo="Revisa el mensaje antes de copiarlo y compartirlo en WhatsApp."
           onClose={() => setModal(null)}
         >
+          {notaWhats && (
+            <p className="aviso-busqueda" role="status">
+              {notaWhats}
+            </p>
+          )}
           {partesWhats.length > 1 ? (
             // Más de 10: se copia por partes (2 por empresa; el resto va en «Tengo N más»).
             partesWhats.map((parte, i) => (

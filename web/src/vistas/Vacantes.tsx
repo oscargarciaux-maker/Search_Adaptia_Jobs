@@ -2,7 +2,7 @@
 // aviso completo a la derecha. ↑/↓ (o J/K) cambian de vacante; en el celular la ficha ocupa la pantalla.
 import React, { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Megaphone } from "lucide-react";
-import { modos } from "../comunes";
+import { IdVacante, modos } from "../comunes";
 import type { Vacante } from "../types";
 import {
   FichaVacante,
@@ -77,7 +77,10 @@ export function ListaVacantes({ vacantes }: { vacantes: Vacante[] }) {
               }
             >
               <span className="item-titulo">{v.titulo}</span>
-              <span className="item-empresa">{v.empresa}</span>
+              <span className="item-empresa">
+                {v.empresa}
+                <IdVacante numero={v.numero} />
+              </span>
               <span className="item-lugar">
                 {[v.ubicacion, modos[v.modalidad] || v.modalidad]
                   .filter(Boolean)

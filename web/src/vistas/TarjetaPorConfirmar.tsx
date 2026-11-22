@@ -2,7 +2,7 @@
 // Toma de Open Seat solo la estructura (título, empresa, fichas, resumen corto y un botón grande); los colores, bordes
 // y tipografía son los del panel, en modo claro y oscuro.
 import { Check, ExternalLink, X } from "lucide-react";
-import { iniciales, modos } from "../comunes";
+import { IdVacante, iniciales, modos } from "../comunes";
 import type { Revision } from "../types";
 
 const IDIOMAS: Record<string, string> = { es: "Español", en: "Inglés" };
@@ -60,7 +60,10 @@ export function TarjetaPorConfirmar({
         </span>
         <div>
           <h4>{r.titulo}</h4>
-          <span className="tarjeta-confirmar-empresa">{r.empresa}</span>
+          <span className="tarjeta-confirmar-empresa">
+            {r.empresa}
+            <IdVacante numero={r.numero} />
+          </span>
         </div>
       </div>
       {fichas.length > 0 && (

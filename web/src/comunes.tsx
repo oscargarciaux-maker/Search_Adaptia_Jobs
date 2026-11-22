@@ -414,6 +414,18 @@ export function TagInput({
   );
 }
 
+// Contrato v48: el número corto de la vacante, el mismo «(ID 1234)» de los mensajes de WhatsApp y del CSV.
+export function IdVacante({ numero }: { numero?: number | null }) {
+  return numero ? <span className="id-vacante">ID {numero}</span> : null;
+}
+
+// Día corto («sáb 15») para las barras y los botones de los últimos días.
+export function diaCorto(dia: string) {
+  return new Date(dia + "T12:00:00")
+    .toLocaleDateString("es-CO", { weekday: "short", day: "numeric" })
+    .replace(/[.,]/g, "");
+}
+
 // Fecha y hora de Bogotá (el horario de la búsqueda); compartidas por el Resumen y «Buscar ahora».
 export function hoyBogota() {
   return new Intl.DateTimeFormat("en-CA", {

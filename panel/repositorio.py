@@ -167,6 +167,23 @@ class RepositorioSupabase:
                 salida[r["id"]] = r.get("description_full") or ""
         return salida
 
+    def numeros(self, ids):
+        """Contrato v48: {id: número corto} del catálogo (SQL 020), por grupos de 100. Si la base todavía no tiene la
+        columna (el panel se publica antes de que «Preparar Supabase» aplique la 020) devuelve {} y nada se rompe."""
+        salida = {}
+        ids = sorted({i for i in ids if i})
+        try:
+            for inicio in range(0, len(ids), 100):
+                grupo = ",".join(ids[inicio:inicio + 100])
+                for r in self.pedir("GET", "catalogo_vacantes", params={"id": f"in.({grupo})",
+                                                                       "select": "id,numero"}) or []:
+                    if r.get("numero") is not None:
+                        salida[r["id"]] = r["numero"]
+        except ErrorRepositorio as e:
+            registro.aviso("repositorio:numeros", e)
+            return {}
+        return salida
+
     def filas_catalogo(self, ids):
         """Contrato v34: {id: fila del catálogo con descripción} para las filas de la bandeja que aún no tienen
         resumen (por grupos de 100)."""
@@ -559,6 +576,12 @@ def configuracion_demo():
     return Configuracion(clientes=clientes, cargos=cargos, perfiles=perfiles).model_dump(mode="json")
 
 
+def numeros(repo, ids):
+    """Contrato v48: {id: número corto («ID 1234»)} de las vacantes; {} si el repositorio no lo tiene."""
+    leer = getattr(repo, "numeros", None)
+    return leer(list(ids)) if leer and ids else {}
+
+
 def nombres(version, tipo="clientes"):
     """{id: nombre} de los clientes (o cargos) de una versión del panel; vacío si no hay versión."""
     return {c["id"]: c["nombre"] for c in ((version or {}).get("configuracion") or {}).get(tipo, [])}
@@ -844,6 +867,14 @@ class RepositorioDemo:
 
     def guardar_descripcion(self, vacante_id, texto):
         return None  # la demostración no lee sitios externos
+
+    def numeros(self, ids):
+        """Contrato v48: en la demostración cada vacante recibe 1, 2, 3… la primera vez que se pide y no cambia."""
+        with self.lock:
+            dados = self.estado.setdefault("numeros", {})
+            for i in sorted({i for i in ids if i} - set(dados)):
+                dados[i] = len(dados) + 1
+            return {i: dados[i] for i in ids if i in dados}
 
     def descripciones(self, ids):
         """Demostración: descripciones ficticias según el título, para proponer funciones."""

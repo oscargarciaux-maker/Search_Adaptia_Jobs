@@ -71,15 +71,17 @@ def con_posts(vacantes, minimo=MINIMO, maximo=None):
 
 def _linea(i, v):
     titulo, empresa = " ".join(v["titulo"].split()), " ".join(v["empresa"].split())
+    # Contrato v48: el número corto de la vacante, para nombrarla («ID 1234»); sin número, nada.
+    numero = f" (ID {v['numero']})" if v.get("numero") else ""
     if es_post(v):
         correo = (v.get("contacto") or {}).get("correo", "")
         # Contrato v28: si la ubicación se dedujo o no se pudo confirmar, el mensaje lo dice.
         nota = {"deducida": " (ubicación deducida, confírmala)",
                 "sin_confirmar": " (no dice dónde es: pregúntalo)"}.get(v.get("post_ubicacion", ""), "")
-        return (f"{i}. 📣 Post · {titulo} · {empresa}{nota}\nEscríbele por mensaje a quien publicó: {v['enlace']}"
+        return (f"{i}. 📣 Post · {titulo} · {empresa}{nota}{numero}\nEscríbele por mensaje a quien publicó: {v['enlace']}"
                 + (f"\nO al correo: {correo}" if correo else ""))
     modo = MODOS.get(v.get("modalidad", ""), "")
-    return f"{i}. {titulo} · {empresa}" + (f" ({modo})" if modo else "") + f"\n{v['enlace']}"
+    return f"{i}. {titulo} · {empresa}" + (f" ({modo})" if modo else "") + numero + f"\n{v['enlace']}"
 
 
 def _empresa(v):

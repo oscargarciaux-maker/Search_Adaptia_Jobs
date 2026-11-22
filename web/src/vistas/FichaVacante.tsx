@@ -14,7 +14,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { api } from "../api";
-import { Ayuda, fecha, grados, iniciales, modos } from "../comunes";
+import { Ayuda, IdVacante, fecha, grados, iniciales, modos } from "../comunes";
 import type { BloqueFicha, FichaVacante as Ficha, Vacante } from "../types";
 
 // Las fichas ya leídas se recuerdan mientras el panel está abierto (el servidor también las guarda 10 minutos).
@@ -225,7 +225,10 @@ export function FichaVacante({
       <header className="ficha-cabecera">
         <span className="company-avatar">{iniciales(v.empresa)}</span>
         <div>
-          <span className="company-name">{v.empresa}</span>
+          <span className="company-name">
+            {v.empresa}
+            <IdVacante numero={v.numero} />
+          </span>
           <h2 id={"ficha-" + v.id}>{v.titulo}</h2>
         </div>
         <span className={"pill " + claseEstado(v)}>{etiquetaEstado(v)}</span>
