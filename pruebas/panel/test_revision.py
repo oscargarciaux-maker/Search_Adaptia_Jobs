@@ -362,7 +362,7 @@ def test_base_sigue_el_contrato_v1():
     texto, incluidas, _, _ = revision.exportar_base(R())
     lector = csv.reader(io.StringIO(texto.lstrip("\ufeff")))
     cabecera = next(lector)
-    assert cabecera == contrato.COLUMNAS + contrato.EXTRAS  # orden del contrato, sin id/created_at/estado
+    assert cabecera == contrato.COLUMNAS + contrato.EXTRAS + ["numero"]  # v48: numero al final; orden del contrato, sin id/created_at/estado
     filas = [dict(zip(cabecera, f)) for f in lector]
     assert incluidas == 1 and len(filas) == 1  # el salto de línea va entre comillas: sigue siendo una sola fila
     f = filas[0]

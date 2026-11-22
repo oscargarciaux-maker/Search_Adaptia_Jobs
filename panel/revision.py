@@ -446,6 +446,10 @@ def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None, todas=None,
                        "ayuda_faltantes": any(p.get("faltan") for p in r.get("perfiles") or []),
                        "iguales": max(0, por_ubicacion.get(r.get("ubicacion"), 0) - 1),
                        "mas_util": r["vacante_id"] in utiles})
+    from panel.servicio import numeros
+    por_id = numeros(repo, [s["vacante_id"] for s in salida])  # contrato v48: «ID 1234»
+    for s in salida:
+        s["numero"] = por_id.get(s["vacante_id"])
     if calculados and getattr(repo, "con_resumen", lambda: False)():
         _guardar_resumenes(repo, calculados)
     if pagina is None:
@@ -619,7 +623,7 @@ def aplicar_confirmacion(actual, explicacion):
 # ── Contrato v17: revisión masiva por CSV (sin IA) y lista de reglas ───────────────────────────────────────────────
 # Se lee de izquierda a derecha: la respuesta sugerida, por qué, y los datos para comprobarla (ampliación v17).
 COLUMNAS_CSV = ["decision", "pais", "por_que", "cargo", "empresa", "ubicacion", "modalidad", "frase_del_aviso", "enlace",
-                "le_serviria_a", "aplicar_a_iguales", "comentario", "vacante_id"]
+                "le_serviria_a", "aplicar_a_iguales", "comentario", "numero", "vacante_id"]
 PREGUNTA = ("¿Puede postularse alguien que vive en LATAM o en España? Sí → «sí» y el país (o LATAM). Solo de otro país → "
             "«otro país». No se puede saber → «no sirve». La columna «decision» ya trae una sugerencia: corrige solo las "
             "que veas mal y lee las que vienen vacías.")
@@ -651,8 +655,10 @@ def exportar_csv(repo, fecha):
             ETIQUETA[s["decision"]], texto_paises(s["paises"]), s["motivo"], datos.get("titulo", ""),
             datos.get("empresa", ""), datos.get("ubicacion", ""), datos.get("modalidad", ""), s["frase"],
             datos.get("enlace", ""), ", ".join(nombres), "", "", r["vacante_id"]]))
+    from panel.servicio import numeros
+    por_id = numeros(repo, [fila[-1] for _, fila in filas])  # contrato v48: «ID 1234»
     for _, fila in sorted(filas, key=lambda x: x[0]):
-        escritor.writerow(fila)
+        escritor.writerow(fila[:-1] + [por_id.get(fila[-1], ""), fila[-1]])
     return "﻿" + salida.getvalue()  # BOM: Excel lo abre con tildes correctas
 
 
@@ -886,11 +892,13 @@ def exportar_base(repo, fecha=None, cliente_id=None, todo=False):
     filas = list(unicas.values())
     incluidas = [f for f in filas if not sin_confirmar(f)]
     columnas = contrato.COLUMNAS + contrato.EXTRAS
+    from panel.servicio import numeros
+    por_id = numeros(repo, [f.get("vacante_id") for f in incluidas])
     salida = io.StringIO()
     escritor = csv.writer(salida)
-    escritor.writerow(columnas)
+    escritor.writerow(columnas + ["numero"])  # contrato v48: el «ID 1234» de los mensajes, al final
     for f in incluidas:
-        escritor.writerow([_celda(c, f.get(c)) for c in columnas])
+        escritor.writerow([_celda(c, f.get(c)) for c in columnas] + [por_id.get(f.get("vacante_id"), "")])
     return "\ufeff" + salida.getvalue(), len(incluidas), len(filas) - len(incluidas), sin_fila
 
 

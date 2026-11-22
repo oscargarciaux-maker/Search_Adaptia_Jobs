@@ -296,8 +296,17 @@ def resultados(repo, cliente_id=None, fecha=None):
         else:
             salida.append(ficha)
         vistas[clave] = ficha
+    por_id = numeros(repo, [v["id"] for v in salida])
+    for v in salida:
+        v["numero"] = por_id.get(v["id"])
     return {**{k: r[k] for k in ("ejecucion", "clientes")}, "vacantes": salida,
             "listas": sum(v["estado"] == "lista" for v in salida)}
+
+
+def numeros(repo, ids):
+    """Contrato v48: el número corto («ID 1234») de cada vacante; {} si el repositorio aún no lo tiene."""
+    leer = getattr(repo, "numeros", None)
+    return leer(ids) if leer and ids else {}
 
 
 def ficha(repo, vacante_id, traer=True, obtener=None):
@@ -330,7 +339,8 @@ def ficha(repo, vacante_id, traer=True, obtener=None):
             "anos_min": datos.get("anos_min"), "ingles": datos.get("ingles") or "", "nivel": datos.get("nivel") or "",
             "enlace": datos.get("enlace", ""), "enlace_directo": datos.get("enlace_directo", ""),
             "tipo": datos.get("tipo") or "", "activa": fila.get("status", "active") == "active",
-            "bloques": fichas.bloques(texto), "origen": origen if texto else "sin_descripcion"}
+            "bloques": fichas.bloques(texto), "origen": origen if texto else "sin_descripcion",
+            "numero": numeros(repo, [vacante_id]).get(vacante_id)}
 
 
 def resumen_clientes(repo, fecha=None, dias=7):
@@ -586,14 +596,26 @@ def cobertura(repo, fecha=None):
                     "comprobado, que esa persona nunca recibió; no es una promesa para los próximos días."}
 
 
-def whatsapp(repo, cliente_id, fecha=None, resultados=None, contactos=None, cuantas=10):
+SEGUNDOS_DIA_ANTERIOR = 30  # contrato v48: tope para comprobar al momento los enlaces de un día anterior
+
+
+def whatsapp(repo, cliente_id, fecha=None, resultados=None, contactos=None, cuantas=10, comprobar=None,
+             segundos=SEGUNDOS_DIA_ANTERIOR):
     """El mensaje para copiar. El servidor pasa los `resultados` y `contactos` que ya tiene en memoria (18 nov).
     Contrato v43 (regla 7): el operador elige `cuantas` (10 por defecto, como el borrador diario), con 2 por empresa;
-    las que quedan fuera van en «Tengo N más…». Con más de 10, el texto se entrega también en `partes` de 10."""
+    las que quedan fuera van en «Tengo N más…». Con más de 10, el texto se entrega también en `partes` de 10.
+    Contrato v48: de un día anterior entran también las ya entregadas; las que no tienen el enlace comprobado en 24 h se
+    comprueban al momento (`comprobar`, con tope de `segundos`) y las cerradas o sin comprobar se quitan."""
     r = resultados if resultados is not None else globals()["resultados"](repo, cliente_id, fecha)
     from panel import borradores
+    dia = ((r.get("ejecucion") or {}).get("fecha") or "")[:10]
+    anterior = bool(dia) and dia < hoy()
+    candidatas = [v for v in r["vacantes"] if v["estado"] == "lista" or (anterior and v["estado"] == "entregada")]
+    quitadas = {"cerradas": 0, "sin_comprobar": 0}
+    if anterior:
+        candidatas = _comprobar_anteriores(repo, candidatas, cuantas, comprobar, segundos, quitadas)
     elegidas, empresas, sobran = [], {}, 0
-    for v in (v for v in r["vacantes"] if v["estado"] == "lista"):
+    for v in candidatas:
         empresa = borradores._empresa(v)
         if len(elegidas) < cuantas and (borradores.es_post(v) or empresas.get(empresa, 0) < borradores.POR_EMPRESA):
             empresas[empresa] = empresas.get(empresa, 0) + 1
@@ -602,9 +624,11 @@ def whatsapp(repo, cliente_id, fecha=None, resultados=None, contactos=None, cuan
             sobran += 1
     listas = borradores.con_posts(elegidas, maximo=cuantas)
     sobran += len(elegidas) - len(listas)
+    extra = {"dia_anterior": anterior, "quitadas": quitadas} if anterior else {}
     if not listas:
-        return {"texto": "", "partes": [], "vacantes": 0,
-                "nota": "No hay vacantes con filtros y enlace vigentes para copiar."}
+        nota = ("Ninguna vacante de ese día sigue con el enlace abierto y comprobado." if anterior else
+                "No hay vacantes con filtros y enlace vigentes para copiar.")
+        return {"texto": "", "partes": [], "vacantes": 0, "nota": nota, **extra}
     # Misma plantilla humana que los borradores diarios (contrato v10): cargo y lista, sin enumerar filtros.
     grupos = {}
     for v in listas:
@@ -614,9 +638,61 @@ def whatsapp(repo, cliente_id, fecha=None, resultados=None, contactos=None, cuan
     contacto = next((c for c in contactos
                      if c.get("cliente_id") == cliente_id), {})
     nombre = contacto.get("nombre_saludo", "")
-    texto = borradores.texto(nombre, list(grupos.items()), (r.get("ejecucion") or {}).get("fecha") or hoy(),
-                             str(cliente_id or ""), mas=sobran)
-    return {"texto": texto, "partes": partir_mensaje(texto), "vacantes": len(listas), "sobran": sobran}
+    texto = borradores.texto(nombre, list(grupos.items()), dia or hoy(), str(cliente_id or ""), mas=sobran,
+                             todas_de_hoy=not anterior)
+    return {"texto": texto, "partes": partir_mensaje(texto), "vacantes": len(listas), "sobran": sobran, **extra}
+
+
+def _comprobar_anteriores(repo, candidatas, cuantas, comprobar, segundos, quitadas):
+    """Contrato v48: de un día anterior, las «entregada» (sin comprobación de 24 h) se comprueban ahora, en orden y
+    solo las que podrían entrar (una ventana de `cuantas`·2 + 5, por los 2 por empresa). Nunca se manda un enlace
+    cerrado ni uno sin comprobar. Sin `comprobar` (demostración) se toman como vienen."""
+    if comprobar is None:
+        return candidatas
+    from buscador import verificar_enlaces
+    from panel.revision import _comprobada_hace_poco
+    ventana = [v for v in candidatas if v["estado"] == "entregada"][:min(60, cuantas * 2 + 5)]
+    revisar, filas, vigentes = [], {}, {}  # sin tocar los objetos de `candidatas` (son la copia en memoria)
+    for v in ventana:
+        fila = repo.vacante(v["id"]) or {}
+        datos = fila.get("datos") or {}
+        filas[v["id"]] = fila
+        if fila.get("status", "active") != "active":
+            continue
+        if _comprobada_hace_poco(datos):
+            vigentes[v["id"]] = datos.get("enlace") or v.get("enlace", "")
+            continue
+        revisar.append({"id": v["id"], "titulo": datos.get("titulo") or v["titulo"],
+                        "enlace": datos.get("enlace") or v.get("enlace", ""),
+                        "enlace_directo": datos.get("enlace_directo", "")})
+    cache = {}
+    if revisar:
+        verificar_enlaces.auditar(revisar, cache, maximo=len(revisar), segundos=segundos, comprobar_url=comprobar)
+    resultado = {}
+    for w in revisar:
+        ver = verificar_enlaces.anotar(w, cache)
+        resultado[w["id"]] = ver
+        if ver["estado"] == "verificada":
+            try:  # que la próxima vez ya cuente como comprobada (como al confirmar en «Por confirmar»)
+                repo.actualizar_catalogo_datos(w["id"], dict(filas[w["id"]].get("datos") or {}, verificacion=ver))
+            except ErrorRepositorio as e:
+                registro.aviso("servicio:whatsapp-anterior", e)
+    salida, en_ventana = [], {v["id"] for v in ventana}
+    for v in candidatas:
+        if v["estado"] == "lista":
+            salida.append(v)
+        elif v["id"] in en_ventana:
+            if v["id"] in vigentes:
+                salida.append(dict(v, enlace=vigentes[v["id"]]))
+                continue
+            ver = resultado.get(v["id"])
+            if ver and ver["estado"] == "verificada":
+                salida.append(dict(v, enlace=ver.get("url_utilizable") or v["enlace"]))
+            elif (ver and ver["estado"] == "rechazada") or (filas.get(v["id"]) or {}).get("status", "active") != "active":
+                quitadas["cerradas"] += 1
+            else:
+                quitadas["sin_comprobar"] += 1
+    return salida
 
 
 def partir_mensaje(texto, por_parte=10):

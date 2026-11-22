@@ -55,7 +55,8 @@ def identidades(conn):
 # comprobaciones de guardar y programar (metas por perfil, contrato v21) y 016 solo añade «Aplicar hoy» (contrato v27):
 # se pueden ensayar igual. 018 solo añade la columna `panel_revisiones.resumen` (contrato v34). 019 solo reemplaza
 # las funciones `panel_publicar` y `panel_publicar_hoy` («Confirmar y aplicar», contrato v43), sin tablas ni datos.
-ENSAYABLES = {"006", "007", "008", "009", "010", "011", "012", "013", "014", "015", "016", "017", "018", "019"}
+# 020 solo añade el número corto de cada vacante (`catalogo_vacantes.numero`, su secuencia y disparadores; contrato v48).
+ENSAYABLES = {"006", "007", "008", "009", "010", "011", "012", "013", "014", "015", "016", "017", "018", "019", "020"}
 
 
 def ensayar(conn):

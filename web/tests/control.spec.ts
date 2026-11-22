@@ -331,6 +331,8 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   const tres = await page.evaluate(() => navigator.clipboard.readText());
   expect((tres.match(/https:\/\//g) || []).length).toBe(3);
   expect(tres).toContain("Tengo 47 vacantes más");
+  // Contrato v48: cada vacante lleva su número corto, el mismo del panel y del CSV.
+  expect(tres).toMatch(/\(ID \d+\)\nhttps:\/\//);
   await dialog
     .getByRole("button", { name: "Cerrar", exact: true })
     .last()
@@ -1680,4 +1682,50 @@ test("18 nov: Cupo diario en una línea y «Ver historial» al pie de su tarjeta
   expect(
     Math.abs((await pie("Ver historial")) - (await pie("Ver vacantes"))),
   ).toBeLessThan(6);
+});
+
+test("contrato v48: tomar las vacantes de un día desde el detalle y copiarlas con su ID", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/");
+  const lista = page.getByRole("list", { name: "Clientes y su avance" });
+  await lista
+    .getByRole("button", { name: /^Cliente de ejemplo 02\s*:/ })
+    .click();
+  const detalle = page.locator("dialog[open]");
+  const tomar = detalle
+    .getByRole("group", { name: /Tomar las vacantes de un día/ })
+    .getByRole("button");
+  await expect(tomar.first()).toBeVisible();
+  const nombre = (await tomar.first().getAttribute("aria-label")) || "";
+  expect(nombre).toMatch(/^Tomar las \d+ vacantes del /);
+  await tomar.first().click();
+  await expect(page).toHaveURL(/#vacantes/);
+  const dia = page.getByLabel("Día de la búsqueda");
+  await expect(dia).toHaveAttribute("type", "date");
+  const elegido = await dia.inputValue();
+  expect(elegido).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  await expect(page.locator("#copiar-whatsapp")).toBeFocused();
+  // El número corto también se ve en la lista de vacantes.
+  await expect(page.locator(".id-vacante").first()).toHaveText(/^ID \d+$/);
+  await page.locator("#copiar-whatsapp").click();
+  const dialogo = page.locator("dialog[open]");
+  await expect(dialogo.getByLabel("Mensaje de WhatsApp")).toHaveValue(
+    /\(ID \d+\)/,
+  );
+  // Otro día en el calendario: si no hubo búsqueda, lo dice.
+  await dialogo
+    .getByRole("button", { name: "Cerrar", exact: true })
+    .last()
+    .click();
+  // (La demostración tiene una sola muestra: se simula un día sin búsqueda.)
+  await page.route(/\/api\/resultados\?.*fecha=2020-01-01/, (route) =>
+    route.fulfill({
+      json: { ejecucion: null, clientes: [], vacantes: [], listas: 0 },
+    }),
+  );
+  await dia.fill("2020-01-01");
+  await expect(page.getByText("Ese día no hubo búsqueda.")).toBeVisible();
+  await expect(page.locator("#copiar-whatsapp")).toBeDisabled();
 });

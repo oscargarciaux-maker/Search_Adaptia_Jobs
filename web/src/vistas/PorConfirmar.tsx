@@ -20,6 +20,7 @@ import {
   Ayuda,
   Empty,
   ETIQUETA_SUGERIDA,
+  IdVacante,
   REGIONES,
   SelectorPaises,
   fecha,
@@ -412,7 +413,10 @@ export function PorConfirmar({
                   }
                 >
                   <span className="item-titulo">{x.titulo}</span>
-                  <span className="item-empresa">{x.empresa}</span>
+                  <span className="item-empresa">
+                    {x.empresa}
+                    <IdVacante numero={x.numero} />
+                  </span>
                   <span className="item-lugar">
                     <MapPin size={12} />
                     {[
@@ -497,7 +501,10 @@ export function PorConfirmar({
               <div className="vacancy-top">
                 <span className="company-avatar">{iniciales(r.empresa)}</span>
                 <div>
-                  <span className="company-name">{r.empresa}</span>
+                  <span className="company-name">
+                    {r.empresa}
+                    <IdVacante numero={r.numero} />
+                  </span>
                   <h2>{r.titulo}</h2>
                 </div>
                 {r.ayuda_faltantes && (

@@ -692,8 +692,12 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         contactos = _copia("contactos", "", 30, repo.contactos)
         if not 1 <= cuantas <= 500:
             raise HTTPException(422, "Elige entre 1 y 500 vacantes.")
+        comprobar = None
+        if not demo:  # contrato v48: un día anterior comprueba al momento los enlaces sin comprobación de 24 h
+            from buscador import verificar_enlaces
+            comprobar = verificar_enlaces.comprobar
         return servicio.whatsapp(repo, cliente_id, fecha, resultados=_resultados(cliente_id, fecha), contactos=contactos,
-                                 cuantas=cuantas)
+                                 cuantas=cuantas, comprobar=comprobar)
 
     # Contrato v46: enlace corto de «Mandarme todos». Se abre desde el teléfono del operador, sin sesión: la firma
     # (HMAC con la llave del servidor, válida solo hoy) es la que da acceso. No registra datos del cliente.

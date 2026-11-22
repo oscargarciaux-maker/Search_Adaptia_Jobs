@@ -154,6 +154,11 @@ def main():
                  values('alias-pendiente','QA','Ensayo','bbbbbbbbbbbbbbbb');
                 alter table public.ofertas enable trigger oferta_unica;""")
             siguiente_id = conn.execute("select last_value+1 from public.ofertas_id_seq").fetchone()[0]
+            # SQL 020 (contrato v48): la vacante anterior recibió el 1 al instalar; la nueva, el siguiente; no cambian.
+            assert conn.execute("select id,numero from public.catalogo_vacantes order by numero").fetchall() == [
+                ("aaaaaaaaaaaaaaaa", 1), ("bbbbbbbbbbbbbbbb", 2)]
+            conn.execute("update public.catalogo_vacantes set numero=99 where id='aaaaaaaaaaaaaaaa'")
+            assert conn.execute("select numero from public.catalogo_vacantes where id='aaaaaaaaaaaaaaaa'").fetchone()[0] == 1
             copia = respaldo.crear(conn, trabajo, raiz / "completo.enc", llave)
             assert b"Empresa ficticia" not in copia.read_bytes()
             with nueva() as (_, destino):
@@ -178,9 +183,15 @@ def main():
                 assert (raiz / "trabajo-restaurado/estado.json").read_bytes() == (trabajo / "estado.json").read_bytes()
                 assert destino.execute("insert into public.ofertas(external_id,job_title,company_name) values('nueva','QA','Ensayo') returning id").fetchone()[0] == siguiente_id
                 assert destino.execute("select tgenabled from pg_trigger where tgname='oferta_unica'").fetchone()[0] == 'O'
+                assert destino.execute("""insert into public.catalogo_vacantes(id,datos,observed_at,status)
+                    values('cccccccccccccccc','{}',now(),'active') returning numero""").fetchone()[0] == 3
+                # Un respaldo anterior a SQL 020 (sin numero) se restaura y cada vacante recibe el suyo.
+                destino.execute("""insert into public.catalogo_vacantes select * from jsonb_populate_recordset(
+                    null::public.catalogo_vacantes, '[{"id":"dddddddddddddddd","contract_version":"v2","datos":{},"observed_at":"2026-11-22T00:00:00Z","status":"active"}]')""")
+                assert destino.execute("select numero from public.catalogo_vacantes where id='dddddddddddddddd'").fetchone()[0] == 4
                 assert not destino.execute("select has_table_privilege('anon','public.estado_operativo','SELECT')").fetchone()[0]
         print("Actualización manual → automática sin perder crédito/historia, respaldo obligatorio y migradores concurrentes: aprobados.")
-        print("Copia AES-GCM y restauración: dieciséis tablas, dos secuencias, decimales exactos, pendiente, permisos y trabajo; corrupción rechazada.")
+        print("Copia AES-GCM y restauración: dieciséis tablas, tres secuencias, numero de vacante, decimales exactos, pendiente, permisos y trabajo; corrupción rechazada.")
 
 
 if __name__ == "__main__":

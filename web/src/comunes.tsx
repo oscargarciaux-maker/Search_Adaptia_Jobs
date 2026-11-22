@@ -415,6 +415,11 @@ export function TagInput({
 }
 
 // Fecha y hora de Bogotá (el horario de la búsqueda); compartidas por el Resumen y «Buscar ahora».
+// Contrato v48: el número corto de la vacante, el mismo «(ID 1234)» de los mensajes de WhatsApp y del CSV.
+export function IdVacante({ numero }: { numero?: number | null }) {
+  return numero ? <span className="id-vacante">ID {numero}</span> : null;
+}
+
 export function hoyBogota() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Bogota",

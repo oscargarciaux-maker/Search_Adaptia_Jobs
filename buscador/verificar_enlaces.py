@@ -45,6 +45,7 @@ _CERRADA_LINKEDIN = re.compile(r"closed-job|Ya no se aceptan solicitudes", re.I)
 # Indeed responde 401 a cualquier comprobación: no se le pregunta; su vacante vale si el enlace directo está comprobado.
 SIN_COMPROBACION_DIRECTA = ("indeed.com",)
 PAUSA_LINKEDIN = 1.5  # segundos entre comprobaciones de LinkedIn
+RESERVA_REFUERZO = 60  # contrato v48: segundos que la primera comprobación de «Buscar ahora» deja al refuerzo
 BLOQUEOS_LINKEDIN = 3  # tras tantos 429 seguidos, LinkedIn descansa el resto de la ronda
 
 
@@ -381,9 +382,11 @@ def resumen(vacantes):
     return {"vacantes": len(vacantes), "estados": dict(estados), "motivos": dict(motivos)}
 
 
-def cola_de_seleccion(vacantes, entregadas, hoy, cache, iniciales, maximo, ahora=None):
+def cola_de_seleccion(vacantes, entregadas, hoy, cache, iniciales, maximo, ahora=None, limite=None):
     """Candidatas en el orden en que las elegiría la selección (con los filtros del panel si está activo), más allá del
-    cupo: si las primeras fallan, ya estarán comprobadas las siguientes. Solo cuenta las que necesitan comprobación."""
+    cupo: si las primeras fallan, ya estarán comprobadas las siguientes. Solo cuenta las que necesitan comprobación.
+    `limite` (contrato v48, «Buscar ahora»): instante de `time.monotonic()` en que se deja de ordenar y se devuelve lo
+    que haya."""
     from buscador import contrato, entrega
     ahora = ahora or datetime.now(timezone.utc)
     ids_iniciales = {v["id"] for lista in iniciales.values() for v, _ in lista}
@@ -396,6 +399,8 @@ def cola_de_seleccion(vacantes, entregadas, hoy, cache, iniciales, maximo, ahora
                 and not contrato.entregable(dict(v, verificacion=None), idiomas)]
     cola, vistas, por_comprobar = [], set(ids_iniciales), 0
     for _ in range(12):
+        if limite is not None and time.monotonic() >= limite:
+            break
         disponibles = [v for v in vacantes if v["id"] not in vistas]
         seleccion, _ = entrega.elegir(disponibles, entregadas, hoy, iniciales=iniciales, omitir_verificacion=True)
         # `elegir` devuelve también los objetos del lote ya registrado: nunca se auditan aquí (ver `historicas`).
@@ -419,6 +424,8 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
     maximo = cfg.get("vacantes_por_captura", 40) if incremental else cfg.get("vacantes_por_corrida", 300)
     segundos = cfg.get("segundos_captura", 90) if incremental else cfg.get("segundos_corrida", 240)
     plazo = time.monotonic() + segundos
+    # Contrato v48: en «Buscar ahora» (faltantes) ordenar también cuenta en el plazo; la noche no cambia.
+    contar_orden = bool(cfg.get("contar_orden"))
     for v in vacantes:
         anotar(v, cache)
     por_id = {v["id"]: v for v in vacantes}
@@ -439,8 +446,10 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
             break
         disponibles = [v for v in vacantes if v["id"] not in revisadas or v["verificacion"]["estado"] == "verificada"]
         t0 = time.monotonic()
-        candidatas = cola_de_seleccion(disponibles, entregadas, hoy, cache, iniciales, maximo - revisadas_n)
-        plazo += time.monotonic() - t0  # el presupuesto de segundos es para comprobar enlaces, no para ordenar
+        candidatas = cola_de_seleccion(disponibles, entregadas, hoy, cache, iniciales, maximo - revisadas_n,
+                                       limite=plazo if contar_orden else None)
+        if not contar_orden:
+            plazo += time.monotonic() - t0  # el presupuesto de segundos es para comprobar enlaces, no para ordenar
         if incremental:
             recientes = sorted(vacantes, key=lambda v: v.get("publicada_en") or v.get("visto_primera_vez", ""), reverse=True)
             inicio = hora * maximo % len(recientes) if recientes else 0

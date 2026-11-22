@@ -275,7 +275,9 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
         # lleguen vacantes. Presupuestos de siempre, con tope de tiempo, y una sola ronda de refuerzo.
         motor["faltantes"] = True
         motor["presupuestos"]["minutos_por_fuente"] = MINUTOS_FALTANTES
-        motor.setdefault("verificacion_enlaces", {})["segundos_corrida"] = SEGUNDOS_FALTANTES["verificacion"]
+        # Contrato v48: el tope incluye el tiempo de ordenar las candidatas (antes se alargaba y tardó 19 min).
+        motor.setdefault("verificacion_enlaces", {}).update(segundos_corrida=SEGUNDOS_FALTANTES["verificacion"],
+                                                            contar_orden=True)
         motor.setdefault("confirmar_ubicacion", {})["segundos"] = SEGUNDOS_FALTANTES["ubicacion"]
         motor.setdefault("refuerzo", {})["rondas"] = min(1, motor["refuerzo"].get("rondas", 1))
     return mapa, configuracion, motor

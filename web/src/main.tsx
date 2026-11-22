@@ -761,6 +761,7 @@ function ClienteDetalle({
   onCerrar,
   onCambio,
   onVacantes,
+  onTomar,
   onRevisar,
   onCsv,
   onEditar,
@@ -774,6 +775,8 @@ function ClienteDetalle({
   onCerrar: () => void;
   onCambio: () => void;
   onVacantes: () => void;
+  // Contrato v48: abrir Vacantes con este cliente y ese día, para copiar su mensaje de WhatsApp.
+  onTomar: (fecha: string) => void;
   onRevisar: () => void;
   onCsv: () => void;
   onEditar: () => void;
@@ -895,6 +898,34 @@ function ClienteDetalle({
                   </div>
                 ))}
               </div>
+              {serie.some((d) => d.n > 0) && (
+                <div
+                  className="dias-tomar"
+                  role="group"
+                  aria-label="Tomar las vacantes de un día para enviarlas por WhatsApp"
+                >
+                  {serie
+                    .filter((d) => d.n > 0)
+                    .map((d) => (
+                      <button
+                        key={d.fecha}
+                        type="button"
+                        className="button secondary"
+                        aria-label={`Tomar las ${d.n} vacantes del ${fecha(d.fecha)}`}
+                        onClick={() => onTomar(d.fecha)}
+                      >
+                        <MessageCircle size={14} aria-hidden="true" />
+                        Tomar vacantes ·{" "}
+                        {new Date(d.fecha + "T12:00:00")
+                          .toLocaleDateString("es-CO", {
+                            weekday: "short",
+                            day: "numeric",
+                          })
+                          .replace(/[.,]/g, "")}
+                      </button>
+                    ))}
+                </div>
+              )}
             </section>
           )}
 
@@ -1450,6 +1481,9 @@ function App() {
     [email, setEmail] = useState(""),
     [password, setPassword] = useState("");
   const peticionResultados = useRef(0);
+  // Contrato v48: al llegar desde «Tomar vacantes» del detalle, el foco queda en «Copiar WhatsApp».
+  const enfocarWhatsApp = useRef(false);
+  const [notaWhats, setNotaWhats] = useState("");
   const [loadingResults, setLoadingResults] = useState(false);
   const [errorResultados, setErrorResultados] = useState(false);
   const [porConfirmar, setPorConfirmar] = useState(0);
@@ -1645,6 +1679,20 @@ function App() {
   useEffect(() => {
     if (enVacantes) cargarResultados();
   }, [selectedClient, resultDate, sesion?.sesion, enVacantes]);
+  useEffect(() => {
+    if (enfocarWhatsApp.current && results && !loadingResults) {
+      enfocarWhatsApp.current = false;
+      document.getElementById("copiar-whatsapp")?.focus();
+    }
+  }, [results, loadingResults]);
+  // Contrato v48: de un día anterior también se copian las ya entregadas (sus enlaces se comprueban al copiar).
+  const diaResultados = (results?.ejecucion?.fecha || "").slice(0, 10);
+  const diaAnterior = Boolean(diaResultados) && diaResultados < hoyBogota();
+  const paraCopiar = diaAnterior
+    ? (results?.vacantes || []).filter(
+        (v) => v.estado === "lista" || v.estado === "entregada",
+      ).length
+    : results?.listas || 0;
   function cambiar(v: Configuracion) {
     setDraft(v);
     setDirty(true);
@@ -1762,11 +1810,29 @@ function App() {
         texto: string;
         vacantes: number;
         partes?: string[];
+        nota?: string;
+        dia_anterior?: boolean;
+        quitadas?: { cerradas: number; sin_comprobar: number };
       }>("/whatsapp/" + selectedClient + "?" + consulta.toString());
       if (!r.texto) {
-        notify("No hay vacantes con comprobación vigente para copiar.", true);
+        notify(
+          r.nota || "No hay vacantes con comprobación vigente para copiar.",
+          true,
+        );
         return;
       }
+      const q = r.quitadas;
+      setNotaWhats(
+        r.dia_anterior
+          ? `Vacantes del ${fecha(diaResultados)}: se comprobaron sus enlaces ahora.` +
+              (q?.cerradas
+                ? ` Se quitaron ${q.cerradas} que ya cerraron.`
+                : "") +
+              (q?.sin_comprobar
+                ? ` ${q.sin_comprobar} no se pudieron comprobar y no van.`
+                : "")
+          : "",
+      );
       setMensaje(r.texto);
       setPartesWhats(r.partes?.length ? r.partes : [r.texto]);
       setParteCopiada(null);
@@ -2070,6 +2136,13 @@ function App() {
                         setDetalle("");
                         setSelectedClient(c.id);
                         go("Vacantes");
+                      }}
+                      onTomar={(dia) => {
+                        setDetalle("");
+                        setSelectedClient(c.id);
+                        setResultDate(dia);
+                        go("Vacantes");
+                        enfocarWhatsApp.current = true;
                       }}
                       onRevisar={() => {
                         setDetalle("");
@@ -2485,25 +2558,30 @@ function App() {
                     </select>
                   </div>
                   <div className="results-count">
-                    <strong>{results?.listas || 0}</strong>
-                    <span>listas para compartir</span>
+                    <strong>{paraCopiar}</strong>
+                    <span>
+                      {diaAnterior
+                        ? "de ese día (se comprueban al copiar)"
+                        : "listas para compartir"}
+                    </span>
                   </div>
                   <label className="cuantas-whatsapp">
                     Cuántas
                     <input
                       type="number"
                       min={1}
-                      max={Math.max(1, results?.listas || 1)}
+                      max={Math.max(1, paraCopiar || 1)}
                       value={cuantasWhats}
                       // Thermos (18 nov): el campo se puede vaciar mientras se escribe; vacío vale 10.
                       onChange={(e) => setCuantasWhats(e.target.value)}
                     />
                   </label>
                   <button
+                    id="copiar-whatsapp"
                     className="button whatsapp"
                     disabled={
                       !selectedClient ||
-                      !results?.listas ||
+                      !paraCopiar ||
                       busy ||
                       loadingResults ||
                       abriendoWhatsApp
@@ -2512,7 +2590,11 @@ function App() {
                     onClick={abrirWhatsApp}
                   >
                     <MessageCircle size={18} />
-                    {abriendoWhatsApp ? "Preparando…" : "Copiar WhatsApp"}
+                    {abriendoWhatsApp
+                      ? diaAnterior
+                        ? "Comprobando enlaces…"
+                        : "Preparando…"
+                      : "Copiar WhatsApp"}
                   </button>
                 </div>
                 <div className="csv-descarga card">
@@ -2581,18 +2663,25 @@ function App() {
                   />
                 </div>
                 <div className="results-tools">
-                  <select
-                    aria-label="Fecha de la captura"
-                    value={resultDate}
-                    onChange={(e) => setResultDate(e.target.value)}
-                  >
-                    <option value="">Última captura</option>
-                    {runs.map((r) => (
-                      <option key={r.id} value={r.fecha}>
-                        {fecha(r.fecha)}
-                      </option>
-                    ))}
-                  </select>
+                  {/* Contrato v48: cualquier día en un calendario, como en la descarga del CSV. */}
+                  <label className="fecha-resultados">
+                    <span className="visually-hidden">Día de la búsqueda</span>
+                    <input
+                      type="date"
+                      aria-label="Día de la búsqueda"
+                      value={resultDate || runs[0]?.fecha || hoyBogota()}
+                      max={hoyBogota()}
+                      onChange={(e) => setResultDate(e.target.value)}
+                    />
+                  </label>
+                  {resultDate &&
+                    results &&
+                    !loadingResults &&
+                    !results.ejecucion && (
+                      <span className="fecha-sin-busqueda" role="status">
+                        Ese día no hubo búsqueda.
+                      </span>
+                    )}
                   <button
                     className="button secondary"
                     onClick={cargarResultados}
@@ -2996,6 +3085,11 @@ function App() {
           subtitulo="Revisa el mensaje antes de copiarlo y compartirlo en WhatsApp."
           onClose={() => setModal(null)}
         >
+          {notaWhats && (
+            <p className="aviso-busqueda" role="status">
+              {notaWhats}
+            </p>
+          )}
           {partesWhats.length > 1 ? (
             // Más de 10: se copia por partes (2 por empresa; el resto va en «Tengo N más»).
             partesWhats.map((parte, i) => (

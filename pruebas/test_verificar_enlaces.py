@@ -188,6 +188,50 @@ def test_cola_de_seleccion_va_mas_alla_del_cupo_y_salta_lo_ya_comprobado(monkeyp
     assert len(sin_comprobar) >= 4
 
 
+class Reloj:
+    """Reloj falso: cada `elegir` tarda `paso` segundos."""
+    def __init__(self, paso): self.t, self.paso = 0.0, paso
+    def __call__(self): return self.t
+
+
+def _orden_lento(monkeypatch, paso):
+    cfg = dict(entrega.config(), roles=[entrega.config()["roles"][1]], por_rol=1)
+    monkeypatch.setattr(entrega, "config", lambda: cfg)
+    reloj = Reloj(paso)
+    monkeypatch.setattr(ve.time, "monotonic", reloj)
+    real, llamadas = entrega.elegir, []
+    def elegir(*a, **k):
+        llamadas.append(1)
+        reloj.t += reloj.paso
+        return real(*a, **k)
+    monkeypatch.setattr(entrega, "elegir", elegir)
+    monkeypatch.setattr(ve, "auditar", lambda vs, cache, **op: 0)
+    return reloj, llamadas
+
+
+def test_buscar_ahora_cuenta_el_orden_dentro_del_plazo(monkeypatch):
+    # Contrato v48: en «Buscar ahora» ordenar las candidatas cuenta en el plazo (la #41 tardó 19 min en vez de 4).
+    reloj, llamadas = _orden_lento(monkeypatch, paso=100)
+    vs = [oferta(i) for i in range(1, 30)]
+    ve.preparar(vs, {}, "2026-11-05", {}, cfg={"vacantes_por_corrida": 800, "segundos_corrida": 240, "contar_orden": True})
+    assert len(llamadas) <= 3 and reloj.t <= 240 + 100
+
+
+def test_cola_de_seleccion_se_detiene_en_el_limite(monkeypatch):
+    reloj, llamadas = _orden_lento(monkeypatch, paso=10)
+    vs = [oferta(i) for i in range(1, 30)]
+    ve.cola_de_seleccion(vs, {}, "2026-11-05", {}, {}, maximo=800, limite=25)
+    assert len(llamadas) == 3  # empieza en 0, 10 y 20; a los 30 ya pasó el límite
+
+
+def test_la_busqueda_de_la_manana_no_cuenta_el_orden(monkeypatch):
+    # Sin la marca (búsqueda completa) el plazo sigue siendo solo para comprobar enlaces, como antes.
+    reloj, llamadas = _orden_lento(monkeypatch, paso=100)
+    vs = [oferta(i) for i in range(1, 30)]
+    ve.preparar(vs, {}, "2026-11-05", {}, cfg={"vacantes_por_corrida": 800, "segundos_corrida": 240})
+    assert len(llamadas) > 3
+
+
 def test_lote_del_dia_se_recomprueba_con_el_plazo_para_compartir(monkeypatch):
     registrada = oferta(1)
     hace7h = datetime.now(timezone.utc) - timedelta(hours=7)
@@ -244,6 +288,27 @@ def test_produccion_audita_antes_de_nueva_seleccion(monkeypatch, tmp_path):
     r = bodega.correr(tmp_path, hoy="2026-11-05")
     assert r["entrega"]["vacantes"] == 0 and not r["entrega"]["meta_cumplida"]
     assert r["verificacion_enlaces"]["estados"] == {"pendiente": 1}
+
+
+@pytest.mark.parametrize("contar_orden", [True, False])
+def test_buscar_ahora_deja_segundos_para_el_refuerzo(monkeypatch, tmp_path, contar_orden):
+    # Contrato v48: la primera comprobación de «Buscar ahora» deja RESERVA_REFUERZO s; la noche usa todo su plazo.
+    from buscador import supabase
+    monkeypatch.setattr(supabase, "exigir_conexion", lambda: None)
+    monkeypatch.setattr(supabase, "subir", lambda filas: {"filas": len(filas), "enviadas": 0, "confirmadas": []})
+    monkeypatch.setattr(bodega, "recoger", lambda *a, **k: ([dict(titulo="UX Designer", empresa="A",
+        enlace=URL, fuente="Lever", ubicacion="Remote LATAM", descripcion=TEXTO)], set(), set(), {}))
+    pedidos = []
+    real = ve.preparar
+    monkeypatch.setattr(ve, "preparar", lambda *a, **k: pedidos.append(dict(k["cfg"])) or real(*a, **k))
+    monkeypatch.setattr(ve, "comprobar", lambda *a, **k: None)
+    cfg = bodega.config()
+    cfg["refuerzo"]["rondas"] = 0
+    cfg["verificacion_enlaces"].update(segundos_corrida=240, contar_orden=contar_orden)
+    monkeypatch.setattr(bodega, "config", lambda: cfg)
+    monkeypatch.delenv("CATALOGO_ACTIVO", raising=False)
+    bodega.correr(tmp_path, hoy="2026-11-05")
+    assert pedidos[0]["segundos_corrida"] == (240 - ve.RESERVA_REFUERZO if contar_orden else 240)
 
 
 def test_validacion_no_aprueba_historial_si_sus_enlaces_actuales_fallaron():
