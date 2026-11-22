@@ -7,7 +7,9 @@ Decisiones de Oscar del 22 nov. Sin IA. Añade la SQL 020; no modifica ninguna m
   - la columna `numero` (bigint, único, no nulo);
   - la secuencia `catalogo_vacantes_numero_seq`;
   - dos disparadores: uno da el siguiente número a cada vacante nueva (también a una fila restaurada de un respaldo
-    anterior, que no trae número) y otro impide cambiarlo.
+    anterior, que no trae número) y otro impide cambiarlo;
+  - sin valor por defecto: el buscador reenvía cada vacante varias veces al día y el disparador reutiliza su número,
+    así no se gastan números en cada envío.
 - Las vacantes ya guardadas se numeran por orden de llegada (`first_seen_at`, `observed_at`, `id`) y nunca se
   renumeran.
 - El identificador de 16 caracteres (`id`) sigue siendo la llave en todas las tablas; el número solo lo acompaña.
@@ -43,8 +45,10 @@ Decisiones de Oscar del 22 nov. Sin IA. Añade la SQL 020; no modifica ninguna m
   tiempo de abrir enlaces, no el de ordenar las candidatas: `cola_de_seleccion` repite la selección del día hasta 12
   veces por ronda, en hasta 4 rondas, sobre unas 8.800 vacantes.
 - **En «Buscar ahora» para quien falta** (`verificacion_enlaces.contar_orden`):
-  - el tiempo de ordenar cuenta dentro del tope (240 s);
-  - `cola_de_seleccion` deja de ordenar al llegar al límite y devuelve lo que lleva;
+  - el tiempo de ordenar cuenta dentro del tope (240 s), y ordenar usa como mucho la mitad de lo que queda: la otra
+    mitad es siempre para abrir enlaces;
+  - `cola_de_seleccion` no empieza otra selección que no alcanzaría a terminar antes del límite y devuelve lo que
+    lleva;
   - la primera comprobación usa como mucho 240 − 60 s; los 60 s restantes quedan para las vacantes nuevas del
     refuerzo y del rescate.
 - **La búsqueda completa de la mañana no cambia** (decisión de Oscar).

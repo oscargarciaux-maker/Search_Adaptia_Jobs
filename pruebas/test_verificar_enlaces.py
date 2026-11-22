@@ -205,28 +205,31 @@ def _orden_lento(monkeypatch, paso):
         reloj.t += reloj.paso
         return real(*a, **k)
     monkeypatch.setattr(entrega, "elegir", elegir)
-    monkeypatch.setattr(ve, "auditar", lambda vs, cache, **op: 0)
-    return reloj, llamadas
+    plazos = []
+    monkeypatch.setattr(ve, "auditar", lambda vs, cache, **op: plazos.append(op["segundos"]) or 0)
+    return reloj, llamadas, plazos
 
 
 def test_buscar_ahora_cuenta_el_orden_dentro_del_plazo(monkeypatch):
     # Contrato v48: en «Buscar ahora» ordenar las candidatas cuenta en el plazo (la #41 tardó 19 min en vez de 4).
-    reloj, llamadas = _orden_lento(monkeypatch, paso=100)
+    reloj, llamadas, plazos = _orden_lento(monkeypatch, paso=100)
     vs = [oferta(i) for i in range(1, 30)]
     ve.preparar(vs, {}, "2026-11-05", {}, cfg={"vacantes_por_corrida": 800, "segundos_corrida": 240, "contar_orden": True})
     assert len(llamadas) <= 3 and reloj.t <= 240 + 100
+    # Thermos: ordenar nunca se come todo el plazo; abrir enlaces conserva al menos la mitad que quedaba.
+    assert plazos and plazos[-1] >= 100
 
 
 def test_cola_de_seleccion_se_detiene_en_el_limite(monkeypatch):
-    reloj, llamadas = _orden_lento(monkeypatch, paso=10)
+    reloj, llamadas, _ = _orden_lento(monkeypatch, paso=10)
     vs = [oferta(i) for i in range(1, 30)]
     ve.cola_de_seleccion(vs, {}, "2026-11-05", {}, {}, maximo=800, limite=25)
-    assert len(llamadas) == 3  # empieza en 0, 10 y 20; a los 30 ya pasó el límite
+    assert len(llamadas) == 2  # 0→10 y 10→20; la tercera terminaría a los 30, después del límite
 
 
 def test_la_busqueda_de_la_manana_no_cuenta_el_orden(monkeypatch):
     # Sin la marca (búsqueda completa) el plazo sigue siendo solo para comprobar enlaces, como antes.
-    reloj, llamadas = _orden_lento(monkeypatch, paso=100)
+    reloj, llamadas, plazos = _orden_lento(monkeypatch, paso=100)
     vs = [oferta(i) for i in range(1, 30)]
     ve.preparar(vs, {}, "2026-11-05", {}, cfg={"vacantes_por_corrida": 800, "segundos_corrida": 240})
     assert len(llamadas) > 3

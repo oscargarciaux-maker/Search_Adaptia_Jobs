@@ -15,12 +15,16 @@ select setval('public.catalogo_vacantes_numero_seq',
               greatest(coalesce((select max(numero) from public.catalogo_vacantes), 0), 1),
               exists(select 1 from public.catalogo_vacantes));
 alter sequence public.catalogo_vacantes_numero_seq owned by public.catalogo_vacantes.numero;
-alter table public.catalogo_vacantes alter column numero set default nextval('public.catalogo_vacantes_numero_seq');
--- Una restauración de un respaldo anterior a esta migración trae numero nulo: se le da el siguiente.
+-- Sin valor por defecto: el buscador reenvía cada vacante varias veces al día (upsert) y un default gastaría un número
+-- en cada envío. El disparador reutiliza el número de la vacante ya guardada y solo pide uno nuevo si no existe; una
+-- restauración de un respaldo anterior a esta migración (numero nulo) también recibe el suyo.
 create or replace function public.numerar_vacante() returns trigger
 language plpgsql set search_path = '' as $$
 begin
-  if new.numero is null then new.numero := nextval('public.catalogo_vacantes_numero_seq'); end if;
+  if new.numero is null then
+    select c.numero into new.numero from public.catalogo_vacantes c where c.id = new.id;
+    if new.numero is null then new.numero := nextval('public.catalogo_vacantes_numero_seq'); end if;
+  end if;
   return new;
 end $$;
 drop trigger if exists numerar_vacante on public.catalogo_vacantes;

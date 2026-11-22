@@ -397,11 +397,15 @@ def cola_de_seleccion(vacantes, entregadas, hoy, cache, iniciales, maximo, ahora
                 if entrega.rol_de(v, cfg["roles"])[0] and not any(h in entregadas for h in entrega.huellas(v))
                 and not contrato.entregable(dict(v, verificacion=None), idiomas)]
     cola, vistas, por_comprobar = [], set(ids_iniciales), 0
+    duracion = 0.0
     for _ in range(12):
-        if limite is not None and time.monotonic() >= limite:
+        # Con límite, no se empieza otra selección que no alcanzaría a terminar antes (la anterior da la medida).
+        if limite is not None and time.monotonic() + duracion >= limite:
             break
+        inicio = time.monotonic()
         disponibles = [v for v in vacantes if v["id"] not in vistas]
         seleccion, _ = entrega.elegir(disponibles, entregadas, hoy, iniciales=iniciales, omitir_verificacion=True)
+        duracion = time.monotonic() - inicio
         # `elegir` devuelve también los objetos del lote ya registrado: nunca se auditan aquí (ver `historicas`).
         nuevas = [v for lista in seleccion.values() for v, _ in lista if v["id"] not in vistas]
         if not nuevas:
@@ -445,8 +449,10 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
             break
         disponibles = [v for v in vacantes if v["id"] not in revisadas or v["verificacion"]["estado"] == "verificada"]
         t0 = time.monotonic()
+        # Con `contar_orden`, ordenar usa como mucho la mitad de lo que queda: la otra mitad es para abrir enlaces.
+        limite = t0 + max(0, plazo - t0) / 2 if contar_orden else None
         candidatas = cola_de_seleccion(disponibles, entregadas, hoy, cache, iniciales, maximo - revisadas_n,
-                                       limite=plazo if contar_orden else None)
+                                       limite=limite)
         if not contar_orden:
             plazo += time.monotonic() - t0  # el presupuesto de segundos es para comprobar enlaces, no para ordenar
         if incremental:

@@ -183,6 +183,12 @@ def main():
                 assert (raiz / "trabajo-restaurado/estado.json").read_bytes() == (trabajo / "estado.json").read_bytes()
                 assert destino.execute("insert into public.ofertas(external_id,job_title,company_name) values('nueva','QA','Ensayo') returning id").fetchone()[0] == siguiente_id
                 assert destino.execute("select tgenabled from pg_trigger where tgname='oferta_unica'").fetchone()[0] == 'O'
+                # Reenviar una vacante ya guardada (upsert del buscador) no gasta números.
+                for _ in range(3):
+                    destino.execute("""insert into public.catalogo_vacantes(id,datos,observed_at,status)
+                        values('aaaaaaaaaaaaaaaa','{}',now(),'closed')
+                        on conflict(id) do update set observed_at=excluded.observed_at""")
+                assert destino.execute("select numero from public.catalogo_vacantes where id='aaaaaaaaaaaaaaaa'").fetchone()[0] == 1
                 assert destino.execute("""insert into public.catalogo_vacantes(id,datos,observed_at,status)
                     values('cccccccccccccccc','{}',now(),'active') returning numero""").fetchone()[0] == 3
                 # Un respaldo anterior a SQL 020 (sin numero) se restaura y cada vacante recibe el suyo.
