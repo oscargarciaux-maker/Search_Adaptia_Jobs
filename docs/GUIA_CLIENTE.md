@@ -235,11 +235,12 @@ Las fuentes y variantes rotan; no se recorren todos los títulos de todos los pa
 
 ### Personas que solo hablan español (contrato v44)
 
-- Al crear un cargo, «Buscar denominaciones afines» muestra primero los nombres **en español** y, si el cargo es un
-  oficio con un añadido («AI Product Manager»), también el oficio **más amplio** («Product Manager», «Gerente de
-  Producto»). Añade con un clic solo los que le sirvan a la persona.
+- Al crear un cargo, «Buscar denominaciones afines» muestra los nombres **en español** que no se usan solos y, si el
+  cargo es un oficio con un añadido («AI Product Manager»), también el oficio **más amplio** («Product Manager»,
+  «Gerente de Producto»). Añade con un clic solo los que le sirvan a la persona. Desde v50, los nombres en español
+  del mapa y del glosario ya se usan solos (ver arriba).
 - En Historial → «Cobertura por persona», quien no llega a su meta muestra **qué hacer** y cuántas vacantes más le
-  llegarían con cada ajuste. Nada se aplica solo: tú decides en el cliente o en el cargo.
+  llegarían con cada ajuste. Esos ajustes no se aplican solos: tú decides en el cliente o en el cargo.
 - Si la persona vive en un país donde casi no hay fuentes, lo dice («Cobertura limitada…»): recibirá sobre todo
   remotas abiertas a su país.
 

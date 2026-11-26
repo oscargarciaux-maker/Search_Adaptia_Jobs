@@ -59,12 +59,14 @@ def buscar(cliente, mapa, estado, presupuesto, hoy=None, max_fichas=80, reloj=ti
             continue
         es = list(f.get("consultas_es") or [])
         resto = [c for c in cobertura.consultas(f) if c not in es]
-        if es:
+        # El turno en español, si alguien de Colombia acepta avisos en español (o en modo heredado, sin `paises_es`).
+        if es and ("paises_es" not in f or PAISES & set(f["paises_es"])):
             todas.append((f["id"], es, "CO:ES", {}))
+        elif es and not resto:
+            todas.append((f["id"], es, "CO", {}))
         if resto:
             todas.append((f["id"], resto, "CO", {}))
     todas = cobertura.repartir(todas, estado, hoy, prioritarias)
-    todas.sort(key=lambda c: ":ES" not in c[2])  # estable: en un portal en español, primero los títulos en español
     avisos, vistos = [], set()
     hechas = fallidas = seguidas = 0
     for familia, consultas, lugar, _ in todas:

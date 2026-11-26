@@ -315,25 +315,27 @@ def anotar(v, cache, ahora=None):
 
 
 def auditar(vacantes, cache, *, maximo=240, segundos=240, hilos=6, comprobar_url=None, ahora=None,
-            vigencia=VIGENCIA_SELECCION, por_carril=False):
-    """`por_carril` (contrato v50, la cola por persona): `maximo` cuenta solo los sitios que se comprueban en paralelo;
-    LinkedIn, que va de una en una, tiene su propio cupo por el tiempo. Antes los dos compartían el máximo y los avisos
-    de Computrabajo, Elempleo o Get on Board (casi todo en español) perdían el turno frente a los de LinkedIn."""
+            vigencia=VIGENCIA_SELECCION, linkedin_aparte=False):
+    """Comprueba hasta `maximo` vacantes y devuelve cuántas escogió. `linkedin_aparte` (contrato v50, la cola por
+    persona): `maximo` cuenta solo los sitios que se comprueban en paralelo, y LinkedIn, que va de una en una, se
+    limita solo por su tiempo; se devuelven las dos sumadas. Antes compartían el máximo y los avisos de Computrabajo,
+    Elempleo o Get on Board (casi todo en español) perdían el turno frente a los de LinkedIn."""
     ahora = ahora or datetime.now(timezone.utc)
     comprobar_url = comprobar_url or comprobar
     plazo = time.monotonic() + segundos
     escogidas, peticiones = [], {}
     # Contrato v41: LinkedIn va de una en una con pausa; no se le asignan más enlaces de los que alcanza en el tiempo, y
     # el resto del cupo queda para los demás sitios (antes Computrabajo y Get on Board casi nunca tenían turno).
-    cupo_linkedin, de_linkedin = int(segundos / max(PAUSA_LINKEDIN, 0.5)) + 1, 0
+    cupo_linkedin, de_linkedin, de_otros = int(segundos / max(PAUSA_LINKEDIN, 0.5)) + 1, 0, 0
     for v in vacantes:
         pendientes = [u for u in urls(v) if not vigente(cache.get(u, {}), v["titulo"], ahora, vigencia)
                       and not sin_comprobacion_directa(u)]
         es_linkedin = bool(pendientes) and all(aviso_linkedin(u) for u in pendientes)
-        cabe = (len(escogidas) - de_linkedin < maximo or es_linkedin) if por_carril else len(escogidas) < maximo
-        if pendientes and cabe and not (es_linkedin and de_linkedin >= cupo_linkedin):
+        usadas = de_otros if linkedin_aparte and not es_linkedin else 0 if linkedin_aparte else de_otros + de_linkedin
+        if pendientes and usadas < maximo and not (es_linkedin and de_linkedin >= cupo_linkedin):
             escogidas.append(v)
             de_linkedin += es_linkedin
+            de_otros += not es_linkedin
             for u in pendientes:
                 peticiones.setdefault((u, v["titulo"]), None)
     # Contrato v39: LinkedIn de una en una y con pausa; tras varios bloqueos seguidos deja el tiempo a los demás sitios.
@@ -382,14 +384,7 @@ def resumen(vacantes):
     estados = Counter((v.get("verificacion") or {}).get("estado", "pendiente") for v in vacantes)
     motivos = Counter((v.get("verificacion") or {}).get("motivo", "sin comprobación") for v in vacantes
                       if (v.get("verificacion") or {}).get("estado") != "verificada")
-    # Contrato v50: cuántas de cada idioma tienen el enlace comprobado (sin descripción no se sabe el idioma).
-    por_idioma = {}
-    for v in vacantes:
-        idioma = v.get("idioma") if v.get("idioma") in ("es", "en") else "otro_o_sin_descripcion"
-        fila = por_idioma.setdefault(idioma, {"vacantes": 0, "comprobadas": 0})
-        fila["vacantes"] += 1
-        fila["comprobadas"] += (v.get("verificacion") or {}).get("estado") == "verificada"
-    return {"vacantes": len(vacantes), "estados": dict(estados), "motivos": dict(motivos), "por_idioma": por_idioma}
+    return {"vacantes": len(vacantes), "estados": dict(estados), "motivos": dict(motivos)}
 
 
 def cola_de_seleccion(vacantes, entregadas, hoy, cache, iniciales, maximo, ahora=None, limite=None):
@@ -464,13 +459,16 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
                                segundos=max(0, plazo - time.monotonic()), vigencia=VIGENCIA_COMPARTIR)
     revisadas = set()
     por_necesidad = 0
-    try:  # contrato v49: primero las candidatas de cada persona; como mucho la mitad del presupuesto que queda
+    # Contrato v49: primero las candidatas de cada persona, con la mitad del presupuesto que queda. Contrato v50: esa
+    # mitad es para los sitios en paralelo; las de LinkedIn van aparte, hasta donde alcance su parte del tiempo.
+    try:
         necesidad = cola_por_necesidad(vacantes, hoy)
         if necesidad and revisadas_n < maximo:
             parte = 3 if incremental else 2
-            por_necesidad = auditar(necesidad, cache, maximo=max(1, (maximo - revisadas_n) // parte),
-                                    segundos=max(0, plazo - time.monotonic()) / parte, por_carril=True)
-            revisadas_n += por_necesidad
+            cupo = max(1, (maximo - revisadas_n) // parte)
+            por_necesidad = auditar(necesidad, cache, maximo=cupo, segundos=max(0, plazo - time.monotonic()) / parte,
+                                    linkedin_aparte=True)
+            revisadas_n += min(por_necesidad, cupo)  # las de LinkedIn, que van aparte, no le quitan cupo al lote
     except Exception as e:  # noqa: BLE001 — sin esta cola, la comprobación sigue con la del lote, como antes
         from buscador import registro
         registro.aviso("verificar_enlaces:necesidad", e)

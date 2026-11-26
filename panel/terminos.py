@@ -127,9 +127,9 @@ def compuestos(cargo):
 
 @lru_cache(maxsize=512)
 def espanol_del_mapa(nombre):
-    """Contrato v44 (decisión de Oscar: «usarlos solos»): títulos en español de la familia del mapa a la que pertenece
-    el cargo. Ya se usan para buscar (consultas_es); con esto también se reconocen al elegir. Solo títulos curados del
-    mapa, nunca compuestos: esos solo se sugieren."""
+    """Contrato v44 (decisión de Oscar: «usarlos solos»): títulos exactos en español de la familia del mapa a la que
+    pertenece el cargo. Se usan para buscar (consultas_es) y para reconocer al elegir. Desde v50 son una parte de
+    `hermanos_es`, que suma los compuestos del glosario."""
     base = normalizar.titulo_base(nombre)
     coincidencias = _familias_de(base) if base else []
     if not coincidencias:
@@ -147,18 +147,13 @@ def espanol_del_mapa(nombre):
 @lru_cache(maxsize=512)
 def hermanos_es(nombre):
     """Contrato v50 (decisión de Oscar del 26 nov: «aplicar solos, con control»): los nombres en español que un cargo
-    usa sin que el operador los añada, para buscar y para reconocer avisos. Son los títulos exactos en español de su
-    familia del mapa (`espanol_del_mapa`, v44), los similares en español de esa familia de varias palabras y, para un
-    cargo compuesto («AI Product Manager»), los que arma el glosario (`compuestos`). El control es el de v49: sin las
-    funciones del cargo en la descripción la vacante va al final, y con señal de otro oficio va a «Por confirmar».
-    Devuelve ((nombre, origen), …) con origen «mapa» (exacto), «similar» o «glosario»."""
-    base = normalizar.titulo_base(nombre)
-    salida = [(x, "mapa") for x in espanol_del_mapa(nombre)]
-    for nivel, _, f in sorted(_familias_de(base) if base else [], key=lambda x: x[:2]):
-        if nivel == 0:
-            salida += [(x, "similar") for x in f.get("similares", [])
-                       if en_espanol(x) and not en_portugues(x) and len(normalizar.titulo_base(x).split()) > 1]
-    salida += [(x, "glosario") for x in compuestos(nombre)[0]]
+    usa sin que el operador los añada, para buscar y para reconocer avisos. Son el mismo oficio con otro nombre: los
+    títulos exactos en español de su familia del mapa (`espanol_del_mapa`, v44) y, para un cargo compuesto («AI Product
+    Manager»), los que arma el glosario (`compuestos`). Los «similares» del mapa son oficios vecinos («Analista de
+    operaciones» para Data Analyst): siguen siendo sugerencias. El control es el de v49: sin las funciones del cargo en
+    la descripción la vacante va al final, y con señal de otro oficio va a «Por confirmar».
+    Devuelve ((nombre, origen), …) con origen «mapa» o «glosario»."""
+    salida = [(x, "mapa") for x in espanol_del_mapa(nombre)] + [(x, "glosario") for x in compuestos(nombre)[0]]
     vistos, unicos = set(), []
     for x, origen in salida:
         clave = normalizar.titulo_base(x)
@@ -178,7 +173,9 @@ def hermanos_del_cargo(cargo):
             if _base(x) not in propios and not any(normalizar.contiene_frase(_texto(x), e) for e in excluidos)]
 
 
-def sugerir(cargo, sesion=None, consultar_esco=True):
+def sugerir(cargo, sesion=None, consultar_esco=True, definicion=None):
+    """Nombres sugeridos para un cargo. `definicion` (contrato v50): sus términos y excluidos tal como están en el
+    borrador, para decir qué nombres en español usa solos (`hermanos_es`) con la misma regla del motor."""
     base = normalizar.titulo_base(cargo)
     exactos, similares, evidencia = variantes(cargo), [], []
     # El mapa existente es una ayuda, nunca un requisito para aceptar un cargo nuevo. Solo aportan las familias donde
@@ -235,16 +232,20 @@ def sugerir(cargo, sesion=None, consultar_esco=True):
     # oficio con modificador («AI Product Manager»), las combinaciones del glosario. Y el oficio base, más amplio.
     combinados, base_titulos, familia_base = compuestos(cargo)
     if familia_base:
-        evidencia.append("Nombres en español armados con el glosario (revisa antes de añadir)")
+        evidencia.append("Nombres en español armados con el glosario (se usan solos)")
+    # Contrato v50: lo que el cargo ya usa solo no se sugiere para añadir (ni aquí ni en «Qué hacer»).
+    usados = hermanos_del_cargo({**{k: (definicion or {}).get(k) or [] for k in (
+        "terminos_exactos", "terminos_similares", "terminos_excluidos")}, "nombre": cargo})
+    solos = {normalizar.titulo_base(x) for x, _ in usados}
     en_es = []
     for x in [*[y for y in principales + limpios if en_espanol(y)], *combinados]:
-        if normalizar.titulo_base(x) not in {normalizar.titulo_base(y) for y in en_es}:
+        if normalizar.titulo_base(x) not in solos | {normalizar.titulo_base(y) for y in en_es}:
             en_es.append(x)
     amplios = [x for x in base_titulos if normalizar.titulo_base(x) not in claves]
     return {"terminos_exactos": principales[:30], "terminos_similares": limpios[:30], "terminos_cercanos": vecinos[:30],
             "terminos_es": en_es[:20], "terminos_base": amplios[:8], "familia_base": familia_base,
             # Contrato v50: los nombres en español que el cargo usa solos (no hace falta añadirlos).
-            "hermanos_es": [_bonito(x) for x, _ in hermanos_es(cargo)],
+            "hermanos_es": [_bonito(x) for x, _ in usados],
             "fuentes": list(dict.fromkeys(evidencia)) or ["Variantes de escritura"],
             "requiere_revision": not limpios and not combinados,
             "nota": "Revisa los términos antes de guardar; un equivalente no garantiza pertinencia de cada anuncio."}
@@ -287,7 +288,7 @@ def grado(titulo, cargo, cercanos=False):
             if puntaje >= 90:
                 return "similar", {"regla":"similitud textual", "termino":t, "grado":"similar", "similitud_textual":round(puntaje)}
     # Contrato v44: los títulos en español de la familia del mapa del cargo (los mismos con que se busca en español).
-    # Contrato v50: y sus nombres hermanos en español (similares del mapa y compuestos del glosario), que se usan solos.
+    # Contrato v50: y los nombres que arma el glosario para un cargo compuesto, que también se usan solos.
     for t, origen in hermanos_es(cargo.get("nombre") or ""):
         canon = _base(t)
         if canon and normalizar.contiene_frase(base, canon):

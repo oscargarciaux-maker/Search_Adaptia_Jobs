@@ -552,6 +552,10 @@ class VistaPrevia(Modelo):
 class Expansion(Modelo):
     cargo: str = Field(min_length=2, max_length=120)
     rapido: bool = False  # 18 nov: al abrir un cargo, solo el mapa y el glosario (sin consultar ESCO)
+    # Contrato v50: los términos del borrador, para decir qué nombres en español usa solos con la regla del motor.
+    terminos_exactos: list[str] = Field(default_factory=list, max_length=200)
+    terminos_similares: list[str] = Field(default_factory=list, max_length=200)
+    terminos_excluidos: list[str] = Field(default_factory=list, max_length=200)
 
     @field_validator("cargo")
     @classmethod

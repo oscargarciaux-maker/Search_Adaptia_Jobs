@@ -76,8 +76,11 @@ presupuestos:
   magneto_fichas: 60           # v44: fichas de Magneto (Colombia; sitemap + JobPosting)
   pausa_linkedin: [1.0, 2.5]   # segundos entre peticiones a LinkedIn
   indeed_busquedas: 90
-  indeed_repaso: 0             # v50: nombres por combinación que se buscan cada noche con los 30 días completos (el panel lo fija en 4)
-  indeed_minutos: 10           # v50: tope de tiempo del repaso de Indeed
+  # Contrato v50: en la búsqueda de cada noche del panel, Indeed repasa los 30 días completos de cada cargo y país
+  # (así sus avisos vuelven a «verse hoy» y cuentan como comprobados). Nombres del cargo por combinación (los de
+  # español aparte), resultados por búsqueda y tope de tiempo. No aplica a la captura horaria, al refuerzo ni a «Buscar
+  # ahora» para quien falta.
+  indeed_repaso: {nombres: 4, nombres_es: 8, resultados: 100, minutos: 10}
   apify_busquedas: 60          # solo con APIFY_TOKEN
   remotos_paginas: 250         # páginas de tableros remotos que se abren para encontrar el original
   empresas_por_probar: 80      # empresas nuevas que se prueban en los sistemas de postulación

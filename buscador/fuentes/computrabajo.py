@@ -98,7 +98,7 @@ def modalidad(texto):
 
 def combinaciones(mapa, nombres):
     """(familia, consultas, lugar, {}) por cargo y país. Contrato v44: los títulos en español tienen su propio turno
-    («CO:ES») en los países de quienes solo hablan español; antes compartían la rotación con los de inglés."""
+    («CO:ES») en los países de quienes aceptan avisos en español (v50); antes compartían la rotación con los de inglés."""
     salida = []
     for f in mapa:
         es = list(f.get("consultas_es") or [])

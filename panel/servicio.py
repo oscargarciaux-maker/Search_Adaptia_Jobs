@@ -491,7 +491,7 @@ def _ampliaciones_del_cargo(cargo, raw, base):
     """Contrato v44: por cargo (una vez, no por persona), las listas de nombres que se podrían añadir y las vacantes que
     sumarían: los nombres en español sugeridos y el oficio general. Solo sugerencias."""
     propios = {titulo_base(x) for x in [cargo.nombre, *raw["terminos_exactos"], *raw["terminos_similares"]]}
-    sug = sugerir(cargo.nombre, consultar_esco=False)
+    sug = sugerir(cargo.nombre, consultar_esco=False, definicion=raw)  # v50: sin los nombres que ya usa solos
     salida = []
     for clave, accion, terminos in (("nombres_es", "Añadir al cargo estos nombres en español", sug.get("terminos_es") or []),
                                      ("oficio_base", "Aceptar también el oficio general", sug.get("terminos_base") or [])):

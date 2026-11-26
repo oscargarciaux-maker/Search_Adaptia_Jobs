@@ -150,13 +150,23 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
     # lo son (26 nov, Product Manager en Colombia: 82 de 320) y solo alcanza unas 290 peticiones por noche: el 25 nov se
     # leyeron 75 fichas de 818 avisos sin mirar el título, y los del cargo se quedaban sin descripción (sin ella no se
     # sabe el idioma ni se entrega). Los demás solo reciben ficha si sobra cupo (título genérico + descripción, v25).
-    from buscador import familias
-    del_cargo = {a["id"] for a in avisos if familias.clasificar(a["titulo"])}
-    avisos.sort(key=lambda a: a["id"] not in del_cargo)  # estable: los turnos por lugar se cuentan entre los del cargo
+    from buscador import familias, normalizar
+    # En una búsqueda profunda el cargo puede no estar en el mapa: ahí «del cargo» es el título que contiene uno de los
+    # nombres con que se buscó (los títulos de otros cargos del mapa no le sirven a esa búsqueda).
+    nombres = {f["id"]: [n for n in map(normalizar.titulo_base, cobertura.consultas(f)) if n] for f in mapa}
+    fuera_del_mapa = {fid for fid, lista in nombres.items() if lista and not familias.clasificar(lista[0])}
+
+    def es_del_cargo(a):
+        if a["familia"] in fuera_del_mapa:
+            base = normalizar.titulo_base(a["titulo"])
+            return any(normalizar.contiene_frase(base, n) for n in nombres[a["familia"]])
+        return bool(familias.clasificar(a["titulo"]))
+    del_cargo = {a["id"] for a in avisos if es_del_cargo(a)}
     turno, vistos_lugar = {}, Counter()
-    for a in avisos:
-        turno[id(a)] = vistos_lugar[a["lugar_busqueda"]]
-        vistos_lugar[a["lugar_busqueda"]] += 1
+    for a in avisos:  # los turnos por lugar se cuentan aparte entre los del cargo y entre los demás
+        clave = (a["id"] in del_cargo, a["lugar_busqueda"])
+        turno[id(a)] = vistos_lugar[clave]
+        vistos_lugar[clave] += 1
     # Contrato v37: primero los avisos de los lugares de quien va corto.
     avisos.sort(key=lambda a: (a["id"] not in del_cargo, a["familia"] not in prioritarias,
                                not cobertura.va_primero(a["familia"], a["lugar_busqueda"]),
@@ -197,7 +207,8 @@ def completar_descripciones(cliente, previas, max_fichas, hoy=None, max_dias=21,
                             limite_segundos=None, prioritarias=()):
     """Relee la ficha pública de avisos de LinkedIn ya guardados que se quedaron sin descripción (LinkedIn limita cuántas
     fichas se leen por búsqueda). Sin descripción no se sabe el idioma y la vacante no se puede entregar.
-    Primero los cargos prioritarios y los más recientes. Devuelve (crudas con descripción, estadísticas); al unirlas
+    Por turnos entre las personas (`cobertura.por_necesidad`, v50); dentro de cada una, cargos prioritarios y recientes.
+    Devuelve (crudas con descripción, estadísticas); al unirlas
     con la copia guardada se conserva la descripción más larga."""
     hoy = hoy or datetime.now(timezone.utc).date().isoformat()
     inicio = reloj()

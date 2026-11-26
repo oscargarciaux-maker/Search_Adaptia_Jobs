@@ -72,8 +72,9 @@ derecha, el botón con el sol o la luna cambia entre modo claro y oscuro (por de
    - Desde el 26 nov (contrato v49) también se leen las funciones del aviso. Si el título coincide pero la
      descripción no trae ninguna función del cargo, llega al final con la etiqueta «Funciones por confirmar». Si
      además parece otro oficio («QA Manufacturing Analyst»), va a «Por confirmar».
-   - Los nombres hermanos en español del cargo («Jefe de producto» para Product Manager, «Ingeniero de pruebas» para
-     QA) se buscan y se reconocen solos (contrato v50), con ese mismo control de funciones. En el diálogo del cargo
+   - Los nombres hermanos en español del cargo (el mismo oficio con otro nombre: «Jefe de producto» para Product
+     Manager, «Ingeniero de pruebas» para QA) se buscan y se reconocen solos (contrato v50), con ese mismo control
+     de funciones. Los oficios vecinos siguen como sugerencias. En el diálogo del cargo
      están en «En español, se usan solos»; tocar uno lo deja de usar.
 2. **La ubicación.**
    - Remota: abierta a su país, al mundo o a un país donde puede trabajar legalmente. Si el aviso nombra un país,

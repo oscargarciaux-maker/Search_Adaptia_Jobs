@@ -431,7 +431,8 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
 
     @app.post("/api/cargos/expandir")
     def expandir(body: Expansion):
-        return sugerir(body.cargo, consultar_esco=not body.rapido)
+        return sugerir(body.cargo, consultar_esco=not body.rapido,
+                       definicion=body.model_dump(include={"terminos_exactos", "terminos_similares", "terminos_excluidos"}))
 
     @app.post("/api/cargos/funciones")
     def proponer_funciones(body: dict):

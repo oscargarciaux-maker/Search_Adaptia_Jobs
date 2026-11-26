@@ -75,12 +75,11 @@ def test_la_relectura_va_por_turnos_entre_personas_y_primero_quien_va_corta():
     sin_cargo = [v(0, "", "CO")]
     personas = [{"familia": "cargo:qa", "perfil": "ana", "lugares": ["CO"], "peso": 5, "corto": False, "idiomas": ["es"]},
                 {"familia": "cargo:pm", "perfil": "luis", "lugares": ["PE"], "peso": 5, "corto": True, "idiomas": ["es"]}]
-    anterior = cobertura._PERSONAS
-    cobertura._PERSONAS = [dict(p, lugares=set(p["lugares"])) for p in personas]
+    cobertura.configurar_personas(personas)
     try:
         orden = [x["id"] for x in cobertura.por_necesidad(sin_cargo + sin_persona + de_ana + de_luis)]
     finally:
-        cobertura._PERSONAS = anterior
+        cobertura.configurar_personas()
     assert orden[:4] == ["cargo:pm-PE-0", "cargo:qa-CO-0", "cargo:pm-PE-1", "cargo:qa-CO-1"]  # por turnos, Luis primero
     assert orden[-2:] == ["cargo:qa-MX-0", "-CO-0"]  # al final lo que no sirve a nadie y lo que no es de ningún cargo
     # Sin personas (modo heredado): el mismo orden de llegada, con lo que no es de ningún cargo al final.
@@ -90,25 +89,28 @@ def test_la_relectura_va_por_turnos_entre_personas_y_primero_quien_va_corta():
 def test_una_busqueda_en_espanol_no_es_turno_de_quien_solo_acepta_ingles():
     personas = [{"familia": "cargo:qa", "perfil": "es", "lugares": ["CO"], "peso": 5, "corto": False, "idiomas": ["es", "en"]},
                 {"familia": "cargo:qa", "perfil": "en", "lugares": ["CO"], "peso": 5, "corto": False, "idiomas": ["en"]}]
-    anterior = cobertura._PERSONAS
-    cobertura._PERSONAS = [dict(p, lugares=set(p["lugares"])) for p in personas]
+    cobertura.configurar_personas(personas)
     try:
         suyas = cobertura.de_personas([("cargo:qa", ["analista qa"], "CO:ES", {}), ("cargo:qa", ["qa"], "CO", {})])
     finally:
-        cobertura._PERSONAS = anterior
+        cobertura.configurar_personas()
     assert [c[2] for c in suyas[0]] == ["CO:ES", "CO"] and [c[2] for c in suyas[1]] == ["CO"]
 
 
 # ── 1.3 Indeed repasa cada noche los 30 días completos ─────────────────────────────────────────────────────────────
-def _indeed(mapa, **opciones):
+REPASO = {"nombres": 4, "nombres_es": 8, "resultados": 100}
+
+
+def _indeed(mapa, estado=None, **opciones):
     pedidas = []
+    indeed.VISTAS.clear()
 
     def scrape(**kw):
         pedidas.append(kw)
         return pd.DataFrame([{"title": "Analista QA", "company": "Empresa", "location": "Bogotá, Colombia",
                               "description": "Pruebas de software.", "date_posted": None,
                               "job_url": "https://co.indeed.com/viewjob?jk=abc", "job_url_direct": "", "is_remote": False}])
-    crudas, stats = indeed.buscar(mapa, [], {}, hoy="2026-11-26", scrape=scrape, **opciones)
+    crudas, stats = indeed.buscar(mapa, [], {} if estado is None else estado, hoy="2026-11-26", scrape=scrape, **opciones)
     return pedidas, crudas, stats
 
 
@@ -118,13 +120,23 @@ MAPA_INDEED = [{"id": "cargo:qa", "consultas": ["qa", "qa engineer", "tester", "
 
 
 def test_el_repaso_de_indeed_pide_la_ventana_completa_con_varios_nombres_y_primero_en_espanol():
-    indeed.VISTAS.clear()
-    pedidas, crudas, stats = _indeed(MAPA_INDEED, presupuesto=50, max_dias=30, repaso=4)
+    estado = {}
+    pedidas, crudas, stats = _indeed(MAPA_INDEED, estado, presupuesto=50, max_dias=30, repaso=REPASO)
     assert stats["repaso"] and all(p["hours_old"] == 30 * 24 and p["results_wanted"] == 100 for p in pedidas)
     es = MAPA_INDEED[0]["consultas_es"]
     en_espanol = [p for p in pedidas if p["search_term"] in es]
     assert {p["search_term"] for p in en_espanol if not p.get("is_remote")} == set(es)  # todos sus nombres en español…
-    assert pedidas[:len(en_espanol)] == en_espanol                                      # …y antes que los demás
+    # …cada nombre con su propia clave: la búsqueda para quien falta (v47) no repite lo que la noche ya buscó.
+    cobertura.configurar_personas([{"familia": "cargo:qa", "perfil": "p", "lugares": ["CO"], "peso": 5, "corto": True,
+                                    "idiomas": ["es", "en"]}])
+    cobertura.configurar_faltantes(True)
+    try:
+        de_nuevo, _, _ = _indeed(MAPA_INDEED, estado, presupuesto=50, max_dias=30)
+    finally:
+        cobertura.configurar_faltantes(False)
+        cobertura.configurar_personas()
+    ya = {(p["search_term"], bool(p.get("is_remote"))) for p in pedidas}
+    assert de_nuevo and all((p["search_term"], bool(p.get("is_remote"))) not in ya for p in de_nuevo)
     generales = {p["search_term"] for p in pedidas if not p.get("is_remote")} - set(MAPA_INDEED[0]["consultas_es"])
     assert len(generales) == 4  # cuatro nombres de la combinación general, no uno por día
     # Con el filtro remoto no se repasa (la búsqueda sin filtro ya trae esos avisos): un solo nombre.
@@ -134,26 +146,44 @@ def test_el_repaso_de_indeed_pide_la_ventana_completa_con_varios_nombres_y_prime
     assert indeed.VISTAS["https://co.indeed.com/viewjob?jk=abc"]["estado"] == "verificada"
 
 
-def test_sin_repaso_indeed_busca_como_antes_y_la_busqueda_para_quien_falta_no_repasa():
+def test_sin_repaso_indeed_busca_como_antes():
     pedidas, _, stats = _indeed(MAPA_INDEED, presupuesto=50, max_dias=30)
     assert not stats["repaso"] and len(pedidas) == 4 and all(p["results_wanted"] == 30 for p in pedidas)
-    anterior = cobertura._FALTANTES
-    cobertura._FALTANTES = True
-    try:
-        pedidas, _, stats = _indeed(MAPA_INDEED, presupuesto=50, max_dias=30, repaso=4)
-    finally:
-        cobertura._FALTANTES = anterior
-    assert not stats["repaso"] and all(p["results_wanted"] == 30 for p in pedidas)
 
 
-def test_el_repaso_de_indeed_respeta_el_presupuesto_y_el_panel_lo_pide_solo_en_la_busqueda_completa(cfg):
-    pedidas, _, stats = _indeed(MAPA_INDEED, presupuesto=5, max_dias=30, repaso=4)
-    assert len(pedidas) == stats["busquedas"] == 5
+def test_el_repaso_es_solo_de_la_busqueda_completa_del_panel(cfg):
+    from buscador import bodega
+    assert bodega.config()["presupuestos"]["indeed_repaso"] == {"nombres": 4, "nombres_es": 8, "resultados": 100,
+                                                                 "minutos": 10}
     _, _, motor = ejecutor.preparar({"configuracion": cfg}, hoy())
-    assert motor["presupuestos"]["indeed_repaso"] == 4 and motor["presupuestos"]["indeed_busquedas"] > 72
-    perfil = cfg["perfiles"][0]["id"]
-    _, _, motor = ejecutor.preparar({"configuracion": cfg}, hoy(), enfocar=[perfil])
-    assert motor["presupuestos"]["indeed_repaso"] == 0 and motor["presupuestos"]["indeed_busquedas"] <= 72
+    assert motor["control_dirigido"] and motor["presupuestos"]["indeed_busquedas"] > 72
+    _, _, motor = ejecutor.preparar({"configuracion": cfg}, hoy(), enfocar=[cfg["perfiles"][0]["id"]])
+    assert motor["faltantes"] and motor["presupuestos"]["indeed_busquedas"] <= 72  # y `bodega.f_indeed` no repasa
+
+
+def test_el_repaso_de_indeed_respeta_el_presupuesto():
+    pedidas, _, stats = _indeed(MAPA_INDEED, presupuesto=5, max_dias=30, repaso=REPASO)
+    assert len(pedidas) == stats["busquedas"] == 5
+    # Por vueltas: primero un nombre de cada combinación, así el presupuesto corto no se va en una sola.
+    assert len({(p["search_term"] in MAPA_INDEED[0]["consultas_es"], bool(p.get("is_remote"))) for p in pedidas[:4]}) == 4
+
+
+def test_con_mas_combinaciones_que_presupuesto_el_repaso_no_deja_sin_turno_a_los_nombres_generales():
+    # Antes de la revisión, todas las combinaciones en español iban primero con sus 8 nombres y se llevaban todo.
+    paises = ["AR", "CL", "CO", "EC", "ES", "MX", "PE", "UY"]
+    mapa = [dict(MAPA_INDEED[0], paises_busqueda=paises, paises_es=paises)]
+    pedidas, _, _ = _indeed(mapa, presupuesto=24, max_dias=30, repaso=REPASO)
+    generales = [p for p in pedidas if p["search_term"] in MAPA_INDEED[0]["consultas"]]
+    assert len(pedidas) == 24 and len(generales) >= 8
+    assert len({p["country_indeed"] for p in pedidas}) == len(paises)  # la primera vuelta pasa por todos los países
+
+
+def test_en_una_busqueda_profunda_las_fichas_van_al_cargo_buscado_aunque_no_este_en_el_mapa():
+    titulos = ["Data Analyst", "Product Designer", "Data Steward", "QA Engineer", "Senior Data Steward"]
+    cliente = _LinkedIn("".join(_tarjeta(200 + i, t) for i, t in enumerate(titulos)))
+    mapa = [{"id": "consulta", "consultas": ["data steward"]}]
+    linkedin_publico.buscar(cliente, mapa, [("CO", "Colombia")], {}, presupuesto=1, hoy="2026-11-26", max_fichas=2)
+    assert set(cliente.fichas) == {"202", "204"}
 
 
 # ── 1.4 Comprobación por carril ────────────────────────────────────────────────────────────────────────────────────
@@ -177,9 +207,9 @@ def test_en_la_cola_por_persona_linkedin_no_le_quita_el_turno_a_los_demas_sitios
         assert verificar_enlaces.auditar(cola, {}, maximo=3, segundos=5, ahora=ahora, comprobar_url=comprobar) == 3
         assert all("linkedin" in u for u in pedidas)
         pedidas.clear()
-        # Por carril: el máximo cuenta solo los sitios en paralelo; LinkedIn va aparte, por su tiempo.
+        # Con LinkedIn aparte: el máximo cuenta solo los sitios en paralelo; LinkedIn se limita por su tiempo.
         assert verificar_enlaces.auditar(cola, {}, maximo=3, segundos=5, ahora=ahora, comprobar_url=comprobar,
-                                         por_carril=True) == 6
+                                         linkedin_aparte=True) == 6
         assert sum("computrabajo" in u for u in pedidas) == 3 and sum("linkedin" in u for u in pedidas) == 3
     finally:
         verificar_enlaces.PAUSA_LINKEDIN = original
@@ -199,8 +229,7 @@ def test_el_embudo_por_idioma_cuenta_solo_avisos_de_un_cargo_y_sin_datos_de_clie
                                                                      "Computrabajo": {"con_cargo": 1, "comprobadas": 0}}}
     assert e["en"]["fuentes"] == {"Portales de empresas": {"con_cargo": 1, "comprobadas": 1}}
     assert e["sin_descripcion"]["con_cargo"] == 1 and e["otro"]["con_cargo"] == 1
-    por_idioma = verificar_enlaces.resumen(vacantes)["por_idioma"]
-    assert por_idioma["es"] == {"vacantes": 4, "comprobadas": 2} and por_idioma["en"] == {"vacantes": 1, "comprobadas": 1}
+    assert "perfil" not in str(e) and "cliente" not in str(e)  # solo idiomas, fuentes y conteos
 
 
 # ── 2.1 Bilingües ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -228,11 +257,16 @@ def test_los_nombres_hermanos_en_espanol_se_buscan_y_se_reconocen_sin_anadirlos(
     cargo = {"nombre": "Product Manager", "terminos_exactos": [], "terminos_similares": [], "terminos_excluidos": []}
     hermanos = dict(terminos.hermanos_es("Product Manager"))
     assert hermanos["jefe de producto"] == "mapa" and hermanos["líder de producto"] == "mapa"
-    assert hermanos["director de producto"] == "similar"  # antes los similares del mapa solo se sugerían
     assert terminos.grado("Jefe de Producto Digital", cargo) == (
         "similar", {"regla": "título en español del mapa", "termino": "jefe de producto", "grado": "similar"})
-    assert terminos.grado("Director de Producto", cargo)[1]["regla"] == "nombre hermano en español"
     assert terminos.grado("Jefe de bodega", cargo) == (None, None)
+    # Los «similares» del mapa son oficios vecinos, no el mismo oficio con otro nombre: siguen siendo sugerencias.
+    assert "director de producto" not in hermanos and terminos.grado("Director de Producto", cargo) == (None, None)
+    assert "analista de operaciones" not in dict(terminos.hermanos_es("Data Analyst"))
+    datos = {"nombre": "Data Analyst", "terminos_exactos": [], "terminos_similares": [], "terminos_excluidos": []}
+    assert terminos.grado("Analista de Operaciones Logísticas", datos) == (None, None)
+    sugeridos = terminos.sugerir("Product Manager", consultar_esco=False)["terminos_es"]
+    assert "director de producto" in {normalizar.titulo_base(x) for x in sugeridos}
     # Un cargo compuesto usa los nombres que arma el glosario (v44: antes solo sugerencias).
     ia = {"nombre": "AI Product Manager", "terminos_exactos": [], "terminos_similares": [], "terminos_excluidos": []}
     assert ("Gerente de Producto de IA", "glosario") in terminos.hermanos_es("AI Product Manager")
@@ -289,7 +323,8 @@ def _remota_de_chile(letra):
 
 @pytest.mark.parametrize("letra,esperados", [
     ("Abierto a candidatos de Colombia y Perú. Ofrecemos seguro de salud en Chile.", ["CL", "CO", "PE"]),
-    ("Contratamos en México, Colombia y Argentina.", ["AR", "CL", "CO", "MX"]),
+    ("Contratamos personas en México, Colombia y Argentina.", ["AR", "CL", "CO", "MX"]),
+    ("Contratamos talento en Colombia, Estados Unidos y México.", ["CL", "CO", "MX"]),  # la lista se lee entera
     ("Vacante remota disponible para Colombia, Ecuador o Perú.", ["CL", "CO", "EC", "PE"]),
     ("Puedes postular desde Uruguay.", ["CL", "UY"]),
 ])
@@ -307,10 +342,34 @@ def test_la_letra_pequena_que_nombra_desde_donde_postular_suma_esos_paises(letra
     "Trabaja desde tu casa o donde quieras. Compensación en USD o en tu moneda local.",
     "No contratamos en Colombia ni en Perú por ahora.",
     "Tenemos equipos en Colombia y oficinas en México.",
+    "Puedes trabajar desde España hasta 4 semanas al año.",       # un beneficio
+    "En 2024 contratamos en México a más de 200 personas.",       # la historia de la empresa
+    "Para profesionales en México tenemos otro proceso.",
+    "Buscamos profesionales en Colombia para este equipo.",
 ])
 def test_las_frases_de_la_empresa_las_vagas_y_las_negadas_no_abren_el_aviso(letra):
     v = _remota_de_chile(letra)
     assert v["paises"] == ["CL"] and v["nota_pais"] != paises.NOTA_APERTURA
+
+
+@pytest.mark.parametrize("ubicacion,letra", [
+    ("Latinoamérica (Remoto)", "Abierto a candidatos de Colombia."),
+    ("Remoto, LATAM", "Contratamos personas en Colombia, Estados Unidos y México."),
+    ("Remoto", "Abierto a candidatos de España y Colombia."),
+    ("Remoto", "Contratamos personas en Brasil, Estados Unidos y Colombia."),
+])
+def test_la_letra_pequena_nunca_recorta_lo_que_el_aviso_ya_abria(ubicacion, letra):
+    def paises_de(texto):
+        return vacante.crear("Product Manager", "Empresa", "https://www.linkedin.com/jobs/view/557", "LinkedIn",
+                             ubicacion=ubicacion, descripcion=PM + texto, fecha="2026-11-20", remoto=True,
+                             hoy="2026-11-26")
+    con, sin = paises_de(letra), paises_de("")
+    assert (con["paises"], con["confianza_pais"], con["nota_pais"]) == (sin["paises"], sin["confianza_pais"], sin["nota_pais"])
+
+
+def test_la_letra_pequena_suma_una_region_y_el_mundo_a_un_aviso_de_un_pais():
+    assert len(_remota_de_chile("Abierto a candidatos de España y Latinoamérica.")["paises"]) == 20
+    assert len(_remota_de_chile("Aceptamos postulaciones de cualquier parte del mundo.")["paises"]) == 20
 
 
 def test_la_letra_pequena_no_convierte_una_oficina_en_remota_ni_pisa_una_restriccion():
@@ -319,5 +378,5 @@ def test_la_letra_pequena_no_convierte_una_oficina_en_remota_ni_pisa_una_restric
                             "Trabajo presencial en nuestras oficinas. Contratamos en México y Colombia.",
                             fecha="2026-11-20", hoy="2026-11-26")
     assert oficina["paises"] == ["CL"] and oficina["modalidad"] != "remoto"
-    restringida = _remota_de_chile("Debes residir en Chile para este cargo. Además, contratamos en México y Colombia.")
+    restringida = _remota_de_chile("Debes residir en Chile para este cargo. Además, contratamos personas en México.")
     assert restringida["paises"] == ["CL"]

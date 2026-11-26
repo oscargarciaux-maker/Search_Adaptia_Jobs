@@ -166,7 +166,7 @@ def consultas_espanol(cargo, raw, maximo=12):
     del glosario; contrato v50, se usan solos salvo los que el operador excluyó). Solo entra lo que después se
     reconoce al clasificar (v49): `grado` reconoce los mismos nombres, así que estos turnos no se pierden."""
     candidatos = [cargo.nombre, *raw["terminos_exactos"], *raw["terminos_similares"],
-                  *[x for x, _ in hermanos_del_cargo({**raw, "nombre": cargo.nombre})]]
+                  *[x for x, _ in hermanos_del_cargo({**raw, "nombre": cargo.nombre})]]  # `raw` puede venir sin nombre
     vistos, salida = set(), []
     for t in candidatos:
         clave = normalizar.texto(t)
@@ -246,8 +246,8 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=N
             # v25: «Coincide por funciones» (otro título) solo con la huella que escribió el operador; la heredada y
             # la automática (v49) van en `_control_cargo` y solo sirven para comprobar los títulos que sí coinciden.
             "funciones": c.funciones,
-            # Contrato v44: los títulos en español de la familia del mapa clasifican los avisos (como en `grado`), pero
-            # no se buscan: no van en `consultas`/`similares`, que rotan en todas las fuentes.
+            # Contrato v44/v50: los nombres hermanos en español clasifican los avisos (como en `grado`). No van en
+            # `consultas`/`similares`, que rotan en todas las fuentes: se buscan aparte, en `consultas_es`.
             "similares_es": [x for x, _ in hermanos_del_cargo(raw)],
             "excluir": raw["terminos_excluidos"], "herramientas": [], "lugares": list(lugares.items()),
             "_control_cargo": raw,
@@ -276,9 +276,9 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=N
     motor["lugares_primero"] = {k: sorted(v) for k, v in primero.items()}
     motor["personas_busqueda"] = personas
     motor["presupuestos"].update(linkedin_busquedas=min(300, max(24, len(roles) * 24)),
-        # Contrato v50: Indeed repasa cada noche los 30 días completos con varios nombres por combinación (así sus
-        # avisos vuelven a «verse hoy» y cuentan como comprobados). Antes 72 búsquedas de un nombre y solo lo nuevo.
-        indeed_busquedas=min(400, max(24, len(roles) * 40)), indeed_repaso=4, indeed_minutos=10,
+        # Contrato v50: la búsqueda de cada noche repasa Indeed con varios nombres por combinación (`indeed_repaso` en
+        # datos/config.yaml): más búsquedas. La de quien falta (v47) no repasa y conserva las 72 de antes.
+        indeed_busquedas=min(72, max(6, len(roles) * 8)) if enfocar is not None else min(400, max(24, len(roles) * 40)),
         getonbrd_busquedas=min(30, len(roles) * 4),
         computrabajo_busquedas=min(90, max(12, len(roles) * 12)),
         elempleo_busquedas=min(30, max(6, len(roles) * 3)),
@@ -289,8 +289,6 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=N
         # lleguen vacantes. Presupuestos de siempre, con tope de tiempo, y una sola ronda de refuerzo.
         motor["faltantes"] = True
         motor["presupuestos"]["minutos_por_fuente"] = MINUTOS_FALTANTES
-        # v50: el repaso de Indeed es de la búsqueda de cada noche; aquí, el presupuesto de siempre y sin repetir.
-        motor["presupuestos"].update(indeed_busquedas=min(72, max(6, len(roles) * 8)), indeed_repaso=0)
         # Contrato v48: el tope incluye el tiempo de ordenar las candidatas (antes se alargaba y tardó 19 min).
         motor.setdefault("verificacion_enlaces", {}).update(segundos_corrida=SEGUNDOS_FALTANTES["verificacion"],
                                                             contar_orden=True, reserva_segundos=RESERVA_REFUERZO)

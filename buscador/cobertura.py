@@ -105,14 +105,13 @@ def medir(estado, crudas, vacantes, hoy, dias=30):
 
 def sirve_a_corta(v):
     """Contrato v40: True si una vacante guardada es de un cargo y un país de alguna persona que va corta (o es nueva).
-    La relectura de descripciones empieza por estas: sin descripción no se sabe el idioma y no se entrega."""
+    La comprobación de enlaces empieza por estas (la relectura de descripciones usa `por_necesidad`, v50)."""
     familias_v = {f.get("familia") for f in v.get("familias") or [] if isinstance(f, dict)}
     # Contrato v49: con la misma regla de países que decide la entrega (`paises.abiertos`), y de un idioma que esa
     # persona acepta cuando ya se sabe (sin descripción aún no se sabe).
     paises_v, mundial, _ = paises.abiertos(v)
     idioma = v.get("idioma") or ""
-    return any(p.get("corto") and p["familia"] in familias_v and (mundial or paises_v & p["lugares"])
-               and (not idioma or idioma in p.get("idiomas", ("es", "en"))) for p in _PERSONAS)
+    return any(p.get("corto") and _le_sirve(p, familias_v, paises_v, mundial, idioma) for p in _PERSONAS)
 
 
 def por_necesidad(vacantes):
@@ -129,9 +128,7 @@ def por_necesidad(vacantes):
                       v.get("idioma") or ""))
     colas = []
     for p in _PERSONAS:
-        suyas = [v for v, fams, abiertos, mundial, idioma in datos
-                 if p["familia"] in fams and (mundial or abiertos & p["lugares"])
-                 and (not idioma or idioma in p.get("idiomas", ("es", "en")))]
+        suyas = [v for v, fams, abiertos, mundial, idioma in datos if _le_sirve(p, fams, abiertos, mundial, idioma)]
         if suyas:
             colas.append((not p.get("corto"), len(suyas), suyas))
     colas.sort(key=lambda c: c[:2])
@@ -226,6 +223,18 @@ def dias_busqueda(clave, ultima, hoy, max_dias):
     return min(max_dias, max(1, (datetime.fromisoformat(hoy) - datetime.fromisoformat(ultima)).days + 1))
 
 
+def es_espanol(lugar):
+    """True si la combinación es la de los títulos en español («CO:ES», «REMOTO_CO:ES», «GLOBAL:ES», «CO:ES:REMOTO»).
+    «ES» y «ES:REMOTO» son España con los nombres generales."""
+    return ":ES" in str(lugar)
+
+
+def _le_sirve(persona, familias_v, abiertos, mundial, idioma):
+    """Una vacante (sus cargos, sus países abiertos y su idioma, si ya se sabe) es del cargo y de un lugar de la persona."""
+    return persona["familia"] in familias_v and bool(mundial or abiertos & persona["lugares"]) \
+        and (not idioma or idioma in persona.get("idiomas", ("es", "en")))
+
+
 def _claves_lugar(lugar):
     """«CO:REMOTO», «REMOTO_CO:ES», «CIUDAD_BOGOTA» → el lugar, sin sufijo y su país, para casarlo con una persona."""
     base = str(lugar).split(":")[0]
@@ -241,9 +250,9 @@ def de_personas(combinaciones):
     for i, persona in enumerate(_PERSONAS):
         # «GLOBAL» (Get on Board: todo LATAM y remoto) sirve a cualquier persona del cargo.
         # Contrato v50: una búsqueda con nombres en español («CO:ES») no es turno de quien no acepta avisos en español.
-        acepta_es = "es" in persona.get("idiomas", ("es",))
+        acepta_es = "es" in persona.get("idiomas", ("es", "en"))
         salida[i] = [c for c in combinaciones if c[0] == persona["familia"]
-                     and (acepta_es or ":ES" not in str(c[2]))
+                     and (acepta_es or not es_espanol(c[2]))
                      and (str(c[2]).startswith("GLOBAL") or _claves_lugar(c[2]) & persona["lugares"])]
     return salida
 

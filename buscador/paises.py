@@ -339,33 +339,33 @@ def _contratacion_remota(desc):
 
 
 # Contrato v50: la letra pequeña en español que dice desde dónde puede postular LA PERSONA («abierto a candidatos de
-# Colombia y Perú», «puedes trabajar desde cualquier país de Latinoamérica», «contratamos en México, Chile y España»).
-# Las frases que hablan de la empresa («presencia en 6 países», «líder en Latinoamérica», «clientes en LATAM») no
-# empiezan así y no abren nada. Se compara contra el texto normalizado (sin tildes ni signos, en minúsculas).
+# Colombia y Perú», «puedes postular desde Uruguay», «vacante disponible para Colombia, Ecuador o Perú»). Solo frases
+# que hablan de quién postula. Las de la empresa («presencia en 6 países», «en 2024 contratamos en México a 200
+# personas», «clientes en LATAM»), las de beneficios («puedes trabajar desde España cuatro semanas al año») y las
+# vagas («desde donde quieras») no empiezan así y no abren nada. Texto normalizado (sin tildes ni signos, minúsculas).
 _APERTURA_ES = re.compile(
     r"\b(?:"
     r"abiert[oa]s?\s+(?:a|para)\s+(?:tod[oa]s?\s+(?:l[oa]s\s+)?)?(?:candidat[oa]s|personas|profesionales|postulantes|"
     r"aplicantes|talentos?|residentes)(?:\s+que\s+(?:residan|vivan|esten|se\s+encuentren))?\s+(?:de|en|desde)"
-    r"|(?:puedes|podras|pueden|podran)\s+(?:trabajar|aplicar|postular|postularte|postularse)"
-    r"(?:\s+(?:remotamente|en\s+remoto|de\s+forma\s+remota))?\s+(?:desde|en)"
-    r"|(?:contratamos|aceptamos|recibimos)\s+(?:(?:talentos?|personas|profesionales|candidat[oa]s|postulaciones|"
-    r"aplicaciones)\s+)?(?:en|de|desde)"
-    r"|(?:para|buscamos)\s+(?:residentes|candidat[oa]s|personas|profesionales|talentos?)\s+"
-    r"(?:de|en|desde|que\s+(?:residan|vivan|esten)\s+en|ubicad[oa]s\s+en|basad[oa]s\s+en)"
+    r"|(?:puedes|podras|pueden|podran)\s+(?:aplicar|postular|postularte|postularse)\s+desde"
+    r"|(?:aceptamos|recibimos)\s+(?:candidat[oa]s|postulantes|postulaciones|aplicaciones)\s+(?:de|desde|en)"
+    r"|contratamos\s+(?:talentos?|personas|profesionales|candidat[oa]s)\s+(?:en|de|desde)"
     r"|(?:vacante|posicion|oferta|oportunidad|rol|puesto|convocatoria)\s+(?:remot[oa]\s+)?"
     r"(?:disponible|abiert[oa]|valid[oa]|habilitad[oa])\s+(?:para|en)"
     r"|paises\s+(?:donde\s+contratamos|en\s+los\s+que\s+contratamos|elegibles|habilitados)"
     r")\s+")
 _ENTRE_LUGARES = re.compile(r"(?:(?:y|o|e|u|ni|tambien|como|toda|todo|todos|todas|el|la|los|las|de|del|cualquier|pais|"
                             r"paises|parte|lugar|resto|otros)\s+){0,5}")
+_NEGADA = re.compile(r"\b(?:no|sin|tampoco|nunca|excepto|salvo)\b")
 
 
 @lru_cache(maxsize=1)
 def _lugares_de_apertura():
-    """Patrón con los nombres de los países cubiertos, sus subregiones y los alcances (LATAM, Europa, todo el mundo)."""
+    """Patrón con los nombres de países de todo el mundo, las subregiones y los alcances (LATAM, Europa, todo el mundo):
+    una lista que mezcla países cubiertos y de fuera («Colombia, Estados Unidos y México») se lee entera."""
     d = datos()
     nombres = {n for _, lista in d["nombres_pais"] for n in lista} | set(d["mundo"] + d["toda_latam"] + d["toda_europa"])
-    nombres |= {n for r in d["subregiones"] for n in r["nombres"]}
+    nombres |= {n for r in d["subregiones"] for n in r["nombres"]} | set(mundo()["por_nombre"])
     return re.compile(r"(?:" + "|".join(re.escape(x) for x in sorted(nombres, key=len, reverse=True) if x) + r")\b")
 
 
@@ -374,7 +374,7 @@ def _apertura_nombrada(desc):
     frase: «abierto a candidatos de colombia y peru» → «colombia y peru», sin lo que venga en la oración siguiente."""
     lugar = _lugares_de_apertura()
     for m in _APERTURA_ES.finditer(desc):
-        if re.search(r"\b(?:no|sin|tampoco|nunca|excepto|salvo)\b", desc[max(0, m.start() - 35):m.start()]):
+        if _NEGADA.search(desc[max(0, m.start() - 35):m.start()]):
             continue
         fin = m.end()
         while True:
@@ -1010,12 +1010,19 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
         alcance_contratacion = []  # «work from anywhere in India»: solo nombra un país de fuera
     if alcance_contratacion is not None:  # None: nombra un lugar que no se reconoce; deciden las reglas de abajo
         return r(alcance_contratacion, "alta", "contratación remota explícita")
-    # Contrato v50: la letra pequeña en español que nombra desde dónde se puede postular suma esos países a los del
-    # aviso («Remoto, Chile» + «abierto a candidatos de Colombia y Perú» → Chile, Colombia y Perú).
-    apertura = _apertura_nombrada(desc)
-    abiertos = interpretar(apertura) if apertura else None
-    if abiertos:
-        return r(ordenar(list(abiertos) + [c for c in nombrados if c in todos]), "alta", NOTA_APERTURA)
+    # Contrato v50: la letra pequeña en español que nombra desde dónde se puede postular SUMA esos países a los del
+    # aviso («Remoto, Chile» + «abierto a candidatos de Colombia y Perú» → Chile, Colombia y Perú). Solo cuando la
+    # ubicación nombra un país concreto: si ya es una región, LATAM o no dice país, deciden las reglas de abajo (una
+    # frase así nunca recorta lo que el aviso ya abría).
+    if nombrados and not (es_latam or es_mundo or es_europa or fuera or subregion(ambito)):
+        apertura = _apertura_nombrada(desc)
+        sumados = set(_paises_nombrados(apertura)) | set(subregion(apertura) or []) if apertura else set()
+        if apertura and _nombra(apertura, d["toda_latam"]):
+            sumados |= set(latam)
+        if apertura and _nombra(apertura, d["mundo"]):
+            sumados |= set(todos)
+        if sumados - set(nombrados):
+            return r(ordenar(list(sumados) + [c for c in nombrados if c in todos]), "alta", NOTA_APERTURA)
     if es_mundo or (_REMOTO.search(titulo_normalizado) and _nombra(titulo_normalizado,d["mundo"])
                     and not _MUNDO_ACOTADO.search(titulo_normalizado)):
         return r(todos, "alta", "")

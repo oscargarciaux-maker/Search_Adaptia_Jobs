@@ -89,22 +89,23 @@ export function CargoDialog({
         new Set([...v.terminos_excluidos, termino]),
       ),
     }));
+    // Qué nombres usa el cargo lo decide el servidor (`hermanos_es`); aquí solo se quita la ficha, como al añadir.
+    setSolos((v) => v.filter((x) => x !== termino));
     setDejado(termino);
   }
-  // Un nombre que contiene un término excluido ya no se usa (misma regla que el servidor).
-  const solosVisibles = solos.filter(
-    (t) =>
-      !c.terminos_excluidos.some(
-        (e) => e.trim() && t.toLowerCase().includes(e.trim().toLowerCase()),
-      ),
-  );
   const [nota, setNota] = useState("");
   // Cada pedido lleva un número: solo se muestra la respuesta del último (la carga al abrir no pisa a la completa).
   const ultimoPedido = useRef(0);
   function pedirSugerencias(rapido: boolean) {
     return api<Sugerencias>("/cargos/expandir", {
       method: "POST",
-      body: JSON.stringify({ cargo: c.nombre, rapido }),
+      body: JSON.stringify({
+        cargo: c.nombre,
+        rapido,
+        terminos_exactos: c.terminos_exactos,
+        terminos_similares: c.terminos_similares,
+        terminos_excluidos: c.terminos_excluidos,
+      }),
     });
   }
   // Sesión de prueba (17 nov): los nombres principales entran solos; los afines quedan como fichas para añadir con un
@@ -115,15 +116,10 @@ export function CargoDialog({
         (x) => x.toLowerCase(),
       ),
     );
-    const hermanos = (r.hermanos_es || []).filter(
-      (x) => !ya.has(x.toLowerCase()),
-    );
-    const deHermanos = new Set(hermanos.map((x) => x.toLowerCase()));
+    // El servidor ya quitó de `hermanos_es` lo excluido y lo que el cargo tiene, y de `terminos_es` lo que se usa solo.
+    const hermanos = r.hermanos_es || [];
     setSolos(hermanos);
-    // Lo que ya se usa solo no se ofrece para añadir.
-    const es = (r.terminos_es || []).filter(
-      (x) => !ya.has(x.toLowerCase()) && !deHermanos.has(x.toLowerCase()),
-    );
+    const es = (r.terminos_es || []).filter((x) => !ya.has(x.toLowerCase()));
     const enEs = new Set([...es, ...hermanos].map((x) => x.toLowerCase()));
     setEnEspanol(es);
     setSugeridos(
@@ -386,7 +382,7 @@ export function CargoDialog({
               (Opciones avanzadas).
             </p>
           )}
-          {estadoSug === "listo" && solosVisibles.length > 0 && (
+          {estadoSug === "listo" && solos.length > 0 && (
             <div
               className="sugeridos-grupo"
               role="group"
@@ -398,7 +394,7 @@ export function CargoDialog({
                 </span>
               </div>
               <div className="sugeridos">
-                {solosVisibles.map((t) => (
+                {solos.map((t) => (
                   <button
                     type="button"
                     className="chip-sugerido"

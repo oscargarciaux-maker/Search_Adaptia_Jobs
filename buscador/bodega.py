@@ -148,9 +148,10 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
         return crudas, stats
 
     def f_indeed():
-        # Contrato v50: en la búsqueda de cada noche Indeed repasa la ventana completa (con tope de tiempo propio).
-        repaso = 0 if solo_mapa else p.get("indeed_repaso", 0)
-        tope = min(limite, p.get("indeed_minutos", 10) * 60) if repaso else limite
+        # Contrato v50: en la búsqueda de cada noche del panel, Indeed repasa la ventana completa (con su tope de
+        # tiempo). No en una búsqueda de un solo cargo ni en la de quien falta (v47: esa no repite lo ya buscado).
+        repaso = p.get("indeed_repaso") if cfg.get("control_dirigido") and not solo_mapa and not faltantes else None
+        tope = min(limite, repaso.get("minutos", 10) * 60) if repaso else limite
         return indeed.buscar(mapa, [c for c, _ in activos], estado["indeed"], p["indeed_busquedas"], hoy=hoy,
                              max_dias=cfg["dias_maximos"], limite_segundos=tope, prioritarias=prioritarias,
                              repaso=repaso)

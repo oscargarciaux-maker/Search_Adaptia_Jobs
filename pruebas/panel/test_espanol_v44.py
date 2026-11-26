@@ -14,11 +14,16 @@ def cfg():
 
 
 # ── Sugerencias compuestas ───────────────────────────────────────────────────────────────────────────────────────────
-def test_ai_product_manager_sugiere_nombres_en_espanol_y_el_oficio_base():
+def test_ai_product_manager_usa_solos_sus_nombres_en_espanol_y_sugiere_el_oficio_base():
     r = terminos.sugerir("AI Product Manager", consultar_esco=False)
-    assert "Gerente de Producto de IA" in r["terminos_es"] and "Product Manager IA" in r["terminos_es"]
+    # Contrato v50: los nombres que arma el glosario se usan solos; ya no se sugieren para añadir.
+    assert "Gerente de Producto de IA" in r["hermanos_es"] and "Product Manager IA" in r["hermanos_es"]
+    assert not set(r["terminos_es"]) & set(r["hermanos_es"])
+    excluido = terminos.sugerir("AI Product Manager", consultar_esco=False,
+                                definicion={"terminos_excluidos": ["gerente de producto"]})
+    assert "Gerente de Producto de IA" not in excluido["hermanos_es"] and "Product Manager IA" in excluido["hermanos_es"]
     assert r["familia_base"] == "product-manager" and "Gerente de Producto" in r["terminos_base"]
-    # Solo sugerencias: los nombres principales del cargo no se tocan.
+    # Los nombres principales del cargo no se tocan.
     assert r["terminos_exactos"] == ["AI Product Manager"]
 
 
