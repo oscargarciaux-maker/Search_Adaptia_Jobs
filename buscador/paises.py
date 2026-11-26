@@ -108,6 +108,25 @@ _MUNDO_ACOTADO = re.compile(r"\b(?:anywhere|worldwide|any country|cualquier (?:p
                             r"(?:in|within|across|en|de|del|dentro de)\b(?!\s+(?:the world|el mundo|todo el mundo)\b)")
 
 
+def abiertos(v):
+    """Contrato v49: (países desde los que se puede postular, si es para cualquier país, si solo pide una franja
+    horaria) de una vacante ya etiquetada. Una sola regla para quien decide (`panel.afinidad.lugar`), quien prioriza
+    (`cobertura.sirve_a_corta`), la admisión (`bodega._sirve_a_perfiles`) y la medición.
+    - Un país cubierto solo cuenta si está en `paises`; uno de fuera, si el aviso lo nombra (`paises_mundo`).
+    - «Anywhere in France…» no es alcance mundial: manda lo nombrado. El alcance mundial vale si el aviso no nombra
+      países o si `paises` trae todos los cubiertos.
+    - «Solo franja»: la nota «por zona horaria» y ningún país nombrado."""
+    elegibles, nombrados = set(v.get("paises") or []), set(v.get("paises_mundo") or [])
+    cubiertos = set(datos()["codigos"])
+    acotado = mundo_acotado(v.get("ubicacion"))
+    paises_abiertos = ((elegibles & nombrados) if acotado else elegibles) | (nombrados - cubiertos)
+    mundial = bool(v.get("alcance_mundial")) and not acotado and (not nombrados or cubiertos <= elegibles)
+    return paises_abiertos, mundial, v.get("nota_pais") == NOTA_ZONA and not nombrados
+
+
+NOTA_ZONA = "por zona horaria"
+
+
 def mundo_acotado(ubicacion):
     """True si la ubicación dice «en cualquier parte de <un lugar>» (no es alcance mundial)."""
     return _MUNDO_ACOTADO.search(normalizar.texto(ubicacion or "")) is not None

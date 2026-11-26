@@ -260,6 +260,43 @@ def deficit_por_perfil(elegidas, roles, hoy):
     return salida
 
 
+POR_PLAZA = 2  # candidatas por cada vacante de la meta de una persona (contrato v49)
+
+
+def candidatas_por_persona(vacantes, hoy, cfg=None):
+    """Contrato v49 (solo modo panel): las candidatas de cada persona —las de su cargo que cumplen SU idioma y SU
+    ubicación, aunque otro cliente ya las haya recibido—, por turnos y primero quien tiene menos de dónde elegir. Hasta
+    `POR_PLAZA` por cada vacante de su meta. Sirve para decidir qué enlaces se comprueban primero. Sin panel, []."""
+    cfg = cfg or config()
+    roles = [r for r in cfg["roles"] if r.get("_perfiles")]
+    if not roles:
+        return []
+    from panel.afinidad import MINIMO_POR_PERFIL, evaluar
+    from panel.modelos import Perfil
+    idiomas = tuple(cfg.get("idiomas", ["es", "en"]))
+    por_persona = []
+    for rol in roles:
+        del_rol = [v for v in vacantes
+                   if any(f.get("familia") in rol["familias"] and f.get("coincidencia") in GRADOS
+                          for f in v.get("familias") or [])
+                   and not contrato.entregable(dict(v, verificacion=None), idiomas)]
+        del_rol.sort(key=lambda v: v.get("fecha_publicacion") or "", reverse=True)  # las más recientes primero
+        for crudo in rol["_perfiles"]:
+            p = Perfil.model_validate(crudo)  # una sola vez por persona (validarlo en cada vacante era lo lento)
+            cuantas = max(MINIMO_POR_PERFIL, int(p.meta_diaria or 0)) * POR_PLAZA
+            suyas = [v for v in del_rol if evaluar(v, p, hoy)["compatible"]]
+            if suyas:
+                por_persona.append((len(suyas), suyas[:cuantas]))
+    por_persona.sort(key=lambda x: x[0])
+    cola, vistas = [], set()
+    for i in range(max((len(suyas) for _, suyas in por_persona), default=0)):
+        for _, suyas in por_persona:
+            if i < len(suyas) and suyas[i]["id"] not in vistas:
+                vistas.add(suyas[i]["id"])
+                cola.append(suyas[i])
+    return cola
+
+
 def sobrante_para_comunidad(salida, por_rol, roles, cfg, hoy):
     """Contrato v21: si los clientes reales no llenan el techo del día, lo que sobra no se pierde. Se completa con
     vacantes que sirven a los perfiles del cliente «Comunidad» y que nadie tomó, dentro del techo y con la misma

@@ -432,6 +432,24 @@ def ajuste(repo, clave):
         return {}
 
 
+def guardar_huellas(repo, version, vacantes):
+    """Contrato v49: al final de la búsqueda del día (no en la captura de cada hora) calcula, de la bodega, la huella
+    de funciones por idioma de los cargos activos sin huella propia y la guarda en `panel_ajustes.huellas_cargos`. La
+    usa la búsqueda siguiente; solo ordena. Un fallo aquí nunca tumba la búsqueda: queda la huella anterior."""
+    if not vacantes or not hasattr(repo, "guardar_ajuste"):
+        return {}
+    try:
+        bodega.etapa("Calcular la huella de funciones de los cargos")
+        cfg = validar_version(version)
+        aprendidos = ajuste(repo, "titulos_aprendidos")
+        cargos = [contenido.cargo_operativo(c.model_dump(mode="json"), aprendidos.get(str(c.id)))
+                  for c in cfg.cargos if c.activo and not c.funciones]
+        return repo.guardar_ajuste("huellas_cargos", contenido.huellas_automaticas(vacantes, cargos))
+    except Exception as e:  # noqa: BLE001
+        registro.aviso("ejecutor:huellas", e)
+        return {}
+
+
 def cargos_operativos(repo, cfg):
     """Contrato v49: {id: cargo operativo} con los títulos aprendidos (v25) y la huella calculada de noche."""
     aprendidos, huellas = ajuste(repo, "titulos_aprendidos"), ajuste(repo, "huellas_cargos")
@@ -655,7 +673,7 @@ def _posts(repo, cfg, fecha, estrictas, filas, fila, operativos):
     for cargo, p in bajos:
         raw = operativos[str(cargo.id)]
         vistas = vistas_por_perfil.setdefault(str(p.id), set())
-        sin_confirmar = 0
+        toleradas = 0  # contrato v49: posts a los que se les perdonó el país o la modalidad (sin confirmar o deducidos)
         for row in candidatos:
             if estrictas.get(p.id, 0) >= MINIMO_POR_PERFIL:
                 break
@@ -663,15 +681,12 @@ def _posts(repo, cfg, fecha, estrictas, filas, fila, operativos):
             if row["vacante_id"] in vistas or not afinidad:
                 continue
             marca = post_ubicacion(row["snapshot"])
-            if marca == "sin_confirmar" and sin_confirmar >= TOPE_POSTS_SIN_CONFIRMAR:
-                continue
             match, extra = evaluar_post(row["snapshot"], p, fecha), [{"tipo": "post"}]
-            # Contrato v49: el tope diario cuenta todo post al que se le perdonó la ubicación, no solo los «sin confirmar».
-            if not match["compatible"] or (match.get("tolerada") and sin_confirmar >= TOPE_POSTS_SIN_CONFIRMAR):
+            if not match["compatible"] or (match["tolerada"] and toleradas >= TOPE_POSTS_SIN_CONFIRMAR):
                 continue
             if marca:
                 extra.append({"post_ubicacion": marca, "pista": row["snapshot"].get("ubicacion_deducida", "")})
-            sin_confirmar += bool(match.get("tolerada"))
+            toleradas += match["tolerada"]
             vistas.add(row["vacante_id"])
             estrictas[p.id] = estrictas.get(p.id, 0) + 1
             filas.append(fila(dict(row, match_grade=entrega.GRADO_CONTRATO.get(afinidad, "close")), p, str(cargo.id),
@@ -788,13 +803,6 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
             por_confirmar = revision.preparar_cola(repo, cfg, fecha, estrictas, filas)
         except Exception:  # noqa: BLE001 — la bandeja es una ayuda; nunca impide registrar lo del día
             por_confirmar = {}
-    if vacantes and revision_lote is not None and hasattr(repo, "guardar_ajuste"):
-        try:  # contrato v49: huella de funciones por idioma para los cargos sin huella propia (solo ordena)
-            bodega.etapa("Calcular la huella de funciones de los cargos")
-            repo.guardar_ajuste("huellas_cargos", contenido.huellas_automaticas(
-                vacantes, [operativos[str(c.id)] for c in cfg.cargos if c.activo and not c.funciones]))
-        except Exception as e:  # noqa: BLE001 — sin huella nueva se usa la de la noche anterior o la del mapa
-            registro.aviso("ejecutor:huellas", e)
     faltantes = {c.nombre: max(0, c.cupo - conteos.get(str(c.id), 0)) for c in cfg.cargos if c.activo}
     from buscador.validacion import errores_catalogo, errores
     confirmado = reporte is None or not (errores_catalogo(reporte) if reporte.get("modo") == "incremental" else errores(reporte))
@@ -885,17 +893,14 @@ def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPL
         except Exception:  # noqa: BLE001 — sin reglas la búsqueda sigue igual que antes
             paises.cargar_reglas()
     try:
-        aprendidos = {}
-        if hasattr(repo, "ajuste"):
-            try:  # contrato v25: títulos aprendidos en la bandeja
-                aprendidos = repo.ajuste("titulos_aprendidos", {}) or {}
-            except Exception:  # noqa: BLE001 — sin ellos la búsqueda sigue igual
-                aprendidos = {}
+        # Contrato v25: títulos aprendidos en la bandeja. Contrato v49: y la huella de funciones de la noche anterior,
+        # para que la clasificación y el lote usen el mismo cargo operativo que la asignación (`cargos_operativos`).
+        aprendidos, huellas = ajuste(repo, "titulos_aprendidos"), ajuste(repo, "huellas_cargos")
         # Contrato v43 (decisión de Oscar, 18 nov): si la configuración se confirmó hoy después de armar el lote, la
         # siguiente pasada horaria también arma lote para lo que falte (excepción a «la captura horaria no entrega»).
         lote_de = (ejecucion.get("resumen") or {}).get("revision_del_lote")
         completar = modo == "incremental" and lote_de is not None and lote_de != version["revision"]
-        with activar(version, fecha, aprendidos, perfiles_cortos(repo, version, fecha) | primero, enfocar):
+        with activar(version, fecha, aprendidos, perfiles_cortos(repo, version, fecha) | primero, enfocar, huellas):
             if completar:
                 bodega._config_operativa["completar_lote"] = True
             if hasattr(repo, "decisiones_ubicacion"):
@@ -920,8 +925,9 @@ def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPL
                     registro.aviso("ejecutor:405", e)
             # Contrato v36: la bodega completa de la noche, para completar el mínimo de cada persona.
             trabajo = Path(salida) / "trabajo"
+            vacantes = bodega._leer_json(trabajo / "bodega.json.gz", [])
             registrar(repo, version, fecha, dict(reporte or {}, busquedas_por_perfil=busquedas), reglas_info,
-                      vacantes=bodega._leer_json(trabajo / "bodega.json.gz", []),
+                      vacantes=vacantes,
                       cache_enlaces=bodega._leer_json(trabajo / "verificacion_enlaces.json", {}),
                       limites_rescate=(30, 60) if modo == "incremental" else (MAX_COMPROBAR_RESCATE, SEGUNDOS_RESCATE),
                       revision_lote=version["revision"] if modo != "incremental" or completar else None)
@@ -931,6 +937,7 @@ def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPL
                     borradores.generar(repo, fecha)
                 except Exception as e:  # noqa: BLE001
                     registro.aviso("ejecutor:412", e)
+                guardar_huellas(repo, version, vacantes)
             return reporte
     except Exception:
         aviso = "La captura requiere revisión; se conserva su historial y pendientes."

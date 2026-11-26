@@ -4,7 +4,7 @@ from collections import Counter, defaultdict, deque
 from datetime import date, timedelta
 from typing import NamedTuple
 
-from buscador import normalizar
+from buscador import normalizar, paises
 
 
 def consultas(familia):
@@ -107,10 +107,11 @@ def sirve_a_corta(v):
     """Contrato v40: True si una vacante guardada es de un cargo y un país de alguna persona que va corta (o es nueva).
     La relectura de descripciones empieza por estas: sin descripción no se sabe el idioma y no se entrega."""
     familias_v = {f.get("familia") for f in v.get("familias") or [] if isinstance(f, dict)}
-    paises_v = set(v.get("paises") or []) | set(v.get("paises_mundo") or [])
-    # Contrato v49: y de un idioma que esa persona acepta, cuando ya se sabe (sin descripción aún no se sabe).
+    # Contrato v49: con la misma regla de países que decide la entrega (`paises.abiertos`), y de un idioma que esa
+    # persona acepta cuando ya se sabe (sin descripción aún no se sabe).
+    paises_v, mundial, _ = paises.abiertos(v)
     idioma = v.get("idioma") or ""
-    return any(p.get("corto") and p["familia"] in familias_v and (v.get("alcance_mundial") or paises_v & p["lugares"])
+    return any(p.get("corto") and p["familia"] in familias_v and (mundial or paises_v & p["lugares"])
                and (not idioma or idioma in p.get("idiomas", ("es", "en"))) for p in _PERSONAS)
 
 

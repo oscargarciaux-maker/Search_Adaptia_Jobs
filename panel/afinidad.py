@@ -67,9 +67,11 @@ def evaluar_post(v, perfil, hoy=None):
     """Como `evaluar`, pero un post deducido o sin confirmar que solo falla por país o modalidad se admite."""
     r = evaluar(v, perfil, hoy)
     if not r["compatible"] and post_ubicacion(v) and set(r["motivos"]) <= POST_UBICACION_TOLERADA:
-        r = dict(r, compatible=True, motivos=[], pruebas=[*r["pruebas"], ETIQUETA_POST_UBICACION[post_ubicacion(v)]],
-                 tolerada=True)  # contrato v49: se le perdonó el país o la modalidad; cuenta para el tope diario
-    return r
+        r = dict(r, compatible=True, motivos=[], pruebas=[*r["pruebas"], ETIQUETA_POST_UBICACION[post_ubicacion(v)]])
+        tolerada = True
+    else:
+        tolerada = False
+    return dict(r, tolerada=tolerada)  # contrato v49: se le perdonó el país o la modalidad; cuenta para el tope diario
 
 
 def faltas(resultado):
@@ -202,14 +204,7 @@ def lugar(v, p):
       perfil marcó; la zona del país donde vive ya no cuenta sola (antes 95 remotas de otro país llegaban a Colombia).
     - Híbrido/presencial: la fila necesita ciudad y el aviso debe nombrarla (o quedar a 50 km)."""
     modo = v.get("modalidad")
-    elegibles, nombrados = set(v.get("paises") or []), set(v.get("paises_mundo") or [])
-    cubiertos = set(paises.datos()["codigos"])
-    abiertos = elegibles | (nombrados - cubiertos)
-    acotado = paises.mundo_acotado(v.get("ubicacion"))
-    if acotado:
-        abiertos = (elegibles & nombrados) | (nombrados - cubiertos)
-    mundial = bool(v.get("alcance_mundial")) and not acotado and (not nombrados or cubiertos <= elegibles)
-    solo_franja = v.get("nota_pais") == "por zona horaria" and not nombrados
+    abiertos, mundial, solo_franja = paises.abiertos(v)
     horario = solo_franja and modo not in ("hibrido", "presencial") and horario_compatible(v, p)
     sin_pais = v.get("confianza_pais") not in {"alta", "media"} and not horario
     primeros = None
@@ -269,8 +264,13 @@ def _ciudad_del_pais(ciudad, del_aviso, paises_fila):
     """Contrato v49: el nombre de una ciudad no anula el país. Vale si el aviso no dice país o si su país es uno de la
     fila («Santiago» de Chile no acepta «Santiago de Cali, Colombia»; «Paris» de una fila de EE. UU. es la de Texas).
     En una fila sin países, el país es el de la ciudad; si el nombre es de varios, no se puede comprobar y vale."""
-    referencia = set(paises_fila) or ({pais_de_ciudad(ciudad)} - {None})
+    referencia = _paises_de_ciudad(ciudad, paises_fila)
     return not del_aviso or not referencia or bool(del_aviso & referencia)
+
+
+def _paises_de_ciudad(ciudad, paises_fila):
+    """Los países donde puede estar una ciudad del perfil: los de su fila; en una fila sin países, el de la ciudad."""
+    return set(paises_fila) or ({pais_de_ciudad(ciudad)} - {None})
 
 
 def en_sus_ciudades(v, ciudades, paises_fila=()):
@@ -296,8 +296,7 @@ def _cerca(v, ciudades, paises_fila=()):
     for c in ciudades:
         # La ciudad del perfil se ubica primero en su país («Madrid» es España, no el Madrid de Cundinamarca); si el
         # nombre es de varios países, en los de su fila (v49: «Valencia» de España no es la de California).
-        suyo = pais_de_ciudad(c)
-        referencia = tuple(sorted(paises_fila)) if paises_fila and suyo not in paises_fila else (suyo,) if suyo else ()
+        referencia = tuple(sorted(_paises_de_ciudad(c, paises_fila)))
         if referencia and codigos and not set(referencia) & set(codigos):
             continue
         if paises.cerca(ciudad, c, referencia or codigos, estado):

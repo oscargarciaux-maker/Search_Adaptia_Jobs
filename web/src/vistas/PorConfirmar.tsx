@@ -444,7 +444,11 @@ export function PorConfirmar({
                     {x.ayuda_faltantes && (
                       <span className="pill amber">Ayuda a faltantes</span>
                     )}
-                    {x.funciones && <span className="pill">Por funciones</span>}
+                    {x.funciones && (
+                      <span className="pill">
+                        {x.otro_oficio ? "Otro oficio" : "Por funciones"}
+                      </span>
+                    )}
                     {x.sugerida && (
                       <span className="item-sugerencia">
                         Sugerencia: {ETIQUETA_SUGERIDA[x.sugerida]}
@@ -552,11 +556,20 @@ export function PorConfirmar({
               <p className="helper">
                 Le serviría a: {r.clientes.join(", ") || "—"}
               </p>
-              {r.funciones && (
+              {r.funciones && !r.otro_oficio && (
                 <p className="revision-funciones">
                   <span className="pill">Coincide por funciones</span> El título
                   es otro, pero la descripción coincide con las funciones del
                   cargo. Si sirve, desde mañana este título entra solo.
+                </p>
+              )}
+              {r.otro_oficio && (
+                <p className="revision-funciones">
+                  <span className="pill">Funciones de otro oficio</span> El
+                  título coincide con el cargo, pero la descripción no nombra
+                  sus funciones y parece otro oficio. Si sirve, desde mañana
+                  este título entra solo; si no, no se le ofrece más a ese
+                  cargo.
                 </p>
               )}
               <div className="revision-acciones">

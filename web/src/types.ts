@@ -253,6 +253,8 @@ export type Revision = {
   iguales: number;
   motivo?: string;
   funciones?: boolean;
+  // Contrato v49: el título coincide, pero las funciones parecen de otro oficio.
+  otro_oficio?: boolean;
   // Contrato v29: entre las 10 más útiles de hoy.
   mas_util?: boolean;
   // 18 nov: para la tarjeta del detalle del cliente.

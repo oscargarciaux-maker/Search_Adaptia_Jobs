@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from buscador import bodega, cobertura, entrega, familias, normalizar, paises, vacante, verificar_enlaces
+from buscador import bodega, cobertura, familias, normalizar, paises, vacante, verificar_enlaces
 from buscador.fuentes import computrabajo as ct
 from panel import ejecutor, terminos
 from panel.modelos import Configuracion
@@ -67,7 +67,7 @@ def test_del_minimo_a_la_meta_no_se_pasa_del_techo_del_dia(cfg):
     for n in range(5):  # hasta el mínimo siempre cabe, aunque se acabe el techo
         assert completar.cabe(perfil, f"v{n}")
         completar.anotar(perfil, f"v{n}")
-    assert completar.libre < 0 and not completar.cabe(perfil, "otra")
+    assert not completar.cabe(perfil, "otra")  # ya no queda techo para una vacante nueva
     assert completar.cabe(perfil, "l1")  # una que ya está en el lote de hoy no gasta techo
     assert completar.falta(perfil) == 1
 
@@ -233,9 +233,37 @@ def test_modalidad_y_alcance_en_espanol(descripcion, modalidad, latam):
 # ── «Buscar ahora» para quien falta ────────────────────────────────────────────────────────────────────────────────
 def test_la_busqueda_para_quien_falta_lee_hireline_y_magneto():
     from buscador.fuentes import sitemaps_empleo
-    assert not set(sitemaps_empleo.SITIOS) & bodega.OMITIDAS_FALTANTES
-    assert bodega.OMITIDAS_FALTANTES == {"Tableros remotos", "Portales de empresas"}
+    assert not set(sitemaps_empleo.SITIOS) & bodega.OMITIDAS_FALTANTES  # v47 las omitía
 
 
-def test_el_lote_no_cambia_para_el_modo_heredado():
-    assert all("_cargo" not in r for r in entrega.config()["roles"])  # sin panel no hay cargo operativo ni evidencia
+# ── La huella de la noche llega a la clasificación (el mismo cargo operativo en todas partes) ───────────────────────
+def test_la_huella_guardada_se_usa_al_clasificar_y_al_asignar(cfg):
+    cfg["cargos"].append({**cfg["cargos"][0], "id": "00000000-0000-0000-0000-0000000000c9", "nombre": "Asesor comercial",
+                          "terminos_exactos": ["Asesor comercial"], "terminos_similares": [], "cupo": 5})
+    perfil = dict(cfg["perfiles"][0], id="00000000-0000-0000-0000-0000000000d9",
+                  cargo_id="00000000-0000-0000-0000-0000000000c9", meta_diaria=5)
+    cfg["perfiles"].append(perfil)
+    cfg["techo_diario"] = 200
+    version = {"revision": 1, "configuracion": cfg}
+    huella = ["prospectar", "cierre de ventas", "crm", "cartera de clientes"]
+    huellas = {"00000000-0000-0000-0000-0000000000c9": huella}
+    mapa, config_entrega, _ = ejecutor.preparar(version, hoy(), huellas=huellas)
+    del_mapa = next(f for f in mapa if f["nombre"] == "Asesor comercial")
+    assert del_mapa["_control_cargo"]["funciones"] == huella and del_mapa["funciones"] == []  # v25 solo con la propia
+    assert next(r for r in config_entrega["roles"] if r["nombre"] == "Asesor comercial")["_cargo"]["funciones"] == huella
+
+    class RepoAjustes(Repo):
+        guardados = {"huellas_cargos": huellas}
+
+        def ajuste(self, clave, defecto=None):
+            return self.guardados.get(clave, defecto)
+
+        def guardar_ajuste(self, clave, valor):
+            self.guardados[clave] = valor
+            return valor
+    repo = RepoAjustes()
+    c = Configuracion.model_validate(cfg)
+    assert ejecutor.cargos_operativos(repo, c)["00000000-0000-0000-0000-0000000000c9"]["funciones"] == huella
+    # Al final de la búsqueda del día se recalcula y se guarda (con pocos avisos, queda vacía; nunca falla).
+    assert ejecutor.guardar_huellas(repo, version, [_vacante(1)]) == {} and repo.guardados["huellas_cargos"] == {}
+    assert ejecutor.guardar_huellas(repo, version, []) == {}

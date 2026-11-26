@@ -72,19 +72,26 @@ reescriben asignaciones.
 - **Evidencia** (`panel/contenido.py::evidencia(titulo, descripcion, cargo)`), sin IA:
   - `fuerte`: 3 o más términos de la huella, o el nombre del cargo 2 o más veces en la descripción;
   - `debil`: 1 o 2 términos;
-  - `ninguna`: hay huella y la descripción no trae ninguno, o el cargo es compuesto («AI Product Manager», «Growth
-    Marketing») y ni el título ni la descripción nombran su distintivo (`datos/glosario_cargos.yaml`);
+  - `ninguna`: hay huella y la descripción no trae ninguno;
   - `sin_huella`: el cargo no tiene huella o el aviso no tiene descripción: no opina.
   - `otro_oficio`: sin ninguna evidencia y con una señal positiva de otro oficio: el título trae un `excluir` de su
     familia del mapa, una palabra de otro sector (`datos/oficios_ajenos.yaml`, editable) que el cargo no usa, o la
     descripción trae 4 o más herramientas de una familia de otra área. Un título que es exactamente un nombre del
     cargo (o uno aprobado en la bandeja) nunca se retiene.
+- **Distintivo** (aparte del nivel): en un cargo compuesto («AI Product Manager» = IA + Product Manager, según
+  `datos/glosario_cargos.yaml`), si ni el título ni la descripción nombran el modificador, `falta_distintivo` trae la
+  forma que falta («IA»). Ordena igual que `ninguna` y deja la etiqueta «No menciona IA».
 - **Qué hace.** `ninguna` solo ordena: pesa como una cosa más que no cumple y deja la etiqueta «Funciones por
   confirmar»; en el mensaje de WhatsApp entra después de las que sí tienen evidencia. `otro_oficio` no se entrega sola:
-  va a «Por confirmar» con el motivo «Título coincide; funciones de otro oficio». «Sirve» la asigna; «No sirve» la
-  retira solo para ese cargo.
-- **Dónde queda.** No se guarda en el catálogo (depende del cargo, que es configuración privada). Va en
-  `panel_asignaciones.explicacion` como `{"funciones": nivel, "halladas": [...]}`.
+  en `familias` queda con la coincidencia `otro_oficio` (grado nuevo, fuera de exacto/similar/cercano y distinto de
+  `funciones`, que es lo contrario: v25) y va a «Por confirmar» con el motivo «Título coincide; funciones de otro
+  oficio». «Sirve» la asigna y aprende el título; «No sirve» la retira solo para ese cargo (motivo «no sirve para ese
+  cargo»; antes, «No sirve» en una duda de cargo la descartaba para todos los cargos).
+- **Dónde queda.** La evidencia no se guarda en el catálogo (depende del cargo, que es configuración privada). Va en
+  `panel_asignaciones.explicacion` como `{"funciones": nivel, "halladas": [...], "falta": "IA"}` (`falta` solo si
+  aplica). Una asignación aprobada a mano en la bandeja lleva `{"aprobada_por": …}` (antes `{"funciones": true}`, que
+  se sigue leyendo). `panel_asignaciones.cargo_configuracion` guarda el cargo operativo: el del operador más
+  `funciones` rellenadas, `excluir_mapa` y `distintivo`.
 - **Orden por calidad.** Vacantes y WhatsApp ordenan por: coincidencia del cargo, lo que no cumple, evidencia y fecha.
 - `match_grade` de una asignación es el del cargo que la recibe (antes, en el cruce entre cargos y al reutilizar, era
   el del cargo de origen).
@@ -119,7 +126,8 @@ reescriben asignaciones.
 - **«Buscar ahora» para quien falta** incluye Hireline y Magneto (ajusta v47) y un título en español por cargo en el
   refuerzo de Get on Board.
 - **Diagnóstico por persona.** Es la «Cobertura por persona» que ya existe (v37): del cargo, compatibles, listas, por
-  comprobar y por qué le faltan. Suma los motivos nuevos de ciudad y su sugerencia en «Qué hacer».
+  comprobar y por qué le faltan. Suma los motivos nuevos de ciudad; «falta la ciudad en el perfil» trae su sugerencia
+  en «Qué hacer» («Escribir la ciudad…»). «Oficina sin ciudad confirmada» no tiene sugerencia: depende del aviso.
 
 Lo que una bodega guardada no puede demostrar: cuántos enlaces más se comprueban y cuántas descripciones más se leen.
 Eso se ve en la primera búsqueda real (`por_necesidad` en la comprobación de enlaces, `del_cargo` y `relectura` en

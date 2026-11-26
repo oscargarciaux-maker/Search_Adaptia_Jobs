@@ -13,6 +13,8 @@ import json
 from collections import Counter
 from uuid import NAMESPACE_DNS, uuid5
 
+from buscador import paises
+
 CARGOS = ("Product Designer", "Product Manager", "QA", "AI Product Manager", "Growth Marketing")
 CIUDADES = {"CO": "Bogotá", "MX": "Ciudad de México", "AR": "Buenos Aires", "CL": "Santiago", "PE": "Lima",
             "ES": "Madrid"}
@@ -44,8 +46,7 @@ def perfil(pais, idiomas=("es", "en"), modalidades=("remoto",), ciudades=()):
 def nombra_otro_pais(v, pais):
     """El aviso nombra países y ninguno es `pais` (y no es de verdad para cualquier país): no debería llegarle."""
     nombrados = set(v.get("paises") or []) | set(v.get("paises_mundo") or [])
-    mundial = v.get("alcance_mundial") and set(v.get("paises_mundo") or []) <= set(v.get("paises") or [])
-    return bool(nombrados) and pais not in nombrados and not mundial
+    return bool(nombrados) and pais not in nombrados and not paises.abiertos(v)[1]
 
 
 def _entregable(v):

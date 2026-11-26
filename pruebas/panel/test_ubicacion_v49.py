@@ -228,4 +228,4 @@ def test_un_post_al_que_se_le_perdona_la_ubicacion_queda_marcado():
     r = evaluar_post(post, perfil("CO"), hoy())
     assert r["compatible"] and r["tolerada"]
     claro = guardada("remoto", ["CO"], ubicacion="Colombia", tipo="post")
-    assert "tolerada" not in evaluar_post(claro, perfil("CO"), hoy())
+    assert not evaluar_post(claro, perfil("CO"), hoy())["tolerada"]

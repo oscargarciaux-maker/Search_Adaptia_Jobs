@@ -219,9 +219,10 @@ class RepositorioSupabase:
                    params={"id": "eq." + vacante_id, "or": "(description_full.is.null,description_full.eq.)"},
                    headers={"Prefer": "return=minimal"}, json={"description_full": texto[:30000]})
 
-    def candidatas_por_funciones(self, desde=None):
-        """Contrato v25: vacantes activas que coinciden con un cargo solo por funciones."""
-        params = {"status": "eq.active", "datos->familias": 'cs.[{"coincidencia":"funciones"}]',
+    def candidatas_por_funciones(self, desde=None, grado="funciones"):
+        """Contrato v25: vacantes activas que coinciden con un cargo solo por funciones. Contrato v49: con
+        `grado="otro_oficio"`, las que coinciden por el título pero sus funciones parecen de otro oficio."""
+        params = {"status": "eq.active", "datos->familias": 'cs.[{"coincidencia":"%s"}]' % grado,
                   "select": "id,datos,description_full"}
         if desde:
             params["observed_at"] = "gte." + desde
@@ -871,7 +872,7 @@ class RepositorioDemo:
     def candidatas_por_confirmar(self, desde=None):
         return []  # la demostración trae su bandeja ya preparada
 
-    def candidatas_por_funciones(self, desde=None):
+    def candidatas_por_funciones(self, desde=None, grado="funciones"):
         return []
 
     def vacante(self, vacante_id):

@@ -20,7 +20,6 @@ MIN_TEXTO = 200   # el mismo mínimo de descripción que pide `contrato.entregab
 OTRA_FAMILIA = 4  # herramientas de otra familia del mapa, de otra área (y ninguna de la suya), para señalar otro oficio
 ETIQUETA_SIN_FUNCIONES = "Funciones por confirmar"
 MOTIVO_OTRO_OFICIO = "Título coincide; funciones de otro oficio"  # motivo en la bandeja «Por confirmar»
-DUDA_OTRO_OFICIO = "otro_oficio"  # marca en `familias` de una vacante retenida por esta razón
 
 
 @lru_cache(maxsize=1)
@@ -29,7 +28,9 @@ def oficios_ajenos():
     ruta = Path(__file__).resolve().parent.parent / "datos" / "oficios_ajenos.yaml"
     try:
         crudo = yaml.safe_load(ruta.read_text(encoding="utf-8")) or {}
-    except OSError:
+    except OSError as e:  # sin la lista solo se pierde esa señal; se avisa para que no pase inadvertido
+        from buscador import registro
+        registro.aviso("contenido:oficios_ajenos", e)
         return ()
     return tuple(dict.fromkeys(normalizar.texto(x) for x in crudo.get("palabras") or [] if normalizar.texto(x)))
 
@@ -110,7 +111,7 @@ def _herramientas_del_mapa():
 
 
 def _otra_familia(desc, propia):
-    """Nombre de otra familia del mapa, de OTRA área, cuyas herramientas (3 o más) sí están en la descripción, o ''.
+    """Nombre de otra familia del mapa, de OTRA área, cuyas herramientas (`OTRA_FAMILIA` o más) sí están en la descripción, o ''.
     Las familias de la misma área comparten herramientas (backend y fullstack, growth y marketing digital): no señalan."""
     area = (propia or {}).get("area")
     for fid, su_area, nombre, herramientas in _herramientas_del_mapa():

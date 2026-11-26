@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from buscador import entrega, normalizar, paises, vacante
 from buscador import registro
 from panel.afinidad import MINIMO_POR_PERFIL, evaluar
+from panel.contenido import MOTIVO_OTRO_OFICIO
 from panel.repositorio import nombres as nombres_de, numeros
 from panel.terminos import grado
 
@@ -75,7 +76,7 @@ DIAS_PENDIENTE = 7
 MOTIVO = "ubicación por confirmar"
 FUNCIONES = "Coincide por funciones"  # contrato v25: el título no encaja, pero la descripción sí
 # Contrato v49: el título sí encaja, pero la descripción no trae sus funciones y hay una señal de otro oficio.
-OTRO_OFICIO = "Título coincide; funciones de otro oficio"
+OTRO_OFICIO = MOTIVO_OTRO_OFICIO
 DUDAS_DE_CARGO = (FUNCIONES, OTRO_OFICIO)  # la duda es el cargo, no el país: no piden país ni tocan el catálogo
 NO_SIRVE_AL_CARGO = "no sirve para ese cargo"
 # Lo único que una confirmación de país puede resolver; cualquier otro motivo deja fuera la vacante para ese perfil.
@@ -176,44 +177,57 @@ def extracto(texto, largo=260):
     return limpio[:largo].rsplit(" ", 1)[0].rstrip(",.;:") + "…"
 
 
-def _candidatos_funciones(repo, perfiles, recibidas, estrictas, fecha, desde, motivo_de, ya):
-    """Contrato v25: vacantes cuyo título no encaja con un cargo pero la descripción coincide por funciones. Solo para
-    los perfiles de ese cargo que cumplen todos sus filtros y nunca la recibieron."""
+def _dudas_de_cargo(repo, perfiles, recibidas, estrictas, fecha, desde, grado_duda, motivo, pista_de, ya):
+    """Vacantes del catálogo con una duda de cargo (`grado_duda`), para los perfiles de ese cargo que cumplen todos sus
+    filtros y nunca la recibieron. `pista_de(cargo, datos)` dice qué mostrar en la tarjeta."""
     salida = []
-    for fila in repo.candidatas_por_funciones(desde):
+    # Los repositorios anteriores a v49 no conocen el segundo parámetro: para «funciones» se llama como siempre.
+    filas = repo.candidatas_por_funciones(desde) if grado_duda == "funciones" else \
+        repo.candidatas_por_funciones(desde, grado_duda)
+    for fila in filas:
         if fila["id"] in ya:
             continue
         datos = _datos_ligeros(fila)
         if datos.get("idioma") not in ("es", "en") or not datos.get("titulo") or \
                 _sin_revisar(datos, fecha, solo_cierre=True):
             continue
-        familias_f = {f["familia"]: f.get("duda") for f in datos.get("familias") or []
-                      if f.get("coincidencia") == "funciones"}
-        sirve, halladas, senal = [], [], None
+        del_grado = {f["familia"] for f in datos.get("familias") or [] if f.get("coincidencia") == grado_duda}
+        sirve, pista = [], ""
         for cargo, p in perfiles:
-            if "cargo:" + str(cargo.id) not in familias_f or fila["id"] in recibidas.get(str(p.id), set()):
+            if "cargo:" + str(cargo.id) not in del_grado or fila["id"] in recibidas.get(str(p.id), set()):
                 continue
             if not evaluar(datos, p, fecha)["compatible"]:
                 continue
-            if familias_f["cargo:" + str(cargo.id)]:  # contrato v49: el título coincide; la duda son sus funciones
-                from panel import contenido
-                senal = senal or contenido.evidencia(datos["titulo"], datos.get("_descripcion"),
-                                                     contenido.cargo_operativo(cargo.model_dump(mode="json")))["senal"]
-            else:
-                desc = normalizar.texto(datos.get("_descripcion", ""))[:12000]
-                halladas = halladas or [t for t in cargo.funciones
-                                        if normalizar.contiene_frase(desc, normalizar.texto(t))]
+            pista = pista or pista_de(cargo, datos)
             sirve.append({"perfil_id": str(p.id), "cliente_id": str(p.cliente_id), "cargo_id": str(cargo.id),
                           "faltan": estrictas.get(p.id, 0) < MINIMO_POR_PERFIL})
         if sirve:
-            motivo = FUNCIONES if senal is None else OTRO_OFICIO
-            pista = "Funciones encontradas: " + ", ".join(halladas[:10]) if senal is None else \
-                "No nombra las funciones del cargo" + (f" y menciona «{senal}»." if senal else ".")
             salida.append({"vacante_id": fila["id"], "motivo": motivo, "pista": pista,
                            "ubicacion": clave_ubicacion(datos.get("ubicacion", "")), "sugerencia": [],
                            "perfiles": sirve, "prioridad": sum(100 if s["faltan"] else 10 for s in sirve)
                            + max(0, 30 - _edad(datos, fecha)), "resumen": resumen_de(datos, motivo)})
     return salida
+
+
+def _candidatos_funciones(repo, perfiles, recibidas, estrictas, fecha, desde, motivo_de, ya):
+    """Contrato v25: vacantes cuyo título no encaja con un cargo pero la descripción coincide por funciones."""
+    def pista(cargo, datos):
+        desc = normalizar.texto(datos.get("_descripcion", ""))[:12000]
+        halladas = [t for t in cargo.funciones if normalizar.contiene_frase(desc, normalizar.texto(t))]
+        return "Funciones encontradas: " + ", ".join(halladas[:10])
+    return _dudas_de_cargo(repo, perfiles, recibidas, estrictas, fecha, desde, "funciones", FUNCIONES, pista, ya)
+
+
+def _candidatos_otro_oficio(repo, perfiles, recibidas, estrictas, fecha, desde, ya, operativos):
+    """Contrato v49: vacantes cuyo título sí es del cargo pero cuya descripción no trae sus funciones y hay una señal
+    de otro oficio. No se entregaron solas: aquí se pregunta. `operativos`: los cargos de `ejecutor.cargos_operativos`."""
+    from buscador.familias import GRADO_OTRO_OFICIO
+    from panel import contenido
+
+    def pista(cargo, datos):
+        senal = contenido.evidencia(datos["titulo"], datos.get("_descripcion"), operativos[str(cargo.id)])["senal"]
+        return "No nombra las funciones del cargo" + (f" y menciona «{senal}»." if senal else ".")
+    return _dudas_de_cargo(repo, perfiles, recibidas, estrictas, fecha, desde, GRADO_OTRO_OFICIO, OTRO_OFICIO, pista, ya)
 
 
 APLICAR_SUGERENCIAS = True  # contrato v32: las sugerencias claras se aplican solas en la cola de la noche
@@ -290,6 +304,12 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, ava
     if not completa and hasattr(repo, "candidatas_por_funciones"):
         candidatos += _candidatos_funciones(repo, perfiles, recibidas, estrictas, fecha, desde, motivo_de,
                                             {c["vacante_id"] for c in candidatos})
+        try:  # contrato v49: título del cargo con funciones de otro oficio
+            from panel.ejecutor import cargos_operativos
+            candidatos += _candidatos_otro_oficio(repo, perfiles, recibidas, estrictas, fecha, desde,
+                                                  {c["vacante_id"] for c in candidatos}, cargos_operativos(repo, cfg))
+        except TypeError:  # repositorios anteriores sin el parámetro `grado`: solo las de v25
+            pass
     existentes = {r["vacante_id"]: r for r in _revisiones_sin_texto(repo)}
     # Las pendientes de otras noches que hay que volver a mirar leen su descripción por grupos de 100 y la sueltan.
     releer = [vid for vid, r in existentes.items() if r.get("estado") == "pendiente" and vid not in sin_revisar
@@ -595,7 +615,7 @@ def _asignar(repo, rev, codigos, fecha, por, comprobar):
                        "match_grade": entrega.GRADO_CONTRATO.get(afinidad, "similar"),
                        "explicacion": [*match["pruebas"], evidencia or {"regla": "similitud textual"},
                                        {"confirmada": {"paises": codigos, "por": por}} if codigos else
-                                       {"funciones": True, "por": por}],
+                                       {"aprobada_por": por}],  # v49 (antes `{"funciones": True}`)
                        "filtros": p.model_dump(mode="json"), "cargo_configuracion": cargo.model_dump(mode="json")})
     if nuevas:
         repo.crear_asignaciones(nuevas)

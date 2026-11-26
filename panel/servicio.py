@@ -1,6 +1,7 @@
 """Vistas y texto para copiar; nunca se envía WhatsApp."""
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+import json
 import logging
 import re
 import threading
@@ -285,13 +286,15 @@ def resultados(repo, cliente_id=None, fecha=None):
             filtros = evaluar(actual, row["filtros"], hoy())
         # Contrato v49: el cargo operativo (con los nombres sugeridos y la huella heredada), también para asignaciones
         # anteriores: antes una vacante que entró por un nombre sugerido quedaba «no corresponde al cargo».
-        clave_cargo = (row.get("cargo_id"), len(str(row["cargo_configuracion"])))
+        clave_cargo = json.dumps(row["cargo_configuracion"], sort_keys=True, ensure_ascii=False, default=str)
         if clave_cargo not in operativos:
             operativos[clave_cargo] = contenido.cargo_operativo(row["cargo_configuracion"])
         cargo = operativos[clave_cargo]
         afinidad_cargo, _ = grado(actual["titulo"], cargo, cercanos=True)  # v27
-        # Aprobada por el operador en «Por confirmar» (v25/v49): el título ya se decidió a mano.
-        aprobada = any(isinstance(e, dict) and e.get("funciones") is True for e in row.get("explicacion") or [])
+        # Aprobada por el operador en «Por confirmar» (v25/v49): el título ya se decidió a mano. La marca es
+        # `{"aprobada_por": …}`; las asignaciones anteriores a v49 traen `{"funciones": True}`.
+        aprobada = any(isinstance(e, dict) and (e.get("aprobada_por") or e.get("funciones") is True)
+                       for e in row.get("explicacion") or [])
         if not afinidad_cargo and not aprobada:
             filtros["compatible"] = False
             filtros["motivos"].append("el título actual no corresponde al cargo configurado")

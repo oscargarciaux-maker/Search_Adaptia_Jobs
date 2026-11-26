@@ -125,6 +125,9 @@ GENERICOS = {"profesional", "especialista", "consultor", "consultora", "analista
              "asociado", "asociada", "specialist", "consultant", "professional", "associate", "lead", "senior",
              "junior", "experto", "experta", "expert"}
 GRADO_FUNCIONES = "funciones"  # nunca se entrega solo: va a «Por confirmar» (contrato v25)
+# Contrato v49: lo contrario de «funciones». El título SÍ es del cargo, pero la descripción no trae ninguna de sus
+# funciones y hay una señal de otro oficio. Tampoco se entrega solo: va a «Por confirmar» con su propio motivo.
+GRADO_OTRO_OFICIO = "otro_oficio"
 
 
 def _por_descripcion_panel(palabras, descripcion, excluidas):
@@ -159,7 +162,7 @@ def clasificar(titulo, descripcion=""):
     completo = normalizar.texto(titulo)
     palabras = [p for p in base.replace("/", " ").split() if p]
     extremos = {palabras[0], palabras[-1]} if palabras else set()
-    salida, dudas = {}, {}
+    salida = {}
     excluidas = set()
     for fam in mapa():
         if fam.get("_control_cargo"):
@@ -170,10 +173,10 @@ def clasificar(titulo, descripcion=""):
             g, _ = grado_control(titulo, fam["_control_cargo"], cercanos=True)
             if g and descripcion:
                 # Contrato v49: el título es del cargo, pero la descripción no trae ninguna de sus funciones y hay
-                # una señal de otro oficio. No se entrega sola: queda con el grado «funciones» y se pregunta.
-                from panel.contenido import DUDA_OTRO_OFICIO, evidencia
+                # una señal de otro oficio. No se entrega sola: queda con el grado «otro_oficio» y se pregunta.
+                from panel.contenido import evidencia
                 if evidencia(titulo, descripcion, fam["_control_cargo"])["otro_oficio"]:
-                    g, dudas[fam["id"]] = GRADO_FUNCIONES, DUDA_OTRO_OFICIO
+                    g = GRADO_OTRO_OFICIO
             if g:
                 salida[fam["id"]] = g
             continue
@@ -203,9 +206,9 @@ def clasificar(titulo, descripcion=""):
                 continue
             if sum(1 for h in fam["_herramientas"] if normalizar.contiene_frase(desc, h)) >= 2:
                 salida[fam["id"]] = "cercano"
-    orden = GRADOS + [GRADO_FUNCIONES]
-    return sorted(({"familia": k, "coincidencia": v, **({"duda": dudas[k]} if k in dudas else {})}
-                   for k, v in salida.items()), key=lambda x: orden.index(x["coincidencia"]))
+    orden = GRADOS + [GRADO_FUNCIONES, GRADO_OTRO_OFICIO]
+    return sorted(({"familia": k, "coincidencia": v} for k, v in salida.items()),
+                  key=lambda x: orden.index(x["coincidencia"]))
 
 
 def consultas(familia_id):

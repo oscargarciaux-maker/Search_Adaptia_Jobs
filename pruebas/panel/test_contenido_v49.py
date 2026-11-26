@@ -7,6 +7,7 @@ import pytest
 
 from buscador import entrega, familias
 from panel import contenido, ejecutor, revision, servicio
+from panel.modelos import Configuracion
 from panel.repositorio import RepositorioDemo, configuracion_demo, hoy
 from pruebas.panel.test_confirmar_v43 import Repo
 from pruebas.panel.test_control import trabajo
@@ -144,7 +145,7 @@ def test_clasificar_retiene_el_titulo_con_funciones_de_otro_oficio(modo_panel):
     normal = familias.clasificar("QA Engineer", QA)
     assert normal == [{"familia": "cargo:" + qa["id"], "coincidencia": "exacto"}]
     dudosa = familias.clasificar("QA Manufacturing Analyst", FABRICA)
-    assert dudosa == [{"familia": "cargo:" + qa["id"], "coincidencia": "funciones", "duda": "otro_oficio"}]
+    assert dudosa == [{"familia": "cargo:" + qa["id"], "coincidencia": "otro_oficio"}]  # grado propio, no «funciones»
     # Sin descripción todavía no se puede saber: se clasifica por el título, como siempre.
     assert familias.clasificar("QA Manufacturing Analyst")[0]["coincidencia"] == "exacto"
     # Y lo que es de otro oficio no entra al lote del cargo.
@@ -244,3 +245,44 @@ def test_formato_de_oficios_ajenos():
     assert len(palabras) >= 40 and len(palabras) == len(set(palabras))
     assert all(isinstance(p, str) and p == normalizar.texto(p) for p in palabras)  # minúsculas y sin tildes
     assert tuple(palabras) == contenido.oficios_ajenos()
+
+
+def test_la_bandeja_pregunta_lo_que_parece_otro_oficio():
+    cfg = Configuracion.model_validate(configuracion_demo())
+    qa = next(c for c in cfg.cargos if c.nombre == "QA")
+    perfiles = [(qa, p) for p in cfg.perfiles_activos(str(qa.id))]
+    datos = trabajo(titulo="QA Manufacturing Analyst", _descripcion=FABRICA,
+                    familias=[{"familia": "cargo:" + str(qa.id), "coincidencia": "otro_oficio"}])
+    fila = {"id": "x1", "datos": {k: v for k, v in datos.items() if k != "_descripcion"}, "description_full": FABRICA}
+
+    class Repo:
+        pedidos = []
+
+        def candidatas_por_funciones(self, desde=None, grado="funciones"):
+            self.pedidos.append(grado)
+            return [fila] if grado == "otro_oficio" else []
+    repo = Repo()
+    operativos = {str(qa.id): contenido.cargo_operativo(qa.model_dump(mode="json"))}
+    tarjetas = revision._candidatos_otro_oficio(repo, perfiles, {}, {}, hoy(), None, set(), operativos)
+    assert repo.pedidos == ["otro_oficio"] and len(tarjetas) == 1
+    assert tarjetas[0]["motivo"] == revision.OTRO_OFICIO == contenido.MOTIVO_OTRO_OFICIO
+    assert tarjetas[0]["pista"] == "No nombra las funciones del cargo y menciona «manufacturing»."
+    assert tarjetas[0]["perfiles"] and tarjetas[0]["resumen"]["sugerida"] == ""
+    # Las de v25 («Coincide por funciones») siguen por su propio camino y no ven esta vacante.
+    assert revision._candidatos_funciones(repo, perfiles, {}, {}, hoy(), None, None, set()) == []
+
+
+def test_la_medicion_reproducible_cuenta_fugas_candidatas_y_funciones():
+    from buscador import medicion
+    es = "Buscamos a una persona para el equipo. Diseñarás en Figma, con prototipos, wireframes y sistema de diseño. " * 3
+    vacantes = [trabajo(id="a", titulo="Product Designer", idioma="es", _descripcion=es, paises=["CO"], modalidad="remoto",
+                        visto_ultima_vez=hoy()),
+                trabajo(id="b", titulo="Product Designer", idioma="es", _descripcion=es, paises=["MX"], modalidad="remoto",
+                        zona_utc=[-7, -3], confianza_pais="media", visto_ultima_vez=hoy())]
+    r = medicion.medir(vacantes)
+    assert r["vacantes"] == 2 and r["fecha"] == hoy()
+    assert all(x["remotas_de_otro_pais"] == 0 for x in r["fugas_de_ubicacion"].values())  # la de México no llega a Colombia
+    assert r["fugas_de_ubicacion"]["CO"]["remotas_compatibles"] == 1
+    disenador = r["solo_espanol_remoto"]["Product Designer"]
+    assert disenador["en_espanol"] == 2 and disenador["paises"]["CO"] == {"compatibles": 1, "comprobadas": 1}
+    assert r["funciones"]["Product Designer"]["es"]["fuerte"] == 2

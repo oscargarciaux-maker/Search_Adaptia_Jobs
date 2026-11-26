@@ -300,7 +300,7 @@ def test_correr_con_faltantes_enfoca_solo_en_ellos(monkeypatch, tmp_path):
         pass
 
     @contextmanager
-    def activar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
+    def activar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=None):
         vistos["enfocar"] = enfocar
         raise Alto
         yield  # pragma: no cover
@@ -633,7 +633,7 @@ def _correr_pedido(monkeypatch, tmp_path, repo):
         pass
 
     @contextmanager
-    def activar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
+    def activar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=None):
         vistos.update(enfocar=enfocar, cortos=set(cortos))
         raise Alto
         yield  # pragma: no cover
