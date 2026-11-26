@@ -899,9 +899,9 @@ def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPL
         # Contrato v43 (decisión de Oscar, 18 nov): si la configuración se confirmó hoy después de armar el lote, la
         # siguiente pasada horaria también arma lote para lo que falte (excepción a «la captura horaria no entrega»).
         lote_de = (ejecucion.get("resumen") or {}).get("revision_del_lote")
-        completar = modo == "incremental" and lote_de is not None and lote_de != version["revision"]
+        arma_lote = modo == "incremental" and lote_de is not None and lote_de != version["revision"]
         with activar(version, fecha, aprendidos, perfiles_cortos(repo, version, fecha) | primero, enfocar, huellas):
-            if completar:
+            if arma_lote:
                 bodega._config_operativa["completar_lote"] = True
             if hasattr(repo, "decisiones_ubicacion"):
                 try:  # contrato v17: cada decisión de la bandeja vale en esta búsqueda
@@ -923,14 +923,14 @@ def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPL
                     reglas_info["ubicaciones_resueltas_por_reglas"] = aprender.guardar_usos(repo, reglas)
                 except Exception as e:  # noqa: BLE001
                     registro.aviso("ejecutor:405", e)
-            # Contrato v36: la bodega completa de la noche, para completar el mínimo de cada persona.
+            # Contrato v36: la bodega completa de la noche, para completar a cada persona hasta su meta (v49).
             trabajo = Path(salida) / "trabajo"
             vacantes = bodega._leer_json(trabajo / "bodega.json.gz", [])
             registrar(repo, version, fecha, dict(reporte or {}, busquedas_por_perfil=busquedas), reglas_info,
                       vacantes=vacantes,
                       cache_enlaces=bodega._leer_json(trabajo / "verificacion_enlaces.json", {}),
                       limites_rescate=(30, 60) if modo == "incremental" else (MAX_COMPROBAR_RESCATE, SEGUNDOS_RESCATE),
-                      revision_lote=version["revision"] if modo != "incremental" or completar else None)
+                      revision_lote=version["revision"] if modo != "incremental" or arma_lote else None)
             if modo != "incremental":
                 try:  # borradores de WhatsApp listos para revisar; un fallo aquí nunca tumba la búsqueda
                     from panel import borradores
