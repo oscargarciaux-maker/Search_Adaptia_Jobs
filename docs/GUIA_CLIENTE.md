@@ -235,6 +235,8 @@ Las fuentes y variantes rotan; no se recorren todos los títulos de todos los pa
 - Portales locales en español además de Computrabajo: Elempleo y Magneto (Colombia), Hireline (México y Colombia) y,
   desde v50, Bumeran (Argentina, México, Perú y Venezuela), Laborum (Chile), Multitrabajos (Ecuador) y Konzerta
   (Panamá). Sus avisos son casi todos presenciales o híbridos: le llegan a quien tiene esa ciudad en su perfil.
+- España: InfoJobs (v50). Trae pocos avisos por búsqueda porque el sitio pide captcha a partir de la sexta página; si
+  el reporte dice `bloqueada`, ese día no dejó leer.
 
 ### Personas que solo hablan español (contrato v44)
 

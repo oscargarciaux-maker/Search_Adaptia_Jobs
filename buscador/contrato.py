@@ -31,7 +31,7 @@ _RASTREO = re.compile(r"^(utm_\w+|gclid|fbclid|trk|trkinfo|trackingid|refid|ref|
 _PORTALES = [("linkedin.com", "LinkedIn"), ("indeed.", "Indeed"), ("getonbrd.com", "Get on Board"),
              ("greenhouse.io", "Greenhouse"), ("lever.co", "Lever"), ("ashbyhq.com", "Ashby"),
              ("workable.com", "Workable"), ("smartrecruiters.com", "SmartRecruiters"), ("recruitee.com", "Recruitee"),
-             ("computrabajo.", "Computrabajo"), ("bumeran.", "Bumeran"), ("laborum.cl", "Laborum"),
+             ("computrabajo.", "Computrabajo"), ("bumeran.", "Bumeran"), ("laborum.cl", "Laborum"), ("infojobs.net", "InfoJobs"),
              ("multitrabajos.com", "Multitrabajos"), ("konzerta.com", "Konzerta"), ("elempleo.com", "elempleo"),
              ("workingnomads.com", "Working Nomads"), ("remotive.com", "Remotive")]
 

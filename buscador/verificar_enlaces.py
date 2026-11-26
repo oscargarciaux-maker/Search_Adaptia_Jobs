@@ -43,7 +43,9 @@ _LINKEDIN_AVISO = re.compile(r"^https?://(?:[a-z]{2,3}\.)?(?:www\.)?linkedin\.co
 LINKEDIN_FICHA = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/"
 _CERRADA_LINKEDIN = re.compile(r"closed-job|Ya no se aceptan solicitudes", re.I)
 # Indeed responde 401 a cualquier comprobación: no se le pregunta; su vacante vale si el enlace directo está comprobado.
-SIN_COMPROBACION_DIRECTA = ("indeed.com",)
+# Sitios cuya ficha no se puede abrir (Indeed responde 401; InfoJobs pide captcha): un aviso suyo cuenta como abierto
+# solo el día que su propia búsqueda lo muestra (v41 para Indeed; v50, decisión de Oscar del 26 nov, para InfoJobs).
+SIN_COMPROBACION_DIRECTA = ("indeed.com", "infojobs.net")
 PAUSA_LINKEDIN = 1.5  # segundos entre comprobaciones de LinkedIn
 BLOQUEOS_LINKEDIN = 3  # tras tantos 429 seguidos, LinkedIn descansa el resto de la ronda
 
@@ -68,11 +70,16 @@ def ficha_linkedin(html, titulo):
     return "verificada", "ficha de LinkedIn abierta"
 
 
-def sin_comprobacion_directa(url):
-    """Dominio de Indeed o un subdominio suyo («co.indeed.com»); nunca un dominio que solo lo contiene o termina igual
-    («notindeed.com», «indeed.com.otro.net»)."""
+def de_dominio(url, dominio):
+    """El enlace es de ese dominio o de un subdominio suyo («co.indeed.com»); nunca de uno que solo lo contiene o
+    termina igual («notindeed.com», «indeed.com.otro.net»)."""
     h = enlaces.host(url)
-    return any(h == d or h.endswith("." + d) for d in SIN_COMPROBACION_DIRECTA)
+    return h == dominio or h.endswith("." + dominio)
+
+
+def sin_comprobacion_directa(url):
+    """Un sitio de `SIN_COMPROBACION_DIRECTA`: su ficha nunca se pide."""
+    return any(de_dominio(url, d) for d in SIN_COMPROBACION_DIRECTA)
 
 
 def vistas_en_portales(enlaces_vistos, ahora=None):

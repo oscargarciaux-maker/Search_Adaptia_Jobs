@@ -18,7 +18,7 @@ from pathlib import Path
 import yaml
 
 from buscador import calidad, contrato, cobertura, enlaces, familias, medicion, normalizar, paises, tiempos, vacante
-from buscador.fuentes import (ats, computrabajo, elempleo, getonbrd, jobint, sitemaps_empleo, tableros_latam, indeed, linkedin_apify, linkedin_publico, open_seat,
+from buscador.fuentes import (ats, computrabajo, elempleo, getonbrd, infojobs, jobint, sitemaps_empleo, tableros_latam, indeed, linkedin_apify, linkedin_publico, open_seat,
                               publicaciones_apify, remotos)
 from buscador.http import Cliente
 
@@ -223,6 +223,13 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
         return jobint.buscar(Cliente(), mapa, activos, estado.setdefault("jobint", {}), p["jobint_busquedas"], hoy=hoy,
                              max_dias=cfg["dias_maximos"], limite_segundos=limite, prioritarias=prioritarias)
 
+    def f_infojobs():
+        # Contrato v50: InfoJobs (España). Pocas páginas por corrida y despacio: después pide captcha y se respeta.
+        if not p.get("infojobs_busquedas", 0):
+            return [], {"omitida": "sin presupuesto"}
+        return infojobs.buscar(Cliente(pausa=(3, 6)), mapa, estado.setdefault("infojobs", {}), p["infojobs_busquedas"],
+                               hoy=hoy, max_dias=cfg["dias_maximos"], limite_segundos=limite, prioritarias=prioritarias)
+
     def f_elempleo():
         if not p.get("elempleo_busquedas", 0):
             return [], {"omitida": "sin presupuesto"}
@@ -287,7 +294,7 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
     fuentes = [("LinkedIn", f_linkedin), ("Indeed", f_indeed), ("LinkedIn (Apify)", f_apify),
                ("Tableros remotos", f_remotos), ("Get on Board", f_getonbrd), ("Portales de empresas", f_ats),
                ("Publicaciones LinkedIn (Apify)", f_publicaciones), ("Computrabajo", f_computrabajo),
-               ("Elempleo", f_elempleo), (jobint.NOMBRE, f_jobint),
+               ("Elempleo", f_elempleo), (jobint.NOMBRE, f_jobint), (infojobs.NOMBRE, f_infojobs),
                *[(n, f_sitemap(n)) for n in sitemaps_empleo.SITIOS]]
     if faltantes:
         for n in OMITIDAS_FALTANTES:
@@ -411,7 +418,8 @@ def limpiar(previas, crudas, hoy, dias_maximos, enlaces_ats, empresas_leidas, co
 
 PRUEBA = {"minutos_por_fuente": 3, "linkedin_busquedas": 6, "linkedin_fichas": 8, "indeed_busquedas": 2,
           "apify_busquedas": 2, "remotos_paginas": 8, "empresas_por_probar": 5,
-          "getonbrd_busquedas": 3, "hireline_fichas": 4, "magneto_fichas": 4, "jobint_busquedas": 6}
+          "getonbrd_busquedas": 3, "hireline_fichas": 4, "magneto_fichas": 4, "jobint_busquedas": 6,
+          "infojobs_busquedas": 2}
 
 
 def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=False):
@@ -521,6 +529,8 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     from buscador.fuentes import linkedin_publico
     fichas_incorporadas = verificar_enlaces.incorporar(vacantes, cache_enlaces, linkedin_publico.FICHAS)
     indeed_incorporadas = verificar_enlaces.incorporar(vacantes, cache_enlaces, indeed.VISTAS)  # contrato v41
+    # Contrato v50 (decisión de Oscar): lo que la búsqueda de InfoJobs mostró hoy cuenta como comprobado 24 h.
+    infojobs_incorporadas = verificar_enlaces.incorporar(vacantes, cache_enlaces, infojobs.VISTAS)
     portales_incorporadas = verificar_enlaces.incorporar(  # contrato v42: listado hoy en el portal de la empresa
         vacantes, cache_enlaces, verificar_enlaces.vistas_en_portales(enlaces_ats))
     entregadas_revision = _leer_json(trabajo / "entregadas.json", {})
@@ -731,6 +741,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     resumen_revision["rechazos_en_corrida"] = {m: n for m, n in descartes.items() if m in verificar_enlaces.RECHAZOS}
     resumen_revision["fichas_linkedin_incorporadas"] = fichas_incorporadas
     resumen_revision["vistas_indeed_incorporadas"] = indeed_incorporadas
+    resumen_revision["vistas_infojobs_incorporadas"] = infojobs_incorporadas
     resumen_revision["vistas_portales_incorporadas"] = portales_incorporadas
     seleccion_actual = {"fecha": lote_actual.get("fecha"), "roles": {}}
     por_id_vigente = {v["id"]: v for v in vacantes}

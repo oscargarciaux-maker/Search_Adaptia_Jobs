@@ -33,7 +33,7 @@ def _anotar_vista(*enlaces_aviso):
     from buscador import verificar_enlaces
     for enlace in enlaces_aviso:
         # Solo páginas de Indeed (por el dominio real, no por el texto): el enlace de la empresa se comprueba como siempre.
-        if enlace and verificar_enlaces.sin_comprobacion_directa(enlace):
+        if enlace and verificar_enlaces.de_dominio(enlace, "indeed.com"):
             VISTAS[enlace] = {"estado": "verificada", "motivo": "vista hoy en la búsqueda de Indeed",
                               "comprobada_en": hora, "destino": enlace}
 

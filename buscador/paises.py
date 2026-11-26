@@ -412,6 +412,18 @@ MODALIDADES = ("hibrido", "remoto", "presencial", "sin dato")  # explícitas ant
 NOTA_INCIERTA = "confirmar países: fuentes con ubicación incierta"
 
 
+def lugar_del_portal(localizacion, pais, nombre_pais):
+    """Contrato v50: la ubicación de un aviso de un portal de un solo país: «Localidad, Provincia» más el país del
+    portal. Si la localidad se llama como un lugar de otro país («Palermo», «Florida», «Concepción del Uruguay»), se
+    quita: el aviso es del país de su portal y no debe abrir otro."""
+    tramos = [t.strip() for t in localizacion.split(",") if t.strip()] if isinstance(localizacion, str) else []
+    for desde in range(len(tramos) + 1):
+        lugar = ", ".join([*tramos[desde:], nombre_pais])
+        if set(alcance("", lugar).get("paises_mundo") or []) <= {pais}:
+            return lugar
+    return nombre_pais
+
+
 def ordenar(codigos):
     """Códigos sin repetir en el orden de `datos/paises.yaml`: el mismo conjunto siempre se guarda igual."""
     orden = {c: i for i, c in enumerate(datos()["codigos"])}

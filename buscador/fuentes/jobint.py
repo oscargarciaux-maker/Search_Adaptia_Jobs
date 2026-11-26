@@ -50,17 +50,6 @@ def _fecha(valor, hoy=""):
     return "" if hoy and fecha > hoy else fecha
 
 
-def _lugar(localizacion, pais, nombre_pais):
-    """«Localidad, Provincia» más el país del portal. Si la localidad se llama como un lugar de otro país («Palermo»,
-    «Florida», «Concepción del Uruguay»), se quita: el aviso es del país de su portal y no debe abrir otro."""
-    tramos = [t.strip() for t in str(localizacion or "").split(",") if t.strip()] if isinstance(localizacion, str) else []
-    for desde in range(len(tramos) + 1):
-        lugar = ", ".join([*tramos[desde:], nombre_pais])
-        if set(paises.alcance("", lugar).get("paises_mundo") or []) <= {pais}:
-            return lugar
-    return nombre_pais
-
-
 def enlace(dominio, titulo, aviso_id):
     """La dirección pública del aviso, como la arma el portal: /empleos/<título>-<id>.html."""
     base = re.sub(r"[^a-z0-9]+", "-", normalizar.sin_tildes(str(titulo or "")).lower()).strip("-") or "aviso"
@@ -85,7 +74,7 @@ def vacante(a, pais, nombres, hoy=""):
     modalidad = normalizar.texto(a.get("modalidadTrabajo") or "")
     remoto = True if modalidad == "remoto" else None
     sufijo = " (Remoto)" if remoto else " (Híbrido)" if modalidad == "hibrido" else " (Presencial)" if modalidad == "presencial" else ""
-    lugar = _lugar(a.get("localizacion"), pais, nombres.get(pais, pais))
+    lugar = paises.lugar_del_portal(a.get("localizacion"), pais, nombres.get(pais, pais))
     empresa = str(a.get("empresa") or "").strip()
     return {"titulo": str(a.get("titulo") or "").strip(), "empresa": "" if empresa.lower() == "confidencial" else empresa,
             "ubicacion": lugar + sufijo, "descripcion": _texto(a.get("detalle"))[:30000],
