@@ -80,14 +80,14 @@ def _bonito(titulo):
                     for i, p in enumerate(palabras))
 
 
-def compuestos(cargo):
-    """Contrato v44: para un cargo que no está en el mapa pero sí su oficio base con un modificador del glosario
-    («AI Product Manager» = AI + Product Manager), devuelve (sugerencias en español, títulos del oficio base, id de la
-    familia base). Sin IA: combina los nombres en español del mapa con las formas en español del modificador. Si el
-    cargo ya está en el mapa o no trae modificador, devuelve listas vacías."""
+@lru_cache(maxsize=512)
+def modificador(cargo):
+    """Contrato v44/v49: para un cargo que no está en el mapa pero sí su oficio base con un modificador del glosario
+    («AI Product Manager» = AI + Product Manager), devuelve (modificador del glosario, familia base). Si el cargo ya
+    está en el mapa o no trae modificador, (None, None)."""
     base = normalizar.titulo_base(cargo)
     if not base or _familias_de(base):
-        return [], [], None
+        return None, None
     for mod in glosario().get("modificadores") or []:
         for forma in sorted(mod.get("en") or [], key=len, reverse=True):
             clave = normalizar.texto(forma)
@@ -95,23 +95,31 @@ def compuestos(cargo):
                 continue
             resto = " ".join(re.sub(rf"(?<![a-z0-9]){re.escape(clave)}(?![a-z0-9])", " ", base).split())
             coincidencias = _familias_de(resto)
-            if not coincidencias:
-                continue
-            f = min(coincidencias, key=lambda x: x[:2])[2]
-            formas = [normalizar.texto(x) for x in [*(mod.get("en") or []), *(mod.get("es") or [])]]
-            espanol = [x for x in f.get("exactos", []) if en_espanol(x)
-                       and not any(normalizar.contiene_frase(normalizar.texto(x), y) for y in formas if y)]
-            ingles = [x for x in f.get("exactos", []) if not en_espanol(x)]
-            # El nombre más común en español, el original en inglés y dos más en español, cada uno con cada forma.
-            titulos = [x for x in (espanol[:1] + ingles[:1] + espanol[1:3]) if x]
-            salida = [_bonito(f"{titulo} {sufijo}") for titulo in titulos for sufijo in mod.get("es") or []]
-            vistos, unicos = set(), []
-            for x in salida:
-                if normalizar.texto(x) not in vistos:
-                    vistos.add(normalizar.texto(x))
-                    unicos.append(x)
-            return unicos[:int(glosario().get("maximo") or 12)], [_bonito(x) for x in f.get("exactos", [])][:8], f["id"]
-    return [], [], None
+            if coincidencias:
+                return mod, min(coincidencias, key=lambda x: x[:2])[2]
+    return None, None
+
+
+def compuestos(cargo):
+    """Contrato v44: para un cargo compuesto (`modificador`), devuelve (sugerencias en español, títulos del oficio base,
+    id de la familia base). Sin IA: combina los nombres en español del mapa con las formas en español del modificador.
+    Si el cargo ya está en el mapa o no trae modificador, devuelve listas vacías."""
+    mod, f = modificador(cargo)
+    if not mod:
+        return [], [], None
+    formas = [normalizar.texto(x) for x in [*(mod.get("en") or []), *(mod.get("es") or [])]]
+    espanol = [x for x in f.get("exactos", []) if en_espanol(x)
+               and not any(normalizar.contiene_frase(normalizar.texto(x), y) for y in formas if y)]
+    ingles = [x for x in f.get("exactos", []) if not en_espanol(x)]
+    # El nombre más común en español, el original en inglés y dos más en español, cada uno con cada forma.
+    titulos = [x for x in (espanol[:1] + ingles[:1] + espanol[1:3]) if x]
+    salida = [_bonito(f"{titulo} {sufijo}") for titulo in titulos for sufijo in mod.get("es") or []]
+    vistos, unicos = set(), []
+    for x in salida:
+        if normalizar.texto(x) not in vistos:
+            vistos.add(normalizar.texto(x))
+            unicos.append(x)
+    return unicos[:int(glosario().get("maximo") or 12)], [_bonito(x) for x in f.get("exactos", [])][:8], f["id"]
 
 
 @lru_cache(maxsize=512)

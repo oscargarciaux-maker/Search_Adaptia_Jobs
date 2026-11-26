@@ -22,18 +22,17 @@ def _id(nombre):
     return str(uuid5(NAMESPACE_DNS, "adaptia.medicion." + nombre))
 
 
-def cargo_ficticio(nombre):
-    """Un cargo como lo dejaría el panel con «Buscar denominaciones afines», sin tocar nada guardado."""
+def cargo_ficticio(nombre, vacantes=()):
+    """Un cargo como lo dejaría el panel con «Buscar denominaciones afines», sin tocar nada guardado. Con `vacantes`,
+    también con la huella de funciones que se calcularía esa noche (contrato v49)."""
+    from panel.contenido import cargo_operativo, huellas_automaticas
     from panel.terminos import sugerir
     s = sugerir(nombre, consultar_esco=False)
     cargo = {"id": _id(nombre), "nombre": nombre, "cupo": 20, "activo": True, "terminos_exactos": s["terminos_exactos"],
              "terminos_similares": s["terminos_similares"], "terminos_excluidos": [], "terminos_cercanos": [],
              "funciones": []}
-    try:  # contrato v49: lo que hereda del mapa (excluidos y huella de funciones)
-        from panel.contenido import cargo_operativo
-        return cargo_operativo(cargo)
-    except ImportError:
-        return cargo
+    huella = huellas_automaticas(vacantes, [cargo]).get(cargo["id"]) if vacantes else ()
+    return cargo_operativo(cargo, huella_auto=huella)
 
 
 def perfil(pais, idiomas=("es", "en"), modalidades=("remoto",), ciudades=()):
@@ -99,28 +98,30 @@ def embudo_espanol(vacantes, hoy, cargos):
 
 def evidencias(vacantes, cargos, ejemplos=6):
     """Por cargo: cuántos títulos que coinciden tienen las funciones del cargo en la descripción (contrato v49)."""
-    try:
-        from panel.contenido import evidencia
-    except ImportError:
-        return {"nota": "la evidencia de funciones aún no existe en esta versión"}
+    from panel.contenido import evidencia
     from panel.terminos import grado
     salida = {}
     for cargo in cargos:
-        niveles, dudosos = Counter(), []
-        for v in vacantes:
-            if not _entregable(v) or grado(v.get("titulo") or "", cargo)[0] not in ("exacto", "similar"):
-                continue
-            e = evidencia(v["titulo"], v["_descripcion"], cargo)
-            niveles["otro_oficio" if e["otro_oficio"] else e["nivel"]] += 1
-            if e["otro_oficio"] and len(dudosos) < ejemplos:
-                dudosos.append(v["titulo"][:60])
-        salida[cargo["nombre"]] = {**dict(niveles), "ejemplos_otro_oficio": dudosos}
+        fila = {"huella": len(cargo["funciones"])}
+        for idioma in ("es", "en"):
+            niveles, dudosos = Counter(), []
+            for v in vacantes:
+                if not _entregable(v) or v["idioma"] != idioma \
+                        or grado(v.get("titulo") or "", cargo)[0] not in ("exacto", "similar"):
+                    continue
+                e = evidencia(v["titulo"], v["_descripcion"], cargo)
+                niveles["otro_oficio" if e["otro_oficio"] else e["nivel"]] += 1
+                niveles["sin_distintivo"] += bool(e["falta_distintivo"])
+                if e["otro_oficio"] and len(dudosos) < ejemplos:
+                    dudosos.append(f"{v['titulo'][:60]} [{e['senal']}]")
+            fila[idioma] = {**dict(niveles), "ejemplos_otro_oficio": dudosos}
+        salida[cargo["nombre"]] = fila
     return salida
 
 
 def medir(vacantes, hoy=None):
     hoy = hoy or max((v.get("visto_ultima_vez") or "")[:10] for v in vacantes)
-    cargos = [cargo_ficticio(n) for n in CARGOS]
+    cargos = [cargo_ficticio(n, vacantes) for n in CARGOS]
     return {"fecha": hoy, "vacantes": len(vacantes), "fugas_de_ubicacion": fugas(vacantes, hoy),
             "solo_espanol_remoto": embudo_espanol(vacantes, hoy, cargos), "funciones": evidencias(vacantes, cargos)}
 

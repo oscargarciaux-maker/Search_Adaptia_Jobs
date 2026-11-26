@@ -554,6 +554,14 @@ DEMO_SECCIONES = ("\n\nResponsibilities:\n- Work with product and engineering on
                   "- Recent work samples or portfolio.\n- Clear written communication.")
 
 
+# Contrato v49: funciones del cargo en los avisos de la demostración (las mismas palabras del mapa de cargos).
+DEMO_FUNCIONES = {
+    "Product Designer": "\n\nYou will design in Figma, build wireframes and prototyping flows, and keep our design system.",
+    "Frontend": "\n\nYou will build interfaces with React and TypeScript, write HTML and CSS and ship with Vite.",
+    "QA": "\n\nYou will write test cases, automate with Cypress and Playwright, and report bugs in Jira.",
+}
+
+
 def id_demo(nombre):
     return str(uuid5(NAMESPACE_DNS, "adaptia.demostracion." + nombre))
 
@@ -1045,7 +1053,10 @@ class RepositorioDemo:
                      "ubicacion": "Remote - Worldwide", "paises": ["CO", "ES"], "confianza_pais": "alta",
                      "modalidad": "remoto", "idioma": "en" if n % 2 else "es", "fecha_publicacion": publicada,
                      "fecha_estimada": False, "anos_min": anos, "ingles": "intermedio",
-                     "_descripcion": (f"English B2 required. We require {anos} years of experience. We build digital products with a collaborative team. " * 5) + DEMO_SECCIONES,
+                     # Contrato v49: casi todas nombran funciones del cargo; una de cada nueve no, y llega al final
+                     # con la etiqueta «Funciones por confirmar».
+                     "_descripcion": (f"English B2 required. We require {anos} years of experience. We build digital products with a collaborative team. " * 5)
+                                     + ("" if n % 9 == 8 else DEMO_FUNCIONES[cargo["nombre"]]) + DEMO_SECCIONES,
                      "enlace": url, "enlace_directo": "", "enlaces_alternativos": [url],
                      "verificacion": {"estado": "verificada", "enlaces": [{"url": url, "estado": "verificada",
                         "comprobada_en": self.creada.isoformat()}]}}

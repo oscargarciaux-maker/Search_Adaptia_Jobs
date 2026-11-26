@@ -239,9 +239,23 @@ def _estimar_en_vivo(repo, p, c, perfil_id, fecha, fuentes, reloj):
             "fuentes": por_fuente, "segundos": round(reloj() - inicio, 1), "nota": NOTA_EN_VIVO}
 
 
+ORDEN_GRADO = {"exact": 0, "similar": 1, "close": 2}
+
+
+def calidad(ficha):
+    """Contrato v49: orden de la lista de un cliente y del mensaje de WhatsApp. Primero las vacantes formales, sin
+    ampliación, con mejor coincidencia del cargo y que encajan en todo (cada etiqueta de lo que no cumple pesa como un
+    grado menos, también «Funciones por confirmar»); a igualdad, la más reciente."""
+    return (ficha.get("tipo") == "post", bool(ficha.get("ampliacion")),
+            ORDEN_GRADO.get(ficha.get("match_grade"), 1) + len(ficha.get("avisos") or ()),
+            -int((ficha.get("publicada") or "0000-00-00").replace("-", "")[:8] or 0))
+
+
 def resultados(repo, cliente_id=None, fecha=None):
+    from panel import contenido
     r = repo.resultados(cliente_id, fecha)
     salida, vistas = [], {}
+    operativos = {}  # el cargo de cada asignación, rellenado una sola vez (contrato v49)
     # Una búsqueda de un día anterior ya se entregó: sus enlaces dejan de recomprobarse y caducan a las 6 h (contrato
     # v9). Sus vacantes compatibles se muestran «Entregada el …», no «por confirmar» (13 nov).
     dia = ((r.get("ejecucion") or {}).get("fecha") or "")[:10]
@@ -269,10 +283,21 @@ def resultados(repo, cliente_id=None, fecha=None):
             filtros = evaluar_post(actual, row["filtros"], hoy())
         else:
             filtros = evaluar(actual, row["filtros"], hoy())
-        afinidad_cargo, _ = grado(actual["titulo"], row["cargo_configuracion"], cercanos=True)  # v27
-        if not afinidad_cargo:
+        # Contrato v49: el cargo operativo (con los nombres sugeridos y la huella heredada), también para asignaciones
+        # anteriores: antes una vacante que entró por un nombre sugerido quedaba «no corresponde al cargo».
+        clave_cargo = (row.get("cargo_id"), len(str(row["cargo_configuracion"])))
+        if clave_cargo not in operativos:
+            operativos[clave_cargo] = contenido.cargo_operativo(row["cargo_configuracion"])
+        cargo = operativos[clave_cargo]
+        afinidad_cargo, _ = grado(actual["titulo"], cargo, cercanos=True)  # v27
+        # Aprobada por el operador en «Por confirmar» (v25/v49): el título ya se decidió a mano.
+        aprobada = any(isinstance(e, dict) and e.get("funciones") is True for e in row.get("explicacion") or [])
+        if not afinidad_cargo and not aprobada:
             filtros["compatible"] = False
             filtros["motivos"].append("el título actual no corresponde al cargo configurado")
+        if not aprobada and actual.get("tipo") != "post":  # un post no trae funciones que comparar
+            filtros["avisos"] = [*filtros.get("avisos", []), *contenido.avisos(
+                contenido.evidencia(actual["titulo"], actual.get("_descripcion"), cargo))]
         es_post = actual.get("tipo") == "post"  # contrato v11: post de LinkedIn sin ficha formal, con su etiqueta
         no_apta = contrato.entregable_post(actual) if es_post else contrato.entregable(actual, panel=True)
         enlace = enlace_utilizable(row) if filtros["compatible"] and not no_apta else ""
@@ -302,6 +327,7 @@ def resultados(repo, cliente_id=None, fecha=None):
     por_id = numeros(repo, [v["id"] for v in salida])
     for v in salida:
         v["numero"] = por_id.get(v["id"])
+    salida.sort(key=calidad)  # estable: a igualdad se conserva el orden en que se asignaron
     # Contrato v48: de un día anterior también se pueden copiar las ya entregadas (se comprueban al copiar).
     return {**{k: r[k] for k in ("ejecucion", "clientes")}, "vacantes": salida,
             "listas": sum(v["estado"] == "lista" for v in salida), "dia_anterior": pasada,

@@ -94,9 +94,11 @@ def prioridad_remota(v):
     return 2
 
 
-def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False, iniciales=(), perfiles=()):
+def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False, iniciales=(), perfiles=(), cargo=None):
     """Toma `cuantas` candidatas [(vacante, grado)] una por una: en cada paso la de menor costo, donde el costo sube con
-    lo que ya se repite (idioma, nivel, país, modalidad, fuente), con un grado más débil, sin descripción o más vieja."""
+    lo que ya se repite (idioma, nivel, país, modalidad, fuente), con un grado más débil, sin descripción o más vieja.
+    `cargo` (contrato v49, modo panel): el cargo operativo; un título sin respaldo en las funciones pesa como una cosa
+    más que no cumple (va después de las que sí lo tienen, nunca se descarta)."""
     elegidas, conteo = list(iniciales), {k: Counter() for k in ("idioma", "nivel", "pais", "modo", "fuente", "empresa")}
     for v, _ in iniciales:
         rasgos = _rasgos(v)
@@ -118,8 +120,12 @@ def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False, 
         from panel.afinidad import coincidencias_preferidas, preferidos
         terminos = preferidos(perfiles)
     resto = []
+    if cargo:
+        from panel import contenido
     for v, g in candidatas:
         clientes, incumple = encaje(v)
+        if cargo:
+            incumple += contenido.penalizacion(contenido.evidencia(v.get("titulo"), v.get("_descripcion"), cargo))
         resto.append((v, g, dict(_rasgos(v), _destinatarios=clientes, _faltas=incumple,
                                  _preferidas=coincidencias_preferidas(v, terminos) if terminos else 0)))
     hoy_d = date.fromisoformat(hoy)
@@ -271,7 +277,7 @@ def sobrante_para_comunidad(salida, por_rol, roles, cfg, hoy):
         libres = [(v, g) for v, g in por_rol[rol["id"]] if v["id"] not in tomadas and
                   any(evaluar(v, p, hoy)["compatible"] for p in comunidad)]
         nuevas = variadas(libres, sobrante, cfg.get("max_por_empresa", 2), hoy, cfg.get("preferir_remotas", False),
-                          perfiles=comunidad)
+                          perfiles=comunidad, cargo=rol.get("_cargo"))
         salida[rol["id"]] = list(salida[rol["id"]]) + list(nuevas)
         tomadas |= {v["id"] for v, _ in nuevas}
         sobrante -= len(nuevas)
@@ -327,7 +333,8 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificac
     for rol in roles:
         candidatas = por_rol[rol["id"]]
         salida[rol["id"]] = variadas(candidatas, meta_de(rol, cfg), cfg.get("max_por_empresa", 2), hoy,
-                                      cfg.get("preferir_remotas", False), iniciales.get(rol["id"], []), perfiles=rol.get("_perfiles",[]))
+                                      cfg.get("preferir_remotas", False), iniciales.get(rol["id"], []),
+                                      perfiles=rol.get("_perfiles", []), cargo=rol.get("_cargo"))
     if panel:
         tomadas = {v["id"] for lista in salida.values() for v, _ in lista}
         libres += [v for lista in por_rol.values() for v, _ in lista if v["id"] not in tomadas]
