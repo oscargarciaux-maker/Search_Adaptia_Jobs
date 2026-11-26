@@ -1697,6 +1697,16 @@ h1 {
   color: inherit;
   display: flex;
 }
+/* Contrato v49: acción dentro del aviso («Buscar ahora para este cliente»). */
+.toast button.toast-accion {
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 6px 10px;
+  white-space: nowrap;
+  font-weight: 600;
+  background: none;
+  color: inherit;
+}
 .loading-page {
   display: flex;
   align-items: center;
@@ -5822,4 +5832,22 @@ select,
 .fecha-sin-busqueda {
   font-size: 12px;
   color: var(--muted);
+}
+
+/* Contrato v49: el error va pegado a su campo (falta la ciudad en una fila presencial o híbrida). */
+.form-error.campo-error {
+  margin-top: 6px;
+}
+/* Contrato v49: por qué lo guardado todavía no está en uso; queda a la vista hasta aplicar bien. */
+.aviso-no-aplica {
+  margin: -6px 0 16px;
+}
+/* Contrato v49: perfiles a los que les falta la ciudad (presencial o híbrido sin ciudad). */
+.falta-ciudad {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--osc-text-rojo-medio, #8f5c4b);
 }

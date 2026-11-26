@@ -321,6 +321,7 @@ export function TagInput({
   visible,
   placeholder = "Añade un término y pulsa Enter",
   sugerencias = [],
+  error = "",
 }: {
   label: string;
   values: string[];
@@ -329,6 +330,8 @@ export function TagInput({
   placeholder?: string;
   // Opciones que aparecen al escribir; elegir una la añade sin pulsar Enter.
   sugerencias?: string[];
+  // Contrato v49: un error junto al campo (p. ej. falta la ciudad en una fila presencial o híbrida).
+  error?: string;
 }) {
   const id = useId();
   const [text, setText] = useState("");
@@ -365,6 +368,8 @@ export function TagInput({
         <input
           id={id}
           aria-label={label}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? id + "-error" : undefined}
           placeholder={placeholder}
           value={text}
           list={sugerencias.length ? id + "-sugerencias" : undefined}
@@ -410,6 +415,11 @@ export function TagInput({
           </datalist>
         )}
       </div>
+      {error && (
+        <p className="form-error campo-error" id={id + "-error"}>
+          {error}
+        </p>
+      )}
     </div>
   );
 }

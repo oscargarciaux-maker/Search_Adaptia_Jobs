@@ -12,7 +12,7 @@ from buscador import bodega, entrega, familias, paises, normalizar
 from buscador import registro
 from panel.afinidad import (AMPLIACIONES, MINIMO_POR_PERFIL, TOPE_POSTS_SIN_CONFIRMAR, evaluar, evaluar_ampliada,
                             evaluar_post, post_ubicacion)
-from panel.acciones import ENFOQUE_COMPLETO, ENFOQUE_FALTANTES
+from panel.acciones import CLAVE_PEDIDA, ENFOQUE_COMPLETO, ENFOQUE_FALTANTES, ENFOQUE_PEDIDO
 from panel import contenido
 from panel.modelos import Configuracion
 from pydantic import ValidationError
@@ -827,7 +827,11 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
 def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPLETO):
     """`enfoque` (contrato v45): «faltantes» = «Buscar ahora» cuando la búsqueda de hoy ya corrió y hay perfiles bajo su
     meta: se busca solo para ellos, corto y sin repetir lo ya buscado hoy (v47). Si hoy aún no hay búsqueda, se hace la
-    completa."""
+    completa.
+    «pedido» (contrato v49) = «Buscar ahora» desde el detalle de un cliente: los perfiles los guardó el panel en
+    `panel_ajustes` (CLAVE_PEDIDA, con su fecha), nunca en las entradas del flujo. Si hoy ya hay lote, se busca solo
+    para ellos (como «faltantes»); si no, la completa del día con ellos primero. Un pedido de otro día, vacío o ilegible
+    hace la búsqueda de siempre. Se usa una sola vez: al leerlo, se vacía."""
     fecha = hoy()
     if prueba:
         return bodega.correr(salida, modo=modo, prueba=True)
@@ -849,6 +853,29 @@ def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPL
             enfocar = None
         if enfocar:
             bodega.etapa(f"Buscar solo para {len(enfocar)} perfiles bajo su meta, sin repetir lo de hoy (v47)")
+    primero = set()  # contrato v49: perfiles pedidos que van primero en la búsqueda completa del día
+    if enfoque == ENFOQUE_PEDIDO and modo == "diario" and hasattr(repo, "ajuste"):
+        pedidos = set()
+        try:
+            pedida = repo.ajuste(CLAVE_PEDIDA, {}) or {}
+            if isinstance(pedida, dict) and pedida.get("fecha") == fecha:
+                activos = {str(p.id) for p in validar_version(version).perfiles_activos()}
+                pedidos = {str(x) for x in pedida.get("perfiles") or [] if isinstance(x, str)} & activos
+            if pedida:
+                repo.guardar_ajuste(CLAVE_PEDIDA, {})  # se usa una sola vez
+            if pedidos:
+                faltan = faltan_hoy(repo, version, fecha)
+                if faltan is None:
+                    primero = pedidos
+                    bodega.etapa(f"Búsqueda completa del día, con {len(pedidos)} perfiles pedidos primero (v49)")
+                else:
+                    enfocar = pedidos
+                    bodega.etapa(f"Buscar solo para {len(pedidos)} perfiles pedidos, sin repetir lo de hoy (v49)")
+            else:
+                bodega.etapa("El pedido no es de hoy o no tiene perfiles activos: búsqueda normal del día")
+        except Exception as e:  # noqa: BLE001 — sin el pedido, la búsqueda completa de siempre
+            registro.aviso("ejecutor:pedido", e)
+            enfocar, primero = None, set()
     ejecucion = iniciar(repo, version, fecha)
     reglas_info, reglas = {}, []
     if hasattr(repo, "decisiones_ubicacion"):
@@ -868,7 +895,7 @@ def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPL
         # siguiente pasada horaria también arma lote para lo que falte (excepción a «la captura horaria no entrega»).
         lote_de = (ejecucion.get("resumen") or {}).get("revision_del_lote")
         completar = modo == "incremental" and lote_de is not None and lote_de != version["revision"]
-        with activar(version, fecha, aprendidos, perfiles_cortos(repo, version, fecha), enfocar):
+        with activar(version, fecha, aprendidos, perfiles_cortos(repo, version, fecha) | primero, enfocar):
             if completar:
                 bodega._config_operativa["completar_lote"] = True
             if hasattr(repo, "decisiones_ubicacion"):
@@ -927,8 +954,10 @@ def main():
     parser.add_argument("--salida", required=True)
     parser.add_argument("--modo", choices=["diario", "incremental", "inicial"], default="diario")
     parser.add_argument("--prueba", action="store_true")
-    parser.add_argument("--enfoque", choices=[ENFOQUE_COMPLETO, ENFOQUE_FALTANTES], default=ENFOQUE_COMPLETO,
-                        help="faltantes: «Buscar ahora» para quienes hoy no llegan a su meta (contrato v45)")
+    parser.add_argument("--enfoque", choices=[ENFOQUE_COMPLETO, ENFOQUE_FALTANTES, ENFOQUE_PEDIDO],
+                        default=ENFOQUE_COMPLETO,
+                        help="faltantes: «Buscar ahora» para quienes hoy no llegan a su meta (contrato v45); pedido: "
+                             "los perfiles que el panel guardó para un cliente (contrato v49)")
     parser.add_argument("--config", help="Versión ficticia para ensayo dirigido; requiere --prueba")
     args = parser.parse_args()
     if args.config:

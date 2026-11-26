@@ -2,6 +2,9 @@
 // búsqueda de las 6:30. El servidor la lanza con su propia llave de GitHub (panel/acciones.py); sin esa llave el botón
 // no aparece. Mientras hay una en cola o corriendo, o si otra tarea ocupa el turno, el botón no deja lanzar y dice por
 // qué (aria-disabled: sigue enfocable y el foco no se pierde al cerrar el diálogo).
+// Contrato v49: el mismo botón en el detalle de un cliente (`cliente`): busca solo para sus perfiles que no llegan a
+// su meta (o, si hoy aún no hay búsqueda, hace la del día con sus perfiles primero). El servidor decide y guarda los
+// perfiles; el navegador solo manda el cliente.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Search } from "lucide-react";
 import { api } from "../api";
@@ -12,9 +15,10 @@ type Corrida = {
     "en_cola" | "corriendo" | "success" | "failure" | "cancelled" | string;
   creada: string;
 };
-// Contrato v45: qué hará el botón, decidido por el servidor (un solo botón para los tres casos).
+// Contrato v45: qué hará el botón, decidido por el servidor (un solo botón para los tres casos). v49: «pedido» es el
+// de un cliente cuando hoy ya hay lote.
 type Plan = {
-  tipo: "completa" | "faltantes" | "nada";
+  tipo: "completa" | "faltantes" | "pedido" | "nada";
   motivo: string;
   detalle?: string; // qué pasa después de pedirla (texto del servidor)
   faltan: {
@@ -36,12 +40,19 @@ type EstadoBusqueda = {
 const ESPERA_PEDIDA = 180_000; // ms: GitHub tarda unos segundos (o más) en listar la corrida pedida
 
 export function BuscarAhora({
-  sinConfirmar,
+  sinAplicar,
+  onAplicar,
+  revision,
+  cliente,
   demo,
   onAviso,
   onTermino,
 }: {
-  sinConfirmar: boolean; // hay cambios que la búsqueda no va a usar
+  sinAplicar: boolean; // hay cambios que la búsqueda no va a usar
+  // Contrato v49: aplicar los cambios antes de buscar (true si quedaron en uso).
+  onAplicar?: () => Promise<boolean>;
+  revision?: number; // versión en uso: al cambiar, se vuelve a pedir el plan
+  cliente?: { id: string; nombre: string };
   demo: boolean;
   onAviso: (texto: string, error?: boolean) => void;
   onTermino: () => void;
@@ -56,9 +67,13 @@ export function BuscarAhora({
   useEffect(() => {
     callbacks.current = { onTermino, onAviso };
   }, [onTermino, onAviso]);
+  const clienteId = cliente?.id || "";
 
   const leer = useCallback(() => {
-    api<EstadoBusqueda>("/busqueda")
+    api<EstadoBusqueda>(
+      "/busqueda" +
+        (clienteId ? "?cliente_id=" + encodeURIComponent(clienteId) : ""),
+    )
       .then((e) => {
         if (e.en_curso) setPedidaEn(null);
         if (corria.current && !e.en_curso) callbacks.current.onTermino();
@@ -86,8 +101,8 @@ export function BuscarAhora({
             },
         ),
       );
-  }, []);
-  useEffect(leer, [leer]);
+  }, [clienteId]);
+  useEffect(leer, [leer, revision]);
 
   // La corrida pedida se muestra «En cola» hasta que GitHub la liste, como mucho ESPERA_PEDIDA.
   useEffect(() => {
@@ -110,19 +125,26 @@ export function BuscarAhora({
 
   if (!estado?.disponible) return null;
 
-  async function lanzar() {
+  async function lanzar(aplicarAntes = false) {
     setEnviando(true);
     try {
+      if (aplicarAntes && onAplicar && !(await onAplicar())) return;
       const r = await api<{ tipo: Plan["tipo"] }>("/busqueda", {
         method: "POST",
-        body: "{}",
+        body: JSON.stringify(clienteId ? { cliente_id: clienteId } : {}),
       });
       setAbierto(false);
       setPedidaEn(Date.now());
       onAviso(
         r.tipo === "faltantes"
           ? "Búsqueda pedida para quienes no llegan a su meta. Tarda unos 30 minutos; puedes cerrar el panel."
-          : "Búsqueda del día pedida. Empieza en unos minutos y tarda alrededor de una hora y media; puedes cerrar el panel.",
+          : r.tipo === "pedido"
+            ? `Búsqueda pedida para ${cliente?.nombre}. Tarda unos 30 minutos; puedes cerrar el panel.`
+            : "Búsqueda del día pedida" +
+              (cliente
+                ? `, con los perfiles de ${cliente.nombre} primero`
+                : "") +
+              ". Empieza en unos minutos y tarda alrededor de una hora y media; puedes cerrar el panel.",
       );
     } catch (e) {
       onAviso((e as Error).message, true);
@@ -136,15 +158,25 @@ export function BuscarAhora({
   const bloqueo = enCurso
     ? `Ya hay una búsqueda ${enCurso.estado === "en_cola" ? "en cola" : "corriendo"}.`
     : estado.ocupado || (plan.tipo === "nada" ? plan.motivo : "");
+  const titulo = cliente
+    ? `Buscar ahora para ${cliente.nombre}`
+    : "Buscar ahora";
   const etiqueta = enCurso
     ? `${enCurso.estado === "en_cola" ? "En cola" : "Buscando"} desde ${horaBogota(enCurso.creada)}`
-    : "Buscar ahora";
+    : titulo;
+  const varios = plan.tipo === "faltantes" || plan.tipo === "pedido";
   return (
     <>
       <button
+        type="button"
         className="button secondary"
         aria-disabled={Boolean(bloqueo) || enviando}
-        title={bloqueo || "Lanza ahora la búsqueda del día"}
+        title={
+          bloqueo ||
+          (cliente
+            ? `Busca ahora vacantes para ${cliente.nombre}`
+            : "Lanza ahora la búsqueda del día")
+        }
         onClick={() => {
           if (bloqueo) onAviso(bloqueo, true);
           else if (!enviando) setAbierto(true);
@@ -159,21 +191,23 @@ export function BuscarAhora({
       </button>
       {abierto && (
         <Dialog
-          titulo="Buscar ahora"
-          subtitulo="Revisa si hoy ya corrió la búsqueda y busca lo que haga falta."
+          titulo={titulo}
+          subtitulo={
+            cliente
+              ? "Busca solo lo que le falta hoy a este cliente."
+              : "Revisa si hoy ya corrió la búsqueda y busca lo que haga falta."
+          }
           onClose={() => !enviando && setAbierto(false)}
         >
           <p className="helper note">{plan.motivo}</p>
-          {plan.tipo === "faltantes" && (
+          {varios && (
             <ul
               className="faltan-lista"
               aria-label="Quiénes no llegan a su meta"
             >
               {plan.faltan.slice(0, 8).map((f) => (
                 <li key={f.perfil_id}>
-                  <span>
-                    {f.cliente} · {f.cargo}
-                  </span>
+                  <span>{cliente ? f.cargo : `${f.cliente} · ${f.cargo}`}</span>
                   <strong>
                     {f.hoy} de {f.meta}
                   </strong>
@@ -187,11 +221,13 @@ export function BuscarAhora({
             </ul>
           )}
           {plan.detalle && <p className="helper">{plan.detalle}</p>}
-          {sinConfirmar && (
+          {sinAplicar && (
             <p className="helper note">
-              Tienes cambios sin confirmar: la búsqueda usa la última
-              configuración confirmada. Si quieres que los use, pulsa antes
-              «Confirmar y aplicar».
+              Tienes cambios sin aplicar: la búsqueda usa la configuración en
+              uso.
+              {onAplicar
+                ? " Pulsa «Aplicar y buscar» para que los use."
+                : " Si quieres que los use, pulsa antes «Aplicar cambios»."}
             </p>
           )}
           {demo && (
@@ -201,23 +237,35 @@ export function BuscarAhora({
           )}
           <div className="dialog-actions">
             <button
+              type="button"
               className="button secondary"
               disabled={enviando}
               onClick={() => setAbierto(false)}
             >
               Cancelar
             </button>
+            {sinAplicar && onAplicar && (
+              <button
+                type="button"
+                className="button secondary"
+                disabled={enviando}
+                onClick={() => lanzar(true)}
+              >
+                Aplicar y buscar
+              </button>
+            )}
             <button
+              type="button"
               className="button primary"
               disabled={enviando}
-              onClick={lanzar}
+              onClick={() => lanzar()}
             >
               {enviando ? (
                 <Loader2 size={16} className="spin" />
               ) : (
                 <Search size={16} />
               )}
-              Buscar ahora
+              {sinAplicar && onAplicar ? "Buscar sin aplicar" : "Buscar ahora"}
             </button>
           </div>
         </Dialog>
