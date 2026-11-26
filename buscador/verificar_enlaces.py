@@ -419,6 +419,45 @@ def cola_de_seleccion(vacantes, entregadas, hoy, cache, iniciales, maximo, ahora
     return cola
 
 
+POR_PLAZA = 2  # candidatas que se comprueban por cada vacante de la meta de una persona (contrato v49)
+
+
+def cola_por_necesidad(vacantes, hoy):
+    """Contrato v49 (solo modo panel): las candidatas de cada persona —las del cargo que cumplen SU idioma y SU
+    ubicación, aunque otro cliente ya las haya recibido—, por turnos y primero quien tiene menos. Antes la cola salía
+    solo de lo que elegiría el lote: de 21 remotas en español abiertas a Colombia para un cargo, 1 tenía el enlace
+    comprobado, y sin enlace comprobado no se puede completar a nadie. Hasta `POR_PLAZA` por cada vacante de su meta."""
+    from buscador import contrato, entrega
+    cfg = entrega.config()
+    roles = [r for r in cfg["roles"] if r.get("_perfiles")]
+    if not roles:
+        return []
+    from panel.afinidad import MINIMO_POR_PERFIL, evaluar
+    from panel.modelos import Perfil
+    idiomas = tuple(cfg.get("idiomas", ["es", "en"]))
+    por_persona = []
+    for rol in roles:
+        del_rol = [v for v in vacantes
+                   if any(f.get("familia") in rol["familias"] and f.get("coincidencia") in entrega.GRADOS
+                          for f in v.get("familias") or [])
+                   and not contrato.entregable(dict(v, verificacion=None), idiomas)]
+        del_rol.sort(key=lambda v: v.get("fecha_publicacion") or "", reverse=True)  # las más recientes primero
+        for crudo in rol["_perfiles"]:
+            p = Perfil.model_validate(crudo)  # una sola vez por persona (validarlo en cada vacante era lo lento)
+            cuantas = max(MINIMO_POR_PERFIL, int(p.meta_diaria or 0)) * POR_PLAZA
+            suyas = [v for v in del_rol if evaluar(v, p, hoy)["compatible"]]
+            if suyas:
+                por_persona.append((len(suyas), suyas[:cuantas]))
+    por_persona.sort(key=lambda x: x[0])  # primero quien tiene menos de dónde elegir
+    cola, vistas = [], set()
+    for i in range(max((len(suyas) for _, suyas in por_persona), default=0)):
+        for _, suyas in por_persona:
+            if i < len(suyas) and suyas[i]["id"] not in vistas:
+                vistas.add(suyas[i]["id"])
+                cola.append(suyas[i])
+    return cola
+
+
 def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, cfg=None):
     """Comprueba candidatas antes de la selección; lo no revisado nunca se da por aprobado.
     Orden: el lote ya registrado hoy (plazo para compartir), las que elegiría la selección en su orden y, en las
@@ -444,6 +483,17 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
         revisadas_n += auditar(historicas, cache, maximo=maximo // 3 if incremental else maximo,
                                segundos=max(0, plazo - time.monotonic()), vigencia=VIGENCIA_COMPARTIR)
     revisadas = set()
+    por_necesidad = 0
+    try:  # contrato v49: primero las candidatas de cada persona; como mucho la mitad del presupuesto que queda
+        necesidad = cola_por_necesidad(vacantes, hoy)
+        if necesidad and revisadas_n < maximo:
+            parte = 3 if incremental else 2
+            por_necesidad = auditar(necesidad, cache, maximo=max(1, (maximo - revisadas_n) // parte),
+                                    segundos=max(0, plazo - time.monotonic()) / parte)
+            revisadas_n += por_necesidad
+    except Exception as e:  # noqa: BLE001 — sin esta cola, la comprobación sigue con la del lote, como antes
+        from buscador import registro
+        registro.aviso("verificar_enlaces:necesidad", e)
     for _ronda in range(4):
         if revisadas_n >= maximo or time.monotonic() >= plazo:
             break
@@ -474,7 +524,8 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
     actuales = [dict(por_id.get(v["id"], v)) for lista in iniciales.values() for v, _ in lista]
     for v in actuales:
         anotar(v, cache)
-    return dict(resumen(vacantes), candidatas_programadas=revisadas_n, seleccion_del_dia=resumen(actuales))
+    return dict(resumen(vacantes), candidatas_programadas=revisadas_n, por_necesidad=por_necesidad,
+                seleccion_del_dia=resumen(actuales))
 
 
 def main():

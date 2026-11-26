@@ -253,7 +253,7 @@ def test_la_captura_horaria_de_madrugada_no_cuenta_como_busqueda_del_dia():
 
 
 def test_solo_cuenta_quien_todavia_puede_recibir_mas():
-    # Con 5 o más, solo hay más si su cargo tiene cupo libre en el lote; Comunidad nunca (recibe lo que sobra).
+    # Cuenta todo el que está bajo su meta (v49); Comunidad nunca (recibe lo que sobra).
     from panel import ejecutor
     from panel.modelos import Configuracion
     from panel.repositorio import configuracion_demo, hoy
@@ -271,8 +271,10 @@ def test_solo_cuenta_quien_todavia_puede_recibir_mas():
         filas = _de_hoy(faltantes={cargo: libre})
         return {str(x.id) for x, _, _ in ejecutor.faltan_hoy(_repo_con(filas, {str(p.id): n}), version, hoy())}
     assert str(p.id) in faltan(2, 0)  # bajo el mínimo: el rescate la completa
-    assert str(p.id) not in faltan(5, 0)  # cupo del cargo lleno: otra búsqueda no le suma
-    assert str(p.id) in faltan(5, 3)
+    # Contrato v49: el rescate completa hasta la meta, así que con 5 (bajo su meta) también puede recibir más, aunque
+    # el cupo de su cargo esté lleno. Solo deja de contar quien ya llegó a su meta.
+    assert str(p.id) in faltan(5, 0) and str(p.id) in faltan(5, 3)
+    assert str(p.id) not in faltan(p.meta_diaria, 3)
     todos = ejecutor.faltan_hoy(_repo_con(_de_hoy(), {}), version, hoy())
     assert todos and not [x for x, _, _ in todos if x.cliente_id in comunidad]
     assert any(p.cliente_id in comunidad for p in cfg.perfiles_activos())

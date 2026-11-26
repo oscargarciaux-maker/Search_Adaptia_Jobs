@@ -63,18 +63,22 @@ reescriben asignaciones.
 
 ## 2. Afinidad por funciones
 
-- **Cargo efectivo** (`panel/contenido.py::cargo_operativo`): un solo cargo «rellenado» para clasificar, asignar,
-  rescatar, revisar y mostrar. Añade a lo que escribió el operador: los nombres sugeridos si no puso ninguno, los
-  títulos aprendidos (v25) y, cuando el cargo es título exacto de una familia del mapa, sus `excluir` y, si no tiene
-  funciones propias, sus `herramientas` como huella.
+- **Cargo operativo** (`panel/contenido.py::cargo_operativo`): un solo cargo «rellenado» para clasificar, asignar,
+  rescatar, revisar y mostrar. Añade a lo que escribió el operador: los nombres sugeridos si no puso ninguno y los
+  títulos aprendidos (v25). Si el cargo no tiene funciones propias, su huella son las `herramientas` de su familia del
+  mapa más la huella calculada de noche (`huellas_automaticas`: por idioma, de los avisos cuyo título es exactamente un
+  nombre del cargo; se guarda en `panel_ajustes.huellas_cargos`). Si es título exacto de una familia, sus `excluir`
+  quedan como señales (`excluir_mapa`), no como descartes.
 - **Evidencia** (`panel/contenido.py::evidencia(titulo, descripcion, cargo)`), sin IA:
   - `fuerte`: 3 o más términos de la huella, o el nombre del cargo 2 o más veces en la descripción;
   - `debil`: 1 o 2 términos;
   - `ninguna`: hay huella y la descripción no trae ninguno, o el cargo es compuesto («AI Product Manager», «Growth
     Marketing») y ni el título ni la descripción nombran su distintivo (`datos/glosario_cargos.yaml`);
   - `sin_huella`: el cargo no tiene huella o el aviso no tiene descripción: no opina.
-  - `otro_oficio`: sin evidencia y con una señal positiva de otro oficio (el título es también de otra familia del mapa
-    o la descripción trae 3 o más herramientas de otra familia y ninguna de la suya).
+  - `otro_oficio`: sin ninguna evidencia y con una señal positiva de otro oficio: el título trae un `excluir` de su
+    familia del mapa, una palabra de otro sector (`datos/oficios_ajenos.yaml`, editable) que el cargo no usa, o la
+    descripción trae 4 o más herramientas de una familia de otra área. Un título que es exactamente un nombre del
+    cargo (o uno aprobado en la bandeja) nunca se retiene.
 - **Qué hace.** `ninguna` solo ordena: pesa como una cosa más que no cumple y deja la etiqueta «Funciones por
   confirmar»; en el mensaje de WhatsApp entra después de las que sí tienen evidencia. `otro_oficio` no se entrega sola:
   va a «Por confirmar» con el motivo «Título coincide; funciones de otro oficio». «Sirve» la asigna; «No sirve» la
@@ -87,22 +91,39 @@ reescriben asignaciones.
 
 ## 3. Más vacantes para quien va corto
 
-- **Completar hasta la meta.** Reutilización (v11) y rescate con toda la bodega (v36) completan hasta la meta diaria
-  del perfil (mínimo 5). Los posts y Comunidad siguen como estaban. Las vacantes añadidas así no pasan, sumadas al lote,
-  del techo del día.
-- **Comprobar enlaces por necesidad.** Antes de la cola del lote se comprueban, por turnos y primero para quien tiene
-  menos, las candidatas de cada persona bajo su meta que cumplen su idioma y su ubicación (aunque otro cliente ya las
-  haya recibido).
+- **Completar hasta la meta** (`panel/ejecutor.py::Completar`). Reutilización (v11) y rescate con toda la bodega (v36)
+  completan hasta la meta diaria del perfil (mínimo 5). Comunidad y los posts siguen en el mínimo. Hasta el mínimo
+  siempre cabe; del mínimo a la meta, una vacante que hoy aún no usa nadie solo entra mientras lote + añadidas no pasen
+  del techo del día. El rescate comprueba hasta 200 enlaces en 5 minutos (antes 80 en 150 s), por turnos y primero para
+  quien tiene menos candidatas. «Buscar ahora» cuenta como «le falta» a todo el que está bajo su meta.
+- **Comprobar enlaces por necesidad** (`buscador/verificar_enlaces.py::cola_por_necesidad`, solo modo panel). Antes de
+  la cola del lote se comprueban las candidatas de cada persona: las de su cargo que cumplen su idioma y su ubicación,
+  aunque otro cliente ya las haya recibido; por turnos, primero quien tiene menos, hasta 2 por cada vacante de su meta
+  y con la mitad del presupuesto como mucho (un tercio en la captura horaria).
 - **Descripciones por necesidad.** Computrabajo lee solo fichas cuyo título es de un cargo buscado, primero las de
-  cargos con personas cortas, y relee las guardadas sin descripción.
-- **Reconocer lo que se busca.** Todo título de `consultas_es` se reconoce al clasificar; los plurales cuentan
-  («Desarrolladores»); `en_espanol` usa listas editables en `datos/titulos_idioma.yaml`; quien solo acepta español
-  recibe el doble de turnos de búsqueda.
-- **Modalidad y alcance en español.** «Modalidad: 100% remoto», «remoto desde Latinoamérica/LATAM/cualquier país» se
-  leen como remota y con su alcance. «Empresa líder en Latinoamérica» no cuenta.
-- **«Buscar ahora» para quien falta** incluye Hireline y Magneto (ajusta v47) y el español en Get on Board.
-- **Diagnóstico por persona** (solo en el panel privado): candidatas → con descripción → idioma → ubicación → enlace
-  comprobado → asignadas.
+  cargos con personas cortas en ese país (300 por noche), y relee hasta 200 guardadas sin descripción
+  (`computrabajo_relectura`). La relectura de LinkedIn y esta ordenan por lo que sirve a quien va corto, con su idioma
+  cuando ya se conoce.
+- **Buscar solo lo que se reconoce.** `consultas_es` son los nombres en español del cargo y los títulos exactos en
+  español de su familia del mapa (`espanol_del_mapa`). Ya no se buscan los «similares» del mapa, que no se reconocían
+  al clasificar (v44: solo se sugieren): esos turnos se gastaban.
+- **Plurales.** «Desarrolladores Full Stack» cuenta como «Desarrollador Full Stack» (`normalizar.singular`, como
+  segunda oportunidad al comparar; no cambia identificadores ni claves).
+- **Títulos en español.** `en_espanol` usa `datos/titulos_idioma.yaml` (editable), con oficios generales («Contador»,
+  «Vendedor», «Asesor comercial»). «Director of Engineering» no cuenta como español.
+- **Turnos.** Quien solo acepta avisos en español recibe el doble de turnos de búsqueda (`PESO_SOLO_ESPANOL`).
+- **Modalidad y alcance en español.** «Modalidad: 100% remoto», «100% remoto | Latinoamérica», «remoto desde cualquier
+  país de Latinoamérica» y «remoto para LATAM» se leen como remota y con su alcance (antes quedaban presenciales en la
+  ciudad de la empresa: el patrón buscaba el signo «%», que la normalización quita). «Empresa líder en Latinoamérica»
+  y «no es 100% remoto» no cuentan.
+- **«Buscar ahora» para quien falta** incluye Hireline y Magneto (ajusta v47) y un título en español por cargo en el
+  refuerzo de Get on Board.
+- **Diagnóstico por persona.** Es la «Cobertura por persona» que ya existe (v37): del cargo, compatibles, listas, por
+  comprobar y por qué le faltan. Suma los motivos nuevos de ciudad y su sugerencia en «Qué hacer».
+
+Lo que una bodega guardada no puede demostrar: cuántos enlaces más se comprueban y cuántas descripciones más se leen.
+Eso se ve en la primera búsqueda real (`por_necesidad` en la comprobación de enlaces, `del_cargo` y `relectura` en
+Computrabajo, `rescatadas` en el resumen).
 
 ## 4. Panel
 

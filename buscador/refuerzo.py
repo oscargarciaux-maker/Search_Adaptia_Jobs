@@ -24,6 +24,9 @@ def buscar(mapa, activos, estado, hoy, ronda, cfg, dias_maximos=30):
 
     def gob():
         terminos = [q for f in mapa for q in cobertura.rotar(cobertura.consultas(f), hoy, 2, desfase=desfase)]
+        # Contrato v49: también un título en español por cargo (para quien solo acepta español), sin repetir.
+        terminos += [q for f in mapa for q in cobertura.rotar(f.get("consultas_es") or [], hoy, 1, desfase=desfase)
+                     if q not in terminos]
         return getonbrd.buscar(Cliente(pausa=(0.3, 0.8)), terminos[:cfg.get("getonbrd_busquedas", 6)])
 
     crudas, salud = [], {}

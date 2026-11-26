@@ -1,0 +1,148 @@
+# Contrato v49 (26 nov): cómo reconocer, sin IA, que el TÍTULO de un cargo está en español. Sirve para decidir qué
+# nombres se buscan en español para quien solo acepta avisos en español (`consultas_es`). Antes estas listas vivían
+# en el código y solo conocían oficios de oficina y tecnología: «Contador», «Vendedor» o «Asesor comercial» no
+# contaban como español y no tenían búsquedas propias.
+# Todo en minúsculas; las tildes dan igual. `python -m pytest` revisa el formato.
+
+# Palabras con las que empieza un título en español.
+inicio:
+  - diseñador
+  - diseñadora
+  - desarrollador
+  - desarrolladora
+  - analista
+  - ingeniero
+  - ingeniera
+  - gerente
+  - jefe
+  - jefa
+  - lider
+  - coordinador
+  - coordinadora
+  - especialista
+  - gestor
+  - gestora
+  - consultor
+  - consultora
+  - programador
+  - programadora
+  - probador
+  - redactor
+  - redactora
+  - responsable
+  - director
+  - directora
+  - encargado
+  - encargada
+  - asistente
+  - auxiliar
+  - tester de
+  - dueño
+  - administrador
+  - administradora
+  - arquitecto
+  - arquitecta
+  - experto
+  - experta
+  # v49: oficios generales
+  - contador
+  - contadora
+  - vendedor
+  - vendedora
+  - asesor
+  - asesora
+  - abogado
+  - abogada
+  - enfermero
+  - enfermera
+  - cajero
+  - cajera
+  - recepcionista
+  - secretaria
+  - secretario
+  - ejecutivo
+  - ejecutiva
+  - representante
+  - agente
+  - promotor
+  - promotora
+  - operario
+  - operaria
+  - tecnico
+  - tecnica
+  - supervisor
+  - supervisora
+  - profesor
+  - profesora
+  - docente
+  - psicologo
+  - psicologa
+  - reclutador
+  - reclutadora
+  - comprador
+  - compradora
+  - almacenista
+  - mesero
+  - mesera
+  - cocinero
+  - cocinera
+  - conductor
+  - conductora
+  - practicante
+  - aprendiz
+  - community manager de
+
+# Palabras que solo se usan en títulos en español.
+palabras:
+  - ia
+  - inteligencia artificial
+  - de
+  - del
+  - y
+  - con
+  - para
+  - datos
+  - pruebas
+  - calidad
+  - producto
+  - proyectos
+  - ventas
+  - mercadeo
+  - comercial
+  - contable
+  - servicio al cliente
+  - atencion al cliente
+  - recursos humanos
+  - talento humano
+
+# Palabras propias del portugués: un título que las trae no cuenta como español (solo se busca en español e inglés).
+portugues:
+  - produto
+  - desenvolvedor
+  - desenvolvedora
+  - dados
+  - engenheiro
+  - engenheira
+  - projetos
+  - vendas
+  - gestao
+  - designer de
+  - testes
+  - qualidade
+  - pleno
+
+# Palabras que también empiezan títulos en inglés («Director of…», «Supervisor, Operations»): con una palabra del
+# inglés en el título, no cuenta como español.
+inicio_tambien_ingles:
+  - director
+  - supervisor
+  - conductor
+ingles:
+  - of
+  - and
+  - the
+  - for
+  - in
+  - at
+  - to
+  - with

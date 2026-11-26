@@ -108,8 +108,10 @@ def sirve_a_corta(v):
     La relectura de descripciones empieza por estas: sin descripción no se sabe el idioma y no se entrega."""
     familias_v = {f.get("familia") for f in v.get("familias") or [] if isinstance(f, dict)}
     paises_v = set(v.get("paises") or []) | set(v.get("paises_mundo") or [])
+    # Contrato v49: y de un idioma que esa persona acepta, cuando ya se sabe (sin descripción aún no se sabe).
+    idioma = v.get("idioma") or ""
     return any(p.get("corto") and p["familia"] in familias_v and (v.get("alcance_mundial") or paises_v & p["lugares"])
-               for p in _PERSONAS)
+               and (not idioma or idioma in p.get("idiomas", ("es", "en"))) for p in _PERSONAS)
 
 
 # Contrato v47 («Buscar ahora» para quien falta, decisión de Oscar del 18 nov): búsqueda corta y sin repetir. Solo

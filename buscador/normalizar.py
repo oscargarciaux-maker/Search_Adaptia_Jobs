@@ -83,6 +83,20 @@ def titulo_base(titulo):
     return re.sub(r"/{2,}", "/", t).strip(" -/")
 
 
+def _singular_palabra(p):
+    if len(p) >= 6 and p.endswith("es") and p[-3] in "rlndjz":
+        return p[:-2]          # desarrolladores, auxiliares, lideres
+    if len(p) >= 5 and p.endswith("s") and not p.endswith(("ss", "us", "is")):
+        return p[:-1]          # analistas, ingenieros, gerentes, engineers
+    return p
+
+
+def singular(texto_normalizado):
+    """Contrato v49: cada palabra en singular, para que «Desarrolladores» cuente como «Desarrollador». Regla simple que
+    se aplica igual al título y al término con que se compara (si acorta de más una palabra, la acorta en los dos)."""
+    return " ".join(_singular_palabra(p) for p in texto_normalizado.split(" "))
+
+
 _SUFIJOS_EMPRESA = re.compile(r"\b(s\.?a\.?s\.?|s\.?a\.?|ltda\.?|inc\.?|llc|ltd\.?|corp\.?|corporation|gmbh|s\.?r\.?l\.?|"
                               r"s\.? de r\.?l\.?(?: de c\.?v\.?)?|s\.?a\.? de c\.?v\.?|co\.?|company|group|grupo)\b")
 

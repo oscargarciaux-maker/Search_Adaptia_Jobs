@@ -127,10 +127,13 @@ def test_reutiliza_vacantes_de_dias_anteriores_sin_repetir_a_la_misma_persona(cf
     ejecutor.registrar(repo, {"revision": 1, "configuracion": cfg}, hoy())
     mias = [a for a in asignaciones if a["perfil_id"] == p["id"]]
     ids = [a["vacante_id"] for a in mias]
-    assert len(mias) == 5 and "h000000000000001" in ids  # 1 de hoy + 4 reutilizadas
+    # Contrato v49: se completa hasta la meta diaria del perfil (antes, hasta 5): 1 de hoy + las reutilizables que haya
+    # (8 de ayer menos las 2 que ya recibió), sin pasar de su meta.
+    esperadas = min(7, max(5, p["meta_diaria"]))
+    assert esperadas > 5 and len(mias) == esperadas and "h000000000000001" in ids
     assert previas[0]["vacante_id"] not in ids and previas[1]["vacante_id"] not in ids
-    assert sum(any(isinstance(e, dict) and e.get("reutilizada") == ayer for e in a["explicacion"]) for a in mias) == 4
-    assert repo.ejecucion["resumen"]["reutilizadas"] >= 4
+    assert sum(any(isinstance(e, dict) and e.get("reutilizada") == ayer for e in a["explicacion"]) for a in mias) == esperadas - 1
+    assert repo.ejecucion["resumen"]["reutilizadas"] >= esperadas - 1
 
 
 # ── Apify dirigido a quien le falta ────────────────────────────────────────────────────────────────────────────────

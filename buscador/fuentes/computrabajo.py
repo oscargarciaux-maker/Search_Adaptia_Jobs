@@ -156,11 +156,18 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
             if len(filas) < POR_PAGINA:
                 break
         cobertura.anotar_hecha(estado, b, hoy)
+    # Contrato v49: solo se lee la ficha de un aviso cuyo título es de un cargo buscado (los demás se descartan después
+    # por «sin familia» y gastaban las fichas: el 25 nov quedaron 554 de 739 avisos guardados sin descripción), y
+    # primero las de cargos con personas cortas en ese país.
+    from buscador import familias
+    del_cargo = {a["id"] for a in avisos if familias.clasificar(a["titulo"])}
     avisos.sort(key=lambda a: a["familia"] not in prioritarias)
+    avisos.sort(key=lambda a: not cobertura.va_primero(a["familia"], a["pais"]))  # estable
     crudas, con_ficha, cerradas = [], 0, 0
     for a in avisos:
         descripcion, fecha, cerrada = "", "", False
-        if con_ficha < max_fichas and seguidas < 4 and not (limite_segundos is not None and reloj() - inicio >= limite_segundos):
+        if a["id"] in del_cargo and con_ficha < max_fichas and seguidas < 4 \
+                and not (limite_segundos is not None and reloj() - inicio >= limite_segundos):
             r = cliente.get(a["enlace"])
             if r is not None and r.status_code == 200:
                 descripcion, fecha, cerrada = ficha(r.text, hoy)
@@ -176,5 +183,42 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
                        "ubicacion": ", ".join(x for x in (a["ciudad"], nombres.get(a["pais"], a["pais"])) if x) + sufijo,
                        "descripcion": descripcion, "fecha": fecha, "enlace": a["enlace"], "enlace_directo": "",
                        "remoto": remoto, "fuente": NOMBRE})
-    return crudas, {"busquedas": hechas, "fallidas": fallidas, "avisos": len(avisos), "con_descripcion": con_ficha,
-                    "cerradas": cerradas, "combinaciones_total": len(todas)}
+    return crudas, {"busquedas": hechas, "fallidas": fallidas, "avisos": len(avisos), "del_cargo": len(del_cargo),
+                    "con_descripcion": con_ficha, "cerradas": cerradas, "combinaciones_total": len(todas)}
+
+
+def completar_descripciones(cliente, previas, max_fichas, hoy=None, max_dias=30, reloj=time.monotonic,
+                            limite_segundos=None):
+    """Contrato v49: relee la ficha de los avisos de Computrabajo ya guardados que quedaron sin descripción (sin ella no
+    se sabe el idioma ni la fecha y la vacante no se puede entregar). Primero lo que sirve a quien va corto y lo más
+    reciente; igual que la relectura de LinkedIn. Devuelve (crudas con descripción, estadísticas)."""
+    hoy = hoy or datetime.now(timezone.utc).date().isoformat()
+    inicio = reloj()
+    desde = (datetime.fromisoformat(hoy) - timedelta(days=max_dias)).date().isoformat()
+    candidatas = [v for v in previas if v.get("fuente") == NOMBRE and len(v.get("_descripcion") or "") < 200
+                  and ".computrabajo.com/" in (v.get("enlace") or "")
+                  and (v.get("fecha_publicacion") or v.get("visto_ultima_vez") or "") >= desde]
+    candidatas.sort(key=lambda v: v.get("visto_primera_vez") or "", reverse=True)
+    candidatas.sort(key=lambda v: not cobertura.sirve_a_corta(v))  # estable
+    crudas, peticiones, cerradas, seguidas = [], 0, 0, 0
+    for v in candidatas:
+        if peticiones >= max_fichas or seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
+            break
+        r = cliente.get(v["enlace"])
+        peticiones += 1
+        if r is None or r.status_code != 200:
+            seguidas += 1 if (r is not None and r.status_code in (403, 429)) else 0
+            continue
+        seguidas = 0
+        descripcion, fecha, cerrada = ficha(r.text, hoy)
+        if cerrada:
+            cerradas += 1
+            continue
+        if len(descripcion) < 200:
+            continue
+        crudas.append({"titulo": v["titulo"], "empresa": v["empresa"], "ubicacion": v.get("ubicacion", ""),
+                       "descripcion": descripcion, "fecha": fecha or v.get("fecha_publicacion", ""),
+                       "enlace": v["enlace"], "enlace_directo": "",
+                       "remoto": True if v.get("modalidad") == "remoto" else None, "fuente": NOMBRE})
+    return crudas, {"pendientes": len(candidatas), "peticiones": peticiones, "con_descripcion": len(crudas),
+                    "cerradas": cerradas}

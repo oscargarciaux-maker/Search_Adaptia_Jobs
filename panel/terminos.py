@@ -23,36 +23,39 @@ def variantes(cargo):
     return list(dict.fromkeys(salida))
 
 
-# PR 1b (16 nov), movido aquí en v44: palabras con que empiezan los títulos en español y palabras propias. Sin IA:
-# listas editables. v44: un título con palabras propias del portugués no cuenta como español (antes «designer de
-# produto» y «gerente de produto» pasaban por la palabra «de» y gastaban turnos de búsqueda).
-INICIO_ES = ("diseñador", "diseñadora", "desarrollador", "desarrolladora", "analista", "ingeniero", "ingeniera",
-             "gerente", "jefe", "jefa", "lider", "líder", "coordinador", "coordinadora", "especialista", "gestor",
-             "gestora", "consultor", "consultora", "programador", "programadora", "probador", "redactor", "redactora",
-             "responsable", "director", "directora", "encargado", "encargada", "asistente", "auxiliar", "tester de",
-             "dueño", "administrador", "administradora", "arquitecto", "arquitecta", "experto", "experta")
-PALABRAS_ES = ("ia", "inteligencia artificial", "de", "del", "y", "con", "para", "datos", "pruebas", "calidad",
-               "producto", "proyectos", "ventas", "mercadeo")
-PALABRAS_PT = ("produto", "desenvolvedor", "desenvolvedora", "dados", "engenheiro", "engenheira", "projetos",
-               "vendas", "gestao", "designer de", "testes", "qualidade", "pleno")
+# PR 1b (16 nov), movido aquí en v44 y a `datos/titulos_idioma.yaml` en v49: palabras con que empiezan los títulos en
+# español y palabras propias. Sin IA: listas editables. v44: un título con palabras propias del portugués no cuenta como
+# español (antes «designer de produto» y «gerente de produto» pasaban por la palabra «de» y gastaban turnos de búsqueda).
+@lru_cache(maxsize=1)
+def titulos_idioma():
+    ruta = Path(__file__).resolve().parent.parent / "datos" / "titulos_idioma.yaml"
+    crudo = yaml.safe_load(ruta.read_text(encoding="utf-8")) or {}
+    return {k: tuple(dict.fromkeys(normalizar.texto(x) for x in crudo.get(k) or [] if normalizar.texto(x)))
+            for k in ("inicio", "palabras", "portugues", "inicio_tambien_ingles", "ingles")}
 
 
 @lru_cache(maxsize=8192)
 def en_portugues(titulo):
     """18 nov: título con palabras propias del portugués («designer de produto»): no se sugiere (solo es/en)."""
     t = normalizar.texto(titulo)
-    return any(normalizar.contiene_frase(t, normalizar.texto(x)) for x in PALABRAS_PT)
+    return any(normalizar.contiene_frase(t, x) for x in titulos_idioma()["portugues"])
 
 
 @lru_cache(maxsize=8192)
 def en_espanol(titulo):
     """Título en español: empieza como uno («Diseñador…») o trae palabras propias («Product Manager IA»), y no trae
-    palabras del portugués."""
+    palabras del portugués. Contrato v49: «Director of Engineering» empieza igual que en español pero trae palabras
+    del inglés: no cuenta."""
     t = normalizar.texto(titulo)
     if en_portugues(titulo):
         return False
-    return any(t == normalizar.texto(x) or t.startswith(normalizar.texto(x) + " ") for x in INICIO_ES) or \
-        any(normalizar.contiene_frase(t, normalizar.texto(x)) for x in PALABRAS_ES)
+    listas = titulos_idioma()
+    con_ingles = any(normalizar.contiene_frase(t, x) for x in listas["ingles"])
+    for x in listas["inicio"]:
+        if t == x or t.startswith(x + " "):
+            if not (x in listas["inicio_tambien_ingles"] and con_ingles):
+                return True
+    return any(normalizar.contiene_frase(t, x) for x in listas["palabras"])
 
 
 def _familias_de(base):
@@ -214,6 +217,7 @@ def sugerir(cargo, sesion=None, consultar_esco=True):
 # Los términos de un cargo se comparan contra miles de títulos: normalizarlos una sola vez (funciones puras).
 _base = lru_cache(maxsize=32768)(normalizar.titulo_base)
 _texto = lru_cache(maxsize=32768)(normalizar.texto)
+_singular = lru_cache(maxsize=32768)(normalizar.singular)
 
 
 def grado(titulo, cargo, cercanos=False):
@@ -231,6 +235,15 @@ def grado(titulo, cargo, cercanos=False):
             canon = _base(t)
             if canon and normalizar.contiene_frase(base, canon):
                 return valor, {"regla": "término de cargo", "termino": t, "grado": valor}
+    # Contrato v49: los plurales cuentan («Desarrolladores Full Stack», «QA Engineers»), como segunda oportunidad.
+    plural = _base(_singular(base))  # y de nuevo el género: «desarrolladoras» → «desarrolladora» → «desarrollador»
+    if plural != base:
+        for campo, valor in (("terminos_exactos", "exacto"), ("terminos_similares", "similar")):
+            terminos = [cargo["nombre"], *cargo.get(campo, [])] if campo == "terminos_exactos" else cargo.get(campo, [])
+            for t in terminos:
+                canon = _base(_singular(_base(t)))
+                if canon and normalizar.contiene_frase(plural, canon):
+                    return valor, {"regla": "término de cargo", "termino": t, "grado": valor}
     if len(base) >= 6:
         opciones = [cargo["nombre"], *cargo.get("terminos_exactos", []), *cargo.get("terminos_similares", [])]
         for t in opciones:

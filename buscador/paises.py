@@ -73,9 +73,17 @@ def alias_ciudad(nombre):
 
 _REMOTO = re.compile(r"\b(remote|remoto|remota|remotely|teletrabajo|home ?office|work from home|wfh|trabajo a distancia|"
                      r"100% remoto|distributed|fully distributed|anywhere|desde casa|trabajo desde casa|remote work)\b")
-_REMOTO_DESC = re.compile(r"\b(fully remote|100% remote|100% remoto|trabajo remoto|remote[- ]first|remote position|"
-                          r"remote role|remote job|this is a remote|posicion remota|modalidad remota|totalmente remoto|"
-                          r"trabajo 100% remoto|home office)\b")
+# Contrato v49: la descripción llega normalizada (sin «%» ni «:»), así que «Modalidad: 100% remoto» es «modalidad 100
+# remoto». Con el «%» escrito, estos patrones nunca coincidían y el aviso quedaba presencial en la ciudad de la empresa.
+_REMOTO_DESC = re.compile(r"\b(fully remote|100 remote|100 remoto|100 remota|remoto 100|trabajo remoto|remote[- ]first|"
+                          r"remote position|remote role|remote job|this is a remote|posicion remota|modalidad remota|"
+                          r"modalidad remoto|modalidad de trabajo remot[oa]|totalmente remot[oa]|home office)\b")
+_NO_REMOTO = re.compile(r"\b(?:no|not|sin|nunca|isn t|is not|no es|tampoco)\b[a-z ]{0,18}$")
+
+
+def _remoto_en_descripcion(d):
+    """True si la descripción dice que el trabajo es remoto (y no lo niega justo antes: «no es 100% remoto»)."""
+    return any(not _NO_REMOTO.search(d[max(0, m.start() - 25):m.start()]) for m in _REMOTO_DESC.finditer(d))
 _HIBRIDO = re.compile(r"\b(hybrid|hibrido|hibrida|semipresencial|semi presencial)\b")
 _PRESENCIAL = re.compile(r"\b(on ?site|onsite|presencial|in office|in-office)\b")
 # Restricciones de residencia en la descripción. Se comparan contra el texto normalizado (sin tildes, minúsculas).
@@ -285,11 +293,16 @@ def _contratacion_remota(desc):
     opciones = "|".join(re.escape(x) for x in alcances)
     patron = (r"\b(?:hiring|contratamos|open to candidates|accepting candidates)\s+(?:remotely\s+)?"
               r"(?:(?:across|in|from|en|de)\s+)?(?:all of\s+)?(?P<contratacion>"+opciones+r")\b"
-              r"|\b(?:work|working|trabajar|trabaja)\s+(?:remotely\s+)?(?:from|desde)\s+(?P<trabajo>"+opciones+r")\b")
+              r"|\b(?:work|working|trabajar|trabaja)\s+(?:remotely\s+)?(?:from|desde)\s+(?P<trabajo>"+opciones+r")\b"
+              # Contrato v49: el español de los avisos de LATAM. «Modalidad: 100% remoto | Latinoamérica», «remoto desde
+              # cualquier país de Latinoamérica», «100% remoto para LATAM». «Empresa líder en Latinoamérica» no cuenta:
+              # el alcance tiene que venir pegado a la palabra «remoto».
+              r"|\bremot[oa]\s+(?:100\s+)?(?:(?:desde|para|en)\s+)?(?:cualquier\s+(?:pais|lugar|parte)\s+de\s+|"
+              r"tod[oa]\s+)?(?P<remoto_es>"+opciones+r")\b")
     for m in re.finditer(patron,desc):
-        if re.search(r"\b(?:not|no|cannot|can t|unable|except|excluding)\b",desc[max(0,m.start()-35):m.start()]):
+        if re.search(r"\b(?:not|no|cannot|can t|unable|except|excluding|sin|tampoco)\b",desc[max(0,m.start()-35):m.start()]):
             continue
-        return m.group("contratacion") or m.group("trabajo")
+        return m.group("contratacion") or m.group("trabajo") or m.group("remoto_es")
     return ""
 
 
@@ -306,7 +319,7 @@ def modalidad(titulo, ubicacion, descripcion="", remoto=None):
         return "presencial"
     if remoto is True or _REMOTO.search(t):
         return "remoto"
-    if _REMOTO_DESC.search(d):
+    if _remoto_en_descripcion(d):
         return "remoto"
     return "presencial" if t.strip() else "sin dato"
 

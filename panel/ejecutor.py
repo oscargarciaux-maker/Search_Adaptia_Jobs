@@ -17,7 +17,7 @@ from panel import contenido
 from panel.modelos import Configuracion
 from pydantic import ValidationError
 from panel.repositorio import RepositorioSupabase, hoy
-from panel.terminos import en_espanol, espanol_del_mapa, grado, sugerir
+from panel.terminos import en_espanol, espanol_del_mapa, grado
 
 
 def validar_version(version):
@@ -134,6 +134,9 @@ def fuentes_en(pais):
 
 PESO_CORTO = 2
 PESO_POCAS_FUENTES = 2
+# Contrato v49: quien solo acepta avisos en español tiene unas 10 veces menos de dónde elegir (medido el 25 nov: 241 de
+# 1.657 Product Manager con descripción estaban en español), así que recibe el doble de turnos de búsqueda.
+PESO_SOLO_ESPANOL = 2
 
 
 def persona_de_busqueda(p, rid, nombres=None, corto=False):
@@ -147,19 +150,22 @@ def persona_de_busqueda(p, rid, nombres=None, corto=False):
         peso *= PESO_CORTO
     if not set(codigos) & _con_fuentes_propias():
         peso *= PESO_POCAS_FUENTES
+    if set(p.idiomas) == {"es"}:
+        peso *= PESO_SOLO_ESPANOL
     # Lugares principales: donde vive (su primera fila) y las regiones de sus filas. Van primero cada día (17 nov: los
     # turnos de quien vive en Emiratos se iban en países sueltos de Europa y «remoto en Emiratos» nunca llegaba).
     primera = lugares_perfil(p.model_copy(update={"ubicaciones": p.filas[:1]}), nombres) if p.filas else {}
     principales = [k for k in lugares if (k in primera and k != "REMOTO_MUNDO") or k.startswith(("REMOTO_REGION_", "REGION_"))]
     return {"familia": rid, "perfil": str(p.id), "lugares": sorted(set(lugares) | set(codigos)), "peso": peso,
-            "corto": bool(corto), "principales": principales}
+            "corto": bool(corto), "principales": principales, "idiomas": list(p.idiomas)}
 
 
 def consultas_espanol(cargo, raw, maximo=12):
-    """Títulos en español del cargo: los suyos y, si faltan, los del mapa de cargos (`sugerir`)."""
-    propios = [cargo.nombre, *raw["terminos_exactos"], *raw["terminos_similares"]]
-    sugeridos = sugerir(cargo.nombre, consultar_esco=False)
-    candidatos = propios + sugeridos["terminos_exactos"] + sugeridos["terminos_similares"]
+    """Títulos en español que se buscan para quien solo acepta español: los del cargo y los títulos exactos en español
+    de su familia del mapa (`espanol_del_mapa`). Contrato v49: solo lo que después se reconoce al clasificar; antes se
+    buscaban también los «similares» del mapa, que `grado` no reconoce: esos turnos se gastaban y sus avisos se
+    descartaban por «sin familia» (v44: los similares del mapa solo se sugieren)."""
+    candidatos = [cargo.nombre, *raw["terminos_exactos"], *raw["terminos_similares"], *espanol_del_mapa(cargo.nombre)]
     vistos, salida = set(), []
     for t in candidatos:
         clave = normalizar.texto(t)
@@ -325,8 +331,8 @@ LOTE_ARMADO = {"parcial", "completa"}
 def faltan_hoy(repo, version, fecha, ejecuciones=None):
     """Contrato v45: [(perfil, recibidas hoy, meta)] de quienes hoy no llegan a su meta y todavía pueden recibir más, o
     None si hoy aún no hay una búsqueda que haya armado su lote (no hay fila, falló, o solo corrió la captura horaria).
-    Puede recibir más quien está bajo el mínimo de 5 (rescate y reutilización lo completan) o cuyo cargo tiene cupo
-    libre en el lote del día. Comunidad no cuenta: recibe lo que sobra. Sin IA: cuenta las asignaciones del día."""
+    Contrato v49: puede recibir más todo el que está bajo su meta (reutilización y rescate completan hasta la meta).
+    Comunidad no cuenta: recibe lo que sobra. Sin IA: cuenta las asignaciones del día."""
     de_hoy = [e for e in (ejecuciones if ejecuciones is not None else repo.ejecuciones()) or []
               if str(e.get("fecha", "")) == fecha]
     resumen = (de_hoy[0].get("resumen") or {}) if de_hoy else {}
@@ -334,8 +340,6 @@ def faltan_hoy(repo, version, fecha, ejecuciones=None):
         return None
     cfg = validar_version(version)
     comunidades = {c.id for c in cfg.clientes if c.comunidad}
-    cargos = {c.id: c.nombre for c in cfg.cargos}
-    cupo_libre = resumen.get("faltantes") or {}
     eid = str(de_hoy[0]["id"])
     conteo = repo.asignaciones_por_perfil([eid])
     salida = []
@@ -343,8 +347,9 @@ def faltan_hoy(repo, version, fecha, ejecuciones=None):
         n, meta = conteo.get((eid, str(p.id)), 0), int(p.meta_diaria or 0)
         if p.cliente_id in comunidades or n >= meta:
             continue
-        if n < MINIMO_POR_PERFIL or cupo_libre.get(cargos.get(p.cargo_id, ""), 1) > 0:
-            salida.append((p, n, meta))
+        # Contrato v49: reutilización y rescate completan hasta la meta, así que todo el que está bajo su meta puede
+        # recibir más (antes, solo quien estaba bajo 5 o tenía cupo libre en su cargo).
+        salida.append((p, n, meta))
     return salida
 
 
@@ -387,6 +392,37 @@ def _embudo_por_nombre(reporte):
 DIAS_REUTILIZAR = 14
 
 
+class Completar:
+    """Contrato v49 (decisión de Oscar): hasta dónde se completa a cada persona con vacantes de días anteriores y de toda
+    la bodega. Hasta su meta diaria (mínimo 5); Comunidad sigue en el mínimo. Del mínimo a la meta, una vacante que hoy
+    aún no usa nadie solo entra mientras lote + añadidas no pasen del techo del día."""
+    def __init__(self, cfg, estrictas, filas, lote):
+        comunidades = {c.id for c in cfg.clientes if c.comunidad}
+        self.estrictas = estrictas
+        self.metas = {p.id: MINIMO_POR_PERFIL if p.cliente_id in comunidades
+                      else max(MINIMO_POR_PERFIL, int(p.meta_diaria or 0)) for p in cfg.perfiles}
+        self.usadas = {f["vacante_id"] for f in filas} | set(lote)
+        self.libre = max(0, int(cfg.techo_diario or 0) - len(set(lote)))
+
+    def objetivo(self, p):
+        return self.metas.get(p.id, MINIMO_POR_PERFIL)
+
+    def falta(self, p):
+        return max(0, self.objetivo(p) - self.estrictas.get(p.id, 0))
+
+    def bajos(self, cfg):
+        return [(c, p) for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id)) if self.falta(p)]
+
+    def cabe(self, p, vacante_id):
+        return self.estrictas.get(p.id, 0) < MINIMO_POR_PERFIL or vacante_id in self.usadas or self.libre > 0
+
+    def anotar(self, p, vacante_id):
+        if vacante_id not in self.usadas:
+            self.usadas.add(vacante_id)
+            self.libre -= 1
+        self.estrictas[p.id] = self.estrictas.get(p.id, 0) + 1
+
+
 def ajuste(repo, clave):
     """Un ajuste del panel ({} si no existe o no se puede leer: la búsqueda sigue igual sin él)."""
     try:
@@ -413,12 +449,12 @@ def _paginas(repo, ruta, params, tamano=500, maximo=5000):
     return salida
 
 
-def _reutilizar(repo, cfg, fecha, estrictas, filas, fila, operativos):
-    """Contrato v11: a cada perfil con menos del mínimo se le añaden vacantes elegidas en días anteriores (para otros
-    clientes o por el cupo) que cumplen sus filtros —con las mismas ampliaciones— y que esa persona nunca recibió.
-    No cambia la selección del día ni el cupo: solo la asignación por persona. Devuelve cuántas se añadieron."""
-    bajos = [(c, p) for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id))
-             if estrictas.get(p.id, 0) < MINIMO_POR_PERFIL]
+def _reutilizar(repo, cfg, fecha, completar, filas, fila, operativos):
+    """Contrato v11: a cada perfil que no llega a su objetivo (v49: su meta diaria; antes, el mínimo de 5) se le añaden
+    vacantes elegidas en días anteriores (para otros clientes o por el cupo) que cumplen sus filtros —con las mismas
+    ampliaciones— y que esa persona nunca recibió. No cambia la selección del día ni el cupo: solo la asignación por
+    persona. Devuelve cuántas se añadieron."""
+    bajos = completar.bajos(cfg)
     if not bajos:
         return 0
     desde = (datetime.fromisoformat(fecha) - timedelta(days=DIAS_REUTILIZAR)).date().isoformat()
@@ -441,11 +477,13 @@ def _reutilizar(repo, cfg, fecha, estrictas, filas, fila, operativos):
         raw = operativos[str(cargo.id)]
         vistas = recibidas.get(str(p.id), set()) | enviadas.get(str(p.cliente_id), set()) | hoy_por_perfil.get(str(p.id), set())
         for row in previas:
-            if estrictas.get(p.id, 0) >= MINIMO_POR_PERFIL:
+            if not completar.falta(p):
                 break
             if row["vacante_id"] in vistas or not grado(row["snapshot"].get("titulo") or "", raw, cercanos=True)[0]:
                 continue
             if _otro_oficio(row["snapshot"], raw):  # contrato v49: eso se pregunta en «Por confirmar»
+                continue
+            if not completar.cabe(p, row["vacante_id"]):
                 continue
             match, extra = evaluar(row["snapshot"], p, fecha), [{"reutilizada": row["delivery_date"]}]
             if not match["compatible"]:
@@ -454,15 +492,17 @@ def _reutilizar(repo, cfg, fecha, estrictas, filas, fila, operativos):
                     continue
                 match, extra = evaluar_ampliada(row["snapshot"], p, fecha, nivel), [*extra, {"ampliacion": nivel}]
             vistas.add(row["vacante_id"])
-            estrictas[p.id] = estrictas.get(p.id, 0) + 1
+            completar.anotar(p, row["vacante_id"])
             filas.append(fila(row, p, str(cargo.id), match["pruebas"], extra))
             añadidas += 1
     return añadidas
 
 
 # Contrato v36 (caso Danna, 17 nov): completar el mínimo con TODA la bodega, no solo con lo que entró a algún lote.
-MAX_COMPROBAR_RESCATE = 80  # enlaces que se comprueban al momento para estos perfiles (no usa Apify)
-SEGUNDOS_RESCATE = 150
+# Contrato v49: se completa hasta la meta (no solo hasta 5), así que hay más enlaces por comprobar: 200 en 5 min (antes
+# 80 en 150 s). La pasada de cada hora sigue con 30 en 60 s.
+MAX_COMPROBAR_RESCATE = 200  # enlaces que se comprueban al momento para estos perfiles (no usa Apify)
+SEGUNDOS_RESCATE = 300
 
 
 def _vigente_24h(v, ahora):
@@ -481,17 +521,16 @@ def _otro_oficio(v, cargo):
     return contenido.evidencia(v.get("titulo"), v.get("_descripcion"), cargo)["otro_oficio"]
 
 
-def _rescatar(repo, cfg, fecha, estrictas, filas, fila, vacantes, operativos, cache=None, comprobar=None, subir=None,
+def _rescatar(repo, cfg, fecha, completar, filas, fila, vacantes, operativos, cache=None, comprobar=None, subir=None,
               maximo=MAX_COMPROBAR_RESCATE, segundos=SEGUNDOS_RESCATE):
-    """Contrato v36: a cada perfil que sigue bajo el mínimo se le dan vacantes de toda la bodega de la noche que cumplen
+    """Contrato v36: a cada perfil que no llega a su objetivo (v49: su meta diaria) se le dan vacantes de toda la bodega de la noche que cumplen
     su ubicación e idioma (lo demás ordena, v27), con enlace comprobado en 24 h, que esa persona nunca recibió —aunque
     otro cliente sí— y con máximo 2 por empresa. Los enlaces que falten se comprueban aquí mismo (como mucho
     `MAX_COMPROBAR_RESCATE`) y su comprobación se guarda en el catálogo para poder compartirlas. No cuentan en el cupo ni
     van a `ofertas`: solo la asignación por persona, como las reutilizadas (v11)."""
     from datetime import timezone
     from buscador import catalogo, contrato, tiempos, verificar_enlaces
-    bajos = [(c, p) for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id))
-             if estrictas.get(p.id, 0) < MINIMO_POR_PERFIL]
+    bajos = completar.bajos(cfg)
     if not bajos or not vacantes:
         return 0
     ahora = datetime.now(timezone.utc)
@@ -530,11 +569,16 @@ def _rescatar(repo, cfg, fecha, estrictas, filas, fila, vacantes, operativos, ca
         lista.sort(key=lambda x: x[:2])
         candidatas[(cargo.id, p.id)] = lista
     # 2) Comprobar al momento los enlaces de las que podrían entrar (las 3 mejores por plaza que falta).
+    # Contrato v49: por turnos y primero quien tiene menos candidatas (con pocas en español, cada enlace cuenta); antes
+    # el presupuesto se iba en los primeros perfiles de la lista.
     por_comprobar, ya = [], set()
-    for cargo, p in bajos:
-        falta = MINIMO_POR_PERFIL - estrictas.get(p.id, 0)
-        for x in candidatas[(cargo.id, p.id)][:falta * 3]:
-            v = x[2]
+    turnos = sorted(bajos, key=lambda cp: len(candidatas[(cp[0].id, cp[1].id)]))
+    for i in range(max((completar.falta(p) * 3 for _, p in bajos), default=0)):
+        for cargo, p in turnos:
+            lista = candidatas[(cargo.id, p.id)]
+            if i >= completar.falta(p) * 3 or i >= len(lista):
+                continue
+            v = lista[i][2]
             if v["id"] not in ya and not _vigente_24h(v, ahora):
                 ya.add(v["id"])
                 por_comprobar.append(v)
@@ -559,15 +603,17 @@ def _rescatar(repo, cfg, fecha, estrictas, filas, fila, vacantes, operativos, ca
     for cargo, p in bajos:
         empresas = Counter(empresa_de.get(f["vacante_id"], "") for f in filas if f["perfil_id"] == str(p.id))
         for _, _, v, afinidad, match, extra in candidatas[(cargo.id, p.id)]:
-            if estrictas.get(p.id, 0) >= MINIMO_POR_PERFIL:
+            if not completar.falta(p):
                 break
             empresa = normalizar.texto(v.get("empresa") or "")
             if v["id"] in vistas.setdefault(str(p.id), set()) or empresas[empresa] >= 2 or not _vigente_24h(v, ahora):
                 continue
+            if not completar.cabe(p, v["id"]):
+                continue
             row = {"vacante_id": v["id"], "snapshot": v, "match_grade": entrega.GRADO_CONTRATO.get(afinidad, "close")}
             vistas[str(p.id)].add(v["id"])
             empresas[empresa] += 1
-            estrictas[p.id] = estrictas.get(p.id, 0) + 1
+            completar.anotar(p, v["id"])
             filas.append(fila(row, p, str(cargo.id), match["pruebas"], [{"rescatada": "bodega"}, *extra]))
             añadidas += 1
     return añadidas
@@ -714,14 +760,15 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
             estrictas[p.id] = estrictas.get(p.id, 0) + 1
             filas.append(fila(row, p, cargo_id, match["pruebas"], [{"ampliacion": nivel}]))
     reutilizadas = posts = rescatadas = 0
+    completar = Completar(cfg, estrictas, filas, [r["vacante_id"] for r in seleccionadas])
     try:
-        reutilizadas = _reutilizar(repo, cfg, fecha, estrictas, filas, fila, operativos)
+        reutilizadas = _reutilizar(repo, cfg, fecha, completar, filas, fila, operativos)
     except Exception as e:  # noqa: BLE001 — completar con días anteriores nunca impide registrar lo del día
         registro.aviso("ejecutor:329", e)
     if vacantes:
         bodega.etapa("Completar a quien va corto con toda la bodega")
         try:
-            rescatadas = _rescatar(repo, cfg, fecha, estrictas, filas, fila, vacantes, operativos, cache=cache_enlaces,
+            rescatadas = _rescatar(repo, cfg, fecha, completar, filas, fila, vacantes, operativos, cache=cache_enlaces,
                                    maximo=limites_rescate[0], segundos=limites_rescate[1])
         except Exception as e:  # noqa: BLE001 — completar nunca impide registrar lo del día
             registro.aviso("ejecutor:rescate-general", e)
