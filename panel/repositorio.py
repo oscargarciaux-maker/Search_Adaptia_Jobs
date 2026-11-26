@@ -35,10 +35,21 @@ class ErrorRepositorio(Exception):
 _SIN_015 = ("Reparte exactamente 120 vacantes", "Los cupos superan 120")
 
 
+# Contrato v49: los motivos por los que la base no deja aplicar, en lenguaje sencillo y con qué hacer.
+_NO_APLICA = {
+    "Cada cargo necesita un perfil activo": "Hay un cargo activo sin ningún perfil activo de un cliente activo: dale un "
+                                            "perfil o archívalo en «Cargos y metas», y vuelve a pulsar «Aplicar cambios».",
+    "Las metas superan el techo diario": "Las metas suman más que el techo diario: baja algunas metas o sube el techo en "
+                                         "«Cargos y metas», y vuelve a pulsar «Aplicar cambios».",
+    "Da una meta diaria a algún perfil": "Ningún perfil activo tiene meta diaria: da una meta a algún perfil y vuelve a "
+                                         "pulsar «Aplicar cambios».",
+}
+
+
 def _mensaje_sql(mensaje):
-    if "panel_publicar_hoy" in mensaje:  # contrato v27: la función de SQL 016 aún no está instalada
-        return ("La base todavía no tiene «Aplicar hoy» (SQL 016). En GitHub → Actions, corre «Preparar Supabase» y "
-                "vuelve a intentarlo. Mientras tanto, «Programar para mañana» sigue funcionando.")
+    for clave, texto in _NO_APLICA.items():
+        if clave in mensaje:
+            return texto
     if any(m in mensaje for m in _SIN_015):
         return ("La base todavía no tiene la actualización de metas por perfil (SQL 015). En GitHub → Actions, corre "
                 "«Preparar Supabase» y vuelve a intentarlo.")
@@ -439,13 +450,9 @@ class RepositorioSupabase:
     def publicar(self, revision):
         actual = self.config()
         if actual["revision"] != revision:
-            raise ErrorRepositorio("La configuración cambió. Recarga antes de programar.", 409)
+            raise ErrorRepositorio("La configuración cambió. Recarga antes de aplicar.", 409)
         Configuracion.model_validate(actual["borrador"]).validar_publicacion()
         return self.pedir("POST", "rpc/panel_publicar", json={"p_revision": revision})
-
-    def publicar_hoy(self, revision):
-        """Contrato v43: «Aplicar hoy» y «Confirmar» son lo mismo (SQL 019): rige desde hoy."""
-        return self.publicar(revision)
 
     def operativa(self, fecha):
         filas = self.pedir("GET", "panel_versiones", params={"vigente_desde": "lte." + fecha, "order": "vigente_desde.desc,revision.desc", "limit": 1})
@@ -772,6 +779,11 @@ class RepositorioDemo:
                 self._guardar()
 
     def operativa(self, fecha):
+        """Contrato v49: lo aplicado en la demostración también queda en uso (un cliente nuevo puede «Buscar ahora»)."""
+        with self.lock:
+            p = self.estado.get("publicada")
+            if p and p.get("configuracion") and str(p.get("vigente_desde", "")) <= fecha:
+                return deepcopy(p)
         return {"revision": 1, "configuracion": configuracion_demo()}
 
     def ejecucion(self, fecha):
@@ -945,21 +957,11 @@ class RepositorioDemo:
     def publicar(self, revision):
         with self.lock:
             if revision != self.estado["revision"]:
-                raise ErrorRepositorio("La configuración cambió. Recarga antes de programar.", 409)
+                raise ErrorRepositorio("La configuración cambió. Recarga antes de aplicar.", 409)
             Configuracion.model_validate(self.estado["borrador"]).validar_publicacion()
             if self.estado["publicada"] and self.estado["publicada"]["revision"] == revision:
                 return {k:self.estado["publicada"][k] for k in ("revision","vigente_desde")}
             # Contrato v43: confirmar deja la configuración vigente desde hoy (la próxima búsqueda ya la usa).
-            self.estado["publicada"] = {"revision": revision, "vigente_desde": hoy(),
-                                        "configuracion": deepcopy(self.estado["borrador"])}
-            self._guardar()
-            return {"revision": revision, "vigente_desde": hoy()}
-
-    def publicar_hoy(self, revision):
-        with self.lock:
-            if revision != self.estado["revision"]:
-                raise ErrorRepositorio("La configuración cambió. Recarga antes de aplicar.", 409)
-            Configuracion.model_validate(self.estado["borrador"]).validar_publicacion()
             self.estado["publicada"] = {"revision": revision, "vigente_desde": hoy(),
                                         "configuracion": deepcopy(self.estado["borrador"])}
             self._guardar()

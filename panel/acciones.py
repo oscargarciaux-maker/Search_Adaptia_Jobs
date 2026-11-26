@@ -8,7 +8,8 @@ repositorio, el navegador, las respuestas ni los registros. Sin ellos el botón 
 los suyos.
 
 Lanza la búsqueda diaria (modo diario, sin prueba); el servidor decide antes si es la completa o, si hoy ya corrió,
-la de quienes no llegan a su meta (contrato v45, `enfoque=faltantes`). Nunca repite lo entregado. GitHub deja una sola tarea esperando por grupo de concurrencia («publicar») y la que llega después
+la de quienes no llegan a su meta (contrato v45, `enfoque=faltantes`) o la de un cliente (contrato v49,
+`enfoque=pedido`). Nunca repite lo entregado. GitHub deja una sola tarea esperando por grupo de concurrencia («publicar») y la que llega después
 cancela a la que esperaba; por eso no lanza si otra tarea del grupo espera turno o si una larga (no la captura horaria,
 que dura minutos) está corriendo, ni dos veces seguidas en pocos minutos."""
 import os
@@ -25,6 +26,12 @@ from panel.repositorio import ErrorRepositorio
 API = "https://api.github.com"
 # Contrato v45: entrada `enfoque` de bodega.yml (también `--enfoque` de panel.ejecutor).
 ENFOQUE_COMPLETO, ENFOQUE_FALTANTES = "completo", "faltantes"
+# Contrato v49: «Buscar ahora» desde el detalle de un cliente. El flujo solo recibe esta opción cerrada; los perfiles
+# pedidos los guarda el servidor en `panel_ajustes` (CLAVE_PEDIDA) y el ejecutor los lee de ahí: ningún identificador
+# va en las entradas del flujo ni en sus registros.
+ENFOQUE_PEDIDO = "pedido"
+ENFOQUES = (ENFOQUE_COMPLETO, ENFOQUE_FALTANTES, ENFOQUE_PEDIDO)
+CLAVE_PEDIDA = "busqueda_pedida"
 FLUJO = "bodega.yml"
 # Flujos con `concurrency: group: publicar` (pruebas/panel/test_buscar_ahora.py lo compara con .github/workflows).
 GRUPO_PUBLICAR = {"bodega.yml", "incremental.yml", "limpiar_fuera_objetivo.yml", "preparar.yml", "profunda.yml",
@@ -128,6 +135,8 @@ class AccionesGitHub:
         return valor
 
     def lanzar(self, enfoque=ENFOQUE_COMPLETO):
+        if enfoque not in ENFOQUES:  # solo opciones cerradas: nunca un texto libre en las entradas del flujo
+            raise ValueError("Búsqueda no reconocida.")
         with self._cerrojo:
             if self._ultimo is not None and time.monotonic() - self._ultimo < ESPERA_ENTRE_LANZAMIENTOS:
                 raise ErrorRepositorio("La búsqueda ya se pidió hace un momento; aparecerá en unos segundos.", 409)
@@ -163,6 +172,8 @@ class AccionesDemo:
         return resumir(corridas, "main")
 
     def lanzar(self, enfoque=ENFOQUE_COMPLETO):
+        if enfoque not in ENFOQUES:
+            raise ValueError("Búsqueda no reconocida.")
         if self.estado()["en_curso"]:
             raise ErrorRepositorio(YA_HAY, 409)
         self._pedida = (time.monotonic(), datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))

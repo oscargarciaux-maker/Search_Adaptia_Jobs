@@ -31,9 +31,9 @@ on:
         type: boolean
         default: false
       enfoque:
-        description: "completo, o faltantes: más a fondo solo para quienes hoy no llegan a su meta («Buscar ahora», v45)"
+        description: "completo; faltantes: solo para quienes hoy no llegan a su meta («Buscar ahora», v45); pedido: los perfiles que el panel guardó al pedirla para un cliente (v49)"
         type: choice
-        options: [completo, faltantes]
+        options: [completo, faltantes, pedido]
         default: completo
 
 permissions:

@@ -24,7 +24,15 @@ import type {
   EstimacionPerfil,
   Ubicacion,
 } from "../types";
-import { conFilas, conMetas, filasDe, perfilNuevo, uid } from "../perfiles";
+import {
+  SIN_CIUDAD,
+  conFilas,
+  conMetas,
+  filaSinCiudad,
+  filasDe,
+  perfilNuevo,
+  uid,
+} from "../perfiles";
 import { useVistaPrevia, type EstadoPrevia } from "../vistaPrevia";
 import { CargoDialog } from "./CargoDialog";
 import {
@@ -588,7 +596,8 @@ export function ClienteDialog({
   // Contrato v30: el WhatsApp llega precargado (sin esperar al abrir) y se guarda sin hacer esperar al cerrar.
   contacto?: Contacto;
   onClose: () => void;
-  onSave: (c: Cliente, p: Perfil[]) => void;
+  // Contrato v49: guarda y aplica. Devuelve el motivo si NO se pudo guardar (el formulario sigue abierto) o null.
+  onSave: (c: Cliente, p: Perfil[]) => Promise<string | null>;
   onGuardarContacto: (id: string, ct: Contacto, tenia: boolean) => void;
   onCrearCargo: (c: Cargo) => void;
 }) {
@@ -622,6 +631,7 @@ export function ClienteDialog({
     return primero ? [perfilNuevo(c.id, primero.id)] : [];
   });
   const [error, setError] = useState("");
+  const [aplicando, setAplicando] = useState(false);
   const cargos = config.cargos.filter((c) => c.activo);
   // Reunión del 14 nov: lo escrito se guarda solo en este navegador mientras se edita. Si algo falla (pantalla en
   // blanco, conexión), al volver a abrir el formulario se ofrece recuperarlo. Nada sale del navegador hasta guardar.
@@ -678,6 +688,7 @@ export function ClienteDialog({
         <form
           onSubmit={async (e) => {
             e.preventDefault();
+            if (aplicando) return;
             if (!ps.length) {
               setError("Añade al menos un perfil de búsqueda.");
               return;
@@ -699,15 +710,23 @@ export function ClienteDialog({
               );
               return;
             }
+            // Contrato v49: una fila con presencial o híbrido pide la ciudad (el error se ve junto al campo).
+            if (ps.some((p) => filasDe(p).some(filaSinCiudad))) {
+              setError(
+                "Falta la ciudad en una ubicación con presencial o híbrido: escríbela o deja esa fila solo en «Remoto».",
+              );
+              return;
+            }
             if (ct.telefono.trim() && !ct.telefono.trim().startsWith("+")) {
               setError("Elige el país del número de WhatsApp.");
               return;
             }
             if (JSON.stringify(ct) !== JSON.stringify(contactoInicial))
               onGuardarContacto(c.id, ct, Boolean(contacto));
-            borrarLocal(claveBorrador);
+            setError("");
+            setAplicando(true);
             // Una restricción a medio llenar (sin monto, sin palabras ni tipos) no se guarda.
-            onSave(
+            const motivo = await onSave(
               c,
               ps.map((p) => ({
                 ...p,
@@ -722,6 +741,10 @@ export function ClienteDialog({
                 ),
               })),
             );
+            setAplicando(false);
+            // Lo escrito en este navegador se borra solo cuando quedó guardado.
+            if (motivo === null) borrarLocal(claveBorrador);
+            else setError("No se guardaron los cambios: " + motivo);
           }}
         >
           {recuperable && (
@@ -1141,9 +1164,17 @@ export function ClienteDialog({
             >
               Cancelar
             </button>
-            <button className="button primary">
-              {cliente ? "Aplicar cambios" : "Añadir cliente"}
-              <Check size={15} />
+            <button className="button primary" disabled={aplicando}>
+              {aplicando
+                ? "Aplicando…"
+                : cliente
+                  ? "Aplicar cambios"
+                  : "Añadir cliente"}
+              {aplicando ? (
+                <Loader2 size={15} className="spin" />
+              ) : (
+                <Check size={15} />
+              )}
             </button>
           </div>
         </form>
@@ -1325,7 +1356,9 @@ function UbicacionesPerfil({
           alguna fila la acepta: remota abierta a uno de sus países, o híbrida o
           presencial con oficina en uno de sus países o ciudades. Para quien
           tiene permiso de trabajo en otro país, añade una fila con ese país y
-          «Remoto». Las ciudades son opcionales: vacío es cualquier ciudad.
+          «Remoto». Con híbrido o presencial escribe la ciudad: sin ella no
+          llegan presenciales ni híbridas. Para solo remoto, la ciudad es
+          opcional.
         </Ayuda>
       </legend>
       {filas.map((f, n) => (
@@ -1347,13 +1380,18 @@ function UbicacionesPerfil({
             visible="Ciudades"
             label={`Ciudades de la ubicación ${n + 1}, perfil ${i + 1}`}
             placeholder={
-              f.paises.length
-                ? "Elige o escribe una ciudad (opcional)"
-                : "Primero elige el país (opcional)"
+              f.modalidades.some((m) => m !== "remoto")
+                ? f.paises.length
+                  ? "Elige o escribe la ciudad de la oficina"
+                  : "Escribe la ciudad de la oficina"
+                : f.paises.length
+                  ? "Elige o escribe una ciudad (opcional)"
+                  : "Primero elige el país (opcional)"
             }
             values={f.ciudades}
             onChange={(v) => cambiar(n, { ciudades: v })}
             sugerencias={ciudadesDe(f.paises)}
+            error={filaSinCiudad(f) ? SIN_CIUDAD : ""}
           />
           <div
             className="ubicacion-modos"

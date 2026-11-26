@@ -11,7 +11,6 @@ import {
   Download,
   Moon,
   Sun,
-  CalendarClock,
   Check,
   CheckCheck,
   Clock3,
@@ -20,12 +19,12 @@ import {
   Globe2,
   Loader2,
   LogOut,
+  MapPin,
   MessageCircle,
   Pencil,
   Plus,
   RefreshCw,
   RotateCcw,
-  Save,
   Search,
   ShieldCheck,
   SlidersHorizontal,
@@ -80,7 +79,7 @@ import {
 } from "./vistas/Actividad";
 import { CargoDialog } from "./vistas/CargoDialog";
 import { ClienteDialog } from "./vistas/ClienteFormulario";
-import { conMetas } from "./perfiles";
+import { conMetas, perfilSinCiudad } from "./perfiles";
 import { useVistaPrevia, type EstadoPrevia } from "./vistaPrevia";
 import { ListaVacantes } from "./vistas/Vacantes";
 import "./style.css";
@@ -103,9 +102,9 @@ function slug(texto: string) {
 function vacioVacantes(estado: EstadoConfig | null, r: Resultados | null) {
   if (!estado?.publicada)
     return {
-      title: "Programa la configuración para empezar",
+      title: "Aplica la configuración para empezar",
       texto:
-        "Las vacantes de cada cliente aparecen después de la primera búsqueda (6:30 a. m.) con su configuración. Ve a «Cargos y metas» y pulsa «Confirmar y aplicar».",
+        "Las vacantes de cada cliente aparecen después de la primera búsqueda (6:30 a. m.) con su configuración. Revisa «Clientes» y «Cargos y metas» y pulsa «Aplicar cambios».",
     };
   const desde = estado.publicada.vigente_desde;
   if (!r?.ejecucion || r.ejecucion.fecha < desde)
@@ -215,23 +214,6 @@ const estadosEjecucion: Record<string, string> = {
 // Resumen con jerarquía (13 nov, pedido de Oscar): Clientes y Cargos y cupos mandan; Vacantes, Por confirmar y
 // Mensajes acompañan; Actividad es una franja tipo «entrada de evento» con la próxima búsqueda. La rejilla no es
 // uniforme a propósito: tamaños distintos y una franja desplazada guían la mirada de lo más usado a lo demás.
-// La próxima búsqueda de hoy en palabras: la de las 8:30 a. m. si aún no pasó; si no, la próxima de cada hora.
-function textoProximaDeHoy(ahora = new Date()) {
-  const ochoYMedia = new Date(
-    Date.UTC(
-      ahora.getUTCFullYear(),
-      ahora.getUTCMonth(),
-      ahora.getUTCDate(),
-      13,
-      30,
-    ),
-  );
-  const seisYMedia = new Date(ochoYMedia.getTime() - 2 * 3600 * 1000);
-  if (ahora < seisYMedia) return "la de las 6:30 a. m.";
-  if (ahora < ochoYMedia) return "la de las 8:30 a. m.";
-  return "la próxima captura de cada hora (a los 23 minutos)";
-}
-
 function proximaBusqueda(ahora = new Date()) {
   // 6:30 a. m. de Bogotá (UTC−5, sin horario de verano) = 11:30 UTC.
   const hoy = new Date(
@@ -255,7 +237,7 @@ type ResumenCliente = {
   recibidas: number | null;
   porConfirmar: number;
   comunidad: boolean;
-  perfiles: { cargo: string; meta: number }[];
+  perfiles: { cargo: string; meta: number; sinCiudad: boolean }[];
 };
 // Paso 8: los datos de cada tarjeta de cliente (meta = suma de las metas de sus perfiles activos, como el servidor).
 function resumenDeClientes(
@@ -278,6 +260,7 @@ function resumenDeClientes(
       const perfiles = ps.map((p) => ({
         cargo: cargosActivos.get(p.cargo_id) || "",
         meta: m.metaDe(p),
+        sinCiudad: perfilSinCiudad(p),
       }));
       const nombres = [...new Set(perfiles.map((p) => p.cargo))];
       return {
@@ -766,6 +749,7 @@ function ClienteDetalle({
   onCsv,
   onEditar,
   descargando,
+  buscarAhora,
 }: {
   cliente: ResumenCliente;
   cfg: Configuracion;
@@ -780,6 +764,8 @@ function ClienteDetalle({
   onCsv: () => void;
   onEditar: () => void;
   descargando: boolean;
+  // Contrato v49: «Buscar ahora» para este cliente (no aparece sin la llave de GitHub).
+  buscarAhora?: React.ReactNode;
 }) {
   const [ocupado, setOcupado] = useState("");
   // Contrato v29: sus «por confirmar» se piden al servidor, con su total real.
@@ -921,10 +907,25 @@ function ClienteDetalle({
               {c.perfiles.map((p, i) => (
                 <li key={i}>
                   {p.cargo} · meta de {p.meta} al día
+                  {p.sinCiudad && (
+                    <>
+                      {" "}
+                      <span className="falta-ciudad">
+                        <MapPin size={13} aria-hidden="true" />
+                        Falta la ciudad
+                      </span>
+                    </>
+                  )}
                 </li>
               ))}
               {!c.perfiles.length && <li>Aún no tiene perfiles activos.</li>}
             </ul>
+            {c.perfiles.some((p) => p.sinCiudad) && (
+              <p className="field-help">
+                Tiene presencial o híbrido sin ciudad: sin ciudad no le llegan
+                presenciales ni híbridas. Escríbela en «Editar perfil».
+              </p>
+            )}
           </section>
 
           {cortes.length > 0 && (
@@ -970,6 +971,7 @@ function ClienteDetalle({
               <Download size={16} />
               {descargando ? "Descargando…" : "Descargar su CSV de hoy"}
             </button>
+            {buscarAhora}
             {!cortes.length && (
               <button
                 type="button"
@@ -1051,7 +1053,7 @@ function BotonTema() {
 }
 
 // Importar clientes desde un CSV (15 nov): vista previa sin guardar y luego importación todo o nada. Los clientes
-// quedan en el borrador como si se hubieran creado a mano; la búsqueda los usa al programar.
+// quedan guardados como si se hubieran creado a mano; la búsqueda los usa desde que se pulsa «Aplicar cambios».
 function ImportarClientes({
   revision,
   dirty,
@@ -1116,7 +1118,7 @@ function ImportarClientes({
         `${r.actualizados} ${r.actualizados === 1 ? "cliente actualizado" : "clientes actualizados"} (conservan lo que recibieron), ${r.nuevos} ${r.nuevos === 1 ? "nuevo" : "nuevos"}` +
           (r.borrados ? `, ${r.borrados} borrados` : "") +
           (r.archivados ? `, ${r.archivados} archivados` : "") +
-          ". Revísalos y pulsa «Confirmar y aplicar».",
+          ". Revísalos y pulsa «Aplicar cambios».",
       );
     } catch (e) {
       notify((e as Error).message, true);
@@ -1198,7 +1200,7 @@ function ImportarClientes({
               <p>
                 Se quitan de la configuración junto con sus perfiles, su
                 WhatsApp y sus mensajes preparados. No se puede deshacer. Las
-                vacantes que ya recibieron y las versiones ya programadas se
+                vacantes que ya recibieron y las configuraciones anteriores se
                 conservan en el historial.
               </p>
               <div className="field">
@@ -1217,7 +1219,8 @@ function ImportarClientes({
         </fieldset>
         {dirty && (
           <p className="importar-error" role="alert">
-            Tienes cambios sin guardar. Guárdalos o recarga antes de importar.
+            Tienes cambios sin aplicar. Pulsa «Aplicar cambios» o recarga antes
+            de importar.
           </p>
         )}
         {error && (
@@ -1265,7 +1268,7 @@ function ImportarClientes({
             {previa.excede_techo && previa.metas && (
               <p className="importar-aviso">
                 Las metas suman {previa.metas.reales} y el cupo diario es{" "}
-                {previa.metas.techo}: antes de programar, sube el cupo o baja
+                {previa.metas.techo}: antes de aplicar, sube el cupo o baja
                 metas.
               </p>
             )}
@@ -1365,11 +1368,11 @@ function BorrarClienteDialog({
       <p className="dialog-copy">
         Se quita de la configuración junto con sus perfiles, su WhatsApp y sus
         mensajes preparados. No se puede deshacer. Las vacantes que ya recibió y
-        las versiones ya programadas se conservan en el historial.
+        las configuraciones anteriores se conservan en el historial.
       </p>
       {dirty && (
         <p className="importar-error" role="alert">
-          Tienes cambios sin guardar. Guárdalos antes de eliminar.
+          Tienes cambios sin aplicar. Pulsa «Aplicar cambios» antes de eliminar.
         </p>
       )}
       <div className="field">
@@ -1439,9 +1442,15 @@ function App() {
     [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
-    [toast, setToast] = useState<{ texto: string; error: boolean } | null>(
-      null,
-    ),
+    [toast, setToast] = useState<{
+      texto: string;
+      error: boolean;
+      accion?: { texto: string; hacer: () => void };
+    } | null>(null),
+    // Contrato v49: por qué no se pudo dejar en uso lo guardado (se ve junto al botón hasta aplicar bien).
+    [noAplica, setNoAplica] = useState(""),
+    // Contrato v49: «Buscar ahora» disponible (el servidor tiene la llave de GitHub).
+    [puedeBuscar, setPuedeBuscar] = useState(false),
     [modal, setModal] = useState<
       "cliente" | "cargo" | "publicar" | "archivo" | "whatsapp" | null
     >(null),
@@ -1522,8 +1531,8 @@ function App() {
   const previaCargos = useVistaPrevia(
     tab === "Cargos y metas" && sesion?.sesion ? draft : null,
   );
-  // Lista grande (17 nov): hay cambios solo si el borrador es distinto del guardado. Si deshaces lo que cambiaste,
-  // vuelve a «sin cambios» y no pide guardar ni programar otra vez.
+  // Lista grande (17 nov): hay cambios solo si lo editado es distinto de lo guardado. Si deshaces lo que cambiaste,
+  // vuelve a «sin cambios» y no pide aplicar otra vez.
   const dirty = useMemo(
     () => marcado && mismoContenido(draft, estado?.borrador) === false,
     [marcado, draft, estado?.borrador],
@@ -1533,16 +1542,27 @@ function App() {
     excede = metas.reales > metas.techo,
     clientes = draft.clientes.filter((c) => c.activo),
     cargos = metas.cargos.filter((c) => c.activo);
-  // Cambios que la próxima búsqueda aún no usa (sin guardar, o guardados sin confirmar).
-  const pendienteDeConfirmar =
+  // Contrato v49: cambios que la próxima búsqueda aún no usa (sin guardar, o guardados pero sin aplicar porque algo
+  // lo impidió, o importados). El botón «Aplicar cambios» de la cabecera solo aparece entonces.
+  const pendienteDeAplicar =
     dirty ||
     Boolean(estado?.revision && estado.publicada?.revision !== estado.revision);
-  function notify(texto: string, error = false) {
-    setToast({ texto, error });
+  async function aplicarPendientes() {
+    return (await aplicar()).aplicado;
+  }
+  function notify(
+    texto: string,
+    error = false,
+    accion?: { texto: string; hacer: () => void },
+  ) {
+    setToast({ texto, error, accion });
   }
   useEffect(() => {
     if (toast) {
-      const t = setTimeout(() => setToast(null), toast.error ? 8000 : 5000);
+      const t = setTimeout(
+        () => setToast(null),
+        toast.error || toast.accion ? 12000 : 5000,
+      );
       return () => clearTimeout(t);
     }
   }, [toast]);
@@ -1556,6 +1576,9 @@ function App() {
       setSesion(s);
       if (s.sesion) {
         cargarContactos();
+        api<{ disponible: boolean }>("/busqueda")
+          .then((b) => setPuedeBuscar(Boolean(b.disponible)))
+          .catch(() => setPuedeBuscar(false));
         api<Revisiones>(PENDIENTES_RESUMEN)
           .then((r) => {
             setPorConfirmar(r.en_espera ?? r.total);
@@ -1685,53 +1708,78 @@ function App() {
     setDraft(v);
     setDirty(true);
   }
-  async function guardar() {
-    if (!estado) return null;
-    const r = await api<
-      Partial<EstadoConfig> & { revision: number; borrador: Configuracion }
-    >("/config", {
-      method: "PUT",
-      body: JSON.stringify({ revision: estado.revision, configuracion: draft }),
-    });
-    const next = { ...estado, ...r };
-    setEstado(next);
-    setDraft(next.borrador);
-    setDirty(false);
-    return next;
-  }
-  async function guardarClick() {
+  // Contrato v49 (pedido de Oscar, 26 nov): un solo «Aplicar cambios» que guarda (PUT /config) y deja en uso
+  // (POST /config/publicar, rige desde hoy: la próxima búsqueda ya lo usa; lo entregado no cambia). Si guardar
+  // falla, nada cambia y se dice por qué. Si guarda pero no se puede dejar en uso (p. ej. metas por encima del
+  // techo), los cambios quedan guardados, el motivo queda a la vista y el botón de la cabecera sigue pendiente.
+  async function aplicar(
+    config: Configuracion = draft,
+    exito = "Cambios aplicados: la próxima búsqueda los usa.",
+  ): Promise<{ guardado: boolean; aplicado: boolean; motivo: string }> {
+    if (!estado)
+      return { guardado: false, aplicado: false, motivo: "Recarga la página." };
     setBusy(true);
+    let actual = estado;
     try {
-      await guardar();
-      notify("Borrador guardado. Puedes programarlo para mañana.");
+      if (!mismoContenido(config, estado.borrador)) {
+        const r = await api<
+          Partial<EstadoConfig> & { revision: number; borrador: Configuracion }
+        >("/config", {
+          method: "PUT",
+          body: JSON.stringify({
+            revision: estado.revision,
+            configuracion: config,
+          }),
+        });
+        actual = { ...estado, ...r };
+        setEstado(actual);
+      }
+      // También cuando lo pedido ya era lo guardado (p. ej. reactivar lo que se había archivado sin aplicar).
+      setDraft(actual.borrador);
+      setDirty(false);
     } catch (e) {
-      notify((e as Error).message, true);
-    } finally {
+      const motivo = (e as Error).message;
+      notify("No se guardaron los cambios: " + motivo, true);
       setBusy(false);
+      return { guardado: false, aplicado: false, motivo };
     }
-  }
-  async function programar() {
-    setBusy(true);
     try {
-      const e = dirty ? await guardar() : estado;
-      if (!e) return;
-      // Contrato v43: «Confirmar y aplicar» rige desde hoy: la próxima búsqueda ya la usa; lo entregado no cambia.
+      // Lo que se sabe sin preguntar al servidor (el mismo cálculo que `validar_publicacion`).
+      const m = conMetas(actual.borrador);
+      if (m.reales > m.techo)
+        throw new Error(
+          `Las metas suman ${m.reales} y el cupo diario es ${m.techo}: baja algunas metas o sube el cupo diario en «Cargos y metas», y vuelve a pulsar «Aplicar cambios».`,
+        );
+      if (m.total < 1)
+        throw new Error(
+          "Ningún perfil activo tiene meta diaria: da una meta a algún perfil y vuelve a pulsar «Aplicar cambios».",
+        );
       const r = await api<{ revision: number; vigente_desde: string }>(
         "/config/publicar",
-        { method: "POST", body: JSON.stringify({ revision: e.revision }) },
+        { method: "POST", body: JSON.stringify({ revision: actual.revision }) },
       );
+      const primera = !actual.publicada;
       setEstado({
-        ...e,
-        publicada: { ...r, configuracion: structuredClone(e.borrador) },
+        ...actual,
+        publicada: { ...r, configuracion: structuredClone(actual.borrador) },
       });
-      setModal(null);
+      setNoAplica("");
       notify(
-        r.vigente_desde > hoyBogota()
-          ? "Configuración programada para el " + fecha(r.vigente_desde) + "."
-          : "Configuración aplicada. La próxima búsqueda ya la usa.",
+        exito +
+          (primera
+            ? " Desde ahora solo se buscan los cargos de tu lista (no los seis fijos de antes)."
+            : ""),
       );
+      return { guardado: true, aplicado: true, motivo: "" };
     } catch (e) {
-      notify((e as Error).message, true);
+      const motivo = (e as Error).message;
+      setNoAplica(motivo);
+      notify(
+        "Tus cambios quedaron guardados, pero la búsqueda todavía no los usa: " +
+          motivo,
+        true,
+      );
+      return { guardado: true, aplicado: false, motivo };
     } finally {
       setBusy(false);
     }
@@ -1984,7 +2032,7 @@ function App() {
               <h1>{tab}</h1>
               <p>
                 {tab === "Resumen"
-                  ? "Organiza tus clientes y prepara las oportunidades de mañana."
+                  ? "Organiza tus clientes y prepara sus oportunidades de cada día."
                   : tab === "Clientes"
                     ? "Configura los criterios que hacen útil una vacante para cada cliente."
                     : tab === "Cargos y metas"
@@ -2005,42 +2053,37 @@ function App() {
                 <>
                   <span
                     className={
-                      "flow-pill" + (pendienteDeConfirmar ? " pending" : "")
+                      "flow-pill" + (pendienteDeAplicar ? " pending" : "")
                     }
                   >
-                    {textoProgramacion(estado, dirty)}
+                    {pendienteDeAplicar
+                      ? "Cambios sin aplicar"
+                      : "En uso desde la próxima búsqueda"}
                   </span>
-                  <Ayuda etiqueta="Guardar y aplicar">
-                    <strong>Guardar borrador</strong> conserva tus cambios sin
-                    tocar la próxima búsqueda.{" "}
-                    <strong>Confirmar y aplicar</strong> los guarda y los usa
-                    desde la próxima búsqueda, aunque sea dentro de unos
-                    minutos. Lo que ya se entregó hoy no cambia.
-                  </Ayuda>
-                  <button
-                    className="button secondary"
-                    onClick={guardarClick}
-                    disabled={!dirty || busy}
-                  >
-                    <Save size={16} />
-                    {busy ? "Guardando…" : "Guardar borrador"}
-                  </button>
                   {tab === "Resumen" && (
                     <BuscarAhora
-                      sinConfirmar={pendienteDeConfirmar}
+                      sinAplicar={pendienteDeAplicar}
+                      onAplicar={aplicarPendientes}
+                      revision={estado?.publicada?.revision}
                       demo={Boolean(sesion.demo)}
                       onAviso={notify}
                       onTermino={recargarResumen}
                     />
                   )}
-                  <button
-                    className="button primary"
-                    onClick={() => setModal("publicar")}
-                    disabled={busy || total < 1 || excede}
-                  >
-                    <CalendarClock size={16} />
-                    Confirmar y aplicar
-                  </button>
+                  {pendienteDeAplicar && (
+                    <button
+                      className="button primary"
+                      onClick={() => aplicar()}
+                      disabled={busy}
+                    >
+                      {busy ? (
+                        <Loader2 size={16} className="spin" />
+                      ) : (
+                        <Check size={16} />
+                      )}
+                      {busy ? "Aplicando…" : "Aplicar cambios"}
+                    </button>
+                  )}
                 </>
               )}
               <BotonTema />
@@ -2060,6 +2103,19 @@ function App() {
               )}
             </div>
           </div>
+          {noAplica &&
+            pendienteDeAplicar &&
+            ["Resumen", "Clientes", "Cargos y metas"].includes(tab) && (
+              <p className="form-error aviso-no-aplica" role="alert">
+                <b>
+                  Tus cambios están guardados, pero la búsqueda aún no los usa.
+                </b>{" "}
+                {noAplica}
+                {noAplica.includes("Aplicar cambios")
+                  ? ""
+                  : " Cuando lo arregles, pulsa «Aplicar cambios»."}
+              </p>
+            )}
           {tab === "Resumen" && (
             <>
               <AvisoUltimaBusqueda ultima={runs?.[0]} soloFallo />
@@ -2121,6 +2177,17 @@ function App() {
                         go("Por confirmar");
                       }}
                       onCsv={() => descargarBase(c.id)}
+                      buscarAhora={
+                        <BuscarAhora
+                          cliente={{ id: c.id, nombre: c.nombre }}
+                          sinAplicar={pendienteDeAplicar}
+                          onAplicar={aplicarPendientes}
+                          revision={estado?.publicada?.revision}
+                          demo={Boolean(sesion.demo)}
+                          onAviso={notify}
+                          onTermino={recargarResumen}
+                        />
+                      }
                       onEditar={() => {
                         setDetalle("");
                         setEditCliente(
@@ -2664,7 +2731,7 @@ function App() {
                   <Ayuda etiqueta="Recargar lista">
                     Vuelve a leer las vacantes de este día desde la base. No
                     busca vacantes nuevas ni vuelve a comprobar los enlaces: eso
-                    lo hacen las búsquedas programadas.
+                    lo hacen las búsquedas de cada día.
                   </Ayuda>
                 </div>
               </div>
@@ -2828,21 +2895,21 @@ function App() {
           cargo={editCargo}
           notify={notify}
           onClose={() => setModal(null)}
-          onSave={(c) => {
-            cambiar({
-              ...draft,
-              cargos: draft.cargos.some((x) => x.id === c.id)
-                ? draft.cargos.map((x) => (x.id === c.id ? c : x))
-                : [...draft.cargos, c],
-            });
+          onSave={async (c) => {
             const nuevo = !draft.cargos.some((x) => x.id === c.id);
-            setModal(null);
-            notify(
-              (nuevo
-                ? "Cargo añadido al borrador."
-                : "Cargo actualizado en el borrador.") +
-                " Pulsa «Confirmar y aplicar» para usarlo en la próxima búsqueda.",
+            // Contrato v49: «Aplicar cambios» del formulario guarda y deja en uso de verdad.
+            const r = await aplicar(
+              {
+                ...draft,
+                cargos: nuevo
+                  ? [...draft.cargos, c]
+                  : draft.cargos.map((x) => (x.id === c.id ? c : x)),
+              },
+              (nuevo ? "Cargo añadido." : "Cargo actualizado.") +
+                " Cambios aplicados: la próxima búsqueda los usa.",
             );
+            if (r.guardado) setModal(null);
+            return r.guardado;
           }}
         />
       )}
@@ -2856,105 +2923,53 @@ function App() {
           onCrearCargo={(nuevo) =>
             cambiar({ ...draft, cargos: [...draft.cargos, nuevo] })
           }
-          onSave={(c, ps) => {
+          onSave={async (c, ps) => {
             // Lista grande del 16 nov: un cargo archivado vuelve solo cuando se le asigna un perfil.
             const usados = new Set(
               ps.filter((p) => p.activo).map((p) => p.cargo_id),
             );
-            cambiar({
-              ...draft,
-              cargos: draft.cargos.map((x) =>
-                !x.activo && usados.has(x.id) ? { ...x, activo: true } : x,
-              ),
-              clientes: draft.clientes.some((x) => x.id === c.id)
-                ? draft.clientes.map((x) => (x.id === c.id ? c : x))
-                : [...draft.clientes, c],
-              perfiles: [
-                ...draft.perfiles.filter((p) => p.cliente_id !== c.id),
-                ...ps,
-              ],
-            });
             const nuevo = !draft.clientes.some((x) => x.id === c.id);
-            setModal(null);
-            notify(
-              (nuevo
-                ? "Cliente añadido al borrador."
-                : "Cliente actualizado en el borrador.") +
-                " Pulsa «Confirmar y aplicar» para usarlo en la próxima búsqueda.",
+            // Contrato v49: «Aplicar cambios» del formulario guarda y deja en uso de verdad.
+            const r = await aplicar(
+              {
+                ...draft,
+                cargos: draft.cargos.map((x) =>
+                  !x.activo && usados.has(x.id) ? { ...x, activo: true } : x,
+                ),
+                clientes: nuevo
+                  ? [...draft.clientes, c]
+                  : draft.clientes.map((x) => (x.id === c.id ? c : x)),
+                perfiles: [
+                  ...draft.perfiles.filter((p) => p.cliente_id !== c.id),
+                  ...ps,
+                ],
+              },
+              (nuevo ? "Cliente añadido." : "Cliente actualizado.") +
+                " Cambios aplicados: la próxima búsqueda los usa.",
             );
+            if (!r.guardado) return r.motivo;
+            setModal(null);
+            // Contrato v49: al crear un cliente, ofrecer buscar ya para él (desde su detalle en el Resumen).
+            if (nuevo && r.aplicado && puedeBuscar && c.activo)
+              notify(
+                `Cliente añadido. Cambios aplicados: la próxima búsqueda los usa. También puedes buscar ya para «${c.nombre}».`,
+                false,
+                {
+                  texto: "Buscar ahora para este cliente",
+                  hacer: () => {
+                    go("Resumen");
+                    setDetalle(c.id);
+                  },
+                },
+              );
+            return null;
           }}
         />
-      )}
-      {modal === "publicar" && (
-        <Dialog
-          titulo="Confirmar y aplicar"
-          subtitulo="Se confirmará esta distribución y los filtros actuales de los clientes."
-          onClose={() => !busy && setModal(null)}
-        >
-          <div className="publish-list">
-            {cargos
-              .filter((c) => c.cupo > 0)
-              .map((c, i) => (
-                <div key={c.id}>
-                  <span
-                    className="color-dot"
-                    style={{ background: colores[i % 5] }}
-                  />
-                  {c.nombre}
-                  <strong>{c.cupo} vacantes</strong>
-                </div>
-              ))}
-          </div>
-          <div className="publish-total">
-            <span>Total del día</span>
-            <strong>
-              {total} / {metas.techo}
-            </strong>
-          </div>
-          {/* Contrato v43: una sola opción; rige desde la próxima búsqueda. */}
-          <p className="helper">
-            Se usa desde la próxima búsqueda: <b>{textoProximaDeHoy()}</b>. Lo
-            que ya se entregó hoy no cambia.
-          </p>
-          {!estado?.publicada && (
-            <p className="helper note">
-              Es tu primera configuración: desde entonces dejan de buscarse los
-              seis cargos fijos anteriores; solo se buscarán los cargos de esta
-              lista.
-            </p>
-          )}
-          {sesion.demo && (
-            <p className="demo-inline">
-              Demostración: esta acción no programa una búsqueda real.
-            </p>
-          )}
-          <div className="dialog-actions">
-            <button
-              className="button secondary"
-              disabled={busy}
-              onClick={() => setModal(null)}
-            >
-              Revisar
-            </button>
-            <button
-              className="button primary"
-              disabled={busy}
-              onClick={() => programar()}
-            >
-              {busy ? (
-                <Loader2 size={16} className="spin" />
-              ) : (
-                <CalendarClock size={16} />
-              )}
-              Confirmar y aplicar
-            </button>
-          </div>
-        </Dialog>
       )}
       {borrarCargo && (
         <Dialog
           titulo={"Eliminar " + borrarCargo.nombre}
-          subtitulo="Se quita del borrador para siempre. Lo ya entregado y el historial se conservan."
+          subtitulo="Se quita de la configuración para siempre. Lo ya entregado y el historial se conservan."
           onClose={() => setBorrarCargo(null)}
         >
           {(() => {
@@ -2966,7 +2981,7 @@ function App() {
                 {suyos
                   ? `También se quitan ${suyos} ${suyos === 1 ? "perfil de cliente que buscaba" : "perfiles de clientes que buscaban"} este cargo; sus clientes conservan los demás perfiles.`
                   : "Ningún cliente busca este cargo."}{" "}
-                Se aplica al pulsar «Confirmar y aplicar».
+                Se aplica al pulsar «Aplicar cambios».
               </p>
             );
           })()}
@@ -2986,7 +3001,9 @@ function App() {
                   cargos: draft.cargos.filter((x) => x.id !== id),
                   perfiles: draft.perfiles.filter((p) => p.cargo_id !== id),
                 });
-                notify(`«${borrarCargo.nombre}» se eliminó del borrador.`);
+                notify(
+                  `«${borrarCargo.nombre}» se eliminó. Pulsa «Aplicar cambios» para que la búsqueda lo use.`,
+                );
                 setBorrarCargo(null);
               }}
             >
@@ -3003,8 +3020,8 @@ function App() {
         >
           <p className="dialog-copy">
             {archive.tipo === "cliente"
-              ? `Desde la próxima búsqueda programada, «${archive.nombre}» deja de recibir vacantes. Las vacantes que ya recibió se conservan y puedes reactivarlo cuando quieras.`
-              : `Desde la próxima búsqueda programada se deja de buscar «${archive.nombre}». Las vacantes ya entregadas se conservan.`}
+              ? `Cuando pulses «Aplicar cambios», «${archive.nombre}» deja de recibir vacantes desde la próxima búsqueda. Las vacantes que ya recibió se conservan y puedes reactivarlo cuando quieras.`
+              : `Cuando pulses «Aplicar cambios», se deja de buscar «${archive.nombre}» desde la próxima búsqueda. Las vacantes ya entregadas se conservan.`}
           </p>
           {archive.tipo === "cargo" && clientCount(archive.id) > 0 && (
             <p className="role-warning" role="alert">
@@ -3040,7 +3057,7 @@ function App() {
                 );
                 setModal(null);
                 notify(
-                  "Archivado en el borrador. Sus vacantes ya recibidas se conservan.",
+                  "Archivado. Sus vacantes ya recibidas se conservan. Pulsa «Aplicar cambios» para que la búsqueda lo use.",
                 );
               }}
             >
@@ -3130,6 +3147,19 @@ function App() {
         >
           {toast.error ? <ShieldCheck size={18} /> : <Check size={18} />}
           <span>{toast.texto}</span>
+          {toast.accion && (
+            <button
+              type="button"
+              className="toast-accion"
+              onClick={() => {
+                const a = toast.accion;
+                setToast(null);
+                a?.hacer();
+              }}
+            >
+              {toast.accion.texto}
+            </button>
+          )}
           <button aria-label="Cerrar aviso" onClick={() => setToast(null)}>
             <X size={15} />
           </button>
@@ -3254,16 +3284,6 @@ function CifrasCargo({
   );
 }
 
-// Lista grande del 16 nov: «Programado desde» confundía. Se dice qué pasa con la próxima búsqueda, en palabras.
-function textoProgramacion(estado: EstadoConfig | null, dirty: boolean) {
-  if (dirty) return "Cambios sin guardar";
-  if (!estado?.revision) return "Sin configuración confirmada";
-  const p = estado.publicada;
-  if (!p || p.revision !== estado.revision) return "Hay cambios sin confirmar";
-  return p.vigente_desde > hoyBogota()
-    ? "Lista: se usa desde la búsqueda de mañana"
-    : "En uso desde la próxima búsqueda";
-}
 function ClientCard({
   c,
   perfiles,
@@ -3285,6 +3305,8 @@ function ClientCard({
   // Sección 7a (13 nov): más baja, sin foto ni «Activo»; editar y vacantes a la vista.
   const p = perfiles[0],
     cargo = cargos.find((x) => x.id === p?.cargo_id);
+  // Contrato v49: perfiles con presencial o híbrido sin ciudad (no les llegan esas vacantes).
+  const sinCiudad = perfiles.filter(perfilSinCiudad).length;
   return (
     <article className="client-card card">
       <div className="client-top">
@@ -3339,6 +3361,18 @@ function ClientCard({
               : ""}
           </span>
         </div>
+        {sinCiudad > 0 && (
+          <div className="falta-ciudad">
+            <MapPin size={14} aria-hidden="true" />
+            <span>
+              Falta la ciudad
+              {perfiles.length > 1
+                ? ` en ${sinCiudad} ${sinCiudad === 1 ? "perfil" : "perfiles"}`
+                : ""}
+              : sin ciudad no llegan presenciales ni híbridas.
+            </span>
+          </div>
+        )}
       </div>
       <div className="client-bottom">
         <button

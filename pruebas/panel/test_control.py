@@ -1047,7 +1047,7 @@ def test_sin_sql_015_se_explica_como_instalarla(monkeypatch):
         repo.pedir("POST", "rpc/panel_publicar", json={})
     assert e.value.estado == 422
     cuerpo["message"] = "Las metas superan el techo diario"
-    with pytest.raises(ErrorRepositorio, match="superan el techo"):
+    with pytest.raises(ErrorRepositorio, match="más que el techo diario: baja algunas metas"):  # v49: qué hacer
         repo.pedir("POST", "rpc/panel_publicar", json={})
 
 
@@ -1417,17 +1417,31 @@ def test_asignaciones_por_cliente_agrupa_por_busqueda_y_cliente():
     assert RepositorioSupabase.asignaciones_por_cliente.__get__(repo)([]) == {}
 
 
-def test_sin_sql_016_aplicar_hoy_explica_como_instalarla():
+def test_v49_lo_que_impide_aplicar_se_explica_con_que_hacer():
     from panel.repositorio import _mensaje_sql
-    texto = _mensaje_sql("Could not find the function public.panel_publicar_hoy(p_revision) in the schema cache")
-    assert "SQL 016" in texto and "Preparar Supabase" in texto
+    for sql in ("Cada cargo necesita un perfil activo", "Las metas superan el techo diario",
+                "Da una meta diaria a algún perfil antes de confirmar"):
+        assert "«Aplicar cambios»" in _mensaje_sql(sql)
+    assert "SQL 015" in _mensaje_sql("Reparte exactamente 120 vacantes")
 
 
-def test_demo_aplicar_hoy_rige_desde_hoy(tmp_path):
+def test_demo_aplicar_rige_desde_hoy_y_queda_en_uso(tmp_path):
     r = RepositorioDemo(tmp_path / "demo.json")
-    assert r.publicar_hoy(r.config()["revision"])["vigente_desde"] == hoy()
+    cfg = r.config()["borrador"]
+    cfg["clientes"][0]["nombre"] = "Cliente aplicado"
+    r.guardar(r.config()["revision"], cfg)
+    assert r.publicar(r.config()["revision"])["vigente_desde"] == hoy()
+    # Contrato v49: lo aplicado es lo que usa «Buscar ahora» del cliente.
+    assert r.operativa(hoy())["configuracion"]["clientes"][0]["nombre"] == "Cliente aplicado"
     with pytest.raises(ErrorRepositorio):
-        r.publicar_hoy(r.config()["revision"] + 1)
+        r.publicar(r.config()["revision"] + 1)
+
+
+def test_v49_ya_no_existe_aplicar_hoy():
+    api = TestClient(crear_app(demo=True, repositorio=RepositorioDemo()))
+    r = api.post("/api/config/aplicar-hoy", json={"revision": 1}, headers={"origin": "http://testserver"})
+    assert r.status_code in (404, 405)
+    assert not hasattr(RepositorioDemo, "publicar_hoy") and not hasattr(RepositorioSupabase, "publicar_hoy")
 
 
 # ── PR 1b (16 nov): más vacantes para quien solo acepta avisos en español ─────────────────────────────────────────

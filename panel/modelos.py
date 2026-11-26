@@ -341,7 +341,7 @@ class Configuracion(Modelo):
         nombres = [" ".join(c.nombre.casefold().replace("-", " ").split()) for c in self.cargos if c.activo]
         if len(nombres) != len(set(nombres)):
             raise ValueError("Usa un solo cargo compartido para los clientes del mismo oficio.")
-        # Un borrador puede pasar el techo mientras se edita; programar no (`validar_publicacion`).
+        # Un borrador puede pasar el techo mientras se edita; aplicar no (`validar_publicacion`).
         return self.aplicar_metas()
 
     def _activos(self):
@@ -399,11 +399,14 @@ class Configuracion(Modelo):
         reales = self.metas()["reales"]
         if reales > self.techo_diario:
             raise ValueError(f"Las metas de los clientes suman {reales} y el techo diario es {self.techo_diario}: "
-                             "baja algunas metas o sube el techo antes de programar.")
+                             "baja algunas metas o sube el techo en «Cargos y metas» y vuelve a pulsar "
+                             "«Aplicar cambios».")
         if self.total <= 0:
-            raise ValueError("Ningún perfil activo tiene meta diaria: da una meta a algún perfil antes de programar.")
+            raise ValueError("Ningún perfil activo tiene meta diaria: da una meta a algún perfil y vuelve a pulsar "
+                             "«Aplicar cambios».")
         if self.total > self.techo_diario:
-            raise ValueError(f"Las metas suman {self.total} y el techo diario es {self.techo_diario}.")
+            raise ValueError(f"Las metas suman {self.total} y el techo diario es {self.techo_diario}: baja algunas metas "
+                             "o sube el techo en «Cargos y metas» y vuelve a pulsar «Aplicar cambios».")
         return self
 
 
@@ -503,6 +506,11 @@ class Guardar(Modelo):
 
 class Publicar(Modelo):
     revision: int = Field(ge=0, strict=True)
+
+
+class PedirBusqueda(Modelo):
+    """Contrato v49: «Buscar ahora» del Resumen (sin cliente) o del detalle de un cliente."""
+    cliente_id: UUID | None = None
 
 
 class EnVivo(Modelo):

@@ -147,3 +147,14 @@ export function conFilas(
     ),
   };
 }
+
+// Contrato v49 (decisión de Oscar): sin ciudad no llegan presenciales ni híbridas (el motor lo descarta con «falta
+// la ciudad en el perfil»). El formulario lo pide en cada fila y el panel avisa en los perfiles que ya existen.
+export const SIN_CIUDAD =
+  "Escribe la ciudad: sin ciudad no llegan presenciales ni híbridas.";
+export function filaSinCiudad(f: Ubicacion) {
+  return f.modalidades.some((m) => m !== "remoto") && !f.ciudades.length;
+}
+export function perfilSinCiudad(p: Perfil) {
+  return filasDe(p).some(filaSinCiudad);
+}

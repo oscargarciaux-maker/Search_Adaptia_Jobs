@@ -374,12 +374,15 @@ PLAN_COMPLETO = {"tipo": "completa", "faltan": [],
                             "sigue sola."}
 
 
-def plan_busqueda(repo, fecha=None, ejecuciones=None):
+def plan_busqueda(repo, fecha=None, ejecuciones=None, cliente_id=None):
     """Un solo botón, tres casos: hoy no hay búsqueda que haya armado su lote (o falló) → la completa del día; ya corrió
     y hay perfiles que no llegan a su meta y pueden recibir más → solo para ellos, corta y sin repetir («faltantes», v47); si no →
-    nada. Solo nombres de clientes del panel privado. Nunca falla: sin datos, la completa."""
+    nada. Solo nombres de clientes del panel privado. Nunca falla: sin datos, la completa.
+    Con `cliente_id` (contrato v49), el plan de ese cliente: ver `plan_cliente`."""
     from panel.ejecutor import faltan_hoy, validar_version
     fecha = fecha or hoy()
+    if cliente_id:
+        return plan_cliente(repo, str(cliente_id), fecha, ejecuciones)
     try:
         version = repo.operativa(fecha)
         if not version:
@@ -405,6 +408,50 @@ def plan_busqueda(repo, fecha=None, ejecuciones=None):
                       f"{'perfil no llega' if len(faltan) == 1 else 'perfiles no llegan'} a su meta: se buscará solo "
                       "para ellos, en sus cargos y lugares, sin repetir lo que ya se buscó hoy.",
             "detalle": "Primero les reparte lo que ya hay guardado y luego busca nombres y páginas nuevas. Tarda unos 30 "
+                       "minutos; puedes cerrar el panel."}
+
+
+def plan_cliente(repo, cliente_id, fecha=None, ejecuciones=None):
+    """Contrato v49: «Buscar ahora» desde el detalle de un cliente. Lee la configuración EN USO (la aplicada), no la que
+    se está editando. Tres casos: hoy aún no hay lote → la completa del día, con los perfiles del cliente primero; ya hay
+    lote → `pedido`: solo los perfiles activos del cliente que no llegan a su meta (uno nuevo cuenta 0); todos en su
+    meta → nada. `perfiles` son los ids que el servidor guarda para la búsqueda (nunca van al flujo de GitHub).
+    Un cliente que no está activo en la configuración en uso es un error 409 que dice qué hacer."""
+    from panel.ejecutor import LOTE_ARMADO, validar_version
+    fecha = fecha or hoy()
+    version = repo.operativa(fecha)
+    cfg = validar_version(version) if version else None
+    cliente = next((c for c in cfg.clientes if str(c.id) == cliente_id), None) if cfg else None
+    if not cliente or not cliente.activo:
+        raise ErrorRepositorio("Este cliente todavía no está en la configuración en uso. Pulsa «Aplicar cambios» y "
+                               "vuelve a intentarlo.", 409)
+    perfiles = [p for p in cfg.perfiles_activos() if str(p.cliente_id) == cliente_id]
+    if not perfiles:
+        raise ErrorRepositorio(f"{cliente.nombre} no tiene perfiles activos con meta en la configuración en uso: "
+                               "activa o añade un perfil y pulsa «Aplicar cambios».", 409)
+    filas = ejecuciones if ejecuciones is not None else (repo.ejecuciones() or [])
+    de_hoy = [e for e in filas if str(e.get("fecha", "")) == fecha]
+    if (not de_hoy or de_hoy[0].get("estado") not in LOTE_ARMADO
+            or (de_hoy[0].get("resumen") or {}).get("revision_del_lote") is None):
+        return {**PLAN_COMPLETO, "cliente": cliente.nombre, "perfiles": [str(p.id) for p in perfiles],
+                "motivo": "Hoy todavía no hay una búsqueda terminada: se hará la búsqueda completa del día, con los "
+                          f"perfiles de {cliente.nombre} primero."}
+    eid = str(de_hoy[0]["id"])
+    conteo = repo.asignaciones_por_perfil([eid])
+    cargos = {str(c.id): c.nombre for c in cfg.cargos}
+    faltan = [{"perfil_id": str(p.id), "cliente": cliente.nombre, "cargo": cargos.get(str(p.cargo_id), ""),
+               "hoy": conteo.get((eid, str(p.id)), 0), "meta": int(p.meta_diaria or 0)} for p in perfiles]
+    faltan = sorted((f for f in faltan if f["hoy"] < f["meta"]), key=lambda f: (f["hoy"] / max(1, f["meta"]), f["cargo"]))
+    if not faltan:
+        return {"tipo": "nada", "faltan": [], "cliente": cliente.nombre, "perfiles": [],
+                "motivo": f"Hoy {cliente.nombre} ya llegó a su meta en todos sus perfiles: no hace falta buscar más."}
+    uno = len(faltan) == 1
+    return {"tipo": "pedido", "faltan": faltan, "cliente": cliente.nombre, "perfiles": [f["perfil_id"] for f in faltan],
+            "motivo": f"La búsqueda de hoy ya corrió y {len(faltan)} {'perfil' if uno else 'perfiles'} de "
+                      f"{cliente.nombre} no {'llega' if uno else 'llegan'} a su meta: se buscará solo para "
+                      f"{'ese perfil' if uno else 'esos perfiles'}, en sus cargos y lugares, sin repetir lo que ya se "
+                      "buscó hoy.",
+            "detalle": "Primero le reparte lo que ya hay guardado y luego busca nombres y páginas nuevas. Tarda unos 30 "
                        "minutos; puedes cerrar el panel."}
 
 

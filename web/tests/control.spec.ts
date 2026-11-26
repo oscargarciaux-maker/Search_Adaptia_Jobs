@@ -46,18 +46,16 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   ).toBeVisible();
   await expect(page.getByText("Mi espacio de trabajo")).toHaveCount(0);
   await expect(page.getByText("Menos ruido.")).toHaveCount(0);
-  // Sección 6: la explicación de Guardar / Programar va en una ayuda (ⓘ), no en una franja.
-  const explicacion = page.getByText(
-    /los guarda y los usa desde la próxima búsqueda/,
-  );
-  await expect(explicacion).toBeHidden();
-  const ayuda = page.getByRole("button", {
-    name: "Más información: Guardar y aplicar",
-  });
-  await ayuda.focus();
-  await expect(explicacion).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(explicacion).toBeHidden();
+  // Contrato v49: un solo «Aplicar cambios», que solo aparece cuando hay algo sin aplicar; sin «Guardar borrador».
+  await expect(
+    page.getByRole("button", { name: "Guardar borrador" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Confirmar y aplicar" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Más información: Guardar y aplicar" }),
+  ).toHaveCount(0);
   await ir(page, "Clientes");
   await page
     .getByRole("button", { name: "Nuevo cliente", exact: true })
@@ -117,6 +115,12 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await paises1.fill("México");
   await paises1.press("Enter");
   await dialog.getByLabel("Presencial en la ubicación 1 del perfil 1").check();
+  // Contrato v49: con presencial, la ciudad es obligatoria (sin ella no llegan presenciales ni híbridas).
+  const ciudad1 = dialog.getByLabel("Ciudades de la ubicación 1, perfil 1");
+  await expect(ciudad1).toHaveAttribute("aria-invalid", "true");
+  await ciudad1.fill("Monterrey");
+  await ciudad1.press("Enter");
+  await expect(ciudad1).not.toHaveAttribute("aria-invalid", "true");
   // La explicación de las filas está en su ayuda, no a la vista.
   await expect(dialog.getByText(/Una fila por lugar/)).toBeHidden();
   await dialog
@@ -177,16 +181,19 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await expect(
     tarjetaCliente.getByRole("button", { name: "Vacantes" }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Guardar borrador", exact: true })
-    .click();
-  await expect(
-    page.getByText("Borrador guardado.", { exact: false }),
-  ).toBeVisible();
+  // Contrato v49: «Añadir cliente» guarda y aplica. Con 130 de metas y techo 120 se guarda pero no queda en uso:
+  // el panel dice por qué y qué hacer, y la cabecera queda con «Aplicar cambios».
+  await expect(page.locator(".aviso-no-aplica")).toContainText(
+    /guardados, pero la búsqueda aún no los usa.*baja algunas metas o sube el cupo diario/,
+  );
+  await expect(page.locator(".flow-pill")).toHaveText("Cambios sin aplicar");
   await page.reload();
   await ir(page, "Clientes");
   await expect(
     page.getByRole("heading", { name: "Prueba operadora" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Aplicar cambios", exact: true }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Archivar Prueba operadora", exact: true })
@@ -201,11 +208,8 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await page.getByRole("button", { name: "Ver archivados (1)" }).click();
   await page.getByRole("button", { name: "Reactivar", exact: true }).click();
   await ir(page, "Cargos y metas");
-  // La operadora suma 10 a los 120 de los demás: con techo 120 no se puede programar; con 130, sí.
+  // La operadora suma 10 a los 120 de los demás: con techo 120 no se puede aplicar; con 130, sí.
   await expect(page.getByText(/pasan el cupo diario/)).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Confirmar y aplicar", exact: true }),
-  ).toBeDisabled();
   // Lista grande del 16 nov: el techo se puede borrar del todo y se valida al salir del campo.
   const techo = page.getByLabel("Cupo diario", { exact: true });
   await techo.fill("");
@@ -262,13 +266,18 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await expect(
     page.getByRole("heading", { name: "Bioacoustics Analyst", exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Confirmar y aplicar", exact: true })
-    .click();
-  await dialog.getByRole("button", { name: "Confirmar y aplicar" }).click();
+  // Contrato v49: «Añadir cargo» también aplica, con el techo de 130 que estaba sin aplicar.
   await expect(
-    page.getByText("Configuración aplicada", { exact: false }),
+    page.getByText("Cambios aplicados: la próxima búsqueda los usa", {
+      exact: false,
+    }),
   ).toBeVisible();
+  await expect(page.locator(".flow-pill")).toHaveText(
+    "En uso desde la próxima búsqueda",
+  );
+  await expect(
+    page.getByRole("button", { name: "Aplicar cambios", exact: true }),
+  ).toHaveCount(0);
   const cfg = await (await request.get("/api/config")).json();
   expect(
     cfg.publicada.configuracion.cargos.reduce(
@@ -620,7 +629,7 @@ test("arreglos de la auditoría: error de carga, textos, título y botones táct
     page.getByText("No se pudieron cargar las vacantes"),
   ).toBeVisible();
   await expect(
-    page.getByText("Programa la configuración para empezar"),
+    page.getByText("Aplica la configuración para empezar"),
   ).toHaveCount(0);
   await page.unroute(/\/api\/resultados/);
   await page.getByRole("button", { name: "Reintentar" }).click();
@@ -776,11 +785,11 @@ test("contrato v22: restricciones, prioridades y margen de años en el perfil", 
     .getByLabel("Añadir restricción al perfil 1")
     .selectOption("salario_minimo"); // a medio llenar: no se guarda
   await dialog.getByRole("button", { name: "Aplicar cambios" }).click();
-  await page
-    .getByRole("button", { name: "Guardar borrador", exact: true })
-    .click();
+  // Contrato v49: «Aplicar cambios» del formulario guarda y deja en uso.
   await expect(
-    page.getByText("Borrador guardado.", { exact: false }),
+    page.getByText("Cambios aplicados: la próxima búsqueda los usa", {
+      exact: false,
+    }),
   ).toBeVisible();
   const cfg = await (await request.get("/api/config")).json();
   const perfil = cfg.borrador.perfiles.find(
@@ -854,11 +863,11 @@ test("contrato v23 y v30: ubicaciones en filas, permiso de trabajo, horario y ci
   await expect(
     page.locator(".client-card", { hasText: "Cliente de ejemplo 01" }),
   ).toContainText("Alemania");
-  await page
-    .getByRole("button", { name: "Guardar borrador", exact: true })
-    .click();
+  // Contrato v49: «Aplicar cambios» del formulario guarda y deja en uso.
   await expect(
-    page.getByText("Borrador guardado.", { exact: false }),
+    page.getByText("Cambios aplicados: la próxima búsqueda los usa", {
+      exact: false,
+    }),
   ).toBeVisible();
   const cfg = await (await request.get("/api/config")).json();
   const perfil = cfg.borrador.perfiles.find(
@@ -876,6 +885,31 @@ test("contrato v23 y v30: ubicaciones en filas, permiso de trabajo, horario y ci
     },
     { paises: ["US"], ciudades: [], modalidades: ["remoto"] },
   ]);
+  // Contrato v49: lo aplicado queda en uso y la demostración la comparten las pruebas: se deja el perfil como
+  // estaba (vive en Colombia) para que las siguientes lo encuentren igual.
+  const sinFilas = {
+    ...perfil,
+    vive_en: "CO",
+    ubicaciones: [{ paises: ["CO"], ciudades: [], modalidades: ["remoto"] }],
+  };
+  const r = await request.put("/api/config", {
+    headers: { Origin: "http://127.0.0.1:8001" },
+    data: {
+      revision: cfg.revision,
+      configuracion: {
+        ...cfg.borrador,
+        perfiles: cfg.borrador.perfiles.map((p: { id: string }) =>
+          p.id === perfil.id ? sinFilas : p,
+        ),
+      },
+    },
+  });
+  expect(r.ok()).toBe(true);
+  const publicar = await request.post("/api/config/publicar", {
+    headers: { Origin: "http://127.0.0.1:8001" },
+    data: { revision: (await r.json()).revision },
+  });
+  expect(publicar.ok()).toBe(true);
 });
 
 test("contrato v25: proponer funciones y confirmar una vacante que coincide por funciones", async ({
@@ -1272,7 +1306,7 @@ test("importar clientes: vista previa con errores, borrar los actuales y program
   for (const n of ["Persona Uno", "Persona Dos", "Persona Tres"])
     await expect(page.getByRole("heading", { name: n })).toBeVisible();
 
-  // Quedan guardados de verdad: al recargar siguen ahí y se pueden programar.
+  // Quedan guardados de verdad: al recargar siguen ahí y se pueden aplicar.
   await page.reload();
   await expect(
     page.getByRole("heading", { name: "Persona Uno" }),
@@ -1284,16 +1318,17 @@ test("importar clientes: vista previa con errores, borrar los actuales y program
   await expect(
     lista.getByRole("button", { name: /^Cliente de ejemplo 02\s*:/ }),
   ).toHaveAccessibleName(/,\s*[1-9]\d* de 10/);
+  // Contrato v49: lo importado queda guardado sin aplicar; un clic en la cabecera lo deja en uso, sin diálogo.
+  await expect(page.locator(".flow-pill")).toHaveText("Cambios sin aplicar");
   await page
-    .getByRole("button", { name: "Confirmar y aplicar", exact: true })
-    .click();
-  await page
-    .locator("dialog[open]")
-    .getByRole("button", { name: "Confirmar y aplicar" })
+    .getByRole("button", { name: "Aplicar cambios", exact: true })
     .click();
   await expect(page.locator(".flow-pill")).toHaveText(
     /En uso desde la próxima búsqueda/,
   );
+  await expect(
+    page.getByRole("button", { name: "Aplicar cambios", exact: true }),
+  ).toHaveCount(0);
 
   // Eliminar definitivamente un cliente archivado.
   await page.goto("/#clientes");
@@ -1303,7 +1338,12 @@ test("importar clientes: vista previa con errores, borrar los actuales y program
     .getByRole("button", { name: /Archivar/ })
     .last()
     .click();
-  await page.getByRole("button", { name: "Guardar borrador" }).click();
+  await page
+    .getByRole("button", { name: "Aplicar cambios", exact: true })
+    .click();
+  await expect(page.locator(".flow-pill")).toHaveText(
+    /En uso desde la próxima búsqueda/,
+  );
   await page.getByRole("button", { name: /Ver archivados/ }).click();
   await page.getByRole("button", { name: "Eliminar definitivamente" }).click();
   const borrar = page.locator("dialog[open]");
@@ -1334,15 +1374,10 @@ test("contrato v27: aplicar hoy, etiquetas de lo que no cumple y distintivo de C
   await expect(
     page.locator(".client-card h3", { hasText: "Cliente de ejemplo 02" }),
   ).toContainText("Comunidad");
-  await page
-    .getByRole("button", { name: "Confirmar y aplicar", exact: true })
-    .click();
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Confirmar y aplicar", exact: true })
-    .click();
   await expect(
-    page.getByText("Configuración aplicada", { exact: false }),
+    page.getByText("Cambios aplicados: la próxima búsqueda los usa", {
+      exact: false,
+    }),
   ).toBeVisible();
   const cfg = await (await request.get("/api/config")).json();
   const hoy = new Intl.DateTimeFormat("en-CA", {
@@ -1411,7 +1446,9 @@ test("lista grande 16 nov: detalle en dos paneles, editar perfil y archivar carg
 }) => {
   await page.setViewportSize({ width: 1366, height: 768 });
   await page.goto("/");
-  await expect(page.locator(".flow-pill")).not.toHaveText(/Programado desde/);
+  await expect(page.locator(".flow-pill")).toHaveText(
+    /^(Cambios sin aplicar|En uso desde la próxima búsqueda)$/,
+  );
   await page.locator(".cliente-mini").first().click();
   const detalle = page.getByRole("dialog");
   await expect(detalle.locator(".detalle-dos-paneles")).toBeVisible();
@@ -1424,20 +1461,26 @@ test("lista grande 16 nov: detalle en dos paneles, editar perfil y archivar carg
   ).toBeVisible();
   await page.keyboard.press("Escape");
 
-  // Lista grande (17 nov): deshacer un cambio deja el panel «sin cambios» (no pide guardar otra vez).
+  // Lista grande (17 nov): deshacer un cambio deja el panel «sin cambios» (no pide aplicar otra vez).
   await page.goto("/#cargos");
+  const aplicarCabecera = page.getByRole("button", {
+    name: "Aplicar cambios",
+    exact: true,
+  });
+  if (await aplicarCabecera.count()) await aplicarCabecera.click(); // lo que dejaron pendiente otras pruebas
+  await expect(aplicarCabecera).toHaveCount(0);
   const techoCampo = page.locator("#techo-diario");
   const original = await techoCampo.inputValue();
   await techoCampo.fill(String(Number(original) + 5));
   await techoCampo.blur();
-  await expect(
-    page.getByRole("button", { name: "Guardar borrador" }),
-  ).toBeEnabled();
+  await expect(aplicarCabecera).toBeVisible();
+  await expect(page.locator(".flow-pill")).toHaveText("Cambios sin aplicar");
   await techoCampo.fill(original);
   await techoCampo.blur();
-  await expect(
-    page.getByRole("button", { name: "Guardar borrador" }),
-  ).toBeDisabled();
+  await expect(aplicarCabecera).toHaveCount(0);
+  await expect(page.locator(".flow-pill")).toHaveText(
+    "En uso desde la próxima búsqueda",
+  );
   // Ventana alta: la franja de archivados queda a la vista y el arrastre no desplaza la página a mitad de camino.
   await page.setViewportSize({ width: 1366, height: 1400 });
   await page.goto("/#cargos");
@@ -1460,7 +1503,10 @@ test("lista grande 16 nov: detalle en dos paneles, editar perfil y archivar carg
     .locator("option", { hasText: nombre + " (archivado" })
     .getAttribute("value");
   await cargo.selectOption(valor || "");
-  await page.getByRole("button", { name: "Aplicar cambios" }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Aplicar cambios" })
+    .click();
   await page.goto("/#cargos");
   await expect(
     page.locator(".role-card h3", { hasText: nombre }),
@@ -1646,11 +1692,12 @@ test("18 nov: «Buscar ahora» lanza la búsqueda desde el Resumen y se bloquea 
   await page.getByRole("heading", { level: 1, name: "Resumen" }).waitFor();
   await page.getByRole("button", { name: "Buscar ahora" }).click();
   const dialog = page.getByRole("dialog");
-  // v45: un solo botón que decide. En la demo la búsqueda de hoy ya corrió y 3 perfiles no llegan a su meta.
+  // v45: un solo botón que decide. En la demo la búsqueda de hoy ya corrió y hay perfiles que no llegan a su meta
+  // (cuáles depende de lo que aplicaron las pruebas anteriores: desde v49 lo aplicado queda en uso en la demo).
   await expect(dialog).toContainText("no llegan a su meta");
   await expect(
     dialog.getByRole("list", { name: "Quiénes no llegan a su meta" }),
-  ).toContainText("Cliente de ejemplo 02");
+  ).toContainText(/ · .+\d+ de \d+/);
   await expect(dialog).toContainText("Demostración");
   await dialog.getByRole("button", { name: "Buscar ahora" }).click();
   await expect(dialog).toBeHidden();
@@ -1748,4 +1795,161 @@ test("18 nov: Cupo diario en una línea y «Ver historial» al pie de su tarjeta
   expect(
     Math.abs((await pie("Ver historial")) - (await pie("Ver vacantes"))),
   ).toBeLessThan(6);
+});
+
+// ── Contrato v49 (26 nov, pedido de Oscar): un solo «Aplicar cambios», «Buscar ahora» por cliente y ciudad ─────────
+async function sinPendientes(page: Page) {
+  const boton = page.getByRole("button", {
+    name: "Aplicar cambios",
+    exact: true,
+  });
+  if (await boton.count()) await boton.click();
+  await expect(boton).toHaveCount(0);
+}
+
+test("contrato v49: «Aplicar cambios» del formulario de cliente deja la configuración en uso", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/");
+  await ir(page, "Clientes");
+  await sinPendientes(page);
+  await expect(page.locator(".flow-pill")).toHaveText(
+    "En uso desde la próxima búsqueda",
+  );
+  await page
+    .getByRole("button", { name: /^Editar / })
+    .first()
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Años de experiencia del perfil 1").selectOption("5");
+  await dialog.getByRole("button", { name: "Aplicar cambios" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(
+    page.getByText("Cambios aplicados: la próxima búsqueda los usa", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await expect(page.locator(".flow-pill")).toHaveText(
+    "En uso desde la próxima búsqueda",
+  );
+  await expect(
+    page.getByRole("button", { name: "Aplicar cambios", exact: true }),
+  ).toHaveCount(0);
+  const cfg = await (await request.get("/api/config")).json();
+  expect(cfg.publicada.revision).toBe(cfg.revision);
+  // Un cambio en línea (el cupo diario) deja el botón de la cabecera pendiente hasta aplicarlo.
+  await ir(page, "Cargos y metas");
+  const techo = page.locator("#techo-diario");
+  const original = await techo.inputValue();
+  await techo.fill(String(Number(original) + 1));
+  await techo.blur();
+  await expect(page.locator(".flow-pill")).toHaveText("Cambios sin aplicar");
+  await page
+    .getByRole("button", { name: "Aplicar cambios", exact: true })
+    .click();
+  await expect(page.locator(".flow-pill")).toHaveText(
+    "En uso desde la próxima búsqueda",
+  );
+  expect(await page.evaluate(revisarContraste)).toEqual([]);
+});
+
+test("contrato v49: «Buscar ahora» desde el detalle de un cliente busca solo para él", async ({
+  page,
+}) => {
+  const errores: string[] = [];
+  page.on("pageerror", (e) => errores.push(e.message));
+  await page.goto("/");
+  await page.getByRole("heading", { level: 1, name: "Resumen" }).waitFor();
+  await sinPendientes(page);
+  await page
+    .getByRole("list", { name: "Clientes y su avance" })
+    .getByRole("button", { name: /^Cliente de ejemplo 02/ })
+    .click();
+  const detalle = page.getByRole("dialog");
+  const boton = detalle.getByRole("button", {
+    name: /^Buscar ahora para Cliente de ejemplo 02$/,
+  });
+  // Si otra prueba dejó una búsqueda de la demostración corriendo (20 s), el botón espera a que termine.
+  await expect(boton).toBeVisible({ timeout: 40_000 });
+  await boton.click();
+  const pedir = page
+    .locator("dialog[open]")
+    .filter({ hasText: "Busca solo lo que le falta hoy a este cliente" })
+    .last(); // va dentro del detalle del cliente
+  await expect(pedir).toContainText("Buscar ahora para Cliente de ejemplo 02");
+  await expect(pedir).toContainText("no llega a su meta");
+  await expect(
+    pedir.getByRole("list", { name: "Quiénes no llegan a su meta" }),
+  ).toContainText(/\d+ de \d+/);
+  await expect(pedir).toContainText("Demostración");
+  expect(await page.evaluate(revisarContraste)).toEqual([]);
+  await pedir.getByRole("button", { name: "Buscar ahora" }).click();
+  await expect(
+    page.getByText("Búsqueda pedida para Cliente de ejemplo 02"),
+  ).toBeVisible();
+  await expect(
+    detalle.getByRole("button", { name: /^(En cola|Buscando)/ }),
+  ).toHaveAttribute("aria-disabled", "true");
+  expect(errores).toEqual([]);
+});
+
+test("contrato v49: una fila presencial o híbrida sin ciudad no se aplica y el panel lo avisa", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/");
+  await ir(page, "Clientes");
+  await page
+    .getByRole("button", { name: "Nuevo cliente", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Nombre o referencia del cliente").fill("Sin ciudad");
+  await dialog.getByLabel("Híbrido en la ubicación 1 del perfil 1").check();
+  const ciudades = dialog.getByLabel("Ciudades de la ubicación 1, perfil 1");
+  await expect(ciudades).toHaveAttribute("aria-invalid", "true");
+  await expect(ciudades).toHaveAccessibleDescription(
+    "Escribe la ciudad: sin ciudad no llegan presenciales ni híbridas.",
+  );
+  await dialog
+    .getByRole("button", { name: "Añadir cliente", exact: true })
+    .click();
+  await expect(dialog.locator(".form-error[role=alert]")).toContainText(
+    "Falta la ciudad",
+  );
+  await expect(dialog).toBeVisible(); // no se aplicó
+  expect(await page.evaluate(revisarContraste)).toEqual([]);
+  await ciudades.fill("Medellín");
+  await ciudades.press("Enter");
+  await expect(ciudades).not.toHaveAttribute("aria-invalid", "true");
+  await dialog.getByRole("button", { name: "Cancelar" }).click();
+
+  // Un perfil que ya existía con presencial sin ciudad: aviso en su tarjeta y en su detalle (sin bloquear).
+  const estado = await (await request.get("/api/config")).json();
+  const cfg = estado.borrador;
+  const cliente = cfg.clientes.find((c: { activo: boolean }) => c.activo);
+  const perfil = cfg.perfiles.find(
+    (p: { cliente_id: string; activo: boolean }) =>
+      p.cliente_id === cliente.id && p.activo,
+  );
+  perfil.ubicaciones = [
+    { paises: [perfil.vive_en], ciudades: [], modalidades: ["presencial"] },
+  ];
+  const r = await request.put("/api/config", {
+    headers: { Origin: "http://127.0.0.1:8001" },
+    data: { revision: estado.revision, configuracion: cfg },
+  });
+  expect(r.ok()).toBe(true);
+  await page.reload();
+  await ir(page, "Clientes");
+  await expect(
+    page.locator(".client-card", { hasText: cliente.nombre }),
+  ).toContainText("Falta la ciudad");
+  await page.goto("/");
+  await page
+    .getByRole("list", { name: "Clientes y su avance" })
+    .getByRole("button", { name: new RegExp("^" + cliente.nombre) })
+    .click();
+  await expect(page.getByRole("dialog")).toContainText("Falta la ciudad");
+  expect(await page.evaluate(revisarContraste)).toEqual([]);
 });
