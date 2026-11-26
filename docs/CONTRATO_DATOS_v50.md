@@ -112,10 +112,32 @@ no promete llenar metas altas solo con español donde el mercado no lo tiene: lo
 
 ## 3. Fuentes en español para cualquier país (segunda entrega)
 
-Cada fuente entra solo si pasa una prueba en vivo: se lista, trae descripción, se postula ahí mismo y su ficha se puede
-comprobar. Orden: Bumeran y su familia (Zonajobs, Laborum, Multitrabajos, Konzerta: AR, MX, PE, VE, CL, EC, PA);
-InfoJobs y Tecnoempleo (ES); Magneto y Hireline por búsqueda (CO, MX); Get on Board por categorías completas;
-Chiletrabajos (CL). Quedan fuera OCC (bloquea) y los portales de empresas latinas (requieren descubrir empresas).
+Una fuente entra solo si pasa una prueba en vivo: se lista, trae descripción, se postula ahí mismo y su aviso se puede
+comprobar. Resultado del 26 nov:
+
+| Fuente | Países | Resultado |
+|---|---|---|
+| Bumeran, Laborum, Multitrabajos y Konzerta (misma plataforma) | AR, MX, PE, VE, CL, EC, PA | **Entra** (`buscador/fuentes/jobint.py`) |
+| InfoJobs | ES | No entra todavía: la búsqueda trae el aviso completo, pero la ficha pide captcha y el enlace no se puede comprobar después. Falta decidir si «visto hoy en su búsqueda» cuenta como comprobado, como en Indeed (v41) |
+| Tecnoempleo | ES | No entra: está en la lista de agregadores desde el 15 nov (`datos/dominios.yaml`) |
+| Magneto y Hireline por búsqueda, Get on Board por categorías, Chiletrabajos | CO, MX, LATAM, CL | Pendientes |
+| OCC | MX | Bloquea (403) |
+
+### Bumeran y sus portales hermanos
+- **Búsqueda.** La API pública del portal (la misma de su página) devuelve el aviso completo: título, empresa, lugar,
+  modalidad, fecha y descripción. Se busca por cargo y país con portal, con varios nombres por turno (3 generales y
+  hasta 6 en español), cada búsqueda con su clave; los avisos de más de 30 días no se guardan. Presupuesto:
+  `jobint_busquedas` (120; el panel, hasta 240 según los cargos). Tres fallos seguidos cortan la fuente.
+- **Dónde se postula.** En el mismo portal; la vacante lleva su dirección pública (`/empleos/<título>-<id>.html`) y el
+  nombre de su portal como fuente.
+- **Comprobación.** La página del aviso se arma en el navegador y no dice nada a una lectura simple. Por eso:
+  - un aviso que la búsqueda del portal mostró hoy con su descripción cuenta como comprobado 24 h («vista hoy en la
+    búsqueda del portal»), igual que una ficha de LinkedIn leída en la búsqueda (v39);
+  - después se comprueba con la ficha de la misma API: abierto si responde, está «activo» y el título coincide;
+    cerrado si no está activo o no existe; un bloqueo o una respuesta rara nunca aprueban ni cierran.
+- **Medido en vivo el 26 nov** (5 cargos, 7 países): 217 búsquedas en 160 segundos, 145 avisos, 120 de un cargo
+  buscado y 118 en español (Perú 55, Chile 40, Argentina 21). Son casi todos presenciales o híbridos: sirven a quien
+  vive en esa ciudad.
 
 ## Lo que no cambia
 

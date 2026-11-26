@@ -223,6 +223,14 @@ def comprobar(url, titulo, *, sesion=None, validar_url=publica, ahora=None, plaz
             if codigo != 200:
                 return resultado("pendiente", "acceso bloqueado o fallo temporal")
             return resultado(*ficha_linkedin(r.text, titulo))
+        from buscador.fuentes import jobint
+        if jobint.aviso_de(url):
+            # Contrato v50: Bumeran y sus portales hermanos arman la página en el navegador; el aviso se comprueba con
+            # la ficha de la API pública del mismo portal (activo y con el mismo título).
+            ruta.append(url)
+            timeout = min(12, max(0.1, plazo - time.monotonic())) if plazo else 12
+            estado, motivo, codigo = jobint.estado_del_aviso(sesion, url, titulo, _coincide, timeout, NAVEGADOR)
+            return resultado(estado, motivo)
         while True:
             if plazo and time.monotonic() >= plazo:
                 return resultado("pendiente", "presupuesto de comprobación agotado")

@@ -232,6 +232,9 @@ Las fuentes y variantes rotan; no se recorren todos los títulos de todos los pa
   aceptan su país, LATAM o todo el mundo. Un cargo en un país da de 2 a 4 vacantes nuevas en español al día.
 - En el reporte de cada búsqueda, `embudo_idioma` dice cuántas vacantes en español hay guardadas y cuántas tienen el
   enlace comprobado.
+- Portales locales en español además de Computrabajo: Elempleo y Magneto (Colombia), Hireline (México y Colombia) y,
+  desde v50, Bumeran (Argentina, México, Perú y Venezuela), Laborum (Chile), Multitrabajos (Ecuador) y Konzerta
+  (Panamá). Sus avisos son casi todos presenciales o híbridos: le llegan a quien tiene esa ciudad en su perfil.
 
 ### Personas que solo hablan español (contrato v44)
 

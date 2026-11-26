@@ -111,8 +111,9 @@ def paises_de_lugares(lugares):
 # Países con fuentes propias además de LinkedIn e Indeed (Computrabajo, Elempleo, Get on Board): fuera de ellos una
 # persona depende solo de LinkedIn e Indeed y recibe el doble de turnos (contrato v40).
 def _con_fuentes_propias():
-    from buscador.fuentes import computrabajo, sitemaps_empleo
-    return set(computrabajo.SITIOS) | {"ES"} | {c for s in sitemaps_empleo.SITIOS.values() for c in s["sitemaps"]}
+    from buscador.fuentes import computrabajo, jobint, sitemaps_empleo
+    return set(computrabajo.SITIOS) | set(jobint.SITIOS) | {"ES"} | {
+        c for s in sitemaps_empleo.SITIOS.values() for c in s["sitemaps"]}
 
 
 def fuentes_en(pais):
@@ -120,7 +121,7 @@ def fuentes_en(pais):
     vive en `pais`, con títulos en español si solo habla español. LinkedIn y los portales de empresas cubren todo el
     mundo; Get on Board aporta remotas abiertas a cualquier país (y a LATAM); Indeed, sus 62 países; las locales,
     donde existen. Sin IA: sale de las listas de cada fuente."""
-    from buscador.fuentes import computrabajo, elempleo, indeed, sitemaps_empleo
+    from buscador.fuentes import computrabajo, elempleo, indeed, jobint, sitemaps_empleo
     salida = ["LinkedIn", "Portales de empresas", "Get on Board (remotas)"]
     if pais in indeed.PAISES:
         salida.append("Indeed")
@@ -128,6 +129,8 @@ def fuentes_en(pais):
         salida.append("Computrabajo")
     if pais in elempleo.PAISES:
         salida.append("Elempleo")
+    if pais in jobint.SITIOS:
+        salida.append(jobint.SITIOS[pais][2])  # Bumeran, Laborum, Multitrabajos o Konzerta
     salida += [nombre for nombre, s in sitemaps_empleo.SITIOS.items() if pais in s["sitemaps"]]
     return salida
 
@@ -282,6 +285,7 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=N
         getonbrd_busquedas=min(30, len(roles) * 4),
         computrabajo_busquedas=min(90, max(12, len(roles) * 12)),
         elempleo_busquedas=min(30, max(6, len(roles) * 3)),
+        jobint_busquedas=min(240, max(20, len(roles) * 24)),  # v50: Bumeran y portales hermanos
         apify_busquedas=0,  # contrato v11: Apify solo para perfiles bajo el mínimo (rescate dirigido)
         empresas_por_probar=20, remotos_paginas=24)
     if enfocar is not None:
