@@ -127,7 +127,8 @@ def traer_descripcion(urls, titulo="", obtener=None, sesion=None):
             return leer_acotado(url, sesion)
     from buscador import verificar_enlaces
     # Indeed e InfoJobs no dejan leer su ficha (401 y captcha): no se pide (v41, v50).
-    for url in [u for u in urls if u and dominio_conocido(u) and not verificar_enlaces.sin_comprobacion_directa(u)][:2]:
+    for url in [u for u in urls if u and dominio_conocido(u) and not verificar_enlaces.de_dominio(u, "infojobs.net")
+                and not verificar_enlaces.sin_comprobacion_directa(u)][:2]:
         html = obtener(url)
         texto = descripcion_jobposting(html, titulo) if html else ""
         if texto:

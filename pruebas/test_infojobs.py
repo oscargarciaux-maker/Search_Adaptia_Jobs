@@ -185,8 +185,8 @@ def test_al_primer_captcha_la_fuente_se_detiene_y_no_insiste():
     cliente = Cliente([Respuesta(_pagina([_aviso(1)])), Respuesta(CAPTCHA), Respuesta(_pagina([_aviso(2)]))])
     estado = {}
     crudas, stats = _buscar(cliente, estado)
-    assert len(cliente.pedidas) == 2 and stats == {"busquedas": 2, "bloqueada": True, "avisos": 1, "vistas": 1,
-                                                   "combinaciones_total": 2}
+    assert len(cliente.pedidas) == 2 and stats == {"modo": "pagina", "busquedas": 2, "bloqueada": True, "avisos": 1,
+                                                   "vistas": 1, "combinaciones_total": 2}
     assert len(crudas) == 1
     assert sum(n for (fuente, _, _), n in cobertura.BUSQUEDAS.items() if fuente == "infojobs") == 1  # la bloqueada no cuenta
     # Un error del sitio o una página sin sus datos también detienen la fuente; nada se inventa.
@@ -203,3 +203,142 @@ def test_la_fuente_esta_registrada_donde_hace_falta():
     assert "InfoJobs" in ejecutor.fuentes_en("ES") and "InfoJobs" not in ejecutor.fuentes_en("CO")
     enlace = "https://www.infojobs.net/madrid/qa-tester/of-iabc001"
     assert enlaces.sirve(enlace) and contrato.portal(enlace) == "InfoJobs"
+
+
+# ── Modo API (con la clave de la aplicación registrada en InfoJobs) ─────────────────────────────────────────────────
+CLAVE = ("id-de-prueba", "secreto-de-prueba")
+
+
+def _resumen(n, titulo="QA Tester", modalidad="Híbrido"):
+    return {"id": f"abc{n:03d}", "title": titulo, "city": "Madrid", "author": {"name": "Empresa Ficticia, S.L."},
+            "link": f"https://www.infojobs.net/madrid/qa-tester/of-iabc{n:03d}?applicationOrigin=search-new",
+            "teleworking": {"id": 2, "value": modalidad}, "published": "2026-11-25T08:00:00.000Z"}
+
+
+def _detalle(n, titulo="QA Tester", **campos):
+    return {"id": f"abc{n:03d}", "title": titulo, "description": TEXTO, "minRequirements": "Dos años de experiencia.",
+            "creationDate": "2026-11-10T09:00:00.000Z", "updateDate": "2026-11-25T08:00:00.000Z", "city": "Madrid",
+            "profile": {"name": "Empresa Ficticia, S.L."}, "active": True, "archived": False, "deleted": False,
+            "link": f"https://www.infojobs.net/madrid/qa-tester/of-iabc{n:03d}", **campos}
+
+
+class RespuestaApi:
+    def __init__(self, cuerpo, codigo=200):
+        self.cuerpo, self.status_code = cuerpo, codigo
+
+    def json(self):
+        if self.cuerpo is None:
+            raise ValueError("sin JSON")
+        return self.cuerpo
+
+
+class Api:
+    def __init__(self, lista, fichas=None, codigo=200):
+        self.pedidas, self.lista, self.fichas, self.codigo = [], lista, fichas or {}, codigo
+
+    def get(self, url, params=None, headers=None, **opciones):
+        self.pedidas.append((url, dict(params or {}), dict(headers or {})))
+        if self.codigo != 200:
+            return RespuestaApi({"error": "102"}, self.codigo)
+        if url == infojobs.API_BUSQUEDA:
+            return RespuestaApi({"offers": self.lista, "totalResults": len(self.lista)})
+        return RespuestaApi(self.fichas.get(url.rsplit("/", 1)[1]))
+
+
+def _api(api, estado=None, **opciones):
+    infojobs.VISTAS.clear()
+    infojobs.FICHAS.clear()
+    cobertura.BUSQUEDAS.clear()
+    return infojobs.buscar_api(api, CLAVE, MAPA, {} if estado is None else estado, hoy="2026-11-26",
+                               **{"presupuesto": 1, "max_fichas": 10, **opciones})
+
+
+def test_las_claves_salen_de_los_secretos_y_sin_ellas_no_hay_modo_api(monkeypatch):
+    monkeypatch.delenv("INFOJOBS_CLIENT_ID", raising=False)
+    monkeypatch.delenv("INFOJOBS_CLIENT_SECRET", raising=False)
+    assert infojobs.credenciales() is None
+    monkeypatch.setenv("INFOJOBS_CLIENT_ID", CLAVE[0])
+    assert infojobs.credenciales() is None  # hacen falta las dos
+    monkeypatch.setenv("INFOJOBS_CLIENT_SECRET", " " + CLAVE[1] + " ")
+    assert infojobs.credenciales() == CLAVE
+    assert infojobs._cabeceras(CLAVE)["Authorization"] == "Basic aWQtZGUtcHJ1ZWJhOnNlY3JldG8tZGUtcHJ1ZWJh"
+
+
+def test_la_api_busca_por_nombre_y_lee_la_ficha_solo_de_los_titulos_de_un_cargo():
+    api = Api([_resumen(1), _resumen(2, "Vendedor de mostrador"), _resumen(3, modalidad="Solo teletrabajo")],
+              {"abc001": _detalle(1, externalUrlForm="https://empleo.empresa-ficticia.es/qa"),
+               "abc003": _detalle(3, archived=True)})
+    crudas, stats = _api(api)
+    url, params, cabeceras = api.pedidas[0]
+    assert url == infojobs.API_BUSQUEDA and params["country"] == "espana" and params["q"] == "analista qa"
+    assert all(c["Authorization"].startswith("Basic ") for _, _, c in api.pedidas)
+    assert [u.rsplit("/", 1)[1] for u, _, _ in api.pedidas[1:]] == ["abc001", "abc003"]  # la del vendedor no se pide
+    assert crudas == [{"titulo": "QA Tester", "empresa": "Empresa Ficticia, S.L.", "ubicacion": "Madrid, España (Híbrido)",
+                       "descripcion": TEXTO.strip() + "\nDos años de experiencia.", "remoto": None, "fuente": "InfoJobs",
+                       "fecha": "2026-11-10",  # la de creación, no la de la última republicación
+                       "enlace": "https://www.infojobs.net/madrid/qa-tester/of-iabc001",
+                       "enlace_directo": "https://empleo.empresa-ficticia.es/qa"}]
+    assert stats == {"modo": "api", "busquedas": 1, "fallidas": 0, "avisos": 3, "del_cargo": 2, "fichas": 2,
+                     "cerradas": 1, "con_descripcion": 1, "combinaciones_total": 2}
+    # La ficha leída comprueba el enlace (activa) o lo cierra (archivada), como una de LinkedIn (v39).
+    assert infojobs.FICHAS["https://www.infojobs.net/madrid/qa-tester/of-iabc001"]["estado"] == "verificada"
+    assert infojobs.FICHAS["https://www.infojobs.net/madrid/qa-tester/of-iabc003"]["motivo"] == "vacante cerrada"
+    # Ni las estadísticas ni lo guardado llevan la clave.
+    assert CLAVE[1] not in json.dumps([crudas, stats, infojobs.FICHAS]) and "c2VjcmV0" not in json.dumps([crudas, stats])
+
+
+def test_la_api_no_inventa_si_la_ficha_es_rara_vieja_o_no_dice_que_esta_activa():
+    fichas = {"abc001": _detalle(1, creationDate="2026-09-01T09:00:00.000Z"),   # más de 30 días: no se guarda
+              "abc002": {k: v for k, v in _detalle(2).items() if k != "active"},  # no dice si está activa
+              "abc003": None, "abc004": _detalle(4, description="Corta.", minRequirements="")}
+    crudas, stats = _api(Api([_resumen(n) for n in (1, 2, 3, 4)], fichas))
+    assert [c["enlace"][-6:] for c in crudas] == ["abc002", "abc004"] and stats["fallidas"] == 1
+    assert infojobs.FICHAS == {}  # sin «activa» o sin descripción suficiente no cuenta como comprobada
+
+
+def test_una_clave_rechazada_detiene_la_fuente_y_lo_dice_sin_mostrarla():
+    api = Api([_resumen(1)], codigo=401)
+    crudas, stats = _api(api, presupuesto=5)
+    assert crudas == [] and len(api.pedidas) == 1 and "rechazó la clave (401)" in stats["error"]
+    assert CLAVE[0] not in json.dumps(stats) and CLAVE[1] not in json.dumps(stats)
+
+
+class SesionApi:
+    def __init__(self, respuesta):
+        self.respuesta, self.pedidas = respuesta, []
+
+    def get(self, url, headers=None, timeout=None, **_):
+        self.pedidas.append((url, bool((headers or {}).get("Authorization"))))
+        return self.respuesta
+
+    def close(self):
+        pass
+
+
+def test_con_clave_el_enlace_se_comprueba_con_la_ficha_de_la_api_y_sin_clave_no_se_pide(monkeypatch):
+    enlace = "https://www.infojobs.net/madrid/qa-tester/of-iabc001"
+    ahora = datetime(2026, 11, 26, tzinfo=timezone.utc)
+    monkeypatch.delenv("INFOJOBS_CLIENT_ID", raising=False)
+    monkeypatch.delenv("INFOJOBS_CLIENT_SECRET", raising=False)
+    sesion = SesionApi(RespuestaApi(_detalle(1)))
+    sin = verificar_enlaces.comprobar(enlace, "QA Tester", sesion=sesion, ahora=ahora)
+    assert sin["motivo"] == "sin comprobación directa" and sesion.pedidas == []
+    monkeypatch.setenv("INFOJOBS_CLIENT_ID", CLAVE[0])
+    monkeypatch.setenv("INFOJOBS_CLIENT_SECRET", CLAVE[1])
+    assert not verificar_enlaces.sin_comprobacion_directa(enlace)
+    assert verificar_enlaces.sin_comprobacion_directa("https://www.infojobs.net/empresas/x")  # no es un aviso
+    assert verificar_enlaces.sin_comprobacion_directa("https://es.indeed.com/viewjob?jk=1")   # Indeed no cambia
+
+    def comprobar(respuesta, titulo="QA Tester"):
+        s = SesionApi(respuesta)
+        r = verificar_enlaces.comprobar(enlace, titulo, sesion=s, ahora=ahora)
+        assert s.pedidas == [(infojobs.API_FICHA + "abc001", True)]  # la API, nunca la página (pide captcha)
+        return r["estado"], r["motivo"]
+    assert comprobar(RespuestaApi(_detalle(1))) == ("verificada", "ficha específica accesible")
+    assert comprobar(RespuestaApi(_detalle(1, archived=True))) == ("rechazada", "vacante cerrada")
+    assert comprobar(RespuestaApi(_detalle(1, deleted=True))) == ("rechazada", "vacante cerrada")
+    assert comprobar(RespuestaApi({}, 404)) == ("rechazada", "enlace roto")
+    for respuesta in (RespuestaApi({}, 401), RespuestaApi({}, 500), RespuestaApi(None), RespuestaApi([1]),
+                      RespuestaApi({k: v for k, v in _detalle(1).items() if k != "active"}),
+                      RespuestaApi(_detalle(1, active=False)), RespuestaApi(_detalle(1, "Vendedor de mostrador"))):
+        assert comprobar(respuesta)[0] == "pendiente"

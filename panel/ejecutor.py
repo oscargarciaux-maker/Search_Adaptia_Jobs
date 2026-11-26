@@ -121,7 +121,7 @@ def fuentes_en(pais):
     vive en `pais`, con títulos en español si solo habla español. LinkedIn y los portales de empresas cubren todo el
     mundo; Get on Board aporta remotas abiertas a cualquier país (y a LATAM); Indeed, sus 62 países; las locales,
     donde existen. Sin IA: sale de las listas de cada fuente."""
-    from buscador.fuentes import computrabajo, elempleo, indeed, infojobs, jobint, sitemaps_empleo
+    from buscador.fuentes import computrabajo, elempleo, indeed, infojobs, jobint, sitemaps_empleo, tecnoempleo
     salida = ["LinkedIn", "Portales de empresas", "Get on Board (remotas)"]
     if pais in indeed.PAISES:
         salida.append("Indeed")
@@ -131,6 +131,8 @@ def fuentes_en(pais):
         salida.append("Elempleo")
     if pais in infojobs.PAISES:
         salida.append("InfoJobs")
+    if pais in tecnoempleo.PAISES:
+        salida.append("Tecnoempleo")
     if pais in jobint.SITIOS:
         salida.append(jobint.SITIOS[pais][2])  # Bumeran, Laborum, Multitrabajos o Konzerta
     salida += [nombre for nombre, s in sitemaps_empleo.SITIOS.items() if pais in s["sitemaps"]]

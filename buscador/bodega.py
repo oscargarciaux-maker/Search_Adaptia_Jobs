@@ -18,7 +18,7 @@ from pathlib import Path
 import yaml
 
 from buscador import calidad, contrato, cobertura, enlaces, familias, medicion, normalizar, paises, tiempos, vacante
-from buscador.fuentes import (ats, computrabajo, elempleo, getonbrd, infojobs, jobint, sitemaps_empleo, tableros_latam, indeed, linkedin_apify, linkedin_publico, open_seat,
+from buscador.fuentes import (ats, computrabajo, elempleo, getonbrd, infojobs, jobint, sitemaps_empleo, tecnoempleo, tableros_latam, indeed, linkedin_apify, linkedin_publico, open_seat,
                               publicaciones_apify, remotos)
 from buscador.http import Cliente
 
@@ -227,8 +227,21 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
         # Contrato v50: InfoJobs (España). Pocas páginas por corrida y despacio: después pide captcha y se respeta.
         if not p.get("infojobs_busquedas", 0):
             return [], {"omitida": "sin presupuesto"}
+        cred = infojobs.credenciales()
+        if cred:  # con la clave de su API oficial: sin captcha, con ficha completa y con comprobación propia
+            return infojobs.buscar_api(Cliente(pausa=(0.4, 0.9)), cred, mapa, estado.setdefault("infojobs", {}),
+                                       p.get("infojobs_api_busquedas", 40), p.get("infojobs_api_fichas", 150), hoy=hoy,
+                                       max_dias=cfg["dias_maximos"], limite_segundos=limite, prioritarias=prioritarias)
         return infojobs.buscar(Cliente(pausa=(3, 6)), mapa, estado.setdefault("infojobs", {}), p["infojobs_busquedas"],
                                hoy=hoy, max_dias=cfg["dias_maximos"], limite_segundos=limite, prioritarias=prioritarias)
+
+    def f_tecnoempleo():
+        # Contrato v50: Tecnoempleo (España, tecnología); búsqueda por nombre y ficha con JobPosting, como Elempleo.
+        if not p.get("tecnoempleo_busquedas", 0):
+            return [], {"omitida": "sin presupuesto"}
+        return tecnoempleo.buscar(Cliente(pausa=(0.8, 1.6)), mapa, estado.setdefault("tecnoempleo", {}),
+                                  p["tecnoempleo_busquedas"], hoy=hoy, max_fichas=p.get("tecnoempleo_fichas", 80),
+                                  limite_segundos=limite, prioritarias=prioritarias)
 
     def f_elempleo():
         if not p.get("elempleo_busquedas", 0):
@@ -295,6 +308,7 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
                ("Tableros remotos", f_remotos), ("Get on Board", f_getonbrd), ("Portales de empresas", f_ats),
                ("Publicaciones LinkedIn (Apify)", f_publicaciones), ("Computrabajo", f_computrabajo),
                ("Elempleo", f_elempleo), (jobint.NOMBRE, f_jobint), (infojobs.NOMBRE, f_infojobs),
+               (tecnoempleo.NOMBRE, f_tecnoempleo),
                *[(n, f_sitemap(n)) for n in sitemaps_empleo.SITIOS]]
     if faltantes:
         for n in OMITIDAS_FALTANTES:
@@ -419,7 +433,8 @@ def limpiar(previas, crudas, hoy, dias_maximos, enlaces_ats, empresas_leidas, co
 PRUEBA = {"minutos_por_fuente": 3, "linkedin_busquedas": 6, "linkedin_fichas": 8, "indeed_busquedas": 2,
           "apify_busquedas": 2, "remotos_paginas": 8, "empresas_por_probar": 5,
           "getonbrd_busquedas": 3, "hireline_fichas": 4, "magneto_fichas": 4, "jobint_busquedas": 6,
-          "infojobs_busquedas": 2}
+          "infojobs_busquedas": 2, "tecnoempleo_busquedas": 2, "tecnoempleo_fichas": 4,
+          "infojobs_api_busquedas": 2, "infojobs_api_fichas": 4}
 
 
 def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=False):
@@ -530,7 +545,8 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     fichas_incorporadas = verificar_enlaces.incorporar(vacantes, cache_enlaces, linkedin_publico.FICHAS)
     indeed_incorporadas = verificar_enlaces.incorporar(vacantes, cache_enlaces, indeed.VISTAS)  # contrato v41
     # Contrato v50 (decisión de Oscar): lo que la búsqueda de InfoJobs mostró hoy cuenta como comprobado 24 h.
-    infojobs_incorporadas = verificar_enlaces.incorporar(vacantes, cache_enlaces, infojobs.VISTAS)
+    infojobs_incorporadas = verificar_enlaces.incorporar(vacantes, cache_enlaces, infojobs.VISTAS) + \
+        verificar_enlaces.incorporar(vacantes, cache_enlaces, infojobs.FICHAS)  # modo API: fichas leídas hoy
     portales_incorporadas = verificar_enlaces.incorporar(  # contrato v42: listado hoy en el portal de la empresa
         vacantes, cache_enlaces, verificar_enlaces.vistas_en_portales(enlaces_ats))
     entregadas_revision = _leer_json(trabajo / "entregadas.json", {})

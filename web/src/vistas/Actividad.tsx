@@ -338,6 +338,7 @@ const FUENTES_BUSQUEDA: Record<string, string> = {
   indeed: "Indeed",
   jobint: "Bumeran",
   infojobs: "InfoJobs",
+  tecnoempleo: "Tecnoempleo",
 };
 function textoBusquedas(b?: Record<string, number>) {
   const partes = Object.entries(b || {})

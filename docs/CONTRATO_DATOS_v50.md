@@ -119,7 +119,7 @@ comprobar. Resultado del 26 nov:
 |---|---|---|
 | Bumeran, Laborum, Multitrabajos y Konzerta (misma plataforma) | AR, MX, PE, VE, CL, EC, PA | **Entra** (`buscador/fuentes/jobint.py`) |
 | InfoJobs | ES | **Entra, con límite** (`buscador/fuentes/infojobs.py`): pocas páginas por corrida; ver abajo |
-| Tecnoempleo | ES | No entra: está en la lista de agregadores (`datos/dominios.yaml`) y Oscar pidió dejarlo así si lo es. En la ficha revisada el 26 nov se postula dentro del propio portal, con cuenta, y no enlaza a otro sitio: podría no serlo. Pendiente de su decisión |
+| Tecnoempleo | ES | **Entra** (`buscador/fuentes/tecnoempleo.py`): pasa de la lista de agregadores a la de portales por decisión de Oscar; ver abajo |
 | Magneto y Hireline por búsqueda, Get on Board por categorías, Chiletrabajos | CO, MX, LATAM, CL | Pendientes |
 | OCC | MX | Bloquea (403) |
 
@@ -147,7 +147,7 @@ comprobar. Resultado del 26 nov:
 
 ### InfoJobs (España)
 - **Decisión de Oscar (26 nov).** InfoJobs entra, y un aviso que su búsqueda mostró hoy cuenta como comprobado 24 h,
-  igual que Indeed (v41). Tecnoempleo no se toca mientras siga en la lista de agregadores.
+  igual que Indeed (v41).
 - **Búsqueda.** La página de búsqueda trae cada aviso completo en sus datos: título, empresa, ciudad, modalidad, fecha,
   enlace y descripción. Se busca por los nombres de los cargos con alguien que trabajaría en España; los nombres en
   español tienen su turno si alguien de España acepta español. Una página por nombre (20 avisos, de lo más reciente a
@@ -170,6 +170,31 @@ comprobar. Resultado del 26 nov:
   secreto; queda como propuesta.
 - En vivo el 26 nov, antes del bloqueo: 6 nombres, 62 avisos, 47 de un cargo buscado y todos en español (17
   presenciales, 16 híbridos y 14 remotos).
+
+- **API oficial (optativa, la vía estable).** Decisión de Oscar del 26 nov: dejarla preparada. Con los secretos
+  `INFOJOBS_CLIENT_ID` e `INFOJOBS_CLIENT_SECRET` (guía: `docs/ACTIVAR_INFOJOBS_API.md`) la fuente usa la API en vez de
+  la página: búsqueda por nombre en España y ficha solo de los títulos de un cargo buscado. La ficha da la descripción,
+  la **fecha de creación** (no la de republicación), si el aviso sigue activo y, si se postula fuera, esa dirección
+  como enlace directo. El reporte dice `modo: api` o `modo: pagina`.
+  - Comprobación con clave: una ficha leída hoy que dice «activo», con descripción, comprueba el enlace; «archivado»
+    o «borrado» lo cierra; lo demás no decide. Después el enlace se vuelve a comprobar con esa misma ficha de la API.
+    La página del aviso sigue sin abrirse. Sin clave vale la regla de arriba («vista hoy»).
+  - Una clave rechazada (401/403) detiene la fuente y lo dice, sin mostrarla. Las claves solo viajan en la cabecera
+    de autenticación.
+  - No se pudo probar contra la API real: no hay clave todavía. Está hecha con su documentación pública y probada con
+    respuestas de ejemplo.
+
+### Tecnoempleo (España, tecnología)
+- **Decisión de Oscar (26 nov).** Pasa de `agregadores` a `portales` en `datos/dominios.yaml` y entra como fuente. En
+  los 13 avisos revisados ninguno enlaza a otro sitio para postular y todos piden entrar como candidato en el propio
+  portal. No se entró con cuenta: el último paso de la postulación no se vio.
+- **Búsqueda y ficha.** Búsqueda por nombre (`/ofertas-trabajo/?te=…`) y ficha con su `JobPosting` (empresa, ciudad,
+  fecha y descripción), con el lector común de Elempleo. Solo se lee la ficha de un título de un cargo buscado; un
+  nombre ya buscado hoy no se repite. Solo para cargos con alguien que trabajaría en España.
+- **Comprobación.** La de siempre: se abre la ficha. En vivo, tres fichas reales quedaron «verificada» y una
+  inexistente «enlace roto».
+- **Medido en vivo el 26 nov** (5 cargos): 12 búsquedas en 67 segundos, 67 avisos, 51 de un cargo buscado; de 30
+  fichas leídas se guardaron 26, todas en español (11 híbridas, 9 remotas y 6 presenciales).
 
 ## Lo que no cambia
 

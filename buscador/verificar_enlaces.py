@@ -78,7 +78,11 @@ def de_dominio(url, dominio):
 
 
 def sin_comprobacion_directa(url):
-    """Un sitio de `SIN_COMPROBACION_DIRECTA`: su ficha nunca se pide."""
+    """Un sitio de `SIN_COMPROBACION_DIRECTA`: su ficha nunca se pide. Con la clave de la API oficial de InfoJobs
+    (contrato v50), sus avisos sí se comprueban: por la ficha de esa API, no por su página."""
+    if de_dominio(url, "infojobs.net"):
+        from buscador.fuentes import infojobs
+        return not (infojobs.credenciales() and infojobs.aviso_de(url))
     return any(de_dominio(url, d) for d in SIN_COMPROBACION_DIRECTA)
 
 
@@ -223,6 +227,13 @@ def comprobar(url, titulo, *, sesion=None, validar_url=publica, ahora=None, plaz
         if sin_comprobacion_directa(url):
             # Indeed responde 401 e InfoJobs pide captcha: su ficha no se pide desde ningún camino (v41, v50).
             return resultado("pendiente", "sin comprobación directa")
+        if de_dominio(url, "infojobs.net"):
+            # Con la clave de su API oficial: la ficha de la API dice si el aviso sigue activo (nunca su página).
+            from buscador.fuentes import infojobs
+            ruta.append(url)
+            timeout = min(12, max(0.1, plazo - time.monotonic())) if plazo else 12
+            estado, motivo, codigo = infojobs.estado_del_aviso(sesion, url, titulo, _coincide, timeout)
+            return resultado(estado, motivo)
         if aviso_linkedin(url):
             ruta.append(url)
             timeout = min(12, max(0.1, plazo - time.monotonic())) if plazo else 12

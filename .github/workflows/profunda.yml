@@ -53,6 +53,8 @@ jobs:
       - name: Buscar
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          INFOJOBS_CLIENT_ID: ${{ secrets.INFOJOBS_CLIENT_ID }}       # optativos: API oficial de InfoJobs (v50)
+          INFOJOBS_CLIENT_SECRET: ${{ secrets.INFOJOBS_CLIENT_SECRET }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           GITHUB_REPOSITORY: ${{ github.repository }}
