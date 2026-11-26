@@ -62,17 +62,22 @@ derecha, el botón con el sol o la luna cambia entre modo claro y oscuro (por de
 - **Actividad.** Cada búsqueda con su resultado, cuántas vinieron de la búsqueda de cada perfil y de la amplia, y
   «Dónde se pierden las vacantes de cada cargo».
 
-**Guardar borrador** conserva los cambios. **Programar para mañana** los aplica desde la búsqueda de las 6:30 del día
-siguiente. La búsqueda que ya empezó no cambia.
+**Aplicar cambios** (26 nov, contrato v49) guarda y deja la configuración vigente: la próxima búsqueda la usa. Es el
+único botón. En el detalle de cada cliente, **Buscar ahora** lanza la búsqueda solo para sus perfiles.
 
 ## 4. Cómo se decide qué vacante llega a quién
 
 1. **El cargo.** El título coincide con los nombres del cargo, o es genérico («Especialista», «Consultor») y la
    descripción nombra el cargo. Si solo coinciden las funciones, va a «Por confirmar»; nunca entra sola.
+   - Desde el 26 nov (contrato v49) también se leen las funciones del aviso. Si el título coincide pero la
+     descripción no trae ninguna función del cargo, llega al final con la etiqueta «Funciones por confirmar». Si
+     además parece otro oficio («QA Manufacturing Analyst»), va a «Por confirmar».
 2. **La ubicación.**
-   - Remota: abierta a su país, al mundo o a un país donde puede trabajar legalmente; o con un horario que el perfil
-     acepta.
-   - Presencial o híbrida: en su país, en uno al que se mudaría o en una de sus ciudades.
+   - Remota: abierta a su país, al mundo o a un país donde puede trabajar legalmente. Si el aviso nombra un país,
+     manda ese país (contrato v49). Una remota que solo dice un horario, sin país, llega solo a quien marcó ese
+     horario.
+   - Presencial o híbrida: en una de sus ciudades (o a 50 km). Sin ciudad escrita en el perfil no llegan (contrato
+     v49).
    - Si no se sabe, puede ir a «Por confirmar» (hasta 10 al día, primero las de quien va corto): un país desconocido
      nunca completa la meta.
 3. **Idioma y fecha (descartan):**
@@ -89,7 +94,9 @@ siguiente. La búsqueda que ya empezó no cambia.
 6. **Cuántas.** Primero se cubren las metas de los clientes reales, sin pasar el techo. Después Comunidad recibe con lo
    que sobre. Entre varias candidatas ganan las que coinciden con las prioridades, con variedad de empresas, países y
    fuentes.
-7. **Si alguien no llega a 5.** Los cargos cercanos ya entran directo. Como último recurso: remotas abiertas a su
+7. **Si alguien no llega a su meta.** Se le completa hasta su meta diaria (contrato v49; antes hasta 5) con vacantes
+   de días anteriores y de toda la bodega que esa persona nunca recibió, sin pasar el techo del día. Los cargos
+   cercanos ya entran directo. Como último recurso: remotas abiertas a su
    país, más de la misma empresa, vacantes de días
    anteriores que esa persona nunca recibió y, como último recurso, posts de LinkedIn etiquetados «Post». Nunca se
    repite una vacante a la misma persona.
@@ -162,7 +169,8 @@ El repositorio está preparado para que una IA lo lea y lo cambie con cuidado.
 
 - Uso diario: [GUIA_CLIENTE.md](GUIA_CLIENTE.md) y [PANEL_CONTROL.md](PANEL_CONTROL.md).
 - Qué cambió y cuándo: [HISTORIAL_CAMBIOS.md](HISTORIAL_CAMBIOS.md).
-- Reglas de los datos: [CONTRATO_DATOS_v27.md](CONTRATO_DATOS_v27.md) (qué descarta y qué solo ordena; «Aplicar
+- Reglas de los datos: [CONTRATO_DATOS_v49.md](CONTRATO_DATOS_v49.md) (ubicación sin fugas, funciones, completar
+  hasta la meta y panel de un botón), [CONTRATO_DATOS_v27.md](CONTRATO_DATOS_v27.md) (qué descarta y qué solo ordena; «Aplicar
   hoy»), [v25](CONTRATO_DATOS_v25.md) (funciones), [v24](CONTRATO_DATOS_v24.md)
   (búsqueda por perfil), [v23](CONTRATO_DATOS_v23.md) (ubicaciones del mundo), [v22](CONTRATO_DATOS_v22.md) (filtros
   del perfil) y [v21](CONTRATO_DATOS_v21.md) (metas y techo).

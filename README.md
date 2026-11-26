@@ -4,7 +4,7 @@ El operador gestiona clientes, perfiles, cargos y cupos desde una interfaz. Defi
 plazo de publicación, años de experiencia exigidos e inglés requerido. El objetivo diario es **120 oportunidades
 únicas distribuidas por cargo**: varios clientes compatibles pueden aprovechar el mismo cupo sin contar copias.
 
-Guardar conserva un borrador. **Programar para mañana** fija una versión para el día siguiente en Colombia. El scraper
+**Aplicar cambios** guarda y deja la configuración vigente: la próxima búsqueda la usa (contrato v49). El scraper
 consulta esos cargos y lugares; cada cliente ve su subconjunto compatible. Los enlaces caducados o retirados no se
 copian. El botón **Copiar WhatsApp** prepara un mensaje en el portapapeles; el operador decide cuándo enviarlo.
 
