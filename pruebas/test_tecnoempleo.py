@@ -89,6 +89,28 @@ def test_fichas_cerradas_o_sin_datos_y_portal_caido():
     assert crudas == [] and stats["fallidas"] == 3 and len(caido.pedidas) == 3  # tres fallos seguidos lo detienen
 
 
+def test_una_pagina_sin_avisos_no_cuenta_como_buscada_y_se_reintenta():
+    estado = {}
+    vacia = Cliente(listado="<html>Sin resultados o página de bloqueo</html>")
+    crudas, stats = te.buscar(vacia, MAPA, estado, 1, hoy="2026-11-26")
+    assert crudas == [] and stats["busquedas"] == 1 and stats["avisos"] == 0
+    despues = Cliente()
+    te.buscar(despues, MAPA, estado, 1, hoy="2026-11-26")
+    assert despues.pedidas[0][1] == vacia.pedidas[0][1]  # el mismo nombre, otra vez
+
+
+def test_en_una_busqueda_profunda_lee_las_fichas_de_un_cargo_que_no_esta_en_el_mapa():
+    ficha = "https://www.tecnoempleo.com/tecnico-laboratorio-clinico-empresa/lims/rf-9999aaaa8888bbbb7777"
+    listado = (f'<h3><a href="{ficha}">Técnico/a de Laboratorio Clínico</a></h3>'
+               f'<h3><a href="{FICHA_QA}">QA Tester Junior</a></h3>')
+    mapa = [{"id": "profunda", "consultas": ["técnico de laboratorio clínico"], "paises_objetivo": ["ES"]}]
+    cliente = Cliente([_ficha("Técnico/a de Laboratorio Clínico")], listado=listado)
+    crudas, stats = te.buscar(cliente, mapa, {}, 1, hoy="2026-11-26")
+    # La del cargo pedido se lee por su nombre; la de otro cargo del mapa no le sirve a esta búsqueda.
+    assert [u for u, _ in cliente.pedidas] == [te.BUSQUEDA, ficha] and stats["del_cargo"] == 1
+    assert [c["titulo"] for c in crudas] == ["Técnico/a de Laboratorio Clínico"]
+
+
 def test_tecnoempleo_es_un_portal_donde_se_postula_y_esta_registrado():
     from buscador import contrato
     from panel import ejecutor

@@ -45,10 +45,18 @@ VISTAS = {}
 FICHAS = {}
 
 
+_CLAVE_RECHAZADA = set()  # claves que InfoJobs rechazó en este proceso: no se vuelve a preguntar con ellas
+
+
 def credenciales():
-    """(Client ID, Client secret) de la aplicación registrada en InfoJobs, o None si no están configuradas."""
+    """(Client ID, Client secret) de la aplicación registrada en InfoJobs, o None si no están configuradas o si
+    InfoJobs ya las rechazó en esta corrida (así no se gasta una petición por aviso con una clave que no vale)."""
     cid, secreto = os.environ.get("INFOJOBS_CLIENT_ID", "").strip(), os.environ.get("INFOJOBS_CLIENT_SECRET", "").strip()
-    return (cid, secreto) if cid and secreto else None
+    return (cid, secreto) if cid and secreto and (cid, secreto) not in _CLAVE_RECHAZADA else None
+
+
+def _rechazar_clave(cred):
+    _CLAVE_RECHAZADA.add(tuple(cred))
 
 
 def _cabeceras(cred):
@@ -214,7 +222,6 @@ def buscar_api(cliente, cred, mapa, estado, presupuesto, max_fichas, hoy=None, m
                limite_segundos=None, prioritarias=()):
     """Como `buscar`, con la API oficial: una búsqueda por nombre y la ficha de cada título de un cargo buscado.
     Devuelve (vacantes crudas, estadísticas). Si la clave no vale (401/403) o hay tres fallos seguidos, se detiene."""
-    from buscador import familias
     hoy = hoy or datetime.now(timezone.utc).date().isoformat()
     inicio = reloj()
     desde = (datetime.fromisoformat(hoy) - timedelta(days=max_dias)).date().isoformat()
@@ -234,6 +241,7 @@ def buscar_api(cliente, cred, mapa, estado, presupuesto, max_fichas, hoy=None, m
         codigo = getattr(r, "status_code", None)
         if codigo in (401, 403):
             error = f"InfoJobs rechazó la clave ({codigo}); revisar los secretos"
+            _rechazar_clave(cred)
             return None
         try:
             datos = r.json() if codigo == 200 else None
@@ -261,9 +269,10 @@ def buscar_api(cliente, cred, mapa, estado, presupuesto, max_fichas, hoy=None, m
             if isinstance(a, dict) and isinstance(a.get("title"), str) and aviso_de(a.get("link")) \
                     and aviso_de(a["link"]) not in resumenes:
                 resumenes[aviso_de(a["link"])] = dict(a, _familia=familia)
-    del_cargo = [a for a in resumenes.values() if familias.clasificar(a["title"])]
+    es_del_cargo = cobertura.titulos_del_cargo(mapa)
+    del_cargo = [a for a in resumenes.values() if es_del_cargo(a["title"], a["_familia"])]
     del_cargo.sort(key=lambda a: a["_familia"] not in prioritarias)  # estable
-    crudas, fichas, cerradas = [], 0, 0
+    crudas, fichas, cerradas, con_descripcion = [], 0, 0, 0
     for a in del_cargo:
         if fichas >= max_fichas or agotada():
             break
@@ -283,9 +292,10 @@ def buscar_api(cliente, cred, mapa, estado, presupuesto, max_fichas, hoy=None, m
         if situacion == "abierta" and len(v["descripcion"]) >= MIN_DESCRIPCION:
             FICHAS[v["enlace"]] = {"estado": "verificada", "motivo": "ficha específica accesible",
                                    "comprobada_en": hora, "destino": v["enlace"]}
+        con_descripcion += len(v["descripcion"]) >= MIN_DESCRIPCION
         crudas.append(v)
     stats = {"modo": "api", "busquedas": hechas, "fallidas": fallidas, "avisos": len(resumenes),
-             "del_cargo": len(del_cargo), "fichas": fichas, "cerradas": cerradas, "con_descripcion": len(crudas),
+             "del_cargo": len(del_cargo), "fichas": fichas, "cerradas": cerradas, "con_descripcion": con_descripcion,
              "combinaciones_total": len(todas)}
     return crudas, dict(stats, error=error) if error else stats
 
@@ -297,9 +307,11 @@ def estado_del_aviso(sesion, url, titulo, coincide, timeout=12):
     if not cred or not aviso_id:
         return "pendiente", "sin comprobación directa", None
     r = sesion.get(API_FICHA + aviso_id, headers=_cabeceras(cred), timeout=timeout)
-    if r.status_code in (404, 410):
-        return "rechazada", "enlace roto", r.status_code
+    if r.status_code in (401, 403):
+        _rechazar_clave(cred)  # el resto de enlaces de InfoJobs queda «sin comprobación directa», sin gastar peticiones
     if r.status_code != 200:
+        # También un 404: hasta verlo con una clave real no se sabe si significa «ya no existe» u otra cosa, y un
+        # cierre retira la vacante. Solo cierran los avisos que la ficha dice archivados o borrados.
         return "pendiente", "acceso bloqueado o fallo temporal", r.status_code
     try:
         ficha = r.json()

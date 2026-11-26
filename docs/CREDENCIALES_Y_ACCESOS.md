@@ -32,6 +32,7 @@ El repositorio, la página pública, las tablas de vacantes y este chat no son a
 | **SUPABASE_SECRET_KEY — API** | Secret key o service_role proporcionada por Supabase. El programa guarda vacantes por REST con ella | Repository secrets → `SUPABASE_SECRET_KEY` |
 | **SUPABASE_URL — dirección API** | Dirección del proyecto; no es una contraseña ni una conexión PostgreSQL | Repository secrets → `SUPABASE_URL` |
 | **APIFY_TOKEN — LinkedIn** | Token de la cuenta Apify, con permisos para el refuerzo de ofertas formales y su presupuesto | Repository secrets → `APIFY_TOKEN` |
+| **InfoJobs — API oficial (optativa)** | Client ID y Client secret de la aplicación registrada en developer.infojobs.net (`docs/ACTIVAR_INFOJOBS_API.md`). Sin ellos InfoJobs se lee por su página | Repository secrets → `INFOJOBS_CLIENT_ID` e `INFOJOBS_CLIENT_SECRET` |
 | **Panel — operadores** | Correos que pueden entrar al panel, separados por comas. No es una clave, pero conviene registrarlo | Render → servicio del panel → Environment → `PANEL_OPERATOR_EMAILS` |
 | **Panel — dirección** | Dirección HTTPS del panel (por ejemplo, la de Render). No es una clave | Render → Environment → `PANEL_ORIGIN` |
 | **Panel — conexión a Supabase** | Las mismas `SUPABASE_URL` y `SUPABASE_SECRET_KEY` de arriba; el panel las usa en el servidor, nunca en el navegador | Render → Environment → `SUPABASE_URL` y `SUPABASE_SECRET_KEY` |

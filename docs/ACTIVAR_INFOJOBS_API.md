@@ -30,7 +30,15 @@ búsquedas y fichas leyó. Si dice `"modo": "pagina"`, los secretos no están (o
   reporte no muestra fallos, se pueden subir.
 - La fecha de cada vacante es la de creación del aviso, no la de su última republicación.
 - El enlace se comprueba con la ficha de la API: abierto si InfoJobs dice que está activo y el título coincide;
-  cerrado si está archivado o borrado. La página del aviso sigue sin abrirse nunca (pide captcha).
+  cerrado solo si la ficha dice archivado o borrado. Cualquier otra respuesta (también un «no encontrado») no decide
+  nada: hasta verlo con una clave real no se sabe qué significa, y cerrar retira la vacante. La página del aviso sigue
+  sin abrirse nunca (pide captcha).
+- **Dónde se usa la clave.** Solo en la búsqueda de la mañana y sus repasos (`bodega.yml`) y en la búsqueda profunda
+  (`profunda.yml`). La captura de cada hora y el servidor del panel no la reciben: ahí un enlace de InfoJobs sigue
+  «sin comprobación directa» y vale lo que comprobó la última búsqueda (24 h). Es a propósito, para no gastar el
+  límite de uso mientras no lo conozcamos.
+- Si InfoJobs rechaza la clave, la fuente se detiene, lo dice en el reporte y en esa corrida no se vuelve a preguntar
+  con ella.
 - Si el aviso se postula en la página de la empresa, esa dirección queda como enlace directo.
 
 ## Límites

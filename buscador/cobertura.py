@@ -223,6 +223,22 @@ def dias_busqueda(clave, ultima, hoy, max_dias):
     return min(max_dias, max(1, (datetime.fromisoformat(hoy) - datetime.fromisoformat(ultima)).days + 1))
 
 
+def titulos_del_cargo(mapa):
+    """Función `es_del_cargo(título, familia)` para decidir a qué avisos se les lee la ficha: los que clasifican en
+    un cargo buscado. En una búsqueda profunda el cargo puede no estar en el mapa: ahí vale el título que contiene uno
+    de los nombres con que se buscó (los títulos de otros cargos del mapa no le sirven a esa búsqueda)."""
+    from buscador import familias
+    nombres = {f["id"]: [n for n in map(normalizar.titulo_base, consultas(f)) if n] for f in mapa}
+    fuera_del_mapa = {fid for fid, lista in nombres.items() if lista and not familias.clasificar(lista[0])}
+
+    def es_del_cargo(titulo, familia):
+        if familia in fuera_del_mapa:
+            base = normalizar.titulo_base(titulo)
+            return any(normalizar.contiene_frase(base, n) for n in nombres[familia])
+        return bool(familias.clasificar(titulo))
+    return es_del_cargo
+
+
 def es_espanol(lugar):
     """True si la combinación es la de los títulos en español («CO:ES», «REMOTO_CO:ES», «GLOBAL:ES», «CO:ES:REMOTO»).
     «ES» y «ES:REMOTO» son España con los nombres generales."""

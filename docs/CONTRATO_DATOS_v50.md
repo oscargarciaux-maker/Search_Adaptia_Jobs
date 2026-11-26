@@ -177,10 +177,13 @@ comprobar. Resultado del 26 nov:
   la **fecha de creación** (no la de republicación), si el aviso sigue activo y, si se postula fuera, esa dirección
   como enlace directo. El reporte dice `modo: api` o `modo: pagina`.
   - Comprobación con clave: una ficha leída hoy que dice «activo», con descripción, comprueba el enlace; «archivado»
-    o «borrado» lo cierra; lo demás no decide. Después el enlace se vuelve a comprobar con esa misma ficha de la API.
-    La página del aviso sigue sin abrirse. Sin clave vale la regla de arriba («vista hoy»).
-  - Una clave rechazada (401/403) detiene la fuente y lo dice, sin mostrarla. Las claves solo viajan en la cabecera
-    de autenticación.
+    o «borrado» lo cierra; lo demás no decide, tampoco un 404 (sin clave real no se sabe qué significa y un cierre
+    retira la vacante). Después el enlace se vuelve a comprobar con esa misma ficha de la API. La página del aviso
+    sigue sin abrirse. Sin clave vale la regla de arriba («vista hoy»).
+  - Los secretos solo llegan a `bodega.yml` y `profunda.yml`. La captura horaria y el servidor del panel no los
+    reciben: ahí el enlace queda «sin comprobación directa» y vale la comprobación de la última búsqueda (24 h).
+  - Una clave rechazada (401/403) detiene la fuente y lo dice, sin mostrarla; en esa corrida no se vuelve a usar,
+    tampoco al comprobar enlaces. Las claves solo viajan en la cabecera de autenticación.
   - No se pudo probar contra la API real: no hay clave todavía. Está hecha con su documentación pública y probada con
     respuestas de ejemplo.
 
@@ -191,8 +194,15 @@ comprobar. Resultado del 26 nov:
 - **Búsqueda y ficha.** Búsqueda por nombre (`/ofertas-trabajo/?te=…`) y ficha con su `JobPosting` (empresa, ciudad,
   fecha y descripción), con el lector común de Elempleo. Solo se lee la ficha de un título de un cargo buscado; un
   nombre ya buscado hoy no se repite. Solo para cargos con alguien que trabajaría en España.
-- **Comprobación.** La de siempre: se abre la ficha. En vivo, tres fichas reales quedaron «verificada» y una
-  inexistente «enlace roto».
+- **Comprobación.** La de siempre: se abre la ficha. En vivo, nueve fichas reales quedaron «verificada» y una
+  inexistente «enlace roto». Cierra por la fecha de cierre de la ficha (`validThrough`), por enlace roto o si la
+  página dice «oferta caducada/finalizada» o «esta oferta ha caducado/finalizado» (frases añadidas a la comprobación
+  común). **No se pudo ver un aviso caducado real** de Tecnoempleo: si muestra otra frase y sigue respondiendo, ese
+  aviso seguiría como abierto hasta que el portal lo retire.
+- Una página de búsqueda sin avisos no cuenta como buscada: ese nombre se reintenta en la siguiente pasada.
+- **Búsqueda profunda.** En Tecnoempleo, InfoJobs (API), Computrabajo y LinkedIn un cargo que no está en el mapa
+  cuenta como «cargo buscado» si el título contiene uno de los nombres con que se buscó
+  (`cobertura.titulos_del_cargo`); antes esas fuentes no leían ninguna ficha en ese caso.
 - **Medido en vivo el 26 nov** (5 cargos): 12 búsquedas en 67 segundos, 67 avisos, 51 de un cargo buscado; de 30
   fichas leídas se guardaron 26, todas en español (11 híbridas, 9 remotas y 6 presenciales).
 

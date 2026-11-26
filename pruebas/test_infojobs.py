@@ -248,6 +248,7 @@ class Api:
 def _api(api, estado=None, **opciones):
     infojobs.VISTAS.clear()
     infojobs.FICHAS.clear()
+    infojobs._CLAVE_RECHAZADA.clear()
     cobertura.BUSQUEDAS.clear()
     return infojobs.buscar_api(api, CLAVE, MAPA, {} if estado is None else estado, hoy="2026-11-26",
                                **{"presupuesto": 1, "max_fichas": 10, **opciones})
@@ -284,7 +285,9 @@ def test_la_api_busca_por_nombre_y_lee_la_ficha_solo_de_los_titulos_de_un_cargo(
     assert infojobs.FICHAS["https://www.infojobs.net/madrid/qa-tester/of-iabc001"]["estado"] == "verificada"
     assert infojobs.FICHAS["https://www.infojobs.net/madrid/qa-tester/of-iabc003"]["motivo"] == "vacante cerrada"
     # Ni las estadísticas ni lo guardado llevan la clave.
-    assert CLAVE[1] not in json.dumps([crudas, stats, infojobs.FICHAS]) and "c2VjcmV0" not in json.dumps([crudas, stats])
+    guardado = json.dumps([crudas, stats, infojobs.FICHAS])
+    cifrada = infojobs._cabeceras(CLAVE)["Authorization"].split()[1]
+    assert CLAVE[1] not in guardado and cifrada not in guardado and cifrada[:12] not in guardado
 
 
 def test_la_api_no_inventa_si_la_ficha_es_rara_vieja_o_no_dice_que_esta_activa():
@@ -293,14 +296,33 @@ def test_la_api_no_inventa_si_la_ficha_es_rara_vieja_o_no_dice_que_esta_activa()
               "abc003": None, "abc004": _detalle(4, description="Corta.", minRequirements="")}
     crudas, stats = _api(Api([_resumen(n) for n in (1, 2, 3, 4)], fichas))
     assert [c["enlace"][-6:] for c in crudas] == ["abc002", "abc004"] and stats["fallidas"] == 1
+    assert stats["con_descripcion"] == 1  # la de descripción corta se guarda, pero no cuenta como «con descripción»
     assert infojobs.FICHAS == {}  # sin «activa» o sin descripción suficiente no cuenta como comprobada
 
 
-def test_una_clave_rechazada_detiene_la_fuente_y_lo_dice_sin_mostrarla():
+def test_una_clave_rechazada_detiene_la_fuente_y_lo_dice_sin_mostrarla(monkeypatch):
+    monkeypatch.setenv("INFOJOBS_CLIENT_ID", CLAVE[0])
+    monkeypatch.setenv("INFOJOBS_CLIENT_SECRET", CLAVE[1])
     api = Api([_resumen(1)], codigo=401)
     crudas, stats = _api(api, presupuesto=5)
     assert crudas == [] and len(api.pedidas) == 1 and "rechazó la clave (401)" in stats["error"]
     assert CLAVE[0] not in json.dumps(stats) and CLAVE[1] not in json.dumps(stats)
+    # Con la clave rechazada, el resto de la corrida no vuelve a preguntar con ella (ni al comprobar enlaces).
+    assert infojobs.credenciales() is None
+    infojobs._CLAVE_RECHAZADA.clear()
+    assert infojobs.credenciales() == CLAVE
+
+
+def test_la_api_en_una_busqueda_profunda_lee_las_fichas_de_un_cargo_que_no_esta_en_el_mapa():
+    mapa = [{"id": "profunda", "consultas": ["técnico de laboratorio clínico"], "paises_objetivo": ["ES"]}]
+    api = Api([_resumen(1, "Técnico/a de Laboratorio Clínico (turno de tarde)"), _resumen(2, "QA Tester")],
+              {"abc001": _detalle(1, "Técnico/a de Laboratorio Clínico (turno de tarde)")})
+    infojobs.FICHAS.clear()
+    cobertura.BUSQUEDAS.clear()
+    crudas, stats = infojobs.buscar_api(api, CLAVE, mapa, {}, hoy="2026-11-26", presupuesto=1, max_fichas=10)
+    # Se lee la del cargo pedido, por su nombre; la de otro cargo del mapa no le sirve a esta búsqueda.
+    assert [u.rsplit("/", 1)[1] for u, _, _ in api.pedidas[1:]] == ["abc001"] and stats["del_cargo"] == 1
+    assert [c["titulo"] for c in crudas] == ["Técnico/a de Laboratorio Clínico (turno de tarde)"]
 
 
 class SesionApi:
@@ -330,6 +352,7 @@ def test_con_clave_el_enlace_se_comprueba_con_la_ficha_de_la_api_y_sin_clave_no_
     assert verificar_enlaces.sin_comprobacion_directa("https://es.indeed.com/viewjob?jk=1")   # Indeed no cambia
 
     def comprobar(respuesta, titulo="QA Tester"):
+        infojobs._CLAVE_RECHAZADA.clear()
         s = SesionApi(respuesta)
         r = verificar_enlaces.comprobar(enlace, titulo, sesion=s, ahora=ahora)
         assert s.pedidas == [(infojobs.API_FICHA + "abc001", True)]  # la API, nunca la página (pide captcha)
@@ -337,8 +360,14 @@ def test_con_clave_el_enlace_se_comprueba_con_la_ficha_de_la_api_y_sin_clave_no_
     assert comprobar(RespuestaApi(_detalle(1))) == ("verificada", "ficha específica accesible")
     assert comprobar(RespuestaApi(_detalle(1, archived=True))) == ("rechazada", "vacante cerrada")
     assert comprobar(RespuestaApi(_detalle(1, deleted=True))) == ("rechazada", "vacante cerrada")
-    assert comprobar(RespuestaApi({}, 404)) == ("rechazada", "enlace roto")
-    for respuesta in (RespuestaApi({}, 401), RespuestaApi({}, 500), RespuestaApi(None), RespuestaApi([1]),
+    # Un 404 no cierra: sin haberlo visto con una clave real no se sabe qué significa, y un cierre retira la vacante.
+    for respuesta in (RespuestaApi({}, 404), RespuestaApi({}, 500), RespuestaApi(None), RespuestaApi([1]),
                       RespuestaApi({k: v for k, v in _detalle(1).items() if k != "active"}),
                       RespuestaApi(_detalle(1, active=False)), RespuestaApi(_detalle(1, "Vendedor de mostrador"))):
         assert comprobar(respuesta)[0] == "pendiente"
+    # Clave rechazada al comprobar: ese enlace queda pendiente y los siguientes ya no gastan una petición cada uno.
+    assert comprobar(RespuestaApi({}, 401))[0] == "pendiente"
+    despues = SesionApi(RespuestaApi(_detalle(1)))
+    r = verificar_enlaces.comprobar(enlace, "QA Tester", sesion=despues, ahora=ahora)
+    assert r["motivo"] == "sin comprobación directa" and despues.pedidas == []
+    infojobs._CLAVE_RECHAZADA.clear()

@@ -150,18 +150,8 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
     # lo son (26 nov, Product Manager en Colombia: 82 de 320) y solo alcanza unas 290 peticiones por noche: el 25 nov se
     # leyeron 75 fichas de 818 avisos sin mirar el título, y los del cargo se quedaban sin descripción (sin ella no se
     # sabe el idioma ni se entrega). Los demás solo reciben ficha si sobra cupo (título genérico + descripción, v25).
-    from buscador import familias, normalizar
-    # En una búsqueda profunda el cargo puede no estar en el mapa: ahí «del cargo» es el título que contiene uno de los
-    # nombres con que se buscó (los títulos de otros cargos del mapa no le sirven a esa búsqueda).
-    nombres = {f["id"]: [n for n in map(normalizar.titulo_base, cobertura.consultas(f)) if n] for f in mapa}
-    fuera_del_mapa = {fid for fid, lista in nombres.items() if lista and not familias.clasificar(lista[0])}
-
-    def es_del_cargo(a):
-        if a["familia"] in fuera_del_mapa:
-            base = normalizar.titulo_base(a["titulo"])
-            return any(normalizar.contiene_frase(base, n) for n in nombres[a["familia"]])
-        return bool(familias.clasificar(a["titulo"]))
-    del_cargo = {a["id"] for a in avisos if es_del_cargo(a)}
+    es_del_cargo = cobertura.titulos_del_cargo(mapa)  # también en una búsqueda profunda de un cargo fuera del mapa
+    del_cargo = {a["id"] for a in avisos if es_del_cargo(a["titulo"], a["familia"])}
     turno, vistos_lugar = {}, Counter()
     for a in avisos:  # los turnos por lugar se cuentan aparte entre los del cargo y entre los demás
         clave = (a["id"] in del_cargo, a["lugar_busqueda"])

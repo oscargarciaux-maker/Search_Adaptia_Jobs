@@ -22,7 +22,8 @@ RECHAZOS = {"enlace roto", "vacante cerrada", "postulación con cobro", "destino
             "ciclo de redirecciones", "demasiadas redirecciones", "página general sin vacante", "destino no público"}
 _CERRADA = re.compile(r"no longer accepting applications|this (?:job|position) (?:is no longer available|has been filled)|"
     r"job (?:has expired|is no longer available)|ya no (?:acepta|se aceptan) (?:solicitudes|postulaciones)|"
-    r"(?:esta )?(?:vacante|oferta) (?:ha sido cerrada|ya no está disponible)|vaga (?:encerrada|não está mais disponível)", re.I)
+    r"(?:esta )?(?:vacante|oferta) (?:ha sido cerrada|ya no está disponible|ha caducado|ha finalizado)|"
+    r"oferta (?:caducada|finalizada)|vaga (?:encerrada|não está mais disponível)", re.I)
 _COBRO = re.compile(r"(?:pay|payment|purchase|subscribe|subscription required).{0,70}(?:to apply|to submit (?:your |an )?application)|"
     r"(?:paga|pagar|pago obligatorio|suscr[ií]bete|suscripci[oó]n obligatoria).{0,70}(?:para (?:aplicar|postular|acceder a la oferta))|"
     r"(?:pague|pagamento obrigat[oó]rio).{0,60}para (?:se candidatar|candidatar)|"

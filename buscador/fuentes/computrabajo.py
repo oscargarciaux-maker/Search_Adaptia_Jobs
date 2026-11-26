@@ -159,8 +159,8 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
     # Contrato v49: solo se lee la ficha de un aviso cuyo título es de un cargo buscado (los demás se descartan después
     # por «sin familia» y gastaban las fichas: el 25 nov quedaron 554 de 739 avisos guardados sin descripción), y
     # primero las de cargos con personas cortas en ese país.
-    from buscador import familias
-    del_cargo = {a["id"] for a in avisos if familias.clasificar(a["titulo"])}
+    es_del_cargo = cobertura.titulos_del_cargo(mapa)  # v50: también en una búsqueda profunda fuera del mapa
+    del_cargo = {a["id"] for a in avisos if es_del_cargo(a["titulo"], a["familia"])}
     avisos.sort(key=lambda a: a["familia"] not in prioritarias)
     avisos.sort(key=lambda a: not cobertura.va_primero(a["familia"], a["pais"]))  # estable
     crudas, con_ficha, cerradas = [], 0, 0

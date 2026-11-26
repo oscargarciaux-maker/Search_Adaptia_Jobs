@@ -31,7 +31,7 @@ Settings* → *Members* → *Invite* con su correo y el rol que corresponda.
 
 | Dónde | Qué |
 |---|---|
-| Secretos de GitHub (Settings → Secrets and variables → Actions) | `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_DB_URL`, `SUPABASE_BACKUP_KEY` y `APIFY_TOKEN`. Opcionales: `AVISO_NOCTURNA_URL`, `AVISO_CAPTURA_URL` y `AVISO_RESPALDO_URL`. `GITHUB_TOKEN` lo pone GitHub solo |
+| Secretos de GitHub (Settings → Secrets and variables → Actions) | `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_DB_URL`, `SUPABASE_BACKUP_KEY` y `APIFY_TOKEN`. Opcionales: `AVISO_NOCTURNA_URL`, `AVISO_CAPTURA_URL`, `AVISO_RESPALDO_URL` y, si se activó la API de InfoJobs, `INFOJOBS_CLIENT_ID` e `INFOJOBS_CLIENT_SECRET`. `GITHUB_TOKEN` lo pone GitHub solo |
 | Variables de GitHub | `CAPTURA_HORARIA_ACTIVA` y `ESTADO_SUPABASE_ACTIVO` |
 | Render (panel) | `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `PANEL_ORIGIN`, `PANEL_OPERATOR_EMAILS`, `GITHUB_ACCIONES_TOKEN` y `GITHUB_REPOSITORIO` |
 | Usuarios del panel | Supabase → Authentication → Users, más su correo en `PANEL_OPERATOR_EMAILS` |
@@ -90,6 +90,7 @@ Crea también su usuario del panel en Supabase → Authentication → Users, y c
 | Llave | Dónde | Qué hacer |
 |---|---|---|
 | `APIFY_TOKEN` | Secretos de GitHub | Poner el de su cuenta de Apify, con su límite mensual (el proyecto usa USD 5/mes) |
+| `INFOJOBS_CLIENT_ID` e `INFOJOBS_CLIENT_SECRET` (optativos) | Secretos de GitHub | Registrar su propia aplicación en InfoJobs y poner sus dos datos (`docs/ACTIVAR_INFOJOBS_API.md`); sin ellos InfoJobs se lee por su página |
 | `GITHUB_ACCIONES_TOKEN` | Render | El que él crea (Fase 3) |
 | `SUPABASE_SECRET_KEY` | GitHub y Render | Recomendado, al final: él crea una nueva en Supabase (API Keys), se pone en los dos sitios y se borra la vieja. Así solo él la conoce |
 | Contraseña de la base (va dentro de `SUPABASE_DB_URL`) | GitHub | Igual: él la cambia en Supabase (Database → Reset password) y se actualiza el secreto |

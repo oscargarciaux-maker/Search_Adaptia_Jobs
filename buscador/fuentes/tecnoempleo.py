@@ -52,7 +52,6 @@ def buscar(cliente, mapa, estado, presupuesto, hoy=None, max_fichas=80, reloj=ti
            prioritarias=()):
     """Busca los nombres de cada cargo (uno por búsqueda, cada uno con su clave; lo ya buscado hoy no se repite) y lee
     las fichas de los títulos de un cargo buscado. Devuelve (vacantes crudas, estadísticas)."""
-    from buscador import familias
     hoy = hoy or datetime.now(timezone.utc).date().isoformat()
     inicio = reloj()
     todas = cobertura.repartir(combinaciones(mapa), estado, hoy, prioritarias)
@@ -74,12 +73,15 @@ def buscar(cliente, mapa, estado, presupuesto, hoy=None, max_fichas=80, reloj=ti
             continue
         seguidas = 0
         cobertura.anotar_busqueda("tecnoempleo", familia, lugar)
-        cobertura.anotar_hecha(estado, b, hoy)
-        for enlace, titulo in tarjetas(r.text):
+        hallados = tarjetas(r.text)
+        if hallados:  # una página sin avisos (o un bloqueo con 200) no cuenta como buscada: se reintenta más tarde
+            cobertura.anotar_hecha(estado, b, hoy)
+        for enlace, titulo in hallados:
             if enlace not in vistos:
                 vistos.add(enlace)
                 avisos.append({"enlace": enlace, "titulo": titulo, "familia": familia})
-    del_cargo = [a for a in avisos if familias.clasificar(a["titulo"])]
+    es_del_cargo = cobertura.titulos_del_cargo(mapa)
+    del_cargo = [a for a in avisos if es_del_cargo(a["titulo"], a["familia"])]
     del_cargo.sort(key=lambda a: a["familia"] not in prioritarias)  # estable
     crudas, leidas = jobposting.leer_fichas(cliente, [(a["enlace"], a["titulo"], "ES") for a in del_cargo], hoy, NOMBRE,
                                             max_fichas, reloj, inicio, limite_segundos)
