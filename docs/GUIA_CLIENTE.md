@@ -222,13 +222,31 @@ La captura horaria no consume Apify. La búsqueda nocturna y la profunda pueden 
 hasta USD 5/mes para este programa. Revisar el gasto global de la cuenta, que puede incluir otros trabajos.
 Las fuentes y variantes rotan; no se recorren todos los títulos de todos los países en cada ejecución.
 
+### Vacantes en español (contrato v50, 26 nov)
+
+- Quien acepta español (solo o junto con inglés) recibe búsquedas con los nombres en español de su cargo.
+- Los nombres en español que conocemos de cada cargo **se usan solos**: no hay que añadirlos. En el diálogo del cargo
+  aparecen en «En español, se usan solos»; toca uno para dejar de usarlo (pasa a «Excluir estos términos»).
+  Si las funciones del aviso no acompañan, la vacante va al final con «Funciones por confirmar» o a «Por confirmar».
+- Los avisos en español casi siempre son de un solo país: a cada persona le sirven los de su país y los que dicen que
+  aceptan su país, LATAM o todo el mundo. Un cargo en un país da de 2 a 4 vacantes nuevas en español al día.
+- En el reporte de cada búsqueda, `embudo_idioma` dice cuántas vacantes en español hay guardadas y cuántas tienen el
+  enlace comprobado.
+- Portales locales en español además de Computrabajo: Elempleo y Magneto (Colombia), Hireline (México y Colombia) y,
+  desde v50, Bumeran (Argentina, México, Perú y Venezuela), Laborum (Chile), Multitrabajos (Ecuador) y Konzerta
+  (Panamá). Sus avisos son casi todos presenciales o híbridos: le llegan a quien tiene esa ciudad en su perfil.
+- España: Tecnoempleo (tecnología) e InfoJobs (v50). InfoJobs trae pocos avisos porque su sitio pide captcha a partir
+  de la sexta página; si el reporte dice `bloqueada`, ese día no dejó leer. Para que rinda, activa su API oficial:
+  [ACTIVAR_INFOJOBS_API.md](ACTIVAR_INFOJOBS_API.md).
+
 ### Personas que solo hablan español (contrato v44)
 
-- Al crear un cargo, «Buscar denominaciones afines» muestra primero los nombres **en español** y, si el cargo es un
-  oficio con un añadido («AI Product Manager»), también el oficio **más amplio** («Product Manager», «Gerente de
-  Producto»). Añade con un clic solo los que le sirvan a la persona.
+- Al crear un cargo, «Buscar denominaciones afines» muestra los nombres **en español** que no se usan solos y, si el
+  cargo es un oficio con un añadido («AI Product Manager»), también el oficio **más amplio** («Product Manager»,
+  «Gerente de Producto»). Añade con un clic solo los que le sirvan a la persona. Desde v50, los nombres en español
+  del mapa y del glosario ya se usan solos (ver arriba).
 - En Historial → «Cobertura por persona», quien no llega a su meta muestra **qué hacer** y cuántas vacantes más le
-  llegarían con cada ajuste. Nada se aplica solo: tú decides en el cliente o en el cargo.
+  llegarían con cada ajuste. Esos ajustes no se aplican solos: tú decides en el cliente o en el cargo.
 - Si la persona vive en un país donde casi no hay fuentes, lo dice («Cobertura limitada…»): recibirá sobre todo
   remotas abiertas a su país.
 

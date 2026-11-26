@@ -105,14 +105,42 @@ def medir(estado, crudas, vacantes, hoy, dias=30):
 
 def sirve_a_corta(v):
     """Contrato v40: True si una vacante guardada es de un cargo y un país de alguna persona que va corta (o es nueva).
-    La relectura de descripciones empieza por estas: sin descripción no se sabe el idioma y no se entrega."""
+    La comprobación de enlaces empieza por estas (la relectura de descripciones usa `por_necesidad`, v50)."""
     familias_v = {f.get("familia") for f in v.get("familias") or [] if isinstance(f, dict)}
     # Contrato v49: con la misma regla de países que decide la entrega (`paises.abiertos`), y de un idioma que esa
     # persona acepta cuando ya se sabe (sin descripción aún no se sabe).
     paises_v, mundial, _ = paises.abiertos(v)
     idioma = v.get("idioma") or ""
-    return any(p.get("corto") and p["familia"] in familias_v and (mundial or paises_v & p["lugares"])
-               and (not idioma or idioma in p.get("idiomas", ("es", "en"))) for p in _PERSONAS)
+    return any(p.get("corto") and _le_sirve(p, familias_v, paises_v, mundial, idioma) for p in _PERSONAS)
+
+
+def por_necesidad(vacantes):
+    """Contrato v50: el orden en que se releen las vacantes guardadas sin descripción. Por turnos entre las personas
+    (la primera de cada una, luego la segunda…), primero quien va corta y quien tiene menos de dónde elegir, mirando su
+    cargo y su ubicación (y su idioma, si ya se sabe). Después las de un cargo buscado que hoy no le sirven a nadie y,
+    al final, las que no son de ningún cargo. Dentro de cada persona se conserva el orden en que llegan (lo más
+    reciente primero). Antes solo se adelantaba lo de quien iba corto: el 25 nov se releyeron 100 de 1.581 en espera."""
+    vacantes = list(vacantes)
+    datos = []
+    for v in vacantes:
+        abiertos, mundial, _ = paises.abiertos(v)
+        datos.append((v, {f.get("familia") for f in v.get("familias") or [] if isinstance(f, dict)}, abiertos, mundial,
+                      v.get("idioma") or ""))
+    colas = []
+    for p in _PERSONAS:
+        suyas = [v for v, fams, abiertos, mundial, idioma in datos if _le_sirve(p, fams, abiertos, mundial, idioma)]
+        if suyas:
+            colas.append((not p.get("corto"), len(suyas), suyas))
+    colas.sort(key=lambda c: c[:2])
+    salida, vistas = [], set()
+    for i in range(max((len(c[2]) for c in colas), default=0)):
+        for _, _, suyas in colas:
+            if i < len(suyas) and id(suyas[i]) not in vistas:
+                vistas.add(id(suyas[i]))
+                salida.append(suyas[i])
+    resto = [v for v in vacantes if id(v) not in vistas]
+    resto.sort(key=lambda v: not v.get("familias"))  # estable
+    return salida + resto
 
 
 # Contrato v47 («Buscar ahora» para quien falta, decisión de Oscar del 18 nov): búsqueda corta y sin repetir. Solo
@@ -195,6 +223,34 @@ def dias_busqueda(clave, ultima, hoy, max_dias):
     return min(max_dias, max(1, (datetime.fromisoformat(hoy) - datetime.fromisoformat(ultima)).days + 1))
 
 
+def titulos_del_cargo(mapa):
+    """Función `es_del_cargo(título, familia)` para decidir a qué avisos se les lee la ficha: los que clasifican en
+    un cargo buscado. En una búsqueda profunda el cargo puede no estar en el mapa: ahí vale el título que contiene uno
+    de los nombres con que se buscó (los títulos de otros cargos del mapa no le sirven a esa búsqueda)."""
+    from buscador import familias
+    nombres = {f["id"]: [n for n in map(normalizar.titulo_base, consultas(f)) if n] for f in mapa}
+    fuera_del_mapa = {fid for fid, lista in nombres.items() if lista and not familias.clasificar(lista[0])}
+
+    def es_del_cargo(titulo, familia):
+        if familia in fuera_del_mapa:
+            base = normalizar.titulo_base(titulo)
+            return any(normalizar.contiene_frase(base, n) for n in nombres[familia])
+        return bool(familias.clasificar(titulo))
+    return es_del_cargo
+
+
+def es_espanol(lugar):
+    """True si la combinación es la de los títulos en español («CO:ES», «REMOTO_CO:ES», «GLOBAL:ES», «CO:ES:REMOTO»).
+    «ES» y «ES:REMOTO» son España con los nombres generales."""
+    return ":ES" in str(lugar)
+
+
+def _le_sirve(persona, familias_v, abiertos, mundial, idioma):
+    """Una vacante (sus cargos, sus países abiertos y su idioma, si ya se sabe) es del cargo y de un lugar de la persona."""
+    return persona["familia"] in familias_v and bool(mundial or abiertos & persona["lugares"]) \
+        and (not idioma or idioma in persona.get("idiomas", ("es", "en")))
+
+
 def _claves_lugar(lugar):
     """«CO:REMOTO», «REMOTO_CO:ES», «CIUDAD_BOGOTA» → el lugar, sin sufijo y su país, para casarlo con una persona."""
     base = str(lugar).split(":")[0]
@@ -209,7 +265,10 @@ def de_personas(combinaciones):
     salida = {}
     for i, persona in enumerate(_PERSONAS):
         # «GLOBAL» (Get on Board: todo LATAM y remoto) sirve a cualquier persona del cargo.
+        # Contrato v50: una búsqueda con nombres en español («CO:ES») no es turno de quien no acepta avisos en español.
+        acepta_es = "es" in persona.get("idiomas", ("es", "en"))
         salida[i] = [c for c in combinaciones if c[0] == persona["familia"]
+                     and (acepta_es or not es_espanol(c[2]))
                      and (str(c[2]).startswith("GLOBAL") or _claves_lugar(c[2]) & persona["lugares"])]
     return salida
 

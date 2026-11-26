@@ -98,7 +98,7 @@ def modalidad(texto):
 
 def combinaciones(mapa, nombres):
     """(familia, consultas, lugar, {}) por cargo y país. Contrato v44: los títulos en español tienen su propio turno
-    («CO:ES») en los países de quienes solo hablan español; antes compartían la rotación con los de inglés."""
+    («CO:ES») en los países de quienes aceptan avisos en español (v50); antes compartían la rotación con los de inglés."""
     salida = []
     for f in mapa:
         es = list(f.get("consultas_es") or [])
@@ -159,8 +159,8 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
     # Contrato v49: solo se lee la ficha de un aviso cuyo título es de un cargo buscado (los demás se descartan después
     # por «sin familia» y gastaban las fichas: el 25 nov quedaron 554 de 739 avisos guardados sin descripción), y
     # primero las de cargos con personas cortas en ese país.
-    from buscador import familias
-    del_cargo = {a["id"] for a in avisos if familias.clasificar(a["titulo"])}
+    es_del_cargo = cobertura.titulos_del_cargo(mapa)  # v50: también en una búsqueda profunda fuera del mapa
+    del_cargo = {a["id"] for a in avisos if es_del_cargo(a["titulo"], a["familia"])}
     avisos.sort(key=lambda a: a["familia"] not in prioritarias)
     avisos.sort(key=lambda a: not cobertura.va_primero(a["familia"], a["pais"]))  # estable
     crudas, con_ficha, cerradas = [], 0, 0
@@ -199,7 +199,7 @@ def completar_descripciones(cliente, previas, max_fichas, hoy=None, max_dias=30,
                   and ".computrabajo.com/" in (v.get("enlace") or "")
                   and (v.get("fecha_publicacion") or v.get("visto_ultima_vez") or "") >= desde]
     candidatas.sort(key=lambda v: v.get("visto_primera_vez") or "", reverse=True)
-    candidatas.sort(key=lambda v: not cobertura.sirve_a_corta(v))  # estable
+    candidatas = cobertura.por_necesidad(candidatas)  # contrato v50: por turnos entre personas, primero quien va corta
     crudas, peticiones, cerradas, seguidas = [], 0, 0, 0
     for v in candidatas:
         if peticiones >= max_fichas or seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):

@@ -146,15 +146,23 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
     # avisos con descripción) y los remotos (ahí la descripción decide el país)
     # Contrato v36: por turnos entre los lugares buscados (la 1.ª de cada lugar, luego la 2.ª…), para que las búsquedas
     # de cada perfil (p. ej. Chicago o EE. UU.) también reciban fichas; antes casi todas iban a las remotas de LATAM.
+    # Contrato v50: primero las fichas de los avisos cuyo título es de un cargo buscado. LinkedIn devuelve muchos que no
+    # lo son (26 nov, Product Manager en Colombia: 82 de 320) y solo alcanza unas 290 peticiones por noche: el 25 nov se
+    # leyeron 75 fichas de 818 avisos sin mirar el título, y los del cargo se quedaban sin descripción (sin ella no se
+    # sabe el idioma ni se entrega). Los demás solo reciben ficha si sobra cupo (título genérico + descripción, v25).
+    es_del_cargo = cobertura.titulos_del_cargo(mapa)  # también en una búsqueda profunda de un cargo fuera del mapa
+    del_cargo = {a["id"] for a in avisos if es_del_cargo(a["titulo"], a["familia"])}
     turno, vistos_lugar = {}, Counter()
-    for a in avisos:
-        turno[id(a)] = vistos_lugar[a["lugar_busqueda"]]
-        vistos_lugar[a["lugar_busqueda"]] += 1
+    for a in avisos:  # los turnos por lugar se cuentan aparte entre los del cargo y entre los demás
+        clave = (a["id"] in del_cargo, a["lugar_busqueda"])
+        turno[id(a)] = vistos_lugar[clave]
+        vistos_lugar[clave] += 1
     # Contrato v37: primero los avisos de los lugares de quien va corto.
-    avisos.sort(key=lambda a: (a["familia"] not in prioritarias, not cobertura.va_primero(a["familia"], a["lugar_busqueda"]),
+    avisos.sort(key=lambda a: (a["id"] not in del_cargo, a["familia"] not in prioritarias,
+                               not cobertura.va_primero(a["familia"], a["lugar_busqueda"]),
                                turno[id(a)], "REMOTO" not in a["lugar_busqueda"],
                                -(int((a["fecha"] or "0000-00-00").replace("-", "")))))
-    crudas, con_ficha, cerradas = [], 0, 0
+    crudas, con_ficha, cerradas, fichas_del_cargo = [], 0, 0, 0
     for a in avisos:
         descripcion, cerrado, externo, remoto = "", False, "", None
         if con_ficha < max_fichas and seguidas < 4 and not (limite_segundos is not None and reloj() - inicio >= limite_segundos):
@@ -163,6 +171,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
                 descripcion, cerrado, externo, remoto = ficha(r.text)
                 _anotar_ficha(a["enlace"], a["titulo"], r.text)
                 con_ficha += 1
+                fichas_del_cargo += a["id"] in del_cargo
                 seguidas = 0
             elif r is not None and r.status_code == 429:
                 seguidas += 1
@@ -178,6 +187,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
             "_busqueda": f"{a['familia']}@{a['lugar_busqueda']}",  # contrato v40: de qué búsqueda salió
         })
     stats = {"busquedas": hechas, "fallidas": fallidas, "avisos": len(avisos), "con_descripcion": con_ficha,
+             "del_cargo": len(del_cargo), "fichas_del_cargo": fichas_del_cargo,
              "cerradas": cerradas, "combinaciones_revisadas": sum(1 for c in todas if estado.get(f"{c[0]}@{c[2]}") == hoy),
              "combinaciones_total": len(todas), "por_familia": por_familia, "por_lugar": por_lugar}
     return crudas, stats
@@ -187,7 +197,8 @@ def completar_descripciones(cliente, previas, max_fichas, hoy=None, max_dias=21,
                             limite_segundos=None, prioritarias=()):
     """Relee la ficha pública de avisos de LinkedIn ya guardados que se quedaron sin descripción (LinkedIn limita cuántas
     fichas se leen por búsqueda). Sin descripción no se sabe el idioma y la vacante no se puede entregar.
-    Primero los cargos prioritarios y los más recientes. Devuelve (crudas con descripción, estadísticas); al unirlas
+    Por turnos entre las personas (`cobertura.por_necesidad`, v50); dentro de cada una, cargos prioritarios y recientes.
+    Devuelve (crudas con descripción, estadísticas); al unirlas
     con la copia guardada se conserva la descripción más larga."""
     hoy = hoy or datetime.now(timezone.utc).date().isoformat()
     inicio = reloj()
@@ -199,7 +210,7 @@ def completar_descripciones(cliente, previas, max_fichas, hoy=None, max_dias=21,
                   and (v.get("fecha_publicacion") or v.get("visto_ultima_vez") or "") >= desde]
     candidatas.sort(key=lambda v: v.get("fecha_publicacion") or v.get("visto_primera_vez") or "", reverse=True)
     candidatas.sort(key=lambda v: not any(f["familia"] in prioritarias for f in v.get("familias", [])))  # estable
-    candidatas.sort(key=lambda v: not cobertura.sirve_a_corta(v))  # contrato v40: primero lo de quien va corto
+    candidatas = cobertura.por_necesidad(candidatas)  # contrato v50: por turnos entre personas, primero quien va corta
     crudas, leidas, cerradas, seguidas, peticiones = [], 0, 0, 0, 0
     for v in candidatas:
         if peticiones >= max_fichas or seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):

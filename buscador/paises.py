@@ -127,6 +127,7 @@ def abiertos(v):
 
 
 NOTA_ZONA = "por zona horaria"
+NOTA_APERTURA = "abierta a esos países según el aviso"  # contrato v50: lo dice la letra pequeña en español
 
 
 _TRAS_ACOTAR = re.compile(r"^\s*(?:in|within|across|en|de|del|dentro de)\s+(?:the\s+|el\s+|la\s+|los\s+|las\s+)?")
@@ -337,6 +338,57 @@ def _contratacion_remota(desc):
     return ""
 
 
+# Contrato v50: la letra pequeña en español que dice desde dónde puede postular LA PERSONA («abierto a candidatos de
+# Colombia y Perú», «puedes postular desde Uruguay», «vacante disponible para Colombia, Ecuador o Perú»). Solo frases
+# que hablan de quién postula. Las de la empresa («presencia en 6 países», «en 2024 contratamos en México a 200
+# personas», «clientes en LATAM»), las de beneficios («puedes trabajar desde España cuatro semanas al año») y las
+# vagas («desde donde quieras») no empiezan así y no abren nada. Texto normalizado (sin tildes ni signos, minúsculas).
+_APERTURA_ES = re.compile(
+    r"\b(?:"
+    r"abiert[oa]s?\s+(?:a|para)\s+(?:tod[oa]s?\s+(?:l[oa]s\s+)?)?(?:candidat[oa]s|personas|profesionales|postulantes|"
+    r"aplicantes|talentos?|residentes)(?:\s+que\s+(?:residan|vivan|esten|se\s+encuentren))?\s+(?:de|en|desde)"
+    r"|(?:puedes|podras|pueden|podran)\s+(?:aplicar|postular|postularte|postularse)\s+desde"
+    r"|(?:aceptamos|recibimos)\s+(?:candidat[oa]s|postulantes|postulaciones|aplicaciones)\s+(?:de|desde|en)"
+    r"|contratamos\s+(?:talentos?|personas|profesionales|candidat[oa]s)\s+(?:en|de|desde)"
+    r"|(?:vacante|posicion|oferta|oportunidad|rol|puesto|convocatoria)\s+(?:remot[oa]\s+)?"
+    r"(?:disponible|abiert[oa]|valid[oa]|habilitad[oa])\s+(?:para|en)"
+    r"|paises\s+(?:donde\s+contratamos|en\s+los\s+que\s+contratamos|elegibles|habilitados)"
+    r")\s+")
+_ENTRE_LUGARES = re.compile(r"(?:(?:y|o|e|u|ni|tambien|como|toda|todo|todos|todas|el|la|los|las|de|del|cualquier|pais|"
+                            r"paises|parte|lugar|resto|otros)\s+){0,5}")
+_NEGADA = re.compile(r"\b(?:no|sin|tampoco|nunca|excepto|salvo)\b")
+
+
+@lru_cache(maxsize=1)
+def _lugares_de_apertura():
+    """Patrón con los nombres de países de todo el mundo, las subregiones y los alcances (LATAM, Europa, todo el mundo):
+    una lista que mezcla países cubiertos y de fuera («Colombia, Estados Unidos y México») se lee entera."""
+    d = datos()
+    nombres = {n for _, lista in d["nombres_pais"] for n in lista} | set(d["mundo"] + d["toda_latam"] + d["toda_europa"])
+    nombres |= {n for r in d["subregiones"] for n in r["nombres"]} | set(mundo()["por_nombre"])
+    return re.compile(r"(?:" + "|".join(re.escape(x) for x in sorted(nombres, key=len, reverse=True) if x) + r")\b")
+
+
+def _apertura_nombrada(desc):
+    """Los lugares que siguen a una frase de apertura en español (texto normalizado), o "". Solo la lista pegada a la
+    frase: «abierto a candidatos de colombia y peru» → «colombia y peru», sin lo que venga en la oración siguiente."""
+    lugar = _lugares_de_apertura()
+    for m in _APERTURA_ES.finditer(desc):
+        if _NEGADA.search(desc[max(0, m.start() - 35):m.start()]):
+            continue
+        fin = m.end()
+        while True:
+            # Primero el lugar tal cual («cualquier parte del mundo» es un alcance entero); si no, tras los conectores.
+            hallado = lugar.match(desc, fin) or lugar.match(desc, _ENTRE_LUGARES.match(desc, fin).end())
+            if not hallado:
+                break
+            fin = hallado.end()
+            fin += len(desc[fin:]) - len(desc[fin:].lstrip())
+        if fin > m.end():
+            return desc[m.end():fin].strip()
+    return ""
+
+
 def modalidad(titulo, ubicacion, descripcion="", remoto=None):
     t = normalizar.texto(f"{titulo} {ubicacion}")
     d = normalizar.texto(descripcion)[:30000]
@@ -358,6 +410,22 @@ def modalidad(titulo, ubicacion, descripcion="", remoto=None):
 CONFIANZAS = ("alta", "media", "baja")
 MODALIDADES = ("hibrido", "remoto", "presencial", "sin dato")  # explícitas antes que la presencial por defecto
 NOTA_INCIERTA = "confirmar países: fuentes con ubicación incierta"
+
+
+def lugar_del_portal(localizacion, pais, nombre_pais, remoto=False):
+    """Contrato v50: la ubicación de un aviso de un portal de un solo país: «Localidad, Provincia» más el país del
+    portal. En una remota, si la localidad se llama como un lugar de otro país («Palermo», «Florida», «Concepción del
+    Uruguay»), se quita: el aviso es del país de su portal y no debe abrir otro. En una presencial o híbrida la
+    localidad se conserva siempre: sin ciudad no le llega a nadie (v49), y ahí el país lo decide la ciudad del perfil
+    («Granada, España» se quedaba en «España» por la isla de Granada)."""
+    tramos = [t.strip() for t in localizacion.split(",") if t.strip()] if isinstance(localizacion, str) else []
+    if not remoto:
+        return ", ".join([*tramos, nombre_pais])
+    for desde in range(len(tramos) + 1):
+        lugar = ", ".join([*tramos[desde:], nombre_pais])
+        if set(alcance("", lugar).get("paises_mundo") or []) <= {pais}:
+            return lugar
+    return nombre_pais
 
 
 def ordenar(codigos):
@@ -958,6 +1026,19 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
         alcance_contratacion = []  # «work from anywhere in India»: solo nombra un país de fuera
     if alcance_contratacion is not None:  # None: nombra un lugar que no se reconoce; deciden las reglas de abajo
         return r(alcance_contratacion, "alta", "contratación remota explícita")
+    # Contrato v50: la letra pequeña en español que nombra desde dónde se puede postular SUMA esos países a los del
+    # aviso («Remoto, Chile» + «abierto a candidatos de Colombia y Perú» → Chile, Colombia y Perú). Solo cuando la
+    # ubicación nombra un país concreto: si ya es una región, LATAM o no dice país, deciden las reglas de abajo (una
+    # frase así nunca recorta lo que el aviso ya abría).
+    if nombrados and not (es_latam or es_mundo or es_europa or fuera or subregion(ambito)):
+        apertura = _apertura_nombrada(desc)
+        sumados = set(_paises_nombrados(apertura)) | set(subregion(apertura) or []) if apertura else set()
+        if apertura and _nombra(apertura, d["toda_latam"]):
+            sumados |= set(latam)
+        if apertura and _nombra(apertura, d["mundo"]):
+            sumados |= set(todos)
+        if sumados - set(nombrados):
+            return r(ordenar(list(sumados) + [c for c in nombrados if c in todos]), "alta", NOTA_APERTURA)
     if es_mundo or (_REMOTO.search(titulo_normalizado) and _nombra(titulo_normalizado,d["mundo"])
                     and not _MUNDO_ACOTADO.search(titulo_normalizado)):
         return r(todos, "alta", "")

@@ -17,7 +17,7 @@ from panel import contenido
 from panel.modelos import Configuracion
 from pydantic import ValidationError
 from panel.repositorio import RepositorioSupabase, hoy
-from panel.terminos import en_espanol, espanol_del_mapa, grado
+from panel.terminos import en_espanol, grado, hermanos_del_cargo
 
 
 def validar_version(version):
@@ -111,8 +111,9 @@ def paises_de_lugares(lugares):
 # Países con fuentes propias además de LinkedIn e Indeed (Computrabajo, Elempleo, Get on Board): fuera de ellos una
 # persona depende solo de LinkedIn e Indeed y recibe el doble de turnos (contrato v40).
 def _con_fuentes_propias():
-    from buscador.fuentes import computrabajo, sitemaps_empleo
-    return set(computrabajo.SITIOS) | {"ES"} | {c for s in sitemaps_empleo.SITIOS.values() for c in s["sitemaps"]}
+    from buscador.fuentes import computrabajo, jobint, sitemaps_empleo
+    return set(computrabajo.SITIOS) | set(jobint.SITIOS) | {"ES"} | {
+        c for s in sitemaps_empleo.SITIOS.values() for c in s["sitemaps"]}
 
 
 def fuentes_en(pais):
@@ -120,7 +121,7 @@ def fuentes_en(pais):
     vive en `pais`, con títulos en español si solo habla español. LinkedIn y los portales de empresas cubren todo el
     mundo; Get on Board aporta remotas abiertas a cualquier país (y a LATAM); Indeed, sus 62 países; las locales,
     donde existen. Sin IA: sale de las listas de cada fuente."""
-    from buscador.fuentes import computrabajo, elempleo, indeed, sitemaps_empleo
+    from buscador.fuentes import computrabajo, elempleo, indeed, infojobs, jobint, sitemaps_empleo, tecnoempleo
     salida = ["LinkedIn", "Portales de empresas", "Get on Board (remotas)"]
     if pais in indeed.PAISES:
         salida.append("Indeed")
@@ -128,6 +129,12 @@ def fuentes_en(pais):
         salida.append("Computrabajo")
     if pais in elempleo.PAISES:
         salida.append("Elempleo")
+    if pais in infojobs.PAISES:
+        salida.append("InfoJobs")
+    if pais in tecnoempleo.PAISES:
+        salida.append("Tecnoempleo")
+    if pais in jobint.SITIOS:
+        salida.append(jobint.SITIOS[pais][2])  # Bumeran, Laborum, Multitrabajos o Konzerta
     salida += [nombre for nombre, s in sitemaps_empleo.SITIOS.items() if pais in s["sitemaps"]]
     return salida
 
@@ -161,11 +168,12 @@ def persona_de_busqueda(p, rid, nombres=None, corto=False):
 
 
 def consultas_espanol(cargo, raw, maximo=12):
-    """Títulos en español que se buscan para quien solo acepta español: los del cargo y los títulos exactos en español
-    de su familia del mapa (`espanol_del_mapa`). Contrato v49: solo lo que después se reconoce al clasificar; antes se
-    buscaban también los «similares» del mapa, que `grado` no reconoce: esos turnos se gastaban y sus avisos se
-    descartaban por «sin familia» (v44: los similares del mapa solo se sugieren)."""
-    candidatos = [cargo.nombre, *raw["terminos_exactos"], *raw["terminos_similares"], *espanol_del_mapa(cargo.nombre)]
+    """Títulos en español que se buscan en los lugares de quien acepta avisos en español: los del cargo y sus nombres
+    hermanos (`terminos.hermanos_del_cargo`: títulos en español de su familia del mapa y, para un cargo compuesto, los
+    del glosario; contrato v50, se usan solos salvo los que el operador excluyó). Solo entra lo que después se
+    reconoce al clasificar (v49): `grado` reconoce los mismos nombres, así que estos turnos no se pierden."""
+    candidatos = [cargo.nombre, *raw["terminos_exactos"], *raw["terminos_similares"],
+                  *[x for x, _ in hermanos_del_cargo({**raw, "nombre": cargo.nombre})]]  # `raw` puede venir sin nombre
     vistos, salida = set(), []
     for t in candidatos:
         clave = normalizar.texto(t)
@@ -231,11 +239,13 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=N
                 primero.setdefault(rid, set()).update(lugares_perfil(p, nombres))
                 primero[rid].update(p.paises_oficina)
                 primero[rid].update(x for fila in p.filas if "remoto" in fila.modalidades for x in fila.paises)
-        # PR 1b: para quien solo acepta avisos en español, LinkedIn busca además los títulos en español en sus lugares.
-        solo_es = [p for p in perfiles if set(p.idiomas) == {"es"}]
-        consultas_es = consultas_espanol(c, raw) if solo_es else []
+        # PR 1b: se buscan además los títulos en español del cargo en los lugares de quien acepta avisos en español.
+        # Contrato v50: también para quien acepta español e inglés (antes solo para quien marcó solo español: 15 de
+        # 112 búsquedas de LinkedIn y 6 de 72 de Indeed eran en español). El peso doble sigue siendo de solo español.
+        acepta_es = [p for p in perfiles if "es" in p.idiomas]
+        consultas_es = consultas_espanol(c, raw) if acepta_es else []
         lugares_es = {}
-        for p in solo_es:
+        for p in acepta_es:
             lugares_es.update({k: v for k, v in lugares_perfil(p, nombres).items() if k != "REMOTO_MUNDO"})
         similares = raw["terminos_similares"]  # con los títulos aprobados desde «Coincide por funciones» (v25)
         mapa.append({"id": rid, "nombre": c.nombre, "consultas": [c.nombre, *raw["terminos_exactos"], *raw["terminos_similares"]],
@@ -243,13 +253,13 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=N
             # v25: «Coincide por funciones» (otro título) solo con la huella que escribió el operador; la heredada y
             # la automática (v49) van en `_control_cargo` y solo sirven para comprobar los títulos que sí coinciden.
             "funciones": c.funciones,
-            # Contrato v44: los títulos en español de la familia del mapa clasifican los avisos (como en `grado`), pero
-            # no se buscan: no van en `consultas`/`similares`, que rotan en todas las fuentes.
-            "similares_es": list(espanol_del_mapa(c.nombre)),
+            # Contrato v44/v50: los nombres hermanos en español clasifican los avisos (como en `grado`). No van en
+            # `consultas`/`similares`, que rotan en todas las fuentes: se buscan aparte, en `consultas_es`.
+            "similares_es": [x for x, _ in hermanos_del_cargo(raw)],
             "excluir": raw["terminos_excluidos"], "herramientas": [], "lugares": list(lugares.items()),
             "_control_cargo": raw,
             "consultas_es": consultas_es, "lugares_es": list(lugares_es.items()) if consultas_es else [],
-            # Contrato v44: países de quienes solo hablan español (Indeed y Computrabajo buscan ahí con títulos en español).
+            # Contrato v44/v50: países de quienes aceptan español (Indeed y Computrabajo buscan ahí con títulos en español).
             "paises_es": paises_de_lugares(lugares_es) if consultas_es else [],
             # Contrato v36: también el país donde vive quien acepta remoto (Indeed busca ahí; antes solo oficinas).
             "paises_objetivo": sorted({x for p in perfiles for x in p.paises_oficina} |
@@ -273,9 +283,13 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=N
     motor["lugares_primero"] = {k: sorted(v) for k, v in primero.items()}
     motor["personas_busqueda"] = personas
     motor["presupuestos"].update(linkedin_busquedas=min(300, max(24, len(roles) * 24)),
-        indeed_busquedas=min(72, max(6, len(roles) * 8)), getonbrd_busquedas=min(30, len(roles) * 4),
+        # Contrato v50: la búsqueda de cada noche repasa Indeed con varios nombres por combinación (`indeed_repaso` en
+        # datos/config.yaml): más búsquedas. La de quien falta (v47) no repasa y conserva las 72 de antes.
+        indeed_busquedas=min(72, max(6, len(roles) * 8)) if enfocar is not None else min(400, max(24, len(roles) * 40)),
+        getonbrd_busquedas=min(30, len(roles) * 4),
         computrabajo_busquedas=min(90, max(12, len(roles) * 12)),
         elempleo_busquedas=min(30, max(6, len(roles) * 3)),
+        jobint_busquedas=min(240, max(20, len(roles) * 24)),  # v50: Bumeran y portales hermanos
         apify_busquedas=0,  # contrato v11: Apify solo para perfiles bajo el mínimo (rescate dirigido)
         empresas_por_probar=20, remotos_paginas=24)
     if enfocar is not None:

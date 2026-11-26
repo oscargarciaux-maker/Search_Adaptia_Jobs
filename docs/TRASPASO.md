@@ -128,7 +128,7 @@ copia local antigua. Si aún no estaba activo, seguir [ACTIVAR_ESTADO_OPERATIVO.
 
 ## 6. Reconfigurar cuentas
 
-1. Crear claves del cliente y actualizar los secretos `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `APIFY_TOKEN` y los opcionales.
+1. Crear claves del cliente y actualizar los secretos `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `APIFY_TOKEN` y los opcionales (entre ellos `INFOJOBS_CLIENT_ID` e `INFOJOBS_CLIENT_SECRET`, si se usa la API de InfoJobs: `docs/ACTIVAR_INFOJOBS_API.md`).
    En modo automático, incluir `SUPABASE_DB_URL` del destino y `SUPABASE_BACKUP_KEY`. Conservar también, en su gestor,
    las claves de cifrado anteriores mientras se retengan copias; cambiar el secreto no vuelve legibles los cortes viejos.
 2. Confirmar las variables `CAPTURA_HORARIA_ACTIVA=true` y `PAGES_POR_ACTIONS` según el alojamiento.

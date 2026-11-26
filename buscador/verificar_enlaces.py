@@ -22,7 +22,8 @@ RECHAZOS = {"enlace roto", "vacante cerrada", "postulación con cobro", "destino
             "ciclo de redirecciones", "demasiadas redirecciones", "página general sin vacante", "destino no público"}
 _CERRADA = re.compile(r"no longer accepting applications|this (?:job|position) (?:is no longer available|has been filled)|"
     r"job (?:has expired|is no longer available)|ya no (?:acepta|se aceptan) (?:solicitudes|postulaciones)|"
-    r"(?:esta )?(?:vacante|oferta) (?:ha sido cerrada|ya no está disponible)|vaga (?:encerrada|não está mais disponível)", re.I)
+    r"(?:esta )?(?:vacante|oferta) (?:ha sido cerrada|ya no está disponible|ha caducado|ha finalizado)|"
+    r"oferta (?:caducada|finalizada)|vaga (?:encerrada|não está mais disponível)", re.I)
 _COBRO = re.compile(r"(?:pay|payment|purchase|subscribe|subscription required).{0,70}(?:to apply|to submit (?:your |an )?application)|"
     r"(?:paga|pagar|pago obligatorio|suscr[ií]bete|suscripci[oó]n obligatoria).{0,70}(?:para (?:aplicar|postular|acceder a la oferta))|"
     r"(?:pague|pagamento obrigat[oó]rio).{0,60}para (?:se candidatar|candidatar)|"
@@ -43,7 +44,9 @@ _LINKEDIN_AVISO = re.compile(r"^https?://(?:[a-z]{2,3}\.)?(?:www\.)?linkedin\.co
 LINKEDIN_FICHA = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/"
 _CERRADA_LINKEDIN = re.compile(r"closed-job|Ya no se aceptan solicitudes", re.I)
 # Indeed responde 401 a cualquier comprobación: no se le pregunta; su vacante vale si el enlace directo está comprobado.
-SIN_COMPROBACION_DIRECTA = ("indeed.com",)
+# Sitios cuya ficha no se puede abrir (Indeed responde 401; InfoJobs pide captcha): un aviso suyo cuenta como abierto
+# solo el día que su propia búsqueda lo muestra (v41 para Indeed; v50, decisión de Oscar del 26 nov, para InfoJobs).
+SIN_COMPROBACION_DIRECTA = ("indeed.com", "infojobs.net")
 PAUSA_LINKEDIN = 1.5  # segundos entre comprobaciones de LinkedIn
 BLOQUEOS_LINKEDIN = 3  # tras tantos 429 seguidos, LinkedIn descansa el resto de la ronda
 
@@ -68,11 +71,20 @@ def ficha_linkedin(html, titulo):
     return "verificada", "ficha de LinkedIn abierta"
 
 
-def sin_comprobacion_directa(url):
-    """Dominio de Indeed o un subdominio suyo («co.indeed.com»); nunca un dominio que solo lo contiene o termina igual
-    («notindeed.com», «indeed.com.otro.net»)."""
+def de_dominio(url, dominio):
+    """El enlace es de ese dominio o de un subdominio suyo («co.indeed.com»); nunca de uno que solo lo contiene o
+    termina igual («notindeed.com», «indeed.com.otro.net»)."""
     h = enlaces.host(url)
-    return any(h == d or h.endswith("." + d) for d in SIN_COMPROBACION_DIRECTA)
+    return h == dominio or h.endswith("." + dominio)
+
+
+def sin_comprobacion_directa(url):
+    """Un sitio de `SIN_COMPROBACION_DIRECTA`: su ficha nunca se pide. Con la clave de la API oficial de InfoJobs
+    (contrato v50), sus avisos sí se comprueban: por la ficha de esa API, no por su página."""
+    if de_dominio(url, "infojobs.net"):
+        from buscador.fuentes import infojobs
+        return not (infojobs.credenciales() and infojobs.aviso_de(url))
+    return any(de_dominio(url, d) for d in SIN_COMPROBACION_DIRECTA)
 
 
 def vistas_en_portales(enlaces_vistos, ahora=None):
@@ -213,6 +225,16 @@ def comprobar(url, titulo, *, sesion=None, validar_url=publica, ahora=None, plaz
                 "comprobada_en": ahora.isoformat(timespec="seconds").replace("+00:00", "Z"),
                 "http": codigo, "saltos": max(0, len(ruta) - 1), "ruta": ruta}
     try:
+        if sin_comprobacion_directa(url):
+            # Indeed responde 401 e InfoJobs pide captcha: su ficha no se pide desde ningún camino (v41, v50).
+            return resultado("pendiente", "sin comprobación directa")
+        if de_dominio(url, "infojobs.net"):
+            # Con la clave de su API oficial: la ficha de la API dice si el aviso sigue activo (nunca su página).
+            from buscador.fuentes import infojobs
+            ruta.append(url)
+            timeout = min(12, max(0.1, plazo - time.monotonic())) if plazo else 12
+            estado, motivo, codigo = infojobs.estado_del_aviso(sesion, url, titulo, _coincide, timeout)
+            return resultado(estado, motivo)
         if aviso_linkedin(url):
             ruta.append(url)
             timeout = min(12, max(0.1, plazo - time.monotonic())) if plazo else 12
@@ -223,6 +245,14 @@ def comprobar(url, titulo, *, sesion=None, validar_url=publica, ahora=None, plaz
             if codigo != 200:
                 return resultado("pendiente", "acceso bloqueado o fallo temporal")
             return resultado(*ficha_linkedin(r.text, titulo))
+        from buscador.fuentes import jobint
+        if jobint.aviso_de(url):
+            # Contrato v50: Bumeran y sus portales hermanos arman la página en el navegador; el aviso se comprueba con
+            # la ficha de la API pública del mismo portal (activo y con el mismo título).
+            ruta.append(url)
+            timeout = min(12, max(0.1, plazo - time.monotonic())) if plazo else 12
+            estado, motivo, codigo = jobint.estado_del_aviso(sesion, url, titulo, _coincide, timeout, NAVEGADOR)
+            return resultado(estado, motivo)
         while True:
             if plazo and time.monotonic() >= plazo:
                 return resultado("pendiente", "presupuesto de comprobación agotado")
@@ -315,21 +345,27 @@ def anotar(v, cache, ahora=None):
 
 
 def auditar(vacantes, cache, *, maximo=240, segundos=240, hilos=6, comprobar_url=None, ahora=None,
-            vigencia=VIGENCIA_SELECCION):
+            vigencia=VIGENCIA_SELECCION, linkedin_aparte=False):
+    """Comprueba hasta `maximo` vacantes y devuelve cuántas escogió. `linkedin_aparte` (contrato v50, la cola por
+    persona): `maximo` cuenta solo los sitios que se comprueban en paralelo, y LinkedIn, que va de una en una, se
+    limita solo por su tiempo; se devuelven las dos sumadas. Antes compartían el máximo y los avisos de Computrabajo,
+    Elempleo o Get on Board (casi todo en español) perdían el turno frente a los de LinkedIn."""
     ahora = ahora or datetime.now(timezone.utc)
     comprobar_url = comprobar_url or comprobar
     plazo = time.monotonic() + segundos
     escogidas, peticiones = [], {}
     # Contrato v41: LinkedIn va de una en una con pausa; no se le asignan más enlaces de los que alcanza en el tiempo, y
     # el resto del cupo queda para los demás sitios (antes Computrabajo y Get on Board casi nunca tenían turno).
-    cupo_linkedin, de_linkedin = int(segundos / max(PAUSA_LINKEDIN, 0.5)) + 1, 0
+    cupo_linkedin, de_linkedin, de_otros = int(segundos / max(PAUSA_LINKEDIN, 0.5)) + 1, 0, 0
     for v in vacantes:
         pendientes = [u for u in urls(v) if not vigente(cache.get(u, {}), v["titulo"], ahora, vigencia)
                       and not sin_comprobacion_directa(u)]
         es_linkedin = bool(pendientes) and all(aviso_linkedin(u) for u in pendientes)
-        if pendientes and len(escogidas) < maximo and not (es_linkedin and de_linkedin >= cupo_linkedin):
+        usadas = de_otros if linkedin_aparte and not es_linkedin else 0 if linkedin_aparte else de_otros + de_linkedin
+        if pendientes and usadas < maximo and not (es_linkedin and de_linkedin >= cupo_linkedin):
             escogidas.append(v)
             de_linkedin += es_linkedin
+            de_otros += not es_linkedin
             for u in pendientes:
                 peticiones.setdefault((u, v["titulo"]), None)
     # Contrato v39: LinkedIn de una en una y con pausa; tras varios bloqueos seguidos deja el tiempo a los demás sitios.
@@ -453,13 +489,16 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
                                segundos=max(0, plazo - time.monotonic()), vigencia=VIGENCIA_COMPARTIR)
     revisadas = set()
     por_necesidad = 0
-    try:  # contrato v49: primero las candidatas de cada persona; como mucho la mitad del presupuesto que queda
+    # Contrato v49: primero las candidatas de cada persona, con la mitad del presupuesto que queda. Contrato v50: esa
+    # mitad es para los sitios en paralelo; las de LinkedIn van aparte, hasta donde alcance su parte del tiempo.
+    try:
         necesidad = cola_por_necesidad(vacantes, hoy)
         if necesidad and revisadas_n < maximo:
             parte = 3 if incremental else 2
-            por_necesidad = auditar(necesidad, cache, maximo=max(1, (maximo - revisadas_n) // parte),
-                                    segundos=max(0, plazo - time.monotonic()) / parte)
-            revisadas_n += por_necesidad
+            cupo = max(1, (maximo - revisadas_n) // parte)
+            por_necesidad = auditar(necesidad, cache, maximo=cupo, segundos=max(0, plazo - time.monotonic()) / parte,
+                                    linkedin_aparte=True)
+            revisadas_n += min(por_necesidad, cupo)  # las de LinkedIn, que van aparte, no le quitan cupo al lote
     except Exception as e:  # noqa: BLE001 — sin esta cola, la comprobación sigue con la del lote, como antes
         from buscador import registro
         registro.aviso("verificar_enlaces:necesidad", e)

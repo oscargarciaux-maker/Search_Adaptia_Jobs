@@ -72,10 +72,21 @@ presupuestos:
   computrabajo_relectura: 200  # v49: avisos de Computrabajo ya guardados sin descripción que se releen tras la búsqueda
   elempleo_busquedas: 20       # búsquedas en Elempleo (Colombia; se postula en el mismo portal; PR 1b)
   elempleo_fichas: 80          # fichas de Elempleo que se leen (fecha, salario y modalidad estructurados)
+  infojobs_busquedas: 5        # v50: páginas de búsqueda de InfoJobs (España) por corrida; a la sexta pide captcha y la fuente se detiene
+  infojobs_api_busquedas: 40   # v50: con la clave de la API oficial de InfoJobs (docs/ACTIVAR_INFOJOBS_API.md): búsquedas por corrida
+  infojobs_api_fichas: 150     # v50: fichas de la API que se leen (solo de títulos de un cargo buscado)
+  tecnoempleo_busquedas: 20    # v50: búsquedas en Tecnoempleo (España, tecnología; se postula en el mismo portal)
+  tecnoempleo_fichas: 80       # v50: fichas de Tecnoempleo que se leen (solo de títulos de un cargo buscado)
+  jobint_busquedas: 120        # v50: búsquedas en Bumeran (AR, MX, PE, VE), Laborum (CL), Multitrabajos (EC) y Konzerta (PA)
   hireline_fichas: 60          # v44: fichas de Hireline (México y Colombia, tecnología; sitemap + JobPosting)
   magneto_fichas: 60           # v44: fichas de Magneto (Colombia; sitemap + JobPosting)
   pausa_linkedin: [1.0, 2.5]   # segundos entre peticiones a LinkedIn
   indeed_busquedas: 90
+  # Contrato v50: en la búsqueda de cada noche del panel, Indeed repasa los 30 días completos de cada cargo y país
+  # (así sus avisos vuelven a «verse hoy» y cuentan como comprobados). Nombres del cargo por combinación (los de
+  # español aparte), resultados por búsqueda y tope de tiempo. No aplica a la captura horaria, al refuerzo ni a «Buscar
+  # ahora» para quien falta.
+  indeed_repaso: {nombres: 4, nombres_es: 8, resultados: 100, minutos: 10}
   apify_busquedas: 60          # solo con APIFY_TOKEN
   remotos_paginas: 250         # páginas de tableros remotos que se abren para encontrar el original
   empresas_por_probar: 80      # empresas nuevas que se prueban en los sistemas de postulación

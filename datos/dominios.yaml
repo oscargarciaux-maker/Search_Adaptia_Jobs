@@ -86,6 +86,7 @@ portales:
   - catho.com.br
   - infojobs.com.br
   - infojobs.net
+  - tecnoempleo.com  # v50 (decisión de Oscar, 26 nov): se postula en el propio portal, con cuenta; antes figuraba como agregador
   - vagas.com.br
   - trabajando.com
   - tecoloco.com
@@ -149,7 +150,6 @@ agregadores:
   - jobs.techstars.com
   - uiuxjobsboard.com
   - hirefinity.p3d.66ghz.com
-  - tecnoempleo.com
   - ziprecruiter.com
   - monster.com
   - careerbuilder.com

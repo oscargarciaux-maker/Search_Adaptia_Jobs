@@ -1717,7 +1717,7 @@ test("18 nov: «Buscar ahora» lanza la búsqueda desde el Resumen y se bloquea 
   expect(errores).toEqual([]);
 });
 
-test("contrato v44: nombres en español compuestos y el oficio base para «AI Product Manager»", async ({
+test("contrato v50: los nombres en español de «AI Product Manager» se usan solos y se pueden dejar de usar", async ({
   page,
 }) => {
   await page.goto("/");
@@ -1728,17 +1728,27 @@ test("contrato v44: nombres en español compuestos y el oficio base para «AI Pr
   await dialog
     .getByRole("button", { name: "Buscar denominaciones afines" })
     .click();
-  const espanol = dialog.getByRole("group", { name: "Nombres en español" });
+  // Antes (v44) había que añadirlos uno a uno; ahora se buscan y se reconocen sin añadirlos.
+  const solos = dialog.getByRole("group", {
+    name: "Nombres en español que se usan solos",
+  });
+  const hermano = solos.getByRole("button", {
+    name: "No usar Gerente de Producto de IA",
+  });
+  await expect(hermano).toBeVisible();
   await expect(
-    espanol.getByRole("button", { name: "Añadir Gerente de Producto de IA" }),
-  ).toBeVisible();
+    dialog.getByRole("group", { name: "Nombres en español", exact: true }),
+  ).toContainText("ya se usan solos");
+  // El oficio más amplio sigue siendo una sugerencia que se añade a mano.
   const amplios = dialog.getByRole("group", { name: "Nombres más amplios" });
   await expect(
     amplios.getByRole("button", { name: "Añadir Gerente de Producto" }),
   ).toBeVisible();
-  await espanol
-    .getByRole("button", { name: "Añadir Gerente de Producto de IA" })
-    .click();
+  // «No usar» lo pasa a los términos excluidos y deja de mostrarse como usado.
+  await hermano.click();
+  await expect(hermano).toHaveCount(0);
+  await expect(page.getByText("ya no se usa")).toBeVisible();
+  await dialog.getByRole("button", { name: /Opciones avanzadas/ }).click();
   await expect(
     dialog.getByRole("button", { name: "Quitar Gerente de Producto de IA" }),
   ).toBeVisible();
@@ -1754,7 +1764,7 @@ test("18 nov: al editar un cargo los grupos en español aparecen solos y el cont
   await page.getByRole("button", { name: "Editar QA", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(
-    dialog.getByRole("group", { name: "Nombres en español" }),
+    dialog.getByRole("group", { name: "Nombres en español", exact: true }),
   ).toBeVisible();
   // Lo escrito y las fichas de nombres en blanco (modo oscuro); el texto de ejemplo, gris.
   const ficha = dialog.locator(".term").first();

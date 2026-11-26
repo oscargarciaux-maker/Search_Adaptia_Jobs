@@ -7,6 +7,7 @@ import {
   Plus,
   Sparkles,
   Workflow,
+  X,
 } from "lucide-react";
 import { api } from "../api";
 import { Ayuda, Plegable, Dialog, TagInput } from "../comunes";
@@ -19,6 +20,8 @@ type Sugerencias = {
   terminos_similares: string[];
   terminos_cercanos?: string[];
   terminos_es?: string[];
+  // Contrato v50: nombres en español que el cargo usa solos, sin añadirlos (los del mapa y los del glosario).
+  hermanos_es?: string[];
   terminos_base?: string[];
   fuentes: string[];
   requiere_revision: boolean;
@@ -57,6 +60,8 @@ export function CargoDialog({
   // Contrato v44: nombres en español (del mapa o armados con el glosario) y el oficio base más amplio, aparte.
   const [enEspanol, setEnEspanol] = useState<string[]>([]);
   const [amplios, setAmplios] = useState<string[]>([]);
+  // Contrato v50: nombres en español que se buscan y se reconocen solos; «No usar» los pasa a «Excluir».
+  const [solos, setSolos] = useState<string[]>([]);
   // 18 nov (Oscar seguía sin ver los grupos): se muestran siempre que hay sugerencias pedidas, y si un grupo queda
   // vacío dice por qué (ya los tiene / no hay uno más amplio). Si la carga falla, se dice y se puede reintentar.
   const [estadoSug, setEstadoSug] = useState<
@@ -75,13 +80,32 @@ export function CargoDialog({
     setEnEspanol((s) => s.filter((x) => !terminos.includes(x)));
     setAmplios((s) => s.filter((x) => !terminos.includes(x)));
   }
+  // La lista de excluidos está en «Opciones avanzadas», que puede estar plegada: se dice dónde quedó el nombre.
+  const [dejado, setDejado] = useState("");
+  function noUsar(termino: string) {
+    setC((v) => ({
+      ...v,
+      terminos_excluidos: Array.from(
+        new Set([...v.terminos_excluidos, termino]),
+      ),
+    }));
+    // Qué nombres usa el cargo lo decide el servidor (`hermanos_es`); aquí solo se quita la ficha, como al añadir.
+    setSolos((v) => v.filter((x) => x !== termino));
+    setDejado(termino);
+  }
   const [nota, setNota] = useState("");
   // Cada pedido lleva un número: solo se muestra la respuesta del último (la carga al abrir no pisa a la completa).
   const ultimoPedido = useRef(0);
   function pedirSugerencias(rapido: boolean) {
     return api<Sugerencias>("/cargos/expandir", {
       method: "POST",
-      body: JSON.stringify({ cargo: c.nombre, rapido }),
+      body: JSON.stringify({
+        cargo: c.nombre,
+        rapido,
+        terminos_exactos: c.terminos_exactos,
+        terminos_similares: c.terminos_similares,
+        terminos_excluidos: c.terminos_excluidos,
+      }),
     });
   }
   // Sesión de prueba (17 nov): los nombres principales entran solos; los afines quedan como fichas para añadir con un
@@ -92,8 +116,11 @@ export function CargoDialog({
         (x) => x.toLowerCase(),
       ),
     );
+    // El servidor ya quitó de `hermanos_es` lo excluido y lo que el cargo tiene, y de `terminos_es` lo que se usa solo.
+    const hermanos = r.hermanos_es || [];
+    setSolos(hermanos);
     const es = (r.terminos_es || []).filter((x) => !ya.has(x.toLowerCase()));
-    const enEs = new Set(es.map((x) => x.toLowerCase()));
+    const enEs = new Set([...es, ...hermanos].map((x) => x.toLowerCase()));
     setEnEspanol(es);
     setSugeridos(
       r.terminos_similares.filter(
@@ -102,7 +129,10 @@ export function CargoDialog({
     );
     const base = r.terminos_base || [];
     setAmplios(base.filter((x) => !ya.has(x.toLowerCase())));
-    setConocidos({ es: (r.terminos_es || []).length, base: base.length });
+    setConocidos({
+      es: (r.terminos_es || []).length + hermanos.length,
+      base: base.length,
+    });
     setEstadoSug("listo");
   }
   // «Buscar denominaciones afines»: añade los nombres principales y muestra las fichas.
@@ -284,7 +314,9 @@ export function CargoDialog({
                   "Nombres en español",
                   enEspanol,
                   conocidos.es
-                    ? `Ya tiene los ${conocidos.es} nombres en español que conocemos.`
+                    ? solos.length
+                      ? "Los nombres en español que conocemos ya se usan solos (abajo)."
+                      : `Ya tiene los ${conocidos.es} nombres en español que conocemos.`
                     : "No conocemos nombres en español para este cargo: escríbelos abajo en «Nombres del cargo».",
                 ],
                 [
@@ -344,6 +376,43 @@ export function CargoDialog({
                 )}
               </div>
             ))}
+          {dejado && (
+            <p className="helper note" role="status">
+              «{dejado}» ya no se usa. Quedó en «Excluir estos términos»
+              (Opciones avanzadas).
+            </p>
+          )}
+          {estadoSug === "listo" && solos.length > 0 && (
+            <div
+              className="sugeridos-grupo"
+              role="group"
+              aria-label="Nombres en español que se usan solos"
+            >
+              <div className="sugeridos-cabeza">
+                <span className="sugeridos-titulo">
+                  En español, se usan solos · toca para dejar de usar
+                </span>
+              </div>
+              <div className="sugeridos">
+                {solos.map((t) => (
+                  <button
+                    type="button"
+                    className="chip-sugerido"
+                    key={t}
+                    aria-label={"No usar " + t}
+                    onClick={() => noUsar(t)}
+                  >
+                    <X size={12} />
+                    {t}
+                  </button>
+                ))}
+              </div>
+              <p className="sugeridos-vacio">
+                Se buscan y se reconocen sin añadirlos. Si las funciones del
+                aviso no acompañan, la vacante va al final o a «Por confirmar».
+              </p>
+            </div>
+          )}
           {/* Paso 7 (reunión 14 nov): una sola lista visible. Por dentro se conserva la diferencia: lo que ya era
               principal sigue siéndolo y lo nuevo entra como afín. */}
           <div className="cargo-nombres">

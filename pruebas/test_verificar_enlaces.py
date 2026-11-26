@@ -69,6 +69,8 @@ def test_200_exige_vacante_no_pagina_generica():
 @pytest.mark.parametrize("texto,motivo", [
     ("This job is no longer available.", "vacante cerrada"),
     ("Esta vacante ha sido cerrada.", "vacante cerrada"),
+    ("Esta oferta ha caducado.", "vacante cerrada"),
+    ("Oferta finalizada", "vacante cerrada"),
     ("Pay USD 10 to apply.", "postulación con cobro"),
     ("Suscríbete para acceder a la oferta.", "postulación con cobro"),
     ("Pague para se candidatar.", "postulación con cobro")])

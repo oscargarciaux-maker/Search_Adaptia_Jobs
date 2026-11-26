@@ -431,19 +431,26 @@ familias:
   exactos: [qa analyst, analista qa, qa engineer, ingeniero qa, qa tester, tester, software tester, qa automation,
             qa automation engineer, automatizador de pruebas, analista de pruebas, test analyst, test engineer,
             quality assurance analyst, quality assurance engineer, analista de calidad de software, qa, sdet,
-            analista de testing, testing analyst]
+            analista de testing, testing analyst,
+            # v50 (26 nov): nombres en español vistos en Indeed y no reconocidos
+            ingeniero de pruebas, analista tester, tester qa, tester funcional, probador de software,
+            analista de automatización de pruebas, ingeniero de automatización de pruebas,
+            analista de pruebas de software, ingeniero de pruebas de software, ingeniero de calidad de software,
+            analista de aseguramiento de calidad, aseguramiento de calidad de software]
   similares: [qa manual, manual tester, tester manual, performance tester, pruebas de rendimiento, qa lead, test lead,
               mobile tester, game tester, probador de videojuegos, accessibility tester, uat tester,
               software quality engineer, qa specialist, especialista qa, qa manager, head of qa, qa team lead,
               lead qa engineer, quality assurance lead, quality assurance manager, test manager, qa coordinator,
-              lider de qa, lider qa, jefe de qa, coordinador de qa, gerente de qa]
-  cercanos: [test automation developer, software developer in test, ingeniero de automatización de pruebas]
+              lider de qa, lider qa, jefe de qa, coordinador de qa, gerente de qa,
+              líder de pruebas, arquitecto de pruebas, analista de pruebas de rendimiento]
+  cercanos: [test automation developer, software developer in test]
   herramientas: [selenium, cypress, playwright, appium, jmeter, postman, jira, testrail, cucumber, gherkin,
                  pruebas automatizadas, test cases, casos de prueba]
   genericos: [qa, tester, testing, pruebas, quality]
   excluir: [quality assurance alimentos, food quality, calidad de alimentos, inspector de calidad, quality inspector,
             control de calidad planta, manufacturing quality, qa customer success manager,
-            quality assurance customer service, quality analyst call center]
+            quality assurance customer service, quality analyst call center, pruebas no destructivas, qa/qc,
+            pruebas microbiológicas, pruebas de laboratorio, pruebas eléctricas, calidad alimentos]
 
 # ───────────── Datos e IA ─────────────
 - id: analista-datos
@@ -626,9 +633,13 @@ familias:
   consultas: [product manager, gerente de producto, product lead, technical product manager]
   exactos: [product manager, gerente de producto, product management, gestor de producto, technical product manager,
             digital product manager, product lead, head of product, gerente de producto digital, gerente de produto,
-            group product manager, associate product manager, apm]
+            group product manager, associate product manager, apm,
+            # v50 (26 nov): nombres en español vistos en Indeed de CO, MX, ES, AR, CL y PE y no reconocidos
+            jefe de producto, líder de producto, responsable de producto, manager de producto,
+            jefe de producto digital, líder de producto digital]
   similares: [product specialist, especialista de producto, product strategist, growth product manager,
-              product operations, product ops, product marketing manager, cpo, chief product officer, director de producto]
+              product operations, product ops, product marketing manager, cpo, chief product officer, director de producto,
+              coordinador de producto, coordinador de producto digital]
   cercanos: [product owner, product designer, business analyst, project manager, product analyst]
   herramientas: [roadmap, discovery, okrs, product discovery, priorización, backlog, jira, amplitude, mixpanel]
   genericos: [product, producto, produto]
@@ -639,7 +650,8 @@ familias:
   nombre: Product Owner
   area: Producto y proyectos
   consultas: [product owner, dueño de producto]
-  exactos: [product owner, dueño de producto, po, product owner técnico, technical product owner, digital product owner]
+  exactos: [product owner, dueño de producto, po, product owner técnico, technical product owner, digital product owner,
+            dueño del producto, propietario de producto, propietario del producto]  # v50
   similares: [proxy product owner, business owner, analista de producto, product analyst, product specialist]
   cercanos: [product manager, scrum master, business analyst, analista funcional, product designer, project manager]
   herramientas: [backlog, historias de usuario, user stories, scrum, jira, criterios de aceptación, refinamiento]
@@ -778,7 +790,11 @@ familias:
   exactos: [performance marketing, performance marketer, performance marketing specialist, paid media specialist,
             especialista en pauta digital, paid media manager, trafficker digital, trafficker, media buyer,
             comprador de medios, growth marketer, growth marketing, growth hacker, growth manager,
-            especialista en growth, acquisition manager, user acquisition manager]
+            especialista en growth, acquisition manager, user acquisition manager,
+            # v50 (26 nov): nombres en español vistos en Indeed y no reconocidos
+            especialista en paid media, analista de paid media, analista de growth,
+            especialista en marketing de performance, líder de growth,
+            especialista en publicidad digital, analista de medios digitales]
   similares: [ppc specialist, sem specialist, google ads specialist, meta ads specialist, facebook ads specialist,
               especialista en meta ads, programmatic specialist, especialista programática, cro specialist,
               conversion rate optimization, retention marketing, lifecycle marketing, analista de pauta]

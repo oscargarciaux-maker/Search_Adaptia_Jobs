@@ -1463,7 +1463,7 @@ def test_pr1b_perfil_solo_espanol_busca_titulos_en_espanol_en_sus_lugares(cfg):
     assert "diseñador ux/ui" in f["consultas_es"]
     assert f["lugares_es"] and all(k != "REMOTO_MUNDO" for k, _ in f["lugares_es"])
     combos = linkedin_publico.combinaciones(mapa, [])
-    espanol = [c for c in combos if c[2].endswith(":ES")]
+    espanol = [c for c in combos if c[2].endswith(":ES") and c[0] == f["id"]]
     assert espanol and all(c[1] == f["consultas_es"] for c in espanol)
     # v44: en Computrabajo el español tiene su propio turno en los países de quien solo habla español.
     ct = [c for c in computrabajo.combinaciones(mapa, {}) if c[0] == f["id"]]
@@ -1471,12 +1471,18 @@ def test_pr1b_perfil_solo_espanol_busca_titulos_en_espanol_en_sus_lugares(cfg):
     assert motor["dias_maximos"] == afinidad.ANTIGUEDAD_SISTEMA  # v27: la antigüedad del perfil solo ordena
 
 
-def test_pr1b_sin_perfiles_solo_espanol_no_cambia_la_busqueda(cfg):
+def test_v50_quien_acepta_espanol_e_ingles_tambien_busca_en_espanol_y_quien_solo_ingles_no(cfg):
+    from buscador.fuentes import linkedin_publico
     for p in cfg["perfiles"]:
         p["idiomas"] = ["es", "en"]
     mapa, _, _ = ejecutor.preparar({"configuracion": cfg}, hoy())
+    con_espanol = [f for f in mapa if f["consultas_es"]]
+    assert con_espanol and all(f["lugares_es"] and f["paises_es"] for f in con_espanol)  # antes: solo «solo español»
+    assert [c for c in linkedin_publico.combinaciones(mapa, []) if c[2].endswith(":ES")]
+    for p in cfg["perfiles"]:
+        p["idiomas"] = ["en"]
+    mapa, _, _ = ejecutor.preparar({"configuracion": cfg}, hoy())
     assert all(not f["consultas_es"] and not f["lugares_es"] for f in mapa)
-    from buscador.fuentes import linkedin_publico
     assert not [c for c in linkedin_publico.combinaciones(mapa, []) if c[2].endswith(":ES")]
 
 

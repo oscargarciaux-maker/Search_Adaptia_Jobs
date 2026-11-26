@@ -51,16 +51,28 @@ def buscar(cliente, mapa, estado, presupuesto, hoy=None, max_fichas=80, reloj=ti
     estadísticas)."""
     hoy = hoy or datetime.now(timezone.utc).date().isoformat()
     inicio = reloj()
-    # Portal en español: con títulos en español del cargo (perfiles solo en español) se rota solo entre ellos.
-    todas = [(f["id"], f.get("consultas_es") or cobertura.consultas(f), "CO", {}) for f in mapa
-             if not f.get("paises_objetivo") or PAISES & set(f["paises_objetivo"])]
+    # Contrato v50: los títulos en español del cargo tienen su propio turno («CO:ES») y los demás nombres el suyo
+    # («Product Owner» también titula avisos en español). Antes, si había títulos en español, solo se buscaba con esos.
+    todas = []
+    for f in mapa:
+        if f.get("paises_objetivo") and not PAISES & set(f["paises_objetivo"]):
+            continue
+        es = list(f.get("consultas_es") or [])
+        resto = [c for c in cobertura.consultas(f) if c not in es]
+        # El turno en español, si alguien de Colombia acepta avisos en español (o en modo heredado, sin `paises_es`).
+        if es and ("paises_es" not in f or PAISES & set(f["paises_es"])):
+            todas.append((f["id"], es, "CO:ES", {}))
+        elif es and not resto:
+            todas.append((f["id"], es, "CO", {}))
+        if resto:
+            todas.append((f["id"], resto, "CO", {}))
     todas = cobertura.repartir(todas, estado, hoy, prioritarias)
     avisos, vistos = [], set()
     hechas = fallidas = seguidas = 0
-    for familia, consultas, _, _ in todas:
+    for familia, consultas, lugar, _ in todas:
         if hechas >= presupuesto or seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
             break
-        b = cobertura.siguiente_busqueda(consultas, hoy, 1, f"{familia}@CO", estado, paginada=False)
+        b = cobertura.siguiente_busqueda(consultas, hoy, 1, f"{familia}@{lugar}", estado, paginada=False)
         if b is None:  # contrato v47: ya se buscaron hoy todos sus nombres (lee una sola página)
             continue
         consulta = b.terminos[0]
