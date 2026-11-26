@@ -130,8 +130,8 @@ vacantes también tarda unos segundos mientras lee el catálogo. Detalle técnic
 1. **Cargos y metas**: crear los cargos que quieres (revisar sus nombres) y fijar el techo del día (120 por defecto).
 2. **Clientes**: cada perfil tiene su meta diaria y sus filtros; las metas de los clientes reales deben caber en el techo. Mira la estimación
    «≈ N vacantes guardadas aún no entregadas» o **Estimar con búsqueda en vivo** y usa «Aplicar» si un filtro deja muy pocas.
-3. **Programar para mañana**. La versión rige desde el día siguiente en Colombia: la primera búsqueda que la usa es la de las 6:30 a. m.
-   del día siguiente.
+3. **Aplicar cambios**. La configuración rige desde la próxima búsqueda (contrato v49); desde el detalle de un cliente,
+   «Buscar ahora» la lanza para sus perfiles.
 4. Desde ese momento **los seis cargos fijos actuales dejan de usarse**: si quieres conservar alguno, créalo en el panel.
 5. Al día siguiente, en **Vacantes**, revisa lo que llegó para cada cliente; en **Actividad**, si faltó algo.
 

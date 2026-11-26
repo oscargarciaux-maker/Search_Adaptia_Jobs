@@ -213,11 +213,11 @@ def unir(a, b):
     grados = {}
     for f in a["familias"] + b["familias"]:
         actual = grados.get(f["familia"])
-        orden = familias.GRADOS + [familias.GRADO_FUNCIONES]  # contrato v25: «funciones» es el más débil
+        orden = familias.ORDEN_GRADOS  # contrato v25/v49: «funciones» y «otro_oficio» son los más débiles
         if actual is None or orden.index(f["coincidencia"]) < orden.index(actual):
             grados[f["familia"]] = f["coincidencia"]
     v["familias"] = sorted(({"familia": k, "coincidencia": g} for k, g in grados.items()),
-                           key=lambda x: (familias.GRADOS + [familias.GRADO_FUNCIONES]).index(x["coincidencia"]))
+                           key=lambda x: familias.ORDEN_GRADOS.index(x["coincidencia"]))
     for campo in ("ingles", "salario", "anos_min", "nivel", "idioma"):
         if not v.get(campo) and corta.get(campo):
             v[campo] = corta[campo]

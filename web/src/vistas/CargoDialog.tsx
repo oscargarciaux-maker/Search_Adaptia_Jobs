@@ -32,7 +32,9 @@ export function CargoDialog({
 }: {
   cargo: Cargo | null;
   onClose: () => void;
-  onSave: (c: Cargo) => void;
+  // Contrato v49: puede devolver una promesa (guardar y aplicar); mientras, el botón dice «Aplicando…». Con
+  // `false` no se guardó y el formulario sigue abierto.
+  onSave: (c: Cargo) => void | Promise<boolean>;
   notify: (s: string, error?: boolean) => void;
 }) {
   const [c, setC] = useState<Cargo>(
@@ -50,6 +52,7 @@ export function CargoDialog({
         },
   );
   const [busy, setBusy] = useState(false);
+  const [aplicando, setAplicando] = useState(false);
   const [sugeridos, setSugeridos] = useState<string[]>([]);
   // Contrato v44: nombres en español (del mapa o armados con el glosario) y el oficio base más amplio, aparte.
   const [enEspanol, setEnEspanol] = useState<string[]>([]);
@@ -191,7 +194,7 @@ export function CargoDialog({
         className="form-cargo"
         onSubmit={async (e) => {
           e.preventDefault();
-          if (c.nombre.trim().length < 2 || busy) return;
+          if (c.nombre.trim().length < 2 || busy || aplicando) return;
           if (
             !cargo &&
             !c.terminos_exactos.length &&
@@ -200,13 +203,21 @@ export function CargoDialog({
             await expandir();
             return;
           }
-          onSave({
+          const r = onSave({
             ...c,
             nombre: c.nombre.trim(),
             terminos_exactos: c.terminos_exactos.length
               ? c.terminos_exactos
               : [c.nombre.trim()],
           });
+          if (r instanceof Promise) {
+            setAplicando(true);
+            try {
+              await r;
+            } finally {
+              setAplicando(false);
+            }
+          }
         }}
       >
         <fieldset disabled={busy}>
@@ -419,9 +430,17 @@ export function CargoDialog({
           <button type="button" className="button secondary" onClick={onClose}>
             Cancelar
           </button>
-          <button disabled={busy} className="button primary">
-            {cargo ? "Aplicar cambios" : "Añadir cargo"}
-            <Check size={15} />
+          <button disabled={busy || aplicando} className="button primary">
+            {aplicando
+              ? "Aplicando…"
+              : cargo
+                ? "Aplicar cambios"
+                : "Añadir cargo"}
+            {aplicando ? (
+              <Loader2 size={15} className="spin" />
+            ) : (
+              <Check size={15} />
+            )}
           </button>
         </div>
       </form>

@@ -1,6 +1,7 @@
 """Vistas y texto para copiar; nunca se envía WhatsApp."""
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+import json
 import logging
 import re
 import threading
@@ -20,6 +21,8 @@ SUGERENCIAS = {
     "publicación fuera del plazo": "Ampliar la antigüedad de publicación",
     "oficina en otro país": "Añadir una ubicación donde trabajaría",
     "oficina en otra ciudad": "Añadir la ciudad a sus ubicaciones",
+    # Contrato v49 (decisión de Oscar): sin ciudad no llegan presenciales ni híbridas.
+    "falta la ciudad en el perfil": "Escribir la ciudad donde trabajaría (sin ciudad no llegan presenciales ni híbridas)",
     "no admite postular desde su país": "Añadir un país donde puede trabajar en remoto",
     "modalidad diferente": "Aceptar otra modalidad",
     "idioma del aviso diferente": "Aceptar avisos en español e inglés",
@@ -237,9 +240,23 @@ def _estimar_en_vivo(repo, p, c, perfil_id, fecha, fuentes, reloj):
             "fuentes": por_fuente, "segundos": round(reloj() - inicio, 1), "nota": NOTA_EN_VIVO}
 
 
+ORDEN_GRADO = {"exact": 0, "similar": 1, "close": 2}
+
+
+def calidad(ficha):
+    """Contrato v49: orden de la lista de un cliente y del mensaje de WhatsApp. Primero las vacantes formales, sin
+    ampliación, con mejor coincidencia del cargo y que encajan en todo (cada etiqueta de lo que no cumple pesa como un
+    grado menos, también «Funciones por confirmar»); a igualdad, la más reciente."""
+    return (ficha.get("tipo") == "post", bool(ficha.get("ampliacion")),
+            ORDEN_GRADO.get(ficha.get("match_grade"), 1) + len(ficha.get("avisos") or ()),
+            -int((ficha.get("publicada") or "0000-00-00").replace("-", "")[:8] or 0))
+
+
 def resultados(repo, cliente_id=None, fecha=None):
+    from panel import contenido
     r = repo.resultados(cliente_id, fecha)
     salida, vistas = [], {}
+    operativos = {}  # el cargo de cada asignación, rellenado una sola vez (contrato v49)
     # Una búsqueda de un día anterior ya se entregó: sus enlaces dejan de recomprobarse y caducan a las 6 h (contrato
     # v9). Sus vacantes compatibles se muestran «Entregada el …», no «por confirmar» (13 nov).
     dia = ((r.get("ejecucion") or {}).get("fecha") or "")[:10]
@@ -267,10 +284,23 @@ def resultados(repo, cliente_id=None, fecha=None):
             filtros = evaluar_post(actual, row["filtros"], hoy())
         else:
             filtros = evaluar(actual, row["filtros"], hoy())
-        afinidad_cargo, _ = grado(actual["titulo"], row["cargo_configuracion"], cercanos=True)  # v27
-        if not afinidad_cargo:
+        # Contrato v49: el cargo operativo (con los nombres sugeridos y la huella heredada), también para asignaciones
+        # anteriores: antes una vacante que entró por un nombre sugerido quedaba «no corresponde al cargo».
+        clave_cargo = json.dumps(row["cargo_configuracion"], sort_keys=True, ensure_ascii=False, default=str)
+        if clave_cargo not in operativos:
+            operativos[clave_cargo] = contenido.cargo_operativo(row["cargo_configuracion"])
+        cargo = operativos[clave_cargo]
+        afinidad_cargo, _ = grado(actual["titulo"], cargo, cercanos=True)  # v27
+        # Aprobada por el operador en «Por confirmar» (v25/v49): el título ya se decidió a mano. La marca es
+        # `{"aprobada_por": …}`; las asignaciones anteriores a v49 traen `{"funciones": True}`.
+        aprobada = any(isinstance(e, dict) and (e.get("aprobada_por") or e.get("funciones") is True)
+                       for e in row.get("explicacion") or [])
+        if not afinidad_cargo and not aprobada:
             filtros["compatible"] = False
             filtros["motivos"].append("el título actual no corresponde al cargo configurado")
+        if not aprobada and actual.get("tipo") != "post":  # un post no trae funciones que comparar
+            filtros["avisos"] = [*filtros.get("avisos", []), *contenido.avisos(
+                contenido.evidencia(actual["titulo"], actual.get("_descripcion"), cargo))]
         es_post = actual.get("tipo") == "post"  # contrato v11: post de LinkedIn sin ficha formal, con su etiqueta
         no_apta = contrato.entregable_post(actual) if es_post else contrato.entregable(actual, panel=True)
         enlace = enlace_utilizable(row) if filtros["compatible"] and not no_apta else ""
@@ -300,6 +330,7 @@ def resultados(repo, cliente_id=None, fecha=None):
     por_id = numeros(repo, [v["id"] for v in salida])
     for v in salida:
         v["numero"] = por_id.get(v["id"])
+    salida.sort(key=calidad)  # estable: a igualdad se conserva el orden en que se asignaron
     # Contrato v48: de un día anterior también se pueden copiar las ya entregadas (se comprueban al copiar).
     return {**{k: r[k] for k in ("ejecucion", "clientes")}, "vacantes": salida,
             "listas": sum(v["estado"] == "lista" for v in salida), "dia_anterior": pasada,
@@ -374,12 +405,15 @@ PLAN_COMPLETO = {"tipo": "completa", "faltan": [],
                             "sigue sola."}
 
 
-def plan_busqueda(repo, fecha=None, ejecuciones=None):
+def plan_busqueda(repo, fecha=None, ejecuciones=None, cliente_id=None):
     """Un solo botón, tres casos: hoy no hay búsqueda que haya armado su lote (o falló) → la completa del día; ya corrió
     y hay perfiles que no llegan a su meta y pueden recibir más → solo para ellos, corta y sin repetir («faltantes», v47); si no →
-    nada. Solo nombres de clientes del panel privado. Nunca falla: sin datos, la completa."""
+    nada. Solo nombres de clientes del panel privado. Nunca falla: sin datos, la completa.
+    Con `cliente_id` (contrato v49), el plan de ese cliente: ver `plan_cliente`."""
     from panel.ejecutor import faltan_hoy, validar_version
     fecha = fecha or hoy()
+    if cliente_id:
+        return plan_cliente(repo, str(cliente_id), fecha, ejecuciones)
     try:
         version = repo.operativa(fecha)
         if not version:
@@ -405,6 +439,50 @@ def plan_busqueda(repo, fecha=None, ejecuciones=None):
                       f"{'perfil no llega' if len(faltan) == 1 else 'perfiles no llegan'} a su meta: se buscará solo "
                       "para ellos, en sus cargos y lugares, sin repetir lo que ya se buscó hoy.",
             "detalle": "Primero les reparte lo que ya hay guardado y luego busca nombres y páginas nuevas. Tarda unos 30 "
+                       "minutos; puedes cerrar el panel."}
+
+
+def plan_cliente(repo, cliente_id, fecha=None, ejecuciones=None):
+    """Contrato v49: «Buscar ahora» desde el detalle de un cliente. Lee la configuración EN USO (la aplicada), no la que
+    se está editando. Tres casos: hoy aún no hay lote → la completa del día, con los perfiles del cliente primero; ya hay
+    lote → `pedido`: solo los perfiles activos del cliente que no llegan a su meta (uno nuevo cuenta 0); todos en su
+    meta → nada. `perfiles` son los ids que el servidor guarda para la búsqueda (nunca van al flujo de GitHub).
+    Un cliente que no está activo en la configuración en uso es un error 409 que dice qué hacer."""
+    from panel.ejecutor import LOTE_ARMADO, validar_version
+    fecha = fecha or hoy()
+    version = repo.operativa(fecha)
+    cfg = validar_version(version) if version else None
+    cliente = next((c for c in cfg.clientes if str(c.id) == cliente_id), None) if cfg else None
+    if not cliente or not cliente.activo:
+        raise ErrorRepositorio("Este cliente todavía no está en la configuración en uso. Pulsa «Aplicar cambios» y "
+                               "vuelve a intentarlo.", 409)
+    perfiles = [p for p in cfg.perfiles_activos() if str(p.cliente_id) == cliente_id]
+    if not perfiles:
+        raise ErrorRepositorio(f"{cliente.nombre} no tiene perfiles activos con meta en la configuración en uso: "
+                               "activa o añade un perfil y pulsa «Aplicar cambios».", 409)
+    filas = ejecuciones if ejecuciones is not None else (repo.ejecuciones() or [])
+    de_hoy = [e for e in filas if str(e.get("fecha", "")) == fecha]
+    if (not de_hoy or de_hoy[0].get("estado") not in LOTE_ARMADO
+            or (de_hoy[0].get("resumen") or {}).get("revision_del_lote") is None):
+        return {**PLAN_COMPLETO, "cliente": cliente.nombre, "perfiles": [str(p.id) for p in perfiles],
+                "motivo": "Hoy todavía no hay una búsqueda terminada: se hará la búsqueda completa del día, con los "
+                          f"perfiles de {cliente.nombre} primero."}
+    eid = str(de_hoy[0]["id"])
+    conteo = repo.asignaciones_por_perfil([eid])
+    cargos = {str(c.id): c.nombre for c in cfg.cargos}
+    faltan = [{"perfil_id": str(p.id), "cliente": cliente.nombre, "cargo": cargos.get(str(p.cargo_id), ""),
+               "hoy": conteo.get((eid, str(p.id)), 0), "meta": int(p.meta_diaria or 0)} for p in perfiles]
+    faltan = sorted((f for f in faltan if f["hoy"] < f["meta"]), key=lambda f: (f["hoy"] / max(1, f["meta"]), f["cargo"]))
+    if not faltan:
+        return {"tipo": "nada", "faltan": [], "cliente": cliente.nombre, "perfiles": [],
+                "motivo": f"Hoy {cliente.nombre} ya llegó a su meta en todos sus perfiles: no hace falta buscar más."}
+    uno = len(faltan) == 1
+    return {"tipo": "pedido", "faltan": faltan, "cliente": cliente.nombre, "perfiles": [f["perfil_id"] for f in faltan],
+            "motivo": f"La búsqueda de hoy ya corrió y {len(faltan)} {'perfil' if uno else 'perfiles'} de "
+                      f"{cliente.nombre} no {'llega' if uno else 'llegan'} a su meta: se buscará solo para "
+                      f"{'ese perfil' if uno else 'esos perfiles'}, en sus cargos y lugares, sin repetir lo que ya se "
+                      "buscó hoy.",
+            "detalle": "Primero le reparte lo que ya hay guardado y luego busca nombres y páginas nuevas. Tarda unos 30 "
                        "minutos; puedes cerrar el panel."}
 
 

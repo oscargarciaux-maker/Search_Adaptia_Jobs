@@ -1,0 +1,79 @@
+# Contrato v49 (26 nov): palabras del TÍTULO que delatan otro sector cuando el cargo coincide solo por el nombre.
+# No descartan nada. Solo cuentan si la descripción no trae NINGUNA función del cargo: entonces la vacante no se entrega
+# sola y va a «Por confirmar» («Título coincide; funciones de otro oficio»), donde el operador decide con un clic.
+# Si la palabra forma parte del nombre del cargo, de sus términos o de sus funciones, no cuenta para ese cargo
+# (un cargo «QA de manufactura» no se señala a sí mismo).
+# Ejemplos medidos el 25 nov: «QA Manufacturing Analyst» y «Battery Test Engineer» como QA de software; «Product
+# Designer – Kids' Drinkware» y «Outerwear Design Manager» como diseño de producto digital; «LCL Product Manager – Ocean
+# Freight» y «Global Product Manager – Sustainable Seafood» como Product Manager de software.
+# En minúsculas y sin tildes; `python -m pytest` revisa el formato.
+palabras:
+  # Manufactura, industria y construcción
+  - manufacturing
+  - manufactura
+  - industrial
+  - mechanical
+  - mecanico
+  - electrical
+  - electrico
+  - civil
+  - construction
+  - construccion
+  - obra
+  - hardware
+  - battery
+  - automotive
+  - automotriz
+  - aerospace
+  - flight
+  - semiconductor
+  - packaging
+  - empaque
+  - welding
+  - soldadura
+  # Consumo, moda y hogar
+  - apparel
+  - outerwear
+  - footwear
+  - fashion
+  - moda
+  - textil
+  - textile
+  - jewelry
+  - joyeria
+  - furniture
+  - muebles
+  - drinkware
+  - cookware
+  - menaje
+  - cosmetics
+  - cosmeticos
+  - interiors
+  - interiores
+  # Alimentos, salud y laboratorio
+  - food
+  - alimentos
+  - seafood
+  - beverage
+  - bebidas
+  - pharma
+  - pharmaceutical
+  - farmaceutica
+  - farmaceutico
+  - clinical
+  - clinico
+  - laboratory
+  - laboratorio
+  - nursing
+  - enfermeria
+  # Transporte y carga
+  - freight
+  - fletes
+  - shipping
+  - warehouse
+  - bodega
+  - almacen
+  # Atención y ventas en tienda
+  - call center
+  - retail store
+  - tienda

@@ -94,9 +94,11 @@ def prioridad_remota(v):
     return 2
 
 
-def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False, iniciales=(), perfiles=()):
+def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False, iniciales=(), perfiles=(), cargo=None):
     """Toma `cuantas` candidatas [(vacante, grado)] una por una: en cada paso la de menor costo, donde el costo sube con
-    lo que ya se repite (idioma, nivel, país, modalidad, fuente), con un grado más débil, sin descripción o más vieja."""
+    lo que ya se repite (idioma, nivel, país, modalidad, fuente), con un grado más débil, sin descripción o más vieja.
+    `cargo` (contrato v49, modo panel): el cargo operativo; un título sin respaldo en las funciones pesa como una cosa
+    más que no cumple (va después de las que sí lo tienen, nunca se descarta)."""
     elegidas, conteo = list(iniciales), {k: Counter() for k in ("idioma", "nivel", "pais", "modo", "fuente", "empresa")}
     for v, _ in iniciales:
         rasgos = _rasgos(v)
@@ -118,8 +120,12 @@ def variadas(candidatas, cuantas, max_por_empresa, hoy, preferir_remotas=False, 
         from panel.afinidad import coincidencias_preferidas, preferidos
         terminos = preferidos(perfiles)
     resto = []
+    if cargo:
+        from panel import contenido
     for v, g in candidatas:
         clientes, incumple = encaje(v)
+        if cargo:
+            incumple += contenido.penalizacion(contenido.evidencia(v.get("titulo"), v.get("_descripcion"), cargo))
         resto.append((v, g, dict(_rasgos(v), _destinatarios=clientes, _faltas=incumple,
                                  _preferidas=coincidencias_preferidas(v, terminos) if terminos else 0)))
     hoy_d = date.fromisoformat(hoy)
@@ -254,6 +260,43 @@ def deficit_por_perfil(elegidas, roles, hoy):
     return salida
 
 
+POR_PLAZA = 2  # candidatas por cada vacante de la meta de una persona (contrato v49)
+
+
+def candidatas_por_persona(vacantes, hoy, cfg=None):
+    """Contrato v49 (solo modo panel): las candidatas de cada persona —las de su cargo que cumplen SU idioma y SU
+    ubicación, aunque otro cliente ya las haya recibido—, por turnos y primero quien tiene menos de dónde elegir. Hasta
+    `POR_PLAZA` por cada vacante de su meta. Sirve para decidir qué enlaces se comprueban primero. Sin panel, []."""
+    cfg = cfg or config()
+    roles = [r for r in cfg["roles"] if r.get("_perfiles")]
+    if not roles:
+        return []
+    from panel.afinidad import MINIMO_POR_PERFIL, evaluar
+    from panel.modelos import Perfil
+    idiomas = tuple(cfg.get("idiomas", ["es", "en"]))
+    por_persona = []
+    for rol in roles:
+        del_rol = [v for v in vacantes
+                   if any(f.get("familia") in rol["familias"] and f.get("coincidencia") in GRADOS
+                          for f in v.get("familias") or [])
+                   and not contrato.entregable(dict(v, verificacion=None), idiomas)]
+        del_rol.sort(key=lambda v: v.get("fecha_publicacion") or "", reverse=True)  # las más recientes primero
+        for crudo in rol["_perfiles"]:
+            p = Perfil.model_validate(crudo)  # una sola vez por persona (validarlo en cada vacante era lo lento)
+            cuantas = max(MINIMO_POR_PERFIL, int(p.meta_diaria or 0)) * POR_PLAZA
+            suyas = [v for v in del_rol if evaluar(v, p, hoy)["compatible"]]
+            if suyas:
+                por_persona.append((len(suyas), suyas[:cuantas]))
+    por_persona.sort(key=lambda x: x[0])
+    cola, vistas = [], set()
+    for i in range(max((len(suyas) for _, suyas in por_persona), default=0)):
+        for _, suyas in por_persona:
+            if i < len(suyas) and suyas[i]["id"] not in vistas:
+                vistas.add(suyas[i]["id"])
+                cola.append(suyas[i])
+    return cola
+
+
 def sobrante_para_comunidad(salida, por_rol, roles, cfg, hoy):
     """Contrato v21: si los clientes reales no llenan el techo del día, lo que sobra no se pierde. Se completa con
     vacantes que sirven a los perfiles del cliente «Comunidad» y que nadie tomó, dentro del techo y con la misma
@@ -271,7 +314,7 @@ def sobrante_para_comunidad(salida, por_rol, roles, cfg, hoy):
         libres = [(v, g) for v, g in por_rol[rol["id"]] if v["id"] not in tomadas and
                   any(evaluar(v, p, hoy)["compatible"] for p in comunidad)]
         nuevas = variadas(libres, sobrante, cfg.get("max_por_empresa", 2), hoy, cfg.get("preferir_remotas", False),
-                          perfiles=comunidad)
+                          perfiles=comunidad, cargo=rol.get("_cargo"))
         salida[rol["id"]] = list(salida[rol["id"]]) + list(nuevas)
         tomadas |= {v["id"] for v, _ in nuevas}
         sobrante -= len(nuevas)
@@ -327,7 +370,8 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificac
     for rol in roles:
         candidatas = por_rol[rol["id"]]
         salida[rol["id"]] = variadas(candidatas, meta_de(rol, cfg), cfg.get("max_por_empresa", 2), hoy,
-                                      cfg.get("preferir_remotas", False), iniciales.get(rol["id"], []), perfiles=rol.get("_perfiles",[]))
+                                      cfg.get("preferir_remotas", False), iniciales.get(rol["id"], []),
+                                      perfiles=rol.get("_perfiles", []), cargo=rol.get("_cargo"))
     if panel:
         tomadas = {v["id"] for lista in salida.values() for v, _ in lista}
         libres += [v for lista in por_rol.values() for v, _ in lista if v["id"] not in tomadas]
@@ -379,6 +423,9 @@ PERDIDA = {"con_descripcion": "sin descripción completa (no se sabe el idioma)"
 # Motivo de `panel.afinidad.evaluar` → filtro del perfil (solo categorías genéricas, nunca datos de clientes).
 FILTRO_DE_MOTIVO = {"modalidad diferente": "modalidad", "país sin elegibilidad confirmada": "país",
                     "oficina en otro país": "país", "no admite postular desde su país": "país",
+                    # Contrato v49: presencial/híbrida exige ciudad en el perfil y en el aviso.
+                    "falta la ciudad en el perfil": "ciudad", "oficina sin ciudad confirmada": "ciudad",
+                    "oficina en otra ciudad": "ciudad",
                     "idioma del aviso diferente": "idioma del aviso", "publicación fuera del plazo": "antigüedad",
                     "fecha de publicación sin confirmar": "antigüedad", "experiencia no informada": "años de experiencia",
                     "experiencia fuera del rango": "años de experiencia",

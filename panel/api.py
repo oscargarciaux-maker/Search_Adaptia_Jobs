@@ -20,8 +20,9 @@ from buscador import paises
 from buscador.fuentes.publicaciones_apify import PREFIJOS
 from buscador import registro
 from panel import servicio
-from panel.acciones import ENFOQUE_COMPLETO, ENFOQUE_FALTANTES, desde_entorno as conexion_github
-from panel.modelos import AjusteOperador, BorrarCliente, ImportarClientes, CambioBorrador, Configuracion, Contacto, DecisionRevision, EstadoRegla, SubirRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, Publicar, VistaPrevia, explicar, parcial, solo_perfil
+from panel.acciones import (CLAVE_PEDIDA, ENFOQUE_COMPLETO, ENFOQUE_FALTANTES, ENFOQUE_PEDIDO,
+                            desde_entorno as conexion_github)
+from panel.modelos import AjusteOperador, BorrarCliente, ImportarClientes, CambioBorrador, Configuracion, Contacto, DecisionRevision, EstadoRegla, SubirRevision, Credenciales, EnVivo, Expansion, Guardar, Perfil, PedirBusqueda, Publicar, VistaPrevia, explicar, parcial, solo_perfil
 from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase, hoy, nombres
 from panel.terminos import sugerir
 
@@ -408,10 +409,6 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
     def publicar(body: Publicar):
         return repo.publicar(body.revision)
 
-    @app.post("/api/config/aplicar-hoy")
-    def aplicar_hoy(body: Publicar):
-        return repo.publicar_hoy(body.revision)
-
     @app.get("/api/yo")
     def yo(request: Request):
         """Sesión de prueba (17 nov): el nombre de quien inició sesión, para mostrarlo arriba. Solo a esa persona."""
@@ -619,8 +616,9 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         return resultado
 
     @app.get("/api/busqueda")
-    def busqueda():
-        """«Buscar ahora»: si el panel puede lanzar la búsqueda y si hay una en cola o corriendo."""
+    def busqueda(cliente_id: UUID | None = None):
+        """«Buscar ahora»: si el panel puede lanzar la búsqueda y si hay una en cola o corriendo. Con `cliente_id`
+        (contrato v49), el plan de ese cliente."""
         if not app.state.acciones:
             return {"disponible": False}
         try:
@@ -628,25 +626,44 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         except ErrorRepositorio as e:  # el botón queda visible y dice por qué no se puede (el mensaje no lleva la llave)
             registro.aviso("api:busqueda", RuntimeError(e.mensaje))
             estado = {"en_curso": None, "ocupado": e.mensaje, "ultima_pedida": None}
-        return {"disponible": True, **estado, "plan": _plan()}
+        return {"disponible": True, **estado, "plan": _plan(str(cliente_id) if cliente_id else "")}
 
-    def _plan():
-        """Contrato v45: qué hará «Buscar ahora» (copia de 60 s; cualquier escritura la renueva)."""
+    def _plan(cliente=""):
+        """Contrato v45: qué hará «Buscar ahora» (copia de 60 s; cualquier escritura la renueva). Contrato v49: con un
+        cliente, su plan; si no se puede pedir para él (no está en la configuración en uso), «nada» con el motivo."""
         try:
-            return _copia("plan-busqueda", "", 60,
-                          lambda: servicio.plan_busqueda(repo, ejecuciones=_copia("ejecuciones", "", 30, repo.ejecuciones)))
+            return _copia("plan-busqueda", cliente, 60,
+                          lambda: servicio.plan_busqueda(repo, ejecuciones=_copia("ejecuciones", "", 30, repo.ejecuciones),
+                                                         cliente_id=cliente or None))
+        except ErrorRepositorio as e:
+            return {"tipo": "nada", "faltan": [], "motivo": e.mensaje}
         except Exception as e:  # noqa: BLE001 — sin el plan, se hace la búsqueda completa de siempre
             registro.aviso("api:plan", e)
             return dict(servicio.PLAN_COMPLETO)
 
     @app.post("/api/busqueda")
-    def buscar_ahora():
+    def buscar_ahora(body: PedirBusqueda | None = None):
         if not app.state.acciones:
             raise ErrorRepositorio("Falta la llave de GitHub en el alojamiento del panel (GITHUB_ACCIONES_TOKEN).", 409)
         # Contrato v45: el servidor decide (no el navegador) qué búsqueda lanzar, con datos frescos.
-        plan = servicio.plan_busqueda(repo)  # nunca falla: sin datos, la completa
+        cliente = str(body.cliente_id) if body and body.cliente_id else None
+        # Sin cliente nunca falla (sin datos, la completa); con cliente, 409 si no está en la configuración en uso.
+        plan = servicio.plan_busqueda(repo, cliente_id=cliente)
         if plan["tipo"] == "nada":
             raise ErrorRepositorio(plan["motivo"], 409)
+        if cliente:
+            # Contrato v49: los perfiles quedan en el servidor (panel_ajustes); el flujo solo recibe «pedido». Se guarda
+            # antes de lanzar para que la búsqueda ya los encuentre. Si hoy aún no hay lote, la búsqueda es la completa
+            # con ellos primero.
+            anterior = repo.ajuste(CLAVE_PEDIDA, {}) or {}
+            repo.guardar_ajuste(CLAVE_PEDIDA, {"fecha": hoy(), "perfiles": plan["perfiles"]})
+            try:
+                return {**app.state.acciones.lanzar(ENFOQUE_PEDIDO), "tipo": plan["tipo"]}
+            except Exception:
+                # Si no se pudo lanzar (ya hay una búsqueda, o se pidió hace un momento), el pedido que ya estaba en
+                # cola se conserva: antes un segundo pedido rechazado cambiaba los perfiles de la búsqueda del primero.
+                repo.guardar_ajuste(CLAVE_PEDIDA, anterior)
+                raise
         enfoque = ENFOQUE_FALTANTES if plan["tipo"] == "faltantes" else ENFOQUE_COMPLETO
         return {**app.state.acciones.lanzar(enfoque), "tipo": plan["tipo"]}
 

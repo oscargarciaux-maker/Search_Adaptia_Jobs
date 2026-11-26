@@ -253,7 +253,7 @@ def test_la_captura_horaria_de_madrugada_no_cuenta_como_busqueda_del_dia():
 
 
 def test_solo_cuenta_quien_todavia_puede_recibir_mas():
-    # Con 5 o más, solo hay más si su cargo tiene cupo libre en el lote; Comunidad nunca (recibe lo que sobra).
+    # Cuenta todo el que está bajo su meta (v49); Comunidad nunca (recibe lo que sobra).
     from panel import ejecutor
     from panel.modelos import Configuracion
     from panel.repositorio import configuracion_demo, hoy
@@ -271,8 +271,10 @@ def test_solo_cuenta_quien_todavia_puede_recibir_mas():
         filas = _de_hoy(faltantes={cargo: libre})
         return {str(x.id) for x, _, _ in ejecutor.faltan_hoy(_repo_con(filas, {str(p.id): n}), version, hoy())}
     assert str(p.id) in faltan(2, 0)  # bajo el mínimo: el rescate la completa
-    assert str(p.id) not in faltan(5, 0)  # cupo del cargo lleno: otra búsqueda no le suma
-    assert str(p.id) in faltan(5, 3)
+    # Contrato v49: el rescate completa hasta la meta, así que con 5 (bajo su meta) también puede recibir más, aunque
+    # el cupo de su cargo esté lleno. Solo deja de contar quien ya llegó a su meta.
+    assert str(p.id) in faltan(5, 0) and str(p.id) in faltan(5, 3)
+    assert str(p.id) not in faltan(p.meta_diaria, 3)
     todos = ejecutor.faltan_hoy(_repo_con(_de_hoy(), {}), version, hoy())
     assert todos and not [x for x, _, _ in todos if x.cliente_id in comunidad]
     assert any(p.cliente_id in comunidad for p in cfg.perfiles_activos())
@@ -298,7 +300,7 @@ def test_correr_con_faltantes_enfoca_solo_en_ellos(monkeypatch, tmp_path):
         pass
 
     @contextmanager
-    def activar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
+    def activar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=None):
         vistos["enfocar"] = enfocar
         raise Alto
         yield  # pragma: no cover
@@ -506,3 +508,176 @@ def test_get_on_board_no_anota_lo_que_fallo(monkeypatch, tmp_path):
     mapa = [{"id": "cargo:x", "consultas": ["A", "B"], "exactos": [], "similares": [], "lugares": []}]
     bodega.recoger(cfg, estado, "2026-11-18", tmp_path, solo_mapa=mapa)
     assert not estado.get("getonbrd")
+
+
+# ── Contrato v49: «Buscar ahora» desde el detalle de un cliente ────────────────────────────────────────────────────
+def _datos_dos_perfiles():
+    """La demo con un segundo perfil (nuevo, sin asignaciones) en el primer cliente."""
+    from copy import deepcopy
+    from panel.repositorio import configuracion_demo
+    datos = configuracion_demo()
+    primero = next(p for p in datos["perfiles"] if p["cliente_id"] == datos["clientes"][0]["id"])
+    primero["meta_diaria"] = int(primero.get("meta_diaria") or 10) - 5  # sin pasar el techo del día
+    datos["perfiles"].append({**deepcopy(primero), "id": "0f0e0d0c-0b0a-4000-8000-000000000049", "meta_diaria": 5})
+    return datos
+
+
+def _cliente_con_perfiles():
+    from panel.modelos import Configuracion
+    cfg = Configuracion.model_validate(_datos_dos_perfiles())
+    c = cfg.clientes[0]
+    return str(c.id), [str(p.id) for p in cfg.perfiles_activos() if p.cliente_id == c.id], cfg
+
+
+def _repo_pedido(ejecuciones, por_perfil):
+    class Repo(type(_repo_con(ejecuciones, por_perfil))):
+        def operativa(self, fecha):
+            return {"revision": 1, "configuracion": _datos_dos_perfiles()}
+    repo = Repo()
+    return repo
+
+
+def test_pedido_sin_lote_hace_la_completa_con_sus_perfiles_primero():
+    from panel.repositorio import hoy
+    cid, suyos, _ = _cliente_con_perfiles()
+    gh, repo = GitHubAnotado(), _repo_pedido([], {})
+    api = TestClient(crear_app(demo=True, repositorio=repo, acciones=gh))
+    plan = api.get("/api/busqueda", params={"cliente_id": cid}).json()["plan"]
+    assert plan["tipo"] == "completa" and "primero" in plan["motivo"]
+    r = api.post("/api/busqueda", json={"cliente_id": cid}, headers=H)
+    assert r.json() == {"lanzada": True, "tipo": "completa"} and gh.enfoques == ["pedido"]
+    assert repo.ajuste("busqueda_pedida") == {"fecha": hoy(), "perfiles": suyos}
+
+
+def test_pedido_con_lote_solo_para_sus_perfiles_bajo_su_meta():
+    cid, suyos, cfg = _cliente_con_perfiles()
+    lleno = suyos[0]
+    meta = next(int(p.meta_diaria or 0) for p in cfg.perfiles if str(p.id) == lleno)
+    gh, repo = GitHubAnotado(), _repo_pedido(_de_hoy(), {lleno: meta})  # uno cumple; los demás cuentan 0 (como uno nuevo)
+    api = TestClient(crear_app(demo=True, repositorio=repo, acciones=gh))
+    plan = api.get("/api/busqueda", params={"cliente_id": cid}).json()["plan"]
+    assert plan["tipo"] == "pedido" and {f["perfil_id"] for f in plan["faltan"]} == set(suyos) - {lleno}
+    assert all(f["hoy"] == 0 for f in plan["faltan"])
+    assert api.post("/api/busqueda", json={"cliente_id": cid}, headers=H).json()["tipo"] == "pedido"
+    assert gh.enfoques == ["pedido"] and set(repo.ajuste("busqueda_pedida")["perfiles"]) == set(suyos) - {lleno}
+
+
+def test_pedido_con_todos_en_su_meta_no_lanza():
+    cid, _, cfg = _cliente_con_perfiles()
+    gh, repo = GitHubAnotado(), _repo_pedido(_de_hoy(), {str(p.id): int(p.meta_diaria or 0) for p in cfg.perfiles})
+    api = TestClient(crear_app(demo=True, repositorio=repo, acciones=gh))
+    assert api.get("/api/busqueda", params={"cliente_id": cid}).json()["plan"]["tipo"] == "nada"
+    r = api.post("/api/busqueda", json={"cliente_id": cid}, headers=H)
+    assert r.status_code == 409 and "meta" in r.json()["detail"]
+    assert gh.enfoques == [] and repo.ajuste("busqueda_pedida") is None
+
+
+def test_pedido_de_un_cliente_que_no_esta_en_uso_o_no_es_valido():
+    from uuid import uuid4
+    gh, repo = GitHubAnotado(), _repo_pedido(_de_hoy(), {})
+    api = TestClient(crear_app(demo=True, repositorio=repo, acciones=gh))
+    otro = str(uuid4())
+    plan = api.get("/api/busqueda", params={"cliente_id": otro}).json()["plan"]
+    assert plan["tipo"] == "nada" and "Aplicar cambios" in plan["motivo"]
+    r = api.post("/api/busqueda", json={"cliente_id": otro}, headers=H)
+    assert r.status_code == 409 and "Aplicar cambios" in r.json()["detail"]
+    assert api.post("/api/busqueda", json={"cliente_id": "no-es-un-id"}, headers=H).status_code == 422
+    assert api.post("/api/busqueda", json={"cliente_id": otro, "perfiles": ["x"]}, headers=H).status_code == 422
+    assert api.get("/api/busqueda", params={"cliente_id": "no-es-un-id"}).status_code == 422
+    assert gh.enfoques == [] and repo.ajuste("busqueda_pedida") is None
+
+
+def test_pedido_de_un_cliente_archivado_no_lanza():
+    cid, _, _ = _cliente_con_perfiles()
+
+    class Repo(type(_repo_pedido([], {}))):
+        def operativa(self, fecha):
+            datos = _datos_dos_perfiles()
+            for c in datos["clientes"]:
+                c["activo"] = c["activo"] and c["id"] != cid
+            return {"revision": 1, "configuracion": datos}
+    gh = GitHubAnotado()
+    api = TestClient(crear_app(demo=True, repositorio=Repo(), acciones=gh))
+    assert api.post("/api/busqueda", json={"cliente_id": cid}, headers=H).status_code == 409 and gh.enfoques == []
+
+
+def test_pedido_ninguna_entrada_del_flujo_lleva_identificadores():
+    cid, suyos, _ = _cliente_con_perfiles()
+    gh, sesion = _gh()
+    api = TestClient(crear_app(demo=True, repositorio=_repo_pedido(_de_hoy(), {}), acciones=gh))
+    assert api.post("/api/busqueda", json={"cliente_id": cid}, headers=H).status_code == 200
+    envios = [kw for metodo, _, _, kw in sesion.pedidos if metodo == "POST"]
+    assert envios == [{"json": {"ref": "main", "inputs": {"modo": "diario", "prueba": "false", "enfoque": "pedido"}}}]
+    assert not any(x in str(sesion.pedidos) for x in [cid, *suyos])
+    with pytest.raises(ValueError):  # nunca un texto libre como enfoque
+        acciones.AccionesGitHub(TOKEN, "dueno/repo", sesion=SesionFalsa()).lanzar("pedido; echo x")
+    with pytest.raises(ValueError):
+        acciones.AccionesDemo().lanzar(cid)
+
+
+def test_bodega_yml_ofrece_pedido_como_opcion_cerrada():
+    import yaml
+    from pathlib import Path
+    flujo = yaml.safe_load((Path(__file__).resolve().parents[2] / ".github/workflows/bodega.yml").read_text("utf-8"))
+    entradas = (flujo.get("on") or flujo.get(True))["workflow_dispatch"]["inputs"]
+    assert entradas["enfoque"]["type"] == "choice" and set(entradas["enfoque"]["options"]) == set(acciones.ENFOQUES)
+    assert all(e.get("type") in ("choice", "boolean") for e in entradas.values())  # ninguna entrada de texto libre
+
+
+def _correr_pedido(monkeypatch, tmp_path, repo):
+    from contextlib import contextmanager
+    from panel import ejecutor
+    vistos = {}
+
+    class Alto(Exception):
+        pass
+
+    @contextmanager
+    def activar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=None):
+        vistos.update(enfocar=enfocar, cortos=set(cortos))
+        raise Alto
+        yield  # pragma: no cover
+    monkeypatch.setattr(ejecutor, "activar", activar)
+    monkeypatch.setattr(ejecutor, "iniciar", lambda *a: {"id": "e1", "resumen": {}})
+    monkeypatch.setattr(ejecutor, "perfiles_cortos", lambda *a: set())
+    try:
+        ejecutor.correr(str(tmp_path), repo=repo, enfoque="pedido")
+    except Alto:
+        pass
+    return vistos
+
+
+def test_correr_pedido_con_lote_enfoca_en_los_pedidos_activos_y_vacia_el_ajuste(monkeypatch, tmp_path):
+    from panel.repositorio import hoy
+    _, suyos, _ = _cliente_con_perfiles()
+    repo = _repo_pedido(_de_hoy(), {})
+    repo.guardar_ajuste("busqueda_pedida", {"fecha": hoy(), "perfiles": [*suyos, "perfil-que-ya-no-existe"]})
+    assert _correr_pedido(monkeypatch, tmp_path, repo)["enfocar"] == set(suyos)
+    assert repo.ajuste("busqueda_pedida") == {}
+    assert _correr_pedido(monkeypatch, tmp_path, repo)["enfocar"] is None  # ya usado: la búsqueda normal
+
+
+def test_correr_pedido_sin_lote_hace_la_completa_con_ellos_primero(monkeypatch, tmp_path):
+    from panel.repositorio import hoy
+    _, suyos, _ = _cliente_con_perfiles()
+    repo = _repo_pedido([], {})
+    repo.guardar_ajuste("busqueda_pedida", {"fecha": hoy(), "perfiles": suyos})
+    vistos = _correr_pedido(monkeypatch, tmp_path, repo)
+    assert vistos["enfocar"] is None and set(suyos) <= vistos["cortos"]
+
+
+def test_correr_pedido_de_otro_dia_o_vacio_hace_la_busqueda_normal(monkeypatch, tmp_path):
+    _, suyos, _ = _cliente_con_perfiles()
+    for pedida in ({"fecha": "2020-01-01", "perfiles": suyos}, {}, {"fecha": "x", "perfiles": "no-es-lista"}, None):
+        repo = _repo_pedido(_de_hoy(), {})
+        if pedida is not None:
+            repo.guardar_ajuste("busqueda_pedida", pedida)
+        vistos = _correr_pedido(monkeypatch, tmp_path, repo)
+        assert vistos["enfocar"] is None and vistos["cortos"] == set()
+
+
+def test_correr_pedido_si_no_se_puede_leer_el_ajuste_no_falla(monkeypatch, tmp_path):
+    class Roto(type(_repo_pedido([], {}))):
+        def ajuste(self, clave, defecto=None):
+            raise RuntimeError("Supabase no responde")
+    assert _correr_pedido(monkeypatch, tmp_path, Roto())["enfocar"] is None

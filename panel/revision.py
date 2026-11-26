@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from buscador import entrega, normalizar, paises, vacante
 from buscador import registro
 from panel.afinidad import MINIMO_POR_PERFIL, evaluar
+from panel.contenido import MOTIVO_OTRO_OFICIO
 from panel.repositorio import nombres as nombres_de, numeros
 from panel.terminos import grado
 
@@ -74,6 +75,10 @@ def _sin_revisar(datos, fecha, solo_cierre=False):
 DIAS_PENDIENTE = 7
 MOTIVO = "ubicación por confirmar"
 FUNCIONES = "Coincide por funciones"  # contrato v25: el título no encaja, pero la descripción sí
+# Contrato v49: el título sí encaja, pero la descripción no trae sus funciones y hay una señal de otro oficio.
+OTRO_OFICIO = MOTIVO_OTRO_OFICIO
+DUDAS_DE_CARGO = (FUNCIONES, OTRO_OFICIO)  # la duda es el cargo, no el país: no piden país ni tocan el catálogo
+NO_SIRVE_AL_CARGO = "no sirve para ese cargo"
 # Lo único que una confirmación de país puede resolver; cualquier otro motivo deja fuera la vacante para ese perfil.
 MOTIVOS_PAIS = {"país sin elegibilidad confirmada", "no admite postular desde su país", "oficina en otro país"}
 DECISIONES = ("sirve", "otro_pais", "no_sirve", "saltar")
@@ -148,6 +153,9 @@ def resumen_de(datos, motivo="", s=None):
     from panel.sugerir import sugerir
     if motivo == FUNCIONES:  # contrato v25: la duda es el cargo, no el país
         s = {"decision": "sirve", "paises": [], "motivo": "El título es otro, pero las funciones coinciden.", "frase": ""}
+    elif motivo == OTRO_OFICIO:  # contrato v49: sin sugerencia; la decide quien conoce al cliente
+        s = {"decision": "", "paises": [], "frase": "",
+             "motivo": "El título coincide, pero la descripción no nombra las funciones del cargo y parece otro oficio."}
     elif s is None:
         s = sugerir(datos) if datos.get("titulo") else {"decision": "", "paises": [], "motivo": "", "frase": ""}
     return {"titulo": datos.get("titulo", ""), "empresa": datos.get("empresa", ""),
@@ -169,35 +177,57 @@ def extracto(texto, largo=260):
     return limpio[:largo].rsplit(" ", 1)[0].rstrip(",.;:") + "…"
 
 
-def _candidatos_funciones(repo, perfiles, recibidas, estrictas, fecha, desde, motivo_de, ya):
-    """Contrato v25: vacantes cuyo título no encaja con un cargo pero la descripción coincide por funciones. Solo para
-    los perfiles de ese cargo que cumplen todos sus filtros y nunca la recibieron."""
+def _dudas_de_cargo(repo, perfiles, recibidas, estrictas, fecha, desde, grado_duda, motivo, pista_de, ya):
+    """Vacantes del catálogo con una duda de cargo (`grado_duda`), para los perfiles de ese cargo que cumplen todos sus
+    filtros y nunca la recibieron. `pista_de(cargo, datos)` dice qué mostrar en la tarjeta."""
     salida = []
-    for fila in repo.candidatas_por_funciones(desde):
+    # Los repositorios anteriores a v49 no conocen el segundo parámetro: para «funciones» se llama como siempre.
+    filas = repo.candidatas_por_funciones(desde) if grado_duda == "funciones" else \
+        repo.candidatas_por_funciones(desde, grado_duda)
+    for fila in filas:
         if fila["id"] in ya:
             continue
         datos = _datos_ligeros(fila)
         if datos.get("idioma") not in ("es", "en") or not datos.get("titulo") or \
                 _sin_revisar(datos, fecha, solo_cierre=True):
             continue
-        familias_f = {f["familia"] for f in datos.get("familias") or [] if f.get("coincidencia") == "funciones"}
-        sirve, halladas = [], []
+        del_grado = {f["familia"] for f in datos.get("familias") or [] if f.get("coincidencia") == grado_duda}
+        sirve, pista = [], ""
         for cargo, p in perfiles:
-            if "cargo:" + str(cargo.id) not in familias_f or fila["id"] in recibidas.get(str(p.id), set()):
+            if "cargo:" + str(cargo.id) not in del_grado or fila["id"] in recibidas.get(str(p.id), set()):
                 continue
             if not evaluar(datos, p, fecha)["compatible"]:
                 continue
-            desc = normalizar.texto(datos.get("_descripcion", ""))[:12000]
-            halladas = halladas or [t for t in cargo.funciones if normalizar.contiene_frase(desc, normalizar.texto(t))]
+            pista = pista or pista_de(cargo, datos)
             sirve.append({"perfil_id": str(p.id), "cliente_id": str(p.cliente_id), "cargo_id": str(cargo.id),
                           "faltan": estrictas.get(p.id, 0) < MINIMO_POR_PERFIL})
         if sirve:
-            salida.append({"vacante_id": fila["id"], "motivo": FUNCIONES,
-                           "pista": "Funciones encontradas: " + ", ".join(halladas[:10]),
+            salida.append({"vacante_id": fila["id"], "motivo": motivo, "pista": pista,
                            "ubicacion": clave_ubicacion(datos.get("ubicacion", "")), "sugerencia": [],
                            "perfiles": sirve, "prioridad": sum(100 if s["faltan"] else 10 for s in sirve)
-                           + max(0, 30 - _edad(datos, fecha)), "resumen": resumen_de(datos, FUNCIONES)})
+                           + max(0, 30 - _edad(datos, fecha)), "resumen": resumen_de(datos, motivo)})
     return salida
+
+
+def _candidatos_funciones(repo, perfiles, recibidas, estrictas, fecha, desde, motivo_de, ya):
+    """Contrato v25: vacantes cuyo título no encaja con un cargo pero la descripción coincide por funciones."""
+    def pista(cargo, datos):
+        desc = normalizar.texto(datos.get("_descripcion", ""))[:12000]
+        halladas = [t for t in cargo.funciones if normalizar.contiene_frase(desc, normalizar.texto(t))]
+        return "Funciones encontradas: " + ", ".join(halladas[:10])
+    return _dudas_de_cargo(repo, perfiles, recibidas, estrictas, fecha, desde, "funciones", FUNCIONES, pista, ya)
+
+
+def _candidatos_otro_oficio(repo, perfiles, recibidas, estrictas, fecha, desde, ya, operativos):
+    """Contrato v49: vacantes cuyo título sí es del cargo pero cuya descripción no trae sus funciones y hay una señal
+    de otro oficio. No se entregaron solas: aquí se pregunta. `operativos`: los cargos de `ejecutor.cargos_operativos`."""
+    from buscador.familias import GRADO_OTRO_OFICIO
+    from panel import contenido
+
+    def pista(cargo, datos):
+        senal = contenido.evidencia(datos["titulo"], datos.get("_descripcion"), operativos[str(cargo.id)])["senal"]
+        return "No nombra las funciones del cargo" + (f" y menciona «{senal}»." if senal else ".")
+    return _dudas_de_cargo(repo, perfiles, recibidas, estrictas, fecha, desde, GRADO_OTRO_OFICIO, OTRO_OFICIO, pista, ya)
 
 
 APLICAR_SUGERENCIAS = True  # contrato v32: las sugerencias claras se aplican solas en la cola de la noche
@@ -274,10 +304,16 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, ava
     if not completa and hasattr(repo, "candidatas_por_funciones"):
         candidatos += _candidatos_funciones(repo, perfiles, recibidas, estrictas, fecha, desde, motivo_de,
                                             {c["vacante_id"] for c in candidatos})
+        try:  # contrato v49: título del cargo con funciones de otro oficio
+            from panel.ejecutor import cargos_operativos
+            candidatos += _candidatos_otro_oficio(repo, perfiles, recibidas, estrictas, fecha, desde,
+                                                  {c["vacante_id"] for c in candidatos}, cargos_operativos(repo, cfg))
+        except TypeError:  # repositorios anteriores sin el parámetro `grado`: solo las de v25
+            pass
     existentes = {r["vacante_id"]: r for r in _revisiones_sin_texto(repo)}
     # Las pendientes de otras noches que hay que volver a mirar leen su descripción por grupos de 100 y la sueltan.
     releer = [vid for vid, r in existentes.items() if r.get("estado") == "pendiente" and vid not in sin_revisar
-              and r.get("motivo") != FUNCIONES and ((r.get("catalogo_vacantes") or {}).get("datos") or {}).get("titulo")
+              and r.get("motivo") not in DUDAS_DE_CARGO and ((r.get("catalogo_vacantes") or {}).get("datos") or {}).get("titulo")
               and (r.get("catalogo_vacantes") or {}).get("reason") == POR_CONFIRMAR]
     for inicio in range(0, len(releer), 100):
         grupo = releer[inicio:inicio + 100]
@@ -300,12 +336,12 @@ def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, ava
         if r.get("estado") != "pendiente":
             continue
         catalogo_fila = r.get("catalogo_vacantes") or {}
-        if catalogo_fila and catalogo_fila.get("reason") != POR_CONFIRMAR and r.get("motivo") != FUNCIONES:
+        if catalogo_fila and catalogo_fila.get("reason") != POR_CONFIRMAR and r.get("motivo") not in DUDAS_DE_CARGO:
             # El sistema ya la resolvió (ficha, Get on Board, reglas) o dejó de ser entregable: no hace falta preguntar.
             vencer.setdefault(RESUELTA_SOLA, []).append(vid)
             continue
         datos_fila = _datos_ligeros(catalogo_fila) if (catalogo_fila.get("datos") or {}).get("titulo") else {}
-        if datos_fila and r.get("motivo") == FUNCIONES:
+        if datos_fila and r.get("motivo") in DUDAS_DE_CARGO:
             motivo_fuera = _sin_revisar(datos_fila, fecha, solo_cierre=True)
         else:
             motivo_fuera = motivo_de(vid, datos_fila) if datos_fila else ""
@@ -431,7 +467,7 @@ def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None, todas=None,
             calculados[r["vacante_id"]] = res
             if r["vacante_id"] in originales:
                 originales[r["vacante_id"]]["resumen"] = res  # la copia en memoria ya no lo vuelve a calcular
-        frase = r.get("pista", "") if r.get("motivo") == FUNCIONES else res.get("frase", "")
+        frase = r.get("pista", "") if r.get("motivo") in DUDAS_DE_CARGO else res.get("frase", "")
         salida.append({**{k: res.get(k, "") for k in ("titulo", "empresa", "ubicacion", "modalidad", "salario",
                                                        "idioma", "publicada", "enlace", "sugerida", "por_que",
                                                        "nivel", "extracto")},
@@ -440,7 +476,8 @@ def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None, todas=None,
                        "vacante_id": r["vacante_id"], "paises_sugeridos": res.get("paises_sugeridos") or [],
                        "paises": res.get("paises") or [], "frase": frase,
                        "pista": r.get("pista", ""), "sugerencia": r.get("sugerencia", []),
-                       "motivo": r.get("motivo", ""), "funciones": r.get("motivo") == FUNCIONES,
+                       "motivo": r.get("motivo", ""), "funciones": r.get("motivo") in DUDAS_DE_CARGO,
+                       "otro_oficio": r.get("motivo") == OTRO_OFICIO,  # contrato v49
                        "clientes": sorted({clientes.get(p["cliente_id"], "") for p in r.get("perfiles") or []} - {""}),
                        "cliente_ids": sorted({p["cliente_id"] for p in r.get("perfiles") or [] if p.get("cliente_id")}),
                        "ayuda_faltantes": any(p.get("faltan") for p in r.get("perfiles") or []),
@@ -492,7 +529,7 @@ def decidir(repo, vacante_id, decision, codigos=(), aplicar_a_iguales=False, fec
     rev = filas[0]
     codigos = expandir(codigos)
     asignadas = 0
-    funciones = rev.get("motivo") == FUNCIONES
+    funciones = rev.get("motivo") in DUDAS_DE_CARGO
     if decision == "sirve":
         # Contrato v23: varias etiquetas a la vez, de cualquier parte (LATAM y EE. UU., Mundo…). Contrato v25: las de
         # «Coincide por funciones» ya tienen la ubicación comprobada y no exigen país.
@@ -507,7 +544,10 @@ def decidir(repo, vacante_id, decision, codigos=(), aplicar_a_iguales=False, fec
         cambios = {"estado": "descartada", "paises": []}
     if decision != "saltar":  # contrato v17: quién decidió y qué; el aprendizaje solo usa decisiones de lugar del operador
         from panel.aprender import ETIQUETAS
-        cambios["motivo"] = (ETIQUETAS[decision] if por == "operador" else
+        # Contrato v49: «No sirve» en una duda de cargo vale solo para ese cargo. Con la etiqueta de siempre, la
+        # búsqueda siguiente la descartaba para todos los cargos (`decisiones_para_busqueda`).
+        cambios["motivo"] = (NO_SIRVE_AL_CARGO if funciones and decision != "sirve" else
+                             ETIQUETAS[decision] if por == "operador" else
                              "decidida por sugerencia clara" if por == "sugerencia" else "decidida por regla")
     repo.actualizar_revision(vacante_id, {**cambios, "decidida_en": datetime.now(timezone.utc).isoformat()})
     if funciones:
@@ -539,7 +579,7 @@ def decidir(repo, vacante_id, decision, codigos=(), aplicar_a_iguales=False, fec
 
 
 def _asignar(repo, rev, codigos, fecha, por, comprobar):
-    """Asignaciones para los perfiles a los que ayuda la vacante confirmada: solo hasta 5 y sin repetir a nadie."""
+    """Asignaciones para los perfiles a los que ayuda la vacante confirmada: hasta su meta y sin repetir a nadie."""
     from panel.ejecutor import validar_version
     from panel.repositorio import ErrorRepositorio
     if not rev.get("perfiles"):
@@ -550,7 +590,7 @@ def _asignar(repo, rev, codigos, fecha, por, comprobar):
         raise ErrorRepositorio("Todavía no hay búsqueda de hoy. Inténtalo después de la búsqueda de la noche.", 409)
     cfg = validar_version(version)
     fila_catalogo = rev.get("catalogo_vacantes") or {}
-    funciones = rev.get("motivo") == FUNCIONES
+    funciones = rev.get("motivo") in DUDAS_DE_CARGO
     datos = con_paises(_datos(fila_catalogo), codigos, por) if codigos else _datos(fila_catalogo)
     perfiles = {str(p.id): p for p in cfg.perfiles if p.activo}
     cargos = {str(c.id): c for c in cfg.cargos}
@@ -560,7 +600,8 @@ def _asignar(repo, rev, codigos, fecha, por, comprobar):
     nuevas = []
     for info in rev.get("perfiles") or []:
         p, cargo = perfiles.get(info["perfil_id"]), cargos.get(info.get("cargo_id"))
-        if not p or not cargo or conteo.get(str(p.id), 0) >= MINIMO_POR_PERFIL:
+        # Contrato v49: hasta la meta diaria del perfil (antes, solo hasta el mínimo de 5).
+        if not p or not cargo or conteo.get(str(p.id), 0) >= max(MINIMO_POR_PERFIL, int(p.meta_diaria or 0)):
             continue
         if rev["vacante_id"] in recibidas.get(str(p.id), set()):
             continue
@@ -575,7 +616,7 @@ def _asignar(repo, rev, codigos, fecha, por, comprobar):
                        "match_grade": entrega.GRADO_CONTRATO.get(afinidad, "similar"),
                        "explicacion": [*match["pruebas"], evidencia or {"regla": "similitud textual"},
                                        {"confirmada": {"paises": codigos, "por": por}} if codigos else
-                                       {"funciones": True, "por": por}],
+                                       {"aprobada_por": por}],  # v49 (antes `{"funciones": True}`)
                        "filtros": p.model_dump(mode="json"), "cargo_configuracion": cargo.model_dump(mode="json")})
     if nuevas:
         repo.crear_asignaciones(nuevas)
@@ -645,7 +686,7 @@ def exportar_csv(repo, fecha):
     escritor.writerow(["", "", PREGUNTA] + [""] * (len(COLUMNAS_CSV) - 3))  # sin vacante_id: al subir se ignora
     filas = []
     # Contrato v25: el CSV es de ubicaciones; las de funciones se deciden en el panel.
-    pendientes = [r for r in repo.revisiones(estado="pendiente") if r.get("motivo") != FUNCIONES]
+    pendientes = [r for r in repo.revisiones(estado="pendiente") if r.get("motivo") not in DUDAS_DE_CARGO]
     por_id = numeros(repo, [r["vacante_id"] for r in pendientes])  # contrato v48: «ID 1234»
     for r in pendientes:
         datos = _datos_ligeros(r.get("catalogo_vacantes"))

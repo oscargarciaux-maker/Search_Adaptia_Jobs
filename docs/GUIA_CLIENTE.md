@@ -63,7 +63,11 @@ momento que sus enlaces sigan abiertos (unos segundos) y quita las que cerraron.
 paréntesis, por ejemplo «(ID 1234)»: es el mismo en el panel, en «Por confirmar» y en la columna «numero» del CSV, para
 que tú y el cliente puedan nombrarla.
 
-**Confirmar y aplicar (18 nov, contrato v43).** Un solo botón: la configuración vale desde la próxima búsqueda, aunque
+**Aplicar cambios (26 nov, contrato v49; antes «Confirmar y aplicar», v43).** Es el único botón: «Guardar borrador»
+se retiró y el botón de los formularios de cliente y de cargo aplica de verdad. En el detalle de cada cliente hay un
+«Buscar ahora» solo para sus perfiles.
+
+**Cómo rige (18 nov, contrato v43).** Un solo botón: la configuración vale desde la próxima búsqueda, aunque
 sea dentro de unos minutos. Si la cambias mientras una búsqueda corre, esa búsqueda reparte con la nueva y no se
 detiene. Si la cambias después de que se armó el lote del día, la próxima búsqueda de cada hora completa lo que falte.
 Comunidad recibe después de los clientes reales y solo hasta su meta. Una vacante que sirve a dos cargos les llega a

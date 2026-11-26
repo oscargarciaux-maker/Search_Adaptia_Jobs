@@ -124,4 +124,3 @@ def test_pasada_horaria_arma_lote_solo_si_la_configuracion_cambio_despues_del_lo
 def test_demo_confirmar_rige_desde_hoy(tmp_path):
     r = RepositorioDemo(tmp_path / "demo.json")
     assert r.publicar(r.config()["revision"])["vigente_desde"] == hoy()
-    assert r.publicar_hoy(r.config()["revision"])["vigente_desde"] == hoy()

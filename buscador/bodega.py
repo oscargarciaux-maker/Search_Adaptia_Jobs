@@ -89,8 +89,9 @@ def _fecha_de(v):
 
 
 # Contrato v47: fuentes que «Buscar ahora» para quien falta no lee (recorren todos los cargos o ya se leyeron hoy).
+# Contrato v49: Hireline y Magneto (sitemaps) sí se leen: tardan unos 25 s cada una y son fuentes en español.
 MOTIVO_FALTANTES = "búsqueda para quien falta: no hace falta releerla (contrato v47)"
-OMITIDAS_FALTANTES = {"Tableros remotos", "Portales de empresas", *sitemaps_empleo.SITIOS}
+OMITIDAS_FALTANTES = {"Tableros remotos", "Portales de empresas"}
 
 
 def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previas=None):
@@ -196,9 +197,19 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
     def f_computrabajo():
         if not p.get("computrabajo_busquedas", 0):
             return [], {"omitida": "sin presupuesto"}
-        return computrabajo.buscar(Cliente(pausa=(0.6, 1.4)), mapa, activos, estado.setdefault("computrabajo", {}),
-                                   p["computrabajo_busquedas"], hoy=hoy, max_fichas=p.get("computrabajo_fichas", 150),
-                                   limite_segundos=limite, prioritarias=prioritarias)
+        t0 = time.monotonic()
+        cliente = Cliente(pausa=(0.6, 1.4))
+        crudas, stats = computrabajo.buscar(cliente, mapa, activos, estado.setdefault("computrabajo", {}),
+                                            p["computrabajo_busquedas"], hoy=hoy,
+                                            max_fichas=p.get("computrabajo_fichas", 150),
+                                            limite_segundos=limite, prioritarias=prioritarias)
+        if previas and p.get("computrabajo_relectura", 0) and not solo_mapa:
+            # Contrato v49: los avisos guardados sin descripción se releen con el tiempo que quede de la fuente.
+            extra, stats["relectura"] = computrabajo.completar_descripciones(
+                cliente, previas, p["computrabajo_relectura"], hoy=hoy, max_dias=cfg["dias_maximos"],
+                limite_segundos=max(0, limite - (time.monotonic() - t0)))
+            crudas = crudas + extra
+        return crudas, stats
 
     def f_elempleo():
         if not p.get("elempleo_busquedas", 0):
@@ -310,7 +321,8 @@ def _sirve_a_perfiles(v):
     objetivo = set(cfg.get("paises_objetivo_mundo") or [])
     if objetivo & set(v.get("paises_mundo") or []):
         return True
-    return bool(cfg.get("acepta_horario") and v.get("zona_utc"))
+    # Contrato v49: la franja horaria solo abre un aviso que no nombra país (nota «por zona horaria»).
+    return bool(cfg.get("acepta_horario") and v.get("zona_utc") and paises.abiertos(v)[2])
 
 
 def limpiar(previas, crudas, hoy, dias_maximos, enlaces_ats, empresas_leidas, consulta="", retiradas=None):

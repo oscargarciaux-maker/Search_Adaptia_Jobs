@@ -419,6 +419,14 @@ def cola_de_seleccion(vacantes, entregadas, hoy, cache, iniciales, maximo, ahora
     return cola
 
 
+def cola_por_necesidad(vacantes, hoy):
+    """Contrato v49 (solo modo panel): las candidatas de cada persona, por turnos y primero quien tiene menos
+    (`entrega.candidatas_por_persona`). Antes la cola salía solo de lo que elegiría el lote: de 21 remotas en español
+    abiertas a Colombia para un cargo, 1 tenía el enlace comprobado, y sin enlace comprobado no se completa a nadie."""
+    from buscador import entrega
+    return entrega.candidatas_por_persona(vacantes, hoy)
+
+
 def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, cfg=None):
     """Comprueba candidatas antes de la selección; lo no revisado nunca se da por aprobado.
     Orden: el lote ya registrado hoy (plazo para compartir), las que elegiría la selección en su orden y, en las
@@ -444,6 +452,17 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
         revisadas_n += auditar(historicas, cache, maximo=maximo // 3 if incremental else maximo,
                                segundos=max(0, plazo - time.monotonic()), vigencia=VIGENCIA_COMPARTIR)
     revisadas = set()
+    por_necesidad = 0
+    try:  # contrato v49: primero las candidatas de cada persona; como mucho la mitad del presupuesto que queda
+        necesidad = cola_por_necesidad(vacantes, hoy)
+        if necesidad and revisadas_n < maximo:
+            parte = 3 if incremental else 2
+            por_necesidad = auditar(necesidad, cache, maximo=max(1, (maximo - revisadas_n) // parte),
+                                    segundos=max(0, plazo - time.monotonic()) / parte)
+            revisadas_n += por_necesidad
+    except Exception as e:  # noqa: BLE001 — sin esta cola, la comprobación sigue con la del lote, como antes
+        from buscador import registro
+        registro.aviso("verificar_enlaces:necesidad", e)
     for _ronda in range(4):
         if revisadas_n >= maximo or time.monotonic() >= plazo:
             break
@@ -474,7 +493,8 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
     actuales = [dict(por_id.get(v["id"], v)) for lista in iniciales.values() for v, _ in lista]
     for v in actuales:
         anotar(v, cache)
-    return dict(resumen(vacantes), candidatas_programadas=revisadas_n, seleccion_del_dia=resumen(actuales))
+    return dict(resumen(vacantes), candidatas_programadas=revisadas_n, por_necesidad=por_necesidad,
+                seleccion_del_dia=resumen(actuales))
 
 
 def main():

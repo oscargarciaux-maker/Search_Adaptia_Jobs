@@ -68,7 +68,8 @@ presupuestos:
   linkedin_fichas: 450         # avisos a los que se les lee la descripción completa
   linkedin_relectura: 300      # avisos ya guardados sin descripción que se releen tras la búsqueda
   computrabajo_busquedas: 60   # páginas de resultados de Computrabajo (17 países; se postula en el mismo portal)
-  computrabajo_fichas: 150     # fichas de Computrabajo a las que se les lee la descripción
+  computrabajo_fichas: 300     # fichas de Computrabajo a las que se les lee la descripción (v49: solo las de un cargo buscado; antes 150 de cualquiera)
+  computrabajo_relectura: 200  # v49: avisos de Computrabajo ya guardados sin descripción que se releen tras la búsqueda
   elempleo_busquedas: 20       # búsquedas en Elempleo (Colombia; se postula en el mismo portal; PR 1b)
   elempleo_fichas: 80          # fichas de Elempleo que se leen (fecha, salario y modalidad estructurados)
   hireline_fichas: 60          # v44: fichas de Hireline (México y Colombia, tecnología; sitemap + JobPosting)

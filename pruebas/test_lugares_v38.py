@@ -89,12 +89,16 @@ def _recibe(perfil, ubicacion, modalidad=None):
     return evaluar(_vacante(ubicacion, modalidad), perfil, hoy())["compatible"]
 
 
-def test_quien_vive_en_eeuu_recibe_las_de_cualquier_ciudad_de_eeuu():
-    p = _perfil({"paises": ["US"], "modalidades": ["remoto", "hibrido", "presencial"]})
+def test_quien_vive_en_eeuu_recibe_las_de_sus_ciudades_de_eeuu():
+    # Contrato v49: presencial exige ciudad en el perfil; el país de cada ciudad se sigue reconociendo (v38).
+    p = _perfil({"paises": ["US"], "modalidades": ["remoto", "hibrido", "presencial"],
+                 "ciudades": ["New York", "Chicago", "Seattle", "Austin", "San Francisco", "Paris"]})
     for ubicacion in ("New York", "New York, NY 10001", "Chicago", "Seattle", "Brooklyn, NY", "Austin, TX 78701",
                       "San Francisco Bay Area", "Paris, TX"):
         assert _recibe(p, ubicacion, "presencial"), ubicacion
     assert _recibe(p, "US-Remote", "remoto")
+    sin_ciudad = _perfil({"paises": ["US"], "modalidades": ["remoto", "hibrido", "presencial"]})
+    assert not _recibe(sin_ciudad, "Chicago", "presencial") and _recibe(sin_ciudad, "US-Remote", "remoto")
     for ubicacion in ("Toronto", "London", "Paris", "Berlin, DE"):
         assert not _recibe(p, ubicacion, "presencial"), ubicacion
 

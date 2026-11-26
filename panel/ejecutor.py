@@ -12,11 +12,12 @@ from buscador import bodega, entrega, familias, paises, normalizar
 from buscador import registro
 from panel.afinidad import (AMPLIACIONES, MINIMO_POR_PERFIL, TOPE_POSTS_SIN_CONFIRMAR, evaluar, evaluar_ampliada,
                             evaluar_post, post_ubicacion)
-from panel.acciones import ENFOQUE_COMPLETO, ENFOQUE_FALTANTES
+from panel.acciones import CLAVE_PEDIDA, ENFOQUE_COMPLETO, ENFOQUE_FALTANTES, ENFOQUE_PEDIDO
+from panel import contenido
 from panel.modelos import Configuracion
 from pydantic import ValidationError
 from panel.repositorio import RepositorioSupabase, hoy
-from panel.terminos import en_espanol, espanol_del_mapa, grado, sugerir
+from panel.terminos import en_espanol, espanol_del_mapa, grado
 
 
 def validar_version(version):
@@ -133,6 +134,9 @@ def fuentes_en(pais):
 
 PESO_CORTO = 2
 PESO_POCAS_FUENTES = 2
+# Contrato v49: quien solo acepta avisos en español tiene unas 10 veces menos de dónde elegir (medido el 25 nov: 241 de
+# 1.657 Product Manager con descripción estaban en español), así que recibe el doble de turnos de búsqueda.
+PESO_SOLO_ESPANOL = 2
 
 
 def persona_de_busqueda(p, rid, nombres=None, corto=False):
@@ -146,19 +150,22 @@ def persona_de_busqueda(p, rid, nombres=None, corto=False):
         peso *= PESO_CORTO
     if not set(codigos) & _con_fuentes_propias():
         peso *= PESO_POCAS_FUENTES
+    if set(p.idiomas) == {"es"}:
+        peso *= PESO_SOLO_ESPANOL
     # Lugares principales: donde vive (su primera fila) y las regiones de sus filas. Van primero cada día (17 nov: los
     # turnos de quien vive en Emiratos se iban en países sueltos de Europa y «remoto en Emiratos» nunca llegaba).
     primera = lugares_perfil(p.model_copy(update={"ubicaciones": p.filas[:1]}), nombres) if p.filas else {}
     principales = [k for k in lugares if (k in primera and k != "REMOTO_MUNDO") or k.startswith(("REMOTO_REGION_", "REGION_"))]
     return {"familia": rid, "perfil": str(p.id), "lugares": sorted(set(lugares) | set(codigos)), "peso": peso,
-            "corto": bool(corto), "principales": principales}
+            "corto": bool(corto), "principales": principales, "idiomas": list(p.idiomas)}
 
 
 def consultas_espanol(cargo, raw, maximo=12):
-    """Títulos en español del cargo: los suyos y, si faltan, los del mapa de cargos (`sugerir`)."""
-    propios = [cargo.nombre, *raw["terminos_exactos"], *raw["terminos_similares"]]
-    sugeridos = sugerir(cargo.nombre, consultar_esco=False)
-    candidatos = propios + sugeridos["terminos_exactos"] + sugeridos["terminos_similares"]
+    """Títulos en español que se buscan para quien solo acepta español: los del cargo y los títulos exactos en español
+    de su familia del mapa (`espanol_del_mapa`). Contrato v49: solo lo que después se reconoce al clasificar; antes se
+    buscaban también los «similares» del mapa, que `grado` no reconoce: esos turnos se gastaban y sus avisos se
+    descartaban por «sin familia» (v44: los similares del mapa solo se sugieren)."""
+    candidatos = [cargo.nombre, *raw["terminos_exactos"], *raw["terminos_similares"], *espanol_del_mapa(cargo.nombre)]
     vistos, salida = set(), []
     for t in candidatos:
         clave = normalizar.texto(t)
@@ -187,7 +194,7 @@ SEGUNDOS_FALTANTES = {"verificacion": 240, "ubicacion": 150}
 RESERVA_REFUERZO = 60  # contrato v48: segundos de la comprobación que la primera pasada deja al refuerzo y al rescate
 
 
-def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
+def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=None):
     """`cortos` (contrato v37): ids de perfiles que en la última búsqueda quedaron bajo el mínimo (o no recibieron
     nada, como los nuevos). Sus lugares van primero en cada fuente y sus avisos reciben ficha primero.
     `enfocar` (contrato v45/v47, «Buscar ahora» para quien falta): ids de los perfiles que hoy no llegan a su meta. Solo
@@ -198,7 +205,7 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
     enfocar = None if enfocar is None else {str(x) for x in enfocar}
     cortos = enfocar if enfocar is not None else {str(x) for x in cortos}
     primero, personas = {}, []
-    aprendidos = aprendidos or {}
+    aprendidos, huellas = aprendidos or {}, huellas or {}
     mapa, roles = [], []
     nombres = {**{p["codigo"]: p["nombre"] for p in paises.mundo()["lista"]},
                **{p["codigo"]: p["nombre"] for p in paises.datos()["paises"]}}
@@ -209,9 +216,9 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
         # Contrato v21: un cargo sin cupo propio se busca igual si Comunidad tiene perfiles en él (recibe lo que sobra).
         if not perfiles or (not c.cupo and not comunidad):
             continue
-        raw = c.model_dump(mode="json")
-        if not raw["terminos_exactos"]:
-            raw["terminos_exactos"] = sugerir(c.nombre, consultar_esco=False)["terminos_exactos"]
+        # Contrato v49: el mismo cargo «rellenado» que usan la asignación, el rescate y el panel (nombres sugeridos,
+        # títulos aprendidos, huella de funciones y señales de otro oficio heredadas del mapa).
+        raw = contenido.cargo_operativo(c.model_dump(mode="json"), aprendidos.get(str(c.id)), huellas.get(str(c.id)))
         lugares = {}
         for p in perfiles:
             lugares.update(lugares_perfil(p, nombres))
@@ -230,12 +237,12 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
         lugares_es = {}
         for p in solo_es:
             lugares_es.update({k: v for k, v in lugares_perfil(p, nombres).items() if k != "REMOTO_MUNDO"})
-        # Contrato v25: títulos aprobados desde «Coincide por funciones» cuentan como similares del cargo.
-        similares = list(dict.fromkeys(raw["terminos_similares"] + list(aprendidos.get(str(c.id)) or [])))
-        raw["terminos_similares"] = similares
+        similares = raw["terminos_similares"]  # con los títulos aprobados desde «Coincide por funciones» (v25)
         mapa.append({"id": rid, "nombre": c.nombre, "consultas": [c.nombre, *raw["terminos_exactos"], *raw["terminos_similares"]],
             "exactos": raw["terminos_exactos"], "similares": similares, "cercanos": raw.get("terminos_cercanos", []),
-            "funciones": raw.get("funciones", []),
+            # v25: «Coincide por funciones» (otro título) solo con la huella que escribió el operador; la heredada y
+            # la automática (v49) van en `_control_cargo` y solo sirven para comprobar los títulos que sí coinciden.
+            "funciones": c.funciones,
             # Contrato v44: los títulos en español de la familia del mapa clasifican los avisos (como en `grado`), pero
             # no se buscan: no van en `consultas`/`similares`, que rotan en todas las fuentes.
             "similares_es": list(espanol_del_mapa(c.nombre)),
@@ -251,7 +258,7 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
             # Contrato v40: países donde se busca (Indeed, Computrabajo): los de sus lugares, no los 30 de «Europa».
             "paises_busqueda": sorted({x for p in perfiles for x in paises_de_lugares(lugares_perfil(p, nombres))}),
             "solo_remoto": all(p.modalidades == ["remoto"] for p in perfiles)})
-        roles.append({"id": rid, "nombre": c.nombre, "familias": [rid], "cupo": c.cupo,
+        roles.append({"id": rid, "nombre": c.nombre, "familias": [rid], "cupo": c.cupo, "_cargo": raw,
                       "_perfiles": [p.model_dump(mode="json") for p in perfiles], "_hoy": fecha,
                       "_comunidad": [p.model_dump(mode="json") for p in comunidad]})
     configuracion = {"por_rol": 20, "roles": roles, "preferir_remotas": True, "max_por_empresa": 2,
@@ -285,8 +292,8 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
 
 
 @contextmanager
-def activar(version, fecha, aprendidos=None, cortos=(), enfocar=None):
-    mapa, cfg, motor = preparar(version, fecha, aprendidos, cortos, enfocar)
+def activar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=None):
+    mapa, cfg, motor = preparar(version, fecha, aprendidos, cortos, enfocar, huellas)
     from buscador import cobertura, contrato
     cobertura.configurar_primero(motor.get("lugares_primero"))
     cobertura.configurar_personas(motor.get("personas_busqueda"))
@@ -324,8 +331,8 @@ LOTE_ARMADO = {"parcial", "completa"}
 def faltan_hoy(repo, version, fecha, ejecuciones=None):
     """Contrato v45: [(perfil, recibidas hoy, meta)] de quienes hoy no llegan a su meta y todavía pueden recibir más, o
     None si hoy aún no hay una búsqueda que haya armado su lote (no hay fila, falló, o solo corrió la captura horaria).
-    Puede recibir más quien está bajo el mínimo de 5 (rescate y reutilización lo completan) o cuyo cargo tiene cupo
-    libre en el lote del día. Comunidad no cuenta: recibe lo que sobra. Sin IA: cuenta las asignaciones del día."""
+    Contrato v49: puede recibir más todo el que está bajo su meta (reutilización y rescate completan hasta la meta).
+    Comunidad no cuenta: recibe lo que sobra. Sin IA: cuenta las asignaciones del día."""
     de_hoy = [e for e in (ejecuciones if ejecuciones is not None else repo.ejecuciones()) or []
               if str(e.get("fecha", "")) == fecha]
     resumen = (de_hoy[0].get("resumen") or {}) if de_hoy else {}
@@ -333,8 +340,6 @@ def faltan_hoy(repo, version, fecha, ejecuciones=None):
         return None
     cfg = validar_version(version)
     comunidades = {c.id for c in cfg.clientes if c.comunidad}
-    cargos = {c.id: c.nombre for c in cfg.cargos}
-    cupo_libre = resumen.get("faltantes") or {}
     eid = str(de_hoy[0]["id"])
     conteo = repo.asignaciones_por_perfil([eid])
     salida = []
@@ -342,8 +347,9 @@ def faltan_hoy(repo, version, fecha, ejecuciones=None):
         n, meta = conteo.get((eid, str(p.id)), 0), int(p.meta_diaria or 0)
         if p.cliente_id in comunidades or n >= meta:
             continue
-        if n < MINIMO_POR_PERFIL or cupo_libre.get(cargos.get(p.cargo_id, ""), 1) > 0:
-            salida.append((p, n, meta))
+        # Contrato v49: reutilización y rescate completan hasta la meta, así que todo el que está bajo su meta puede
+        # recibir más (antes, solo quien estaba bajo 5 o tenía cupo libre en su cargo).
+        salida.append((p, n, meta))
     return salida
 
 
@@ -386,6 +392,81 @@ def _embudo_por_nombre(reporte):
 DIAS_REUTILIZAR = 14
 
 
+class Completar:
+    """Contrato v49 (decisión de Oscar): hasta dónde se completa a cada persona con vacantes de días anteriores y de toda
+    la bodega. Hasta su meta diaria (mínimo 5); Comunidad sigue en el mínimo. Del mínimo a la meta, una vacante que hoy
+    aún no usa nadie solo entra mientras lote + añadidas no pasen del techo del día.
+    `ya_hoy` ({perfil: {vacantes}}): lo asignado en las pasadas anteriores de hoy (8:30, cada hora, «Buscar ahora»).
+    Cuenta para la meta y para el techo: sin esto cada pasada volvía a completar desde cero (un perfil con meta 17
+    quedaba con 17, 33, 49…)."""
+    def __init__(self, cfg, estrictas, filas, lote, ya_hoy=None):
+        comunidades = {c.id for c in cfg.clientes if c.comunidad}
+        self.estrictas = estrictas
+        self.metas = {p.id: MINIMO_POR_PERFIL if p.cliente_id in comunidades
+                      else max(MINIMO_POR_PERFIL, int(p.meta_diaria or 0)) for p in cfg.perfiles}
+        self.usadas = {f["vacante_id"] for f in filas} | set(lote)
+        en_filas = {(f["perfil_id"], f["vacante_id"]) for f in filas}
+        por_id = {str(p.id): p.id for p in cfg.perfiles}
+        for perfil, vacantes in (ya_hoy or {}).items():
+            antes = {v for v in vacantes if (perfil, v) not in en_filas}  # lo que esta pasada no vuelve a asignar
+            if antes and perfil in por_id:
+                estrictas[por_id[perfil]] = estrictas.get(por_id[perfil], 0) + len(antes)
+            self.usadas |= antes
+        self.libre = max(0, int(cfg.techo_diario or 0) - len(self.usadas))
+
+    def objetivo(self, p):
+        return self.metas.get(p.id, MINIMO_POR_PERFIL)
+
+    def falta(self, p):
+        return max(0, self.objetivo(p) - self.estrictas.get(p.id, 0))
+
+    def bajos(self, cfg):
+        return [(c, p) for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id)) if self.falta(p)]
+
+    def cabe(self, p, vacante_id):
+        return self.estrictas.get(p.id, 0) < MINIMO_POR_PERFIL or vacante_id in self.usadas or self.libre > 0
+
+    def anotar(self, p, vacante_id):
+        if vacante_id not in self.usadas:
+            self.usadas.add(vacante_id)
+            self.libre -= 1
+        self.estrictas[p.id] = self.estrictas.get(p.id, 0) + 1
+
+
+def ajuste(repo, clave):
+    """Un ajuste del panel ({} si no existe o no se puede leer: la búsqueda sigue igual sin él)."""
+    try:
+        return (repo.ajuste(clave, {}) or {}) if hasattr(repo, "ajuste") else {}
+    except Exception as e:  # noqa: BLE001
+        registro.aviso("ejecutor:ajuste:" + clave, e)
+        return {}
+
+
+def guardar_huellas(repo, version, vacantes):
+    """Contrato v49: al final de la búsqueda del día (no en la captura de cada hora) calcula, de la bodega, la huella
+    de funciones por idioma de los cargos activos sin huella propia y la guarda en `panel_ajustes.huellas_cargos`. La
+    usa la búsqueda siguiente; solo ordena. Un fallo aquí nunca tumba la búsqueda: queda la huella anterior."""
+    if not vacantes or not hasattr(repo, "guardar_ajuste"):
+        return {}
+    try:
+        bodega.etapa("Calcular la huella de funciones de los cargos")
+        cfg = validar_version(version)
+        aprendidos = ajuste(repo, "titulos_aprendidos")
+        cargos = [contenido.cargo_operativo(c.model_dump(mode="json"), aprendidos.get(str(c.id)))
+                  for c in cfg.cargos if c.activo and not c.funciones]
+        return repo.guardar_ajuste("huellas_cargos", contenido.huellas_automaticas(vacantes, cargos))
+    except Exception as e:  # noqa: BLE001
+        registro.aviso("ejecutor:huellas", e)
+        return {}
+
+
+def cargos_operativos(repo, cfg):
+    """Contrato v49: {id: cargo operativo} con los títulos aprendidos (v25) y la huella calculada de noche."""
+    aprendidos, huellas = ajuste(repo, "titulos_aprendidos"), ajuste(repo, "huellas_cargos")
+    return {str(c.id): contenido.cargo_operativo(c.model_dump(mode="json"), aprendidos.get(str(c.id)),
+                                                 huellas.get(str(c.id))) for c in cfg.cargos}
+
+
 def _paginas(repo, ruta, params, tamano=500, maximo=5000):
     salida = []
     for inicio in range(0, maximo, tamano):
@@ -396,12 +477,12 @@ def _paginas(repo, ruta, params, tamano=500, maximo=5000):
     return salida
 
 
-def _reutilizar(repo, cfg, fecha, estrictas, filas, fila):
-    """Contrato v11: a cada perfil con menos del mínimo se le añaden vacantes elegidas en días anteriores (para otros
-    clientes o por el cupo) que cumplen sus filtros —con las mismas ampliaciones— y que esa persona nunca recibió.
-    No cambia la selección del día ni el cupo: solo la asignación por persona. Devuelve cuántas se añadieron."""
-    bajos = [(c, p) for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id))
-             if estrictas.get(p.id, 0) < MINIMO_POR_PERFIL]
+def _reutilizar(repo, cfg, fecha, completar, filas, fila, operativos):
+    """Contrato v11: a cada perfil que no llega a su objetivo (v49: su meta diaria; antes, el mínimo de 5) se le añaden
+    vacantes elegidas en días anteriores (para otros clientes o por el cupo) que cumplen sus filtros —con las mismas
+    ampliaciones— y que esa persona nunca recibió. No cambia la selección del día ni el cupo: solo la asignación por
+    persona. Devuelve cuántas se añadieron."""
+    bajos = completar.bajos(cfg)
     if not bajos:
         return 0
     desde = (datetime.fromisoformat(fecha) - timedelta(days=DIAS_REUTILIZAR)).date().isoformat()
@@ -421,12 +502,16 @@ def _reutilizar(repo, cfg, fecha, estrictas, filas, fila):
         hoy_por_perfil.setdefault(f["perfil_id"], set()).add(f["vacante_id"])
     añadidas = 0
     for cargo, p in bajos:
-        raw = cargo.model_dump(mode="json")
+        raw = operativos[str(cargo.id)]
         vistas = recibidas.get(str(p.id), set()) | enviadas.get(str(p.cliente_id), set()) | hoy_por_perfil.get(str(p.id), set())
         for row in previas:
-            if estrictas.get(p.id, 0) >= MINIMO_POR_PERFIL:
+            if not completar.falta(p):
                 break
             if row["vacante_id"] in vistas or not grado(row["snapshot"].get("titulo") or "", raw, cercanos=True)[0]:
+                continue
+            if _otro_oficio(row["snapshot"], raw):  # contrato v49: eso se pregunta en «Por confirmar»
+                continue
+            if not completar.cabe(p, row["vacante_id"]):
                 continue
             match, extra = evaluar(row["snapshot"], p, fecha), [{"reutilizada": row["delivery_date"]}]
             if not match["compatible"]:
@@ -435,15 +520,17 @@ def _reutilizar(repo, cfg, fecha, estrictas, filas, fila):
                     continue
                 match, extra = evaluar_ampliada(row["snapshot"], p, fecha, nivel), [*extra, {"ampliacion": nivel}]
             vistas.add(row["vacante_id"])
-            estrictas[p.id] = estrictas.get(p.id, 0) + 1
+            completar.anotar(p, row["vacante_id"])
             filas.append(fila(row, p, str(cargo.id), match["pruebas"], extra))
             añadidas += 1
     return añadidas
 
 
 # Contrato v36 (caso Danna, 17 nov): completar el mínimo con TODA la bodega, no solo con lo que entró a algún lote.
-MAX_COMPROBAR_RESCATE = 80  # enlaces que se comprueban al momento para estos perfiles (no usa Apify)
-SEGUNDOS_RESCATE = 150
+# Contrato v49: se completa hasta la meta (no solo hasta 5), así que hay más enlaces por comprobar: 200 en 5 min (antes
+# 80 en 150 s). La pasada de cada hora sigue con 30 en 60 s.
+MAX_COMPROBAR_RESCATE = 200  # enlaces que se comprueban al momento para estos perfiles (no usa Apify)
+SEGUNDOS_RESCATE = 300
 
 
 def _vigente_24h(v, ahora):
@@ -458,17 +545,20 @@ def _vigente_24h(v, ahora):
     return False
 
 
-def _rescatar(repo, cfg, fecha, estrictas, filas, fila, vacantes, cache=None, comprobar=None, subir=None,
+def _otro_oficio(v, cargo):
+    return contenido.evidencia(v.get("titulo"), v.get("_descripcion"), cargo)["otro_oficio"]
+
+
+def _rescatar(repo, cfg, fecha, completar, filas, fila, vacantes, operativos, cache=None, comprobar=None, subir=None,
               maximo=MAX_COMPROBAR_RESCATE, segundos=SEGUNDOS_RESCATE):
-    """Contrato v36: a cada perfil que sigue bajo el mínimo se le dan vacantes de toda la bodega de la noche que cumplen
+    """Contrato v36: a cada perfil que no llega a su objetivo (v49: su meta diaria) se le dan vacantes de toda la bodega de la noche que cumplen
     su ubicación e idioma (lo demás ordena, v27), con enlace comprobado en 24 h, que esa persona nunca recibió —aunque
     otro cliente sí— y con máximo 2 por empresa. Los enlaces que falten se comprueban aquí mismo (como mucho
     `MAX_COMPROBAR_RESCATE`) y su comprobación se guarda en el catálogo para poder compartirlas. No cuentan en el cupo ni
     van a `ofertas`: solo la asignación por persona, como las reutilizadas (v11)."""
     from datetime import timezone
     from buscador import catalogo, contrato, tiempos, verificar_enlaces
-    bajos = [(c, p) for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id))
-             if estrictas.get(p.id, 0) < MINIMO_POR_PERFIL]
+    bajos = completar.bajos(cfg)
     if not bajos or not vacantes:
         return 0
     ahora = datetime.now(timezone.utc)
@@ -483,7 +573,7 @@ def _rescatar(repo, cfg, fecha, estrictas, filas, fila, vacantes, cache=None, co
     # 1) Candidatas de cada perfil, de mejor a peor (grado, lo que no cumple, más reciente).
     candidatas = {}
     for cargo, p in bajos:
-        raw = cargo.model_dump(mode="json")
+        raw = operativos[str(cargo.id)]
         lista = []
         for v in utiles:
             if v["id"] in vistas.get(str(p.id), set()):
@@ -491,23 +581,32 @@ def _rescatar(repo, cfg, fecha, estrictas, filas, fila, vacantes, cache=None, co
             afinidad, _ = grado(v["titulo"], raw, cercanos=True)
             if afinidad not in entrega.GRADOS:  # «funciones» nunca se entrega sola (v25)
                 continue
+            funciones = contenido.evidencia(v["titulo"], v.get("_descripcion"), raw)
+            if funciones["otro_oficio"]:  # contrato v49: no se entrega sola; se pregunta en «Por confirmar»
+                continue
             match, extra = evaluar(v, p, fecha), []
             if not match["compatible"]:
                 nivel = next((n for n in AMPLIACIONES if evaluar_ampliada(v, p, fecha, n)["compatible"]), None)
                 if not nivel:
                     continue
                 match, extra = evaluar_ampliada(v, p, fecha, nivel), [{"ampliacion": nivel}]
-            lista.append((entrega.GRADOS.index(afinidad) + len(match.get("incumple") or ()) + 2 * bool(extra),
+            lista.append((entrega.GRADOS.index(afinidad) + len(match.get("incumple") or ()) + 2 * bool(extra)
+                          + contenido.penalizacion(funciones),
                           -int((v.get("fecha_publicacion") or "0000-00-00").replace("-", "")[:8] or 0),
                           v, afinidad, match, extra))
         lista.sort(key=lambda x: x[:2])
         candidatas[(cargo.id, p.id)] = lista
     # 2) Comprobar al momento los enlaces de las que podrían entrar (las 3 mejores por plaza que falta).
+    # Contrato v49: por turnos y primero quien tiene menos candidatas (con pocas en español, cada enlace cuenta); antes
+    # el presupuesto se iba en los primeros perfiles de la lista.
     por_comprobar, ya = [], set()
-    for cargo, p in bajos:
-        falta = MINIMO_POR_PERFIL - estrictas.get(p.id, 0)
-        for x in candidatas[(cargo.id, p.id)][:falta * 3]:
-            v = x[2]
+    turnos = sorted(bajos, key=lambda cp: len(candidatas[(cp[0].id, cp[1].id)]))
+    for i in range(max((completar.falta(p) * 3 for _, p in bajos), default=0)):
+        for cargo, p in turnos:
+            lista = candidatas[(cargo.id, p.id)]
+            if i >= completar.falta(p) * 3 or i >= len(lista):
+                continue
+            v = lista[i][2]
             if v["id"] not in ya and not _vigente_24h(v, ahora):
                 ya.add(v["id"])
                 por_comprobar.append(v)
@@ -532,15 +631,17 @@ def _rescatar(repo, cfg, fecha, estrictas, filas, fila, vacantes, cache=None, co
     for cargo, p in bajos:
         empresas = Counter(empresa_de.get(f["vacante_id"], "") for f in filas if f["perfil_id"] == str(p.id))
         for _, _, v, afinidad, match, extra in candidatas[(cargo.id, p.id)]:
-            if estrictas.get(p.id, 0) >= MINIMO_POR_PERFIL:
+            if not completar.falta(p):
                 break
             empresa = normalizar.texto(v.get("empresa") or "")
             if v["id"] in vistas.setdefault(str(p.id), set()) or empresas[empresa] >= 2 or not _vigente_24h(v, ahora):
                 continue
+            if not completar.cabe(p, v["id"]):
+                continue
             row = {"vacante_id": v["id"], "snapshot": v, "match_grade": entrega.GRADO_CONTRATO.get(afinidad, "close")}
             vistas[str(p.id)].add(v["id"])
             empresas[empresa] += 1
-            estrictas[p.id] = estrictas.get(p.id, 0) + 1
+            completar.anotar(p, v["id"])
             filas.append(fila(row, p, str(cargo.id), match["pruebas"], [{"rescatada": "bodega"}, *extra]))
             añadidas += 1
     return añadidas
@@ -549,7 +650,7 @@ def _rescatar(repo, cfg, fecha, estrictas, filas, fila, vacantes, cache=None, co
 DIAS_POSTS = 2  # un post se comparte el día en que se leyó o el siguiente (su comprobación vale 24 h)
 
 
-def _posts(repo, cfg, fecha, estrictas, filas, fila):
+def _posts(repo, cfg, fecha, estrictas, filas, fila, operativos):
     """Contrato v11 (segunda parte): a cada perfil que sigue bajo el mínimo se le asignan posts de LinkedIn del cargo,
     solo hasta completar el mínimo. Cumplen sus filtros (los datos que el post no dice se admiten como «sin dato»,
     igual que una ampliación) y esa persona nunca los recibió. No cuentan en el cupo ni van a `ofertas`."""
@@ -580,9 +681,9 @@ def _posts(repo, cfg, fecha, estrictas, filas, fila):
     # Contrato v28: primero los posts con ubicación clara, después los deducidos y al final los sin confirmar.
     candidatos.sort(key=lambda row: ("", "deducida", "sin_confirmar").index(post_ubicacion(row["snapshot"])))
     for cargo, p in bajos:
-        raw = cargo.model_dump(mode="json")
+        raw = operativos[str(cargo.id)]
         vistas = vistas_por_perfil.setdefault(str(p.id), set())
-        sin_confirmar = 0
+        toleradas = 0  # contrato v49: posts a los que se les perdonó el país o la modalidad (sin confirmar o deducidos)
         for row in candidatos:
             if estrictas.get(p.id, 0) >= MINIMO_POR_PERFIL:
                 break
@@ -590,14 +691,12 @@ def _posts(repo, cfg, fecha, estrictas, filas, fila):
             if row["vacante_id"] in vistas or not afinidad:
                 continue
             marca = post_ubicacion(row["snapshot"])
-            if marca == "sin_confirmar" and sin_confirmar >= TOPE_POSTS_SIN_CONFIRMAR:
-                continue
             match, extra = evaluar_post(row["snapshot"], p, fecha), [{"tipo": "post"}]
-            if not match["compatible"]:
+            if not match["compatible"] or (match["tolerada"] and toleradas >= TOPE_POSTS_SIN_CONFIRMAR):
                 continue
             if marca:
                 extra.append({"post_ubicacion": marca, "pista": row["snapshot"].get("ubicacion_deducida", "")})
-                sin_confirmar += marca == "sin_confirmar"
+            toleradas += match["tolerada"]
             vistas.add(row["vacante_id"])
             estrictas[p.id] = estrictas.get(p.id, 0) + 1
             filas.append(fila(dict(row, match_grade=entrega.GRADO_CONTRATO.get(afinidad, "close")), p, str(cargo.id),
@@ -629,17 +728,21 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
 
     def de_comunidad(p):
         return bool(getattr(clientes.get(str(p.cliente_id)), "comunidad", False))
-    activos = [c for c in cfg.cargos if c.activo]
-    cargos_json = {str(c.id): c.model_dump(mode="json") for c in activos}
+    operativos = cargos_operativos(repo, cfg)
+    cargos_json = {str(c.id): operativos[str(c.id)] for c in cfg.cargos if c.activo}
     seleccionadas = repo.pedir("GET", "entregas_diarias", params={"delivery_date": "eq." + fecha, "select": "*", "limit": 500})
     filas, conteos, estrictas, ampliables = [], {}, {}, []
     def fila(row, p, cargo_id, pruebas, extra=()):
-        c = next(c for c in cfg.cargos if str(c.id) == cargo_id)
-        _, evidencia = grado(row["snapshot"]["titulo"], c.model_dump(mode="json"), cercanos=True)
+        # Contrato v49: el cargo operativo (el mismo con que se clasificó), la coincidencia del cargo que la RECIBE
+        # (antes, en el cruce entre cargos y al reutilizar, quedaba la del cargo de origen) y lo que dicen sus funciones.
+        c, v = operativos[cargo_id], row["snapshot"]
+        afinidad, evidencia = grado(v["titulo"], c, cercanos=True)
+        funciones = contenido.explicacion(contenido.evidencia(v["titulo"], v.get("_descripcion"), c))
         return {"ejecucion_id": ejecucion["id"], "cliente_id": str(p.cliente_id),
                 "perfil_id": str(p.id), "cargo_id": cargo_id, "vacante_id": row["vacante_id"],
-                "match_grade": row["match_grade"], "explicacion": [*pruebas, evidencia or {"regla": "similitud textual"}, *extra],
-                "filtros": p.model_dump(mode="json"), "cargo_configuracion": c.model_dump(mode="json")}
+                "match_grade": entrega.GRADO_CONTRATO.get(afinidad) or row["match_grade"],
+                "explicacion": [*pruebas, evidencia or {"regla": "similitud textual"}, funciones, *extra],
+                "filtros": p.model_dump(mode="json"), "cargo_configuracion": c}
     comunidad, de_reales = [], set()
     for row in seleccionadas:
         if not row["role_id"].startswith("cargo:"):
@@ -649,8 +752,10 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
         candidatos = [(p, cargo_id) for p in cfg.perfiles_activos(cargo_id)] if cargo_id in cargos_json else []
         # Contrato v43: si la vacante también es del otro cargo (exacto o similar; nunca solo «cercano»), llega a sus
         # perfiles sin ocupar su cupo.
+        # Contrato v49: y solo si sus funciones respaldan también ese otro cargo (sin evidencia no cruza).
         for otro, cargo in cargos_json.items():
-            if otro != cargo_id and grado(row["snapshot"].get("titulo", ""), cargo)[0]:
+            if otro != cargo_id and grado(row["snapshot"].get("titulo", ""), cargo)[0] and not contenido.penalizacion(
+                    contenido.evidencia(row["snapshot"].get("titulo"), row["snapshot"].get("_descripcion"), cargo)):
                 candidatos += [(p, otro) for p in cfg.perfiles_activos(otro)]
         for p, cid in candidatos:
             match = evaluar(row["snapshot"], p, fecha)
@@ -680,20 +785,30 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
             estrictas[p.id] = estrictas.get(p.id, 0) + 1
             filas.append(fila(row, p, cargo_id, match["pruebas"], [{"ampliacion": nivel}]))
     reutilizadas = posts = rescatadas = 0
+    ya_hoy = {}
+    if hasattr(repo, "asignadas_de"):
+        try:  # contrato v49: lo de las pasadas anteriores de hoy cuenta para la meta y el techo
+            ya_hoy = repo.asignadas_de(ejecucion["id"])
+        except Exception as e:  # noqa: BLE001 — sin el dato no se completa de más: solo hasta el mínimo de siempre
+            registro.aviso("ejecutor:ya-hoy", e)
+            ya_hoy = None
+    completar = Completar(cfg, estrictas, filas, [r["vacante_id"] for r in seleccionadas], ya_hoy)
+    if ya_hoy is None:
+        completar.metas = dict.fromkeys(completar.metas, MINIMO_POR_PERFIL)
     try:
-        reutilizadas = _reutilizar(repo, cfg, fecha, estrictas, filas, fila)
+        reutilizadas = _reutilizar(repo, cfg, fecha, completar, filas, fila, operativos)
     except Exception as e:  # noqa: BLE001 — completar con días anteriores nunca impide registrar lo del día
         registro.aviso("ejecutor:329", e)
     if vacantes:
         bodega.etapa("Completar a quien va corto con toda la bodega")
         try:
-            rescatadas = _rescatar(repo, cfg, fecha, estrictas, filas, fila, vacantes, cache=cache_enlaces,
+            rescatadas = _rescatar(repo, cfg, fecha, completar, filas, fila, vacantes, operativos, cache=cache_enlaces,
                                    maximo=limites_rescate[0], segundos=limites_rescate[1])
         except Exception as e:  # noqa: BLE001 — completar nunca impide registrar lo del día
             registro.aviso("ejecutor:rescate-general", e)
     bodega.etapa(f"Asignadas {len(filas)}; completar con posts a quien va corto")
     try:
-        posts = _posts(repo, cfg, fecha, estrictas, filas, fila)
+        posts = _posts(repo, cfg, fecha, estrictas, filas, fila, operativos)
     except Exception as e:  # noqa: BLE001 — los posts son el último recurso; nunca impiden registrar lo del día
         registro.aviso("ejecutor:334", e)
     for inicio in range(0, len(filas), 250):
@@ -739,7 +854,11 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
 def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPLETO):
     """`enfoque` (contrato v45): «faltantes» = «Buscar ahora» cuando la búsqueda de hoy ya corrió y hay perfiles bajo su
     meta: se busca solo para ellos, corto y sin repetir lo ya buscado hoy (v47). Si hoy aún no hay búsqueda, se hace la
-    completa."""
+    completa.
+    «pedido» (contrato v49) = «Buscar ahora» desde el detalle de un cliente: los perfiles los guardó el panel en
+    `panel_ajustes` (CLAVE_PEDIDA, con su fecha), nunca en las entradas del flujo. Si hoy ya hay lote, se busca solo
+    para ellos (como «faltantes»); si no, la completa del día con ellos primero. Un pedido de otro día, vacío o ilegible
+    hace la búsqueda de siempre. Se usa una sola vez: al leerlo, se vacía."""
     fecha = hoy()
     if prueba:
         return bodega.correr(salida, modo=modo, prueba=True)
@@ -761,6 +880,29 @@ def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPL
             enfocar = None
         if enfocar:
             bodega.etapa(f"Buscar solo para {len(enfocar)} perfiles bajo su meta, sin repetir lo de hoy (v47)")
+    primero = set()  # contrato v49: perfiles pedidos que van primero en la búsqueda completa del día
+    if enfoque == ENFOQUE_PEDIDO and modo == "diario" and hasattr(repo, "ajuste"):
+        pedidos = set()
+        try:
+            pedida = repo.ajuste(CLAVE_PEDIDA, {}) or {}
+            if isinstance(pedida, dict) and pedida.get("fecha") == fecha:
+                activos = {str(p.id) for p in validar_version(version).perfiles_activos()}
+                pedidos = {str(x) for x in pedida.get("perfiles") or [] if isinstance(x, str)} & activos
+            if pedida:
+                repo.guardar_ajuste(CLAVE_PEDIDA, {})  # se usa una sola vez
+            if pedidos:
+                faltan = faltan_hoy(repo, version, fecha)
+                if faltan is None:
+                    primero = pedidos
+                    bodega.etapa(f"Búsqueda completa del día, con {len(pedidos)} perfiles pedidos primero (v49)")
+                else:
+                    enfocar = pedidos
+                    bodega.etapa(f"Buscar solo para {len(pedidos)} perfiles pedidos, sin repetir lo de hoy (v49)")
+            else:
+                bodega.etapa("El pedido no es de hoy o no tiene perfiles activos: búsqueda normal del día")
+        except Exception as e:  # noqa: BLE001 — sin el pedido, la búsqueda completa de siempre
+            registro.aviso("ejecutor:pedido", e)
+            enfocar, primero = None, set()
     ejecucion = iniciar(repo, version, fecha)
     reglas_info, reglas = {}, []
     if hasattr(repo, "decisiones_ubicacion"):
@@ -770,18 +912,15 @@ def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPL
         except Exception:  # noqa: BLE001 — sin reglas la búsqueda sigue igual que antes
             paises.cargar_reglas()
     try:
-        aprendidos = {}
-        if hasattr(repo, "ajuste"):
-            try:  # contrato v25: títulos aprendidos en la bandeja
-                aprendidos = repo.ajuste("titulos_aprendidos", {}) or {}
-            except Exception:  # noqa: BLE001 — sin ellos la búsqueda sigue igual
-                aprendidos = {}
+        # Contrato v25: títulos aprendidos en la bandeja. Contrato v49: y la huella de funciones de la noche anterior,
+        # para que la clasificación y el lote usen el mismo cargo operativo que la asignación (`cargos_operativos`).
+        aprendidos, huellas = ajuste(repo, "titulos_aprendidos"), ajuste(repo, "huellas_cargos")
         # Contrato v43 (decisión de Oscar, 18 nov): si la configuración se confirmó hoy después de armar el lote, la
         # siguiente pasada horaria también arma lote para lo que falte (excepción a «la captura horaria no entrega»).
         lote_de = (ejecucion.get("resumen") or {}).get("revision_del_lote")
-        completar = modo == "incremental" and lote_de is not None and lote_de != version["revision"]
-        with activar(version, fecha, aprendidos, perfiles_cortos(repo, version, fecha), enfocar):
-            if completar:
+        arma_lote = modo == "incremental" and lote_de is not None and lote_de != version["revision"]
+        with activar(version, fecha, aprendidos, perfiles_cortos(repo, version, fecha) | primero, enfocar, huellas):
+            if arma_lote:
                 bodega._config_operativa["completar_lote"] = True
             if hasattr(repo, "decisiones_ubicacion"):
                 try:  # contrato v17: cada decisión de la bandeja vale en esta búsqueda
@@ -803,19 +942,21 @@ def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPL
                     reglas_info["ubicaciones_resueltas_por_reglas"] = aprender.guardar_usos(repo, reglas)
                 except Exception as e:  # noqa: BLE001
                     registro.aviso("ejecutor:405", e)
-            # Contrato v36: la bodega completa de la noche, para completar el mínimo de cada persona.
+            # Contrato v36: la bodega completa de la noche, para completar a cada persona hasta su meta (v49).
             trabajo = Path(salida) / "trabajo"
+            vacantes = bodega._leer_json(trabajo / "bodega.json.gz", [])
             registrar(repo, version, fecha, dict(reporte or {}, busquedas_por_perfil=busquedas), reglas_info,
-                      vacantes=bodega._leer_json(trabajo / "bodega.json.gz", []),
+                      vacantes=vacantes,
                       cache_enlaces=bodega._leer_json(trabajo / "verificacion_enlaces.json", {}),
                       limites_rescate=(30, 60) if modo == "incremental" else (MAX_COMPROBAR_RESCATE, SEGUNDOS_RESCATE),
-                      revision_lote=version["revision"] if modo != "incremental" or completar else None)
+                      revision_lote=version["revision"] if modo != "incremental" or arma_lote else None)
             if modo != "incremental":
                 try:  # borradores de WhatsApp listos para revisar; un fallo aquí nunca tumba la búsqueda
                     from panel import borradores
                     borradores.generar(repo, fecha)
                 except Exception as e:  # noqa: BLE001
                     registro.aviso("ejecutor:412", e)
+                guardar_huellas(repo, version, vacantes)
             return reporte
     except Exception:
         aviso = "La captura requiere revisión; se conserva su historial y pendientes."
@@ -839,8 +980,10 @@ def main():
     parser.add_argument("--salida", required=True)
     parser.add_argument("--modo", choices=["diario", "incremental", "inicial"], default="diario")
     parser.add_argument("--prueba", action="store_true")
-    parser.add_argument("--enfoque", choices=[ENFOQUE_COMPLETO, ENFOQUE_FALTANTES], default=ENFOQUE_COMPLETO,
-                        help="faltantes: «Buscar ahora» para quienes hoy no llegan a su meta (contrato v45)")
+    parser.add_argument("--enfoque", choices=[ENFOQUE_COMPLETO, ENFOQUE_FALTANTES, ENFOQUE_PEDIDO],
+                        default=ENFOQUE_COMPLETO,
+                        help="faltantes: «Buscar ahora» para quienes hoy no llegan a su meta (contrato v45); pedido: "
+                             "los perfiles que el panel guardó para un cliente (contrato v49)")
     parser.add_argument("--config", help="Versión ficticia para ensayo dirigido; requiere --prueba")
     args = parser.parse_args()
     if args.config:

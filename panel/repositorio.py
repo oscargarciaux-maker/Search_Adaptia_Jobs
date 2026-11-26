@@ -35,10 +35,21 @@ class ErrorRepositorio(Exception):
 _SIN_015 = ("Reparte exactamente 120 vacantes", "Los cupos superan 120")
 
 
+# Contrato v49: los motivos por los que la base no deja aplicar, en lenguaje sencillo y con qué hacer.
+_NO_APLICA = {
+    "Cada cargo necesita un perfil activo": "Hay un cargo activo sin ningún perfil activo de un cliente activo: dale un "
+                                            "perfil o archívalo en «Cargos y metas», y vuelve a pulsar «Aplicar cambios».",
+    "Las metas superan el techo diario": "Las metas suman más que el techo diario: baja algunas metas o sube el techo en "
+                                         "«Cargos y metas», y vuelve a pulsar «Aplicar cambios».",
+    "Da una meta diaria a algún perfil": "Ningún perfil activo tiene meta diaria: da una meta a algún perfil y vuelve a "
+                                         "pulsar «Aplicar cambios».",
+}
+
+
 def _mensaje_sql(mensaje):
-    if "panel_publicar_hoy" in mensaje:  # contrato v27: la función de SQL 016 aún no está instalada
-        return ("La base todavía no tiene «Aplicar hoy» (SQL 016). En GitHub → Actions, corre «Preparar Supabase» y "
-                "vuelve a intentarlo. Mientras tanto, «Programar para mañana» sigue funcionando.")
+    for clave, texto in _NO_APLICA.items():
+        if clave in mensaje:
+            return texto
     if any(m in mensaje for m in _SIN_015):
         return ("La base todavía no tiene la actualización de metas por perfil (SQL 015). En GitHub → Actions, corre "
                 "«Preparar Supabase» y vuelve a intentarlo.")
@@ -208,9 +219,10 @@ class RepositorioSupabase:
                    params={"id": "eq." + vacante_id, "or": "(description_full.is.null,description_full.eq.)"},
                    headers={"Prefer": "return=minimal"}, json={"description_full": texto[:30000]})
 
-    def candidatas_por_funciones(self, desde=None):
-        """Contrato v25: vacantes activas que coinciden con un cargo solo por funciones."""
-        params = {"status": "eq.active", "datos->familias": 'cs.[{"coincidencia":"funciones"}]',
+    def candidatas_por_funciones(self, desde=None, grado="funciones"):
+        """Contrato v25: vacantes activas que coinciden con un cargo solo por funciones. Contrato v49: con
+        `grado="otro_oficio"`, las que coinciden por el título pero sus funciones parecen de otro oficio."""
+        params = {"status": "eq.active", "datos->familias": 'cs.[{"coincidencia":"%s"}]' % grado,
                   "select": "id,datos,description_full"}
         if desde:
             params["observed_at"] = "gte." + desde
@@ -411,6 +423,15 @@ class RepositorioSupabase:
             salida.setdefault(r["cliente_id"], set()).add(r["vacante_id"])
         return salida
 
+    def asignadas_de(self, ejecucion_id):
+        """Contrato v49: {perfil: {vacantes}} ya asignadas en esa ejecución (las pasadas anteriores del día)."""
+        filas = self._paginas("panel_asignaciones", "id", {"ejecucion_id": "eq." + str(ejecucion_id),
+                              "select": "id,perfil_id,vacante_id"}, 1000)
+        salida = {}
+        for r in filas:
+            salida.setdefault(r["perfil_id"], set()).add(r["vacante_id"])
+        return salida
+
     def asignaciones_por_perfil(self, ejecucion_ids):
         """Contrato v37: cuántas vacantes recibió cada perfil en cada búsqueda (solo conteos)."""
         if not ejecucion_ids:
@@ -439,13 +460,9 @@ class RepositorioSupabase:
     def publicar(self, revision):
         actual = self.config()
         if actual["revision"] != revision:
-            raise ErrorRepositorio("La configuración cambió. Recarga antes de programar.", 409)
+            raise ErrorRepositorio("La configuración cambió. Recarga antes de aplicar.", 409)
         Configuracion.model_validate(actual["borrador"]).validar_publicacion()
         return self.pedir("POST", "rpc/panel_publicar", json={"p_revision": revision})
-
-    def publicar_hoy(self, revision):
-        """Contrato v43: «Aplicar hoy» y «Confirmar» son lo mismo (SQL 019): rige desde hoy."""
-        return self.publicar(revision)
 
     def operativa(self, fecha):
         filas = self.pedir("GET", "panel_versiones", params={"vigente_desde": "lte." + fecha, "order": "vigente_desde.desc,revision.desc", "limit": 1})
@@ -552,6 +569,14 @@ class RepositorioSupabase:
 DEMO_SECCIONES = ("\n\nResponsibilities:\n- Work with product and engineering on new features.\n"
                   "- Keep quality and consistency across the product.\n\nRequirements:\n"
                   "- Recent work samples or portfolio.\n- Clear written communication.")
+
+
+# Contrato v49: funciones del cargo en los avisos de la demostración (las mismas palabras del mapa de cargos).
+DEMO_FUNCIONES = {
+    "Product Designer": "\n\nYou will design in Figma, build wireframes and prototyping flows, and keep our design system.",
+    "Frontend": "\n\nYou will build interfaces with React and TypeScript, write HTML and CSS and ship with Vite.",
+    "QA": "\n\nYou will write test cases, automate with Cypress and Playwright, and report bugs in Jira.",
+}
 
 
 def id_demo(nombre):
@@ -772,6 +797,11 @@ class RepositorioDemo:
                 self._guardar()
 
     def operativa(self, fecha):
+        """Contrato v49: lo aplicado en la demostración también queda en uso (un cliente nuevo puede «Buscar ahora»)."""
+        with self.lock:
+            p = self.estado.get("publicada")
+            if p and p.get("configuracion") and str(p.get("vigente_desde", "")) <= fecha:
+                return deepcopy(p)
         return {"revision": 1, "configuracion": configuracion_demo()}
 
     def ejecucion(self, fecha):
@@ -851,7 +881,7 @@ class RepositorioDemo:
     def candidatas_por_confirmar(self, desde=None):
         return []  # la demostración trae su bandeja ya preparada
 
-    def candidatas_por_funciones(self, desde=None):
+    def candidatas_por_funciones(self, desde=None, grado="funciones"):
         return []
 
     def vacante(self, vacante_id):
@@ -945,21 +975,11 @@ class RepositorioDemo:
     def publicar(self, revision):
         with self.lock:
             if revision != self.estado["revision"]:
-                raise ErrorRepositorio("La configuración cambió. Recarga antes de programar.", 409)
+                raise ErrorRepositorio("La configuración cambió. Recarga antes de aplicar.", 409)
             Configuracion.model_validate(self.estado["borrador"]).validar_publicacion()
             if self.estado["publicada"] and self.estado["publicada"]["revision"] == revision:
                 return {k:self.estado["publicada"][k] for k in ("revision","vigente_desde")}
             # Contrato v43: confirmar deja la configuración vigente desde hoy (la próxima búsqueda ya la usa).
-            self.estado["publicada"] = {"revision": revision, "vigente_desde": hoy(),
-                                        "configuracion": deepcopy(self.estado["borrador"])}
-            self._guardar()
-            return {"revision": revision, "vigente_desde": hoy()}
-
-    def publicar_hoy(self, revision):
-        with self.lock:
-            if revision != self.estado["revision"]:
-                raise ErrorRepositorio("La configuración cambió. Recarga antes de aplicar.", 409)
-            Configuracion.model_validate(self.estado["borrador"]).validar_publicacion()
             self.estado["publicada"] = {"revision": revision, "vigente_desde": hoy(),
                                         "configuracion": deepcopy(self.estado["borrador"])}
             self._guardar()
@@ -1045,7 +1065,10 @@ class RepositorioDemo:
                      "ubicacion": "Remote - Worldwide", "paises": ["CO", "ES"], "confianza_pais": "alta",
                      "modalidad": "remoto", "idioma": "en" if n % 2 else "es", "fecha_publicacion": publicada,
                      "fecha_estimada": False, "anos_min": anos, "ingles": "intermedio",
-                     "_descripcion": (f"English B2 required. We require {anos} years of experience. We build digital products with a collaborative team. " * 5) + DEMO_SECCIONES,
+                     # Contrato v49: casi todas nombran funciones del cargo; una de cada nueve no, y llega al final
+                     # con la etiqueta «Funciones por confirmar».
+                     "_descripcion": (f"English B2 required. We require {anos} years of experience. We build digital products with a collaborative team. " * 5)
+                                     + ("" if n % 9 == 8 else DEMO_FUNCIONES[cargo["nombre"]]) + DEMO_SECCIONES,
                      "enlace": url, "enlace_directo": "", "enlaces_alternativos": [url],
                      "verificacion": {"estado": "verificada", "enlaces": [{"url": url, "estado": "verificada",
                         "comprobada_en": self.creada.isoformat()}]}}

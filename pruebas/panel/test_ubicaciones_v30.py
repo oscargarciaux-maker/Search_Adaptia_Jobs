@@ -28,7 +28,8 @@ def test_un_perfil_anterior_se_lee_en_filas_sin_cambiar_lo_que_recibe():
                                "ciudades": ["Monterrey"]})
     assert p.ubicaciones == []  # no se guardan: siguen mandando los campos de siempre
     filas = [(f.paises, f.ciudades, f.modalidades) for f in p.filas]
-    assert filas == [(["MX"], ["Monterrey"], ["remoto", "presencial"]), (["CO"], ["Monterrey"], ["presencial"]),
+    # Contrato v49: cada ciudad queda en las filas de su país (Monterrey es de México, no de Colombia).
+    assert filas == [(["MX"], ["Monterrey"], ["remoto", "presencial"]), (["CO"], [], ["presencial"]),
                      (["US"], [], ["remoto"])]
     assert _ok(_v("remoto", ["MX"]), p) and _ok(_v("remoto", mundo=["US"]), p)
     assert _ok(_v("presencial", ["MX"], ubicacion="Monterrey, México"), p)

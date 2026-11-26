@@ -4,12 +4,12 @@ import re
 from datetime import date
 
 from buscador import contrato, enlaces, normalizar, paises, tasas, tiempos
-from panel.modelos import Perfil, horas_de_zona
+from panel.modelos import Perfil, horas_de_zona, pais_de_ciudad
 
 NIVELES = ["A1", "A2", "B1", "B2", "C1", "C2", "native"]
 CAMPOS_FILTRO = ("id", "titulo", "paises", "confianza_pais", "modalidad", "idioma", "publicada_en",
                  "fecha_publicacion", "fecha_estimada", "ids_agrupados", "salario", "paises_mundo", "alcance_mundial",
-                 "zona_utc", "ubicacion")
+                 "zona_utc", "ubicacion", "nota_pais")
 
 
 def ligera(datos, descripcion=None):
@@ -47,7 +47,8 @@ AVISO_RESTRICCION = {"salario menor al aceptado": "Salario menor al que pide",
 
 
 # Contrato v28: a un post con la ubicación deducida o sin confirmar solo se le perdona lo que depende de saber dónde y
-# cómo es (país y modalidad); idioma, fecha y lo demás se exigen igual. Los «sin confirmar», hasta 2 por perfil al día.
+# cómo es (país y modalidad); idioma, fecha y lo demás se exigen igual. Los «sin confirmar», hasta 2 por perfil al día;
+# desde v49 el tope cuenta todo post al que se le perdonó la ubicación (también los «deducidos»).
 POST_UBICACION_TOLERADA = {"país sin elegibilidad confirmada", "modalidad diferente"}
 TOPE_POSTS_SIN_CONFIRMAR = 2
 ETIQUETA_POST_UBICACION = {"deducida": "Post · ubicación deducida", "sin_confirmar": "Post · ubicación sin confirmar"}
@@ -67,7 +68,10 @@ def evaluar_post(v, perfil, hoy=None):
     r = evaluar(v, perfil, hoy)
     if not r["compatible"] and post_ubicacion(v) and set(r["motivos"]) <= POST_UBICACION_TOLERADA:
         r = dict(r, compatible=True, motivos=[], pruebas=[*r["pruebas"], ETIQUETA_POST_UBICACION[post_ubicacion(v)]])
-    return r
+        tolerada = True
+    else:
+        tolerada = False
+    return dict(r, tolerada=tolerada)  # contrato v49: se le perdonó el país o la modalidad; cuenta para el tope diario
 
 
 def faltas(resultado):
@@ -192,23 +196,31 @@ MARGEN_ZONA = 1
 
 
 def lugar(v, p):
-    """(motivos, prueba) de la ubicación. Contrato v8/v23/v24 por fila (v30): remoto → que admita postular desde un
-    país de la fila (o mundial, o con horario aceptado); híbrido/presencial → oficina en un país o una ciudad de la
-    fila. Si ninguna fila sirve, los motivos son los de la primera (donde vive)."""
-    modo, paises_v = v.get("modalidad"), set(v.get("paises") or [])
-    mundo_v = paises_v | set(v.get("paises_mundo") or [])
-    horario = modo not in ("hibrido", "presencial") and horario_compatible(v, p)
+    """(motivos, prueba) de la ubicación, por fila (v30). Si ninguna fila sirve, los motivos son los de la primera.
+    Contrato v49 (decisiones de Oscar, 26 nov): si el aviso nombra un país, manda ese país.
+    - Un país cubierto (LATAM y España) solo cuenta si está en `paises`; uno de fuera, si el aviso lo nombra.
+    - «Anywhere in France…» no es alcance mundial. El alcance mundial vale si el aviso no nombra países o los cubre todos.
+    - El horario solo abre una remota que NO nombra país (`nota_pais` «por zona horaria») y solo para las zonas que el
+      perfil marcó; la zona del país donde vive ya no cuenta sola (antes 95 remotas de otro país llegaban a Colombia).
+    - Híbrido/presencial: la fila necesita ciudad y el aviso debe nombrarla (o quedar a 50 km)."""
+    modo = v.get("modalidad")
+    abiertos, mundial, solo_franja = paises.abiertos(v)
+    horario = solo_franja and modo not in ("hibrido", "presencial") and horario_compatible(v, p)
     sin_pais = v.get("confianza_pais") not in {"alta", "media"} and not horario
     primeros = None
     for fila in p.filas:
-        motivos, prueba = _en_fila(v, fila, modo, mundo_v, horario, sin_pais)
+        motivos, prueba = _en_fila(v, fila, modo, abiertos, mundial, horario, sin_pais)
         if not motivos:
             return [], prueba
         primeros = primeros or motivos
     return primeros or ["no admite postular desde su país"], ""
 
 
-def _en_fila(v, fila, modo, mundo_v, horario, sin_pais):
+MOTIVO_SIN_CIUDAD = "falta la ciudad en el perfil"
+MOTIVO_CIUDAD_SIN_CONFIRMAR = "oficina sin ciudad confirmada"
+
+
+def _en_fila(v, fila, modo, abiertos, mundial, horario, sin_pais):
     modos = ("remoto", "hibrido", "presencial")
     motivos = []
     if (modo in modos and modo not in fila.modalidades) or (modo not in modos and not set(modos) <= set(fila.modalidades)):
@@ -217,64 +229,91 @@ def _en_fila(v, fila, modo, mundo_v, horario, sin_pais):
     if sin_pais:
         return motivos + ["país sin elegibilidad confirmada"], ""
     if modo in ("hibrido", "presencial"):
-        if not mundo_v & paises_fila and not en_sus_ciudades(v, fila.ciudades):
+        if motivos:  # la fila no acepta esa modalidad: su ciudad no viene al caso
+            return motivos + ([] if abiertos & paises_fila else ["oficina en otro país"]), ""
+        if not fila.ciudades:
+            return [MOTIVO_SIN_CIUDAD], ""
+        if en_sus_ciudades(v, fila.ciudades, paises_fila):
+            return motivos, "Oficina en su ciudad"
+        if paises_fila and not abiertos & paises_fila:
             return motivos + ["oficina en otro país"], ""
-        if fila.ciudades and otra_ciudad(v, fila.ciudades):
-            return motivos + ["oficina en otra ciudad"], ""
-        return motivos, "Ubicación compatible"
-    if mundo_v & paises_fila or v.get("alcance_mundial"):
-        return motivos, "Remota abierta a su país" if modo == "remoto" else "Ubicación compatible"
-    if horario:
+        return motivos + ["oficina en otra ciudad" if otra_ciudad(v, fila.ciudades, paises_fila)
+                          else MOTIVO_CIUDAD_SIN_CONFIRMAR], ""
+    if horario:  # el aviso no nombra país: lo que la admite es la franja que el perfil marcó
         return motivos, "Remota con horario compatible"
+    if abiertos & paises_fila or mundial:
+        return motivos, "Remota abierta a su país" if modo == "remoto" else "Ubicación compatible"
     return motivos + ["no admite postular desde su país"], ""
 
 
 def horario_compatible(v, p):
-    """Una remota que solo pide franja horaria sirve si la franja cruza una zona aceptada o la del país donde vive
-    (±2 h). Sin `zona_utc` no aplica."""
+    """Una remota que solo pide franja horaria sirve si la franja cruza una zona que el perfil marcó en «horarios que
+    acepta» (±1 h). Contrato v49: la zona del país donde vive ya no cuenta sola. Sin `zona_utc` no aplica."""
     zona = v.get("zona_utc")
     if not zona:
         return False
     franjas = [(h - MARGEN_ZONA, h + MARGEN_ZONA) for h in map(horas_de_zona, p.acepta_horario) if h is not None]
-    utc = paises.datos()["utc"].get(p.vive_en)
-    if utc is not None:
-        franjas.append((utc - 2, utc + 2))
     return any(zona[0] <= hi and lo <= zona[1] for lo, hi in franjas)
 
 
-def en_sus_ciudades(v, ciudades):
-    """Contrato v24: la ubicación del aviso nombra una de las ciudades donde trabajaría (la ciudad implica el país).
-    Contrato v38: o queda a 50 km o menos de una de ellas («Brooklyn, NY» para quien trabajaría en New York)."""
+def _paises_del_aviso(v):
+    return set(v.get("paises") or []) | set(v.get("paises_mundo") or [])
+
+
+def _ciudad_del_pais(ciudad, del_aviso, paises_fila):
+    """Contrato v49: el nombre de una ciudad no anula el país. Vale si el aviso no dice país o si su país es uno de la
+    fila («Santiago» de Chile no acepta «Santiago de Cali, Colombia»; «Paris» de una fila de EE. UU. es la de Texas).
+    En una fila sin países, el país es el de la ciudad; si el nombre es de varios, no se puede comprobar y vale."""
+    referencia = _paises_de_ciudad(ciudad, paises_fila)
+    return not del_aviso or not referencia or bool(del_aviso & referencia)
+
+
+def _paises_de_ciudad(ciudad, paises_fila):
+    """Los países donde puede estar una ciudad del perfil: los de su fila; en una fila sin países, el de la ciudad."""
+    return set(paises_fila) or ({pais_de_ciudad(ciudad)} - {None})
+
+
+def en_sus_ciudades(v, ciudades, paises_fila=()):
+    """Contrato v24: la ubicación del aviso nombra una de las ciudades donde trabajaría.
+    Contrato v38: o queda a 50 km o menos de una de ellas («Brooklyn, NY» para quien trabajaría en New York).
+    Contrato v49: siempre que el país del aviso sea el de esa ciudad (`_ciudad_del_pais`)."""
     ubicacion = normalizar.texto(v.get("ubicacion") or "")
     if not ubicacion:
         return False
-    return any(normalizar.contiene_frase(ubicacion, normalizar.texto(c)) for c in ciudades) or _cerca(v, ciudades)
+    del_aviso = _paises_del_aviso(v)
+    return any(normalizar.contiene_frase(ubicacion, normalizar.texto(c)) and _ciudad_del_pais(c, del_aviso, paises_fila)
+               for c in ciudades) or _cerca(v, ciudades, paises_fila)
 
 
-def _cerca(v, ciudades):
+def _cerca(v, ciudades, paises_fila=()):
     """Contrato v38: la ciudad del aviso está en los alrededores de alguna ciudad del perfil (GeoNames, sin IA)."""
     limpia = re.sub(r"\s*\(.*?\)", "", v.get("ubicacion") or "")
-    codigos = tuple(sorted(set(v.get("paises") or []) | set(v.get("paises_mundo") or [])))
+    codigos = tuple(sorted(_paises_del_aviso(v)))
     ciudad = contrato._ciudad(limpia, codigos[0] if len(codigos) == 1 else "")
     if not ciudad:
         return False
     estado = paises.estado_eeuu(limpia)
     for c in ciudades:
-        # La ciudad del perfil se ubica primero en su país («Madrid» es España, no el Madrid de Cundinamarca).
-        suyo = paises.pais_de_lugar(c)
-        if suyo and codigos and suyo not in codigos:
+        # La ciudad del perfil se ubica primero en su país («Madrid» es España, no el Madrid de Cundinamarca); si el
+        # nombre es de varios países, en los de su fila (v49: «Valencia» de España no es la de California).
+        # Para los alrededores la ciudad se ubica en su propio país cuando el nombre lo dice («Madrid» es la de
+        # España aunque la fila sea de Colombia: Bogotá no es «alrededores de Madrid»); si el nombre es de varios
+        # países, en los de la fila («Valencia» de España no es la de California).
+        if paises_fila and codigos and not set(paises_fila) & set(codigos):
+            continue  # la fila es de sus países: «Paris» de una fila de EE. UU. no acepta la de Francia
+        suyo = pais_de_ciudad(c)
+        referencia = (suyo,) if suyo else tuple(sorted(paises_fila))
+        if referencia and codigos and not set(referencia) & set(codigos):
             continue
-        if paises.cerca(ciudad, c, (suyo,) if suyo else codigos, estado):
+        if paises.cerca(ciudad, c, referencia or codigos, estado):
             return True
     return False
 
 
-def otra_ciudad(v, ciudades):
-    """True si la ubicación del aviso nombra una ciudad y no es ninguna de las del perfil. Sin ciudad, no descarta."""
+def otra_ciudad(v, ciudades, paises_fila=()):
+    """True si la ubicación del aviso nombra una ciudad y no es ninguna de las del perfil."""
     ubicacion = normalizar.texto(v.get("ubicacion") or "")
-    if not ubicacion:
-        return False
-    if any(normalizar.contiene_frase(ubicacion, normalizar.texto(c)) for c in ciudades) or _cerca(v, ciudades):
+    if not ubicacion or en_sus_ciudades(v, ciudades, paises_fila):
         return False  # contrato v38: los alrededores de su ciudad («Jersey City» para New York) no son otra ciudad
     limpia = re.sub(r"\s*\(.*?\)", "", v.get("ubicacion") or "")
     codigo = next(iter(v.get("paises") or v.get("paises_mundo") or []), "")

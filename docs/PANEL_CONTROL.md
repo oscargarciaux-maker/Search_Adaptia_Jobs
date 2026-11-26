@@ -63,10 +63,12 @@ claro/oscuro (por defecto sigue al computador; `?tema=oscuro|claro` en la direcc
    Get on Board, sin Apify ni cookies, aplica los mismos filtros y descuenta las ya entregadas. Es una muestra: la
    búsqueda nocturna revisa más páginas y portales. Para no exponer la IP del servidor a bloqueos de LinkedIn, solo
    corre una a la vez y el mismo perfil espera 2 minutos entre repeticiones; ante un bloqueo no insiste.
-5. **Guardar borrador** conserva los cambios; todavía no cambia la búsqueda confirmada. Una advertencia muestra cambios
-   sin guardar. Si otra ventana guardó antes, se rechaza la revisión antigua: recargar y revisar antes de guardar otra vez.
-6. **Programar para mañana** muestra la distribución, guarda los cambios pendientes y confirma una versión inmutable.
-   Entra en vigor al día siguiente según Bogotá. Se exige un perfil activo por cada cargo con meta positiva.
+5. **Aplicar cambios** (26 nov, contrato v49) guarda y deja la configuración vigente: la próxima búsqueda la usa. Es
+   el único botón; «Guardar borrador» y «Programar para mañana» se retiraron. El botón de los formularios de cliente y
+   de cargo aplica de verdad. Si otra ventana aplicó antes, se rechaza la revisión antigua: recargar y volver a aplicar.
+6. Si no se puede aplicar (las metas pasan del techo, o un cargo con meta no tiene un perfil activo), los cambios
+   quedan guardados y el panel dice qué corregir. En el detalle de cada cliente, **Buscar ahora** lanza la búsqueda
+   solo para sus perfiles que no llegan a su meta (o la búsqueda completa del día si hoy aún no corrió).
 7. **Mensajes**: cada mañana cada cliente con WhatsApp y aceptación tiene su mensaje (al menos 5 vacantes cuando existen, sin repetir). «Abrir en WhatsApp» abre su chat con el texto escrito; se revisa, se envía y se marca «enviado». El número y el nombre para saludar se añaden en la ficha del cliente.
 8. En **Actividad**, comprobar la captura y sus faltantes (los avisos por correo se retiraron del panel; GitHub avisa al dueño si un flujo falla). «Dónde se pierden las vacantes de cada cargo» muestra el embudo: encontradas → con descripción → país e idioma confirmados → nuevas → enlace comprobado → cumplen filtros → entregadas, con la mayor pérdida. No se inventan vacantes ni se completan cupos con duplicados,
    ubicaciones ajenas o enlaces pendientes. Si las fuentes no ofrecen suficientes resultados, se indica el déficit.
