@@ -310,7 +310,8 @@ def _sirve_a_perfiles(v):
     objetivo = set(cfg.get("paises_objetivo_mundo") or [])
     if objetivo & set(v.get("paises_mundo") or []):
         return True
-    return bool(cfg.get("acepta_horario") and v.get("zona_utc"))
+    # Contrato v49: la franja horaria solo abre un aviso que no nombra país (nota «por zona horaria»).
+    return bool(cfg.get("acepta_horario") and v.get("zona_utc") and v.get("nota_pais") == "por zona horaria")
 
 
 def limpiar(previas, crudas, hoy, dias_maximos, enlaces_ats, empresas_leidas, consulta="", retiradas=None):

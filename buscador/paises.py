@@ -84,9 +84,27 @@ _RESTRINGE = re.compile(
     r"(the\s+)?(?P<lugar>[a-z .]{2,40})"
     r"|\b(only|solo|solamente|unicamente|exclusively)\s+(open\s+to\s+)?(candidates|applicants|candidatos|personas|residents)?\s*"
     r"(from|in|de|en|residing in|located in|based in)\s+(the\s+)?(?P<lugar2>[a-z .]{2,40})"
-    r"|\b(?P<lugar3>us|usa|u\.s|united states|uk|canada|eu|europe|india)[- ](only|based|residents?)\b"
+    r"|\b(?P<lugar3>us|usa|u\.s|united states|uk|canada|eu|europe|india)[- ](?P<marca3>only|based|residents?)\b"
     r"|\b(?:must be|must have|need to be|required to be)\s+(?:legally )?(?:authorized to work|eligible to work|the right to work)\s+in\s+(?:the )?(?P<lugar4>[a-z .]{2,40})"
     r"|\b(?:debes?|debera[s]?|es necesario|se requiere)\s+(?:residir|vivir|estar ubicado|estar ubicada|tener residencia)\s+en\s+(?P<lugar5>[a-z .]{2,40})")
+# Contrato v49: «US-based» solo restringe la residencia si habla de la persona («must be US-based», «US-based
+# candidates»). «A leading US-based company» o «US based clients» describen a la empresa: 243 vacantes de la bodega del
+# 25 nov quedaban fuera de LATAM solo por eso.
+_BASADO_ANTES = re.compile(r"\b(?:must be|should be|need to be|needs to be|have to be|has to be|required to be|are|is|"
+                           r"be|being|currently)\s*$")
+_BASADO_DESPUES = re.compile(r"\s*(?:candidates?|applicants?|only|residents?|talent|individuals?|professionals?|"
+                             r"citizens?|people|persons?)\b")
+# Contrato v49: «Anywhere in France, Belgium, Spain» o «en cualquier parte de México» no es para cualquier país: manda
+# el lugar que nombra después.
+_MUNDO_ACOTADO = re.compile(r"\b(?:anywhere|worldwide|any country|cualquier (?:parte|lugar|pais))\s+"
+                            r"(?:in|within|across|en|de|del|dentro de)\b(?!\s+(?:the world|el mundo|todo el mundo)\b)")
+
+
+def mundo_acotado(ubicacion):
+    """True si la ubicación dice «en cualquier parte de <un lugar>» (no es alcance mundial)."""
+    return _MUNDO_ACOTADO.search(normalizar.texto(ubicacion or "")) is not None
+
+
 _ZONA = re.compile(r"\b(?:utc|gmt)\s*([-+−–])\s*(\d{1,2})(?:[:.]\d{2})?(?:\s*(?:to|a|al|-|–|y|and)\s*(?:utc|gmt)?\s*([-+−–])\s*(\d{1,2}))?")
 _ZONAS_US = {"est": -5, "edt": -5, "eastern time": -5, "cst": -6, "central time": -6, "mst": -7, "pst": -8, "pacific time": -8}
 
@@ -250,6 +268,10 @@ def _restricciones(desc):
         lugar = (m.group("lugar") or m.group("lugar2") or m.group("lugar3") or m.group("lugar4") or m.group("lugar5") or "").strip()
         coincidencia = m.group("coincidencia")
         contexto = coincidencia[:coincidencia.find(lugar)]
+        if m.group("lugar3") and m.group("marca3") == "based" and not (
+                _BASADO_ANTES.search(desc[max(0, m.start() - 30):m.start()])
+                or _BASADO_DESPUES.match(desc[m.start() + len(coincidencia):][:30])):
+            continue  # contrato v49: describe a la empresa o a sus clientes, no dónde debe vivir la persona
         residencia = re.search(r"\b(reside|live|located|based|living|residing|candidates|applicants|candidatos|personas|residents)\b", contexto)
         conocido = _paises_nombrados(lugar) or any(_nombra(lugar,d[k]) for k in ("fuera","toda_latam","toda_europa","mundo")) or any(_nombra(lugar,r["nombres"]) for r in d["subregiones"])
         if residencia or conocido or m.group("lugar4") or m.group("lugar5"):
@@ -584,6 +606,11 @@ def elegibles(titulo, ubicacion, descripcion="", remoto=None):
     """Países desde los que se puede aplicar, con modalidad, confianza y una nota corta (y, desde v23, `paises_mundo`,
     `alcance_mundial` y `zona_utc`)."""
     r = {**_elegibles(titulo, ubicacion, descripcion, remoto), **alcance(titulo, ubicacion, descripcion)}
+    restriccion = r.pop("_restriccion")
+    if restriccion and r["modalidad"] == "remoto":
+        # Contrato v49: en una remota con residencia obligatoria solo cuentan los países de esa frase. Antes se
+        # sumaba el de la ubicación («Colombia» + «must reside in Argentina» llegaba a quien vive en Colombia).
+        r["paises_mundo"] = restriccion
     if r["confianza"] != "baja" or not (_REGLAS["exactas"] or _REGLAS["frases"]):
         return r
     texto = clave(ubicacion)
@@ -742,15 +769,19 @@ def alcance(titulo, ubicacion, descripcion=""):
     remoto_en = re.search(r"\bremote\s+(?:only\s+)?(?:in|from|within)\s+([a-z /.+]{2,80})", titulo_n)
     frases = _restricciones(normalizar.texto(descripcion)[:30000]) + _restricciones(titulo_n) + \
         ([remoto_en.group(1)] if remoto_en else [])
+    restriccion = set()  # contrato v49: los países de las frases de residencia, aparte de los de la ubicación
     for frase in frases:
-        hallados |= paises_en_texto(frase)
+        restriccion |= paises_en_texto(frase)
         if re.match(r"(us|usa|u s)\b", frase):
-            hallados.add("US")
+            restriccion.add("US")
         if re.match(r"uk\b", frase):
-            hallados.add("GB")
-    mundial = _nombra(ubicacion_n, d["mundo"]) or bool(_REMOTO.search(titulo_n) and _nombra(titulo_n, d["mundo"]))
+            restriccion.add("GB")
+    hallados |= restriccion
+    # Contrato v49: «Anywhere in France, Belgium, Spain» nombra dónde; no es para cualquier país.
+    mundial = (_nombra(ubicacion_n, d["mundo"]) and not _MUNDO_ACOTADO.search(ubicacion_n)) or \
+        bool(_REMOTO.search(titulo_n) and _nombra(titulo_n, d["mundo"]) and not _MUNDO_ACOTADO.search(titulo_n))
     rangos = _rangos_zona(normalizar.sin_tildes(f"{ubicacion} {titulo} {descripcion[:6000]}").lower())
-    return {"paises_mundo": sorted(hallados), "alcance_mundial": bool(mundial),
+    return {"paises_mundo": sorted(hallados), "alcance_mundial": bool(mundial), "_restriccion": sorted(restriccion),
             "zona_utc": [min(a for a, _ in rangos), max(b for _, b in rangos)] if rangos else None}
 
 
@@ -789,7 +820,7 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
         ciudades = _ciudad_dentro(ciudad_sola, d["ciudades"])
     nombrados = nombres_pais or ciudades
     es_latam = _nombra(ambito, d["toda_latam"])
-    es_mundo = _nombra(ambito, d["mundo"])
+    es_mundo = _nombra(ambito, d["mundo"]) and not _MUNDO_ACOTADO.search(ambito)  # v49: «anywhere in <lugar>»
     es_europa = _nombra(ambito, d["toda_europa"])
     ambito_sin_propios = ambito
     for frase in d["propios_con_fuera"]:
@@ -880,7 +911,8 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
     contratacion = _contratacion_remota(desc)
     if contratacion:
         return r(interpretar(contratacion), "alta", "contratación remota explícita")
-    if es_mundo or (_REMOTO.search(titulo_normalizado) and _nombra(titulo_normalizado,d["mundo"])):
+    if es_mundo or (_REMOTO.search(titulo_normalizado) and _nombra(titulo_normalizado,d["mundo"])
+                    and not _MUNDO_ACOTADO.search(titulo_normalizado)):
         return r(todos, "alta", "")
     region = subregion(ambito)
     if region:

@@ -552,11 +552,15 @@ def test_presencial_solo_en_su_pais_o_en_los_que_se_mudaria():
             "modalidades": ["presencial", "hibrido"]}
     bogota, cdmx = _vacante_en("Bogotá, Colombia"), _vacante_en("Ciudad de México, México")
     assert bogota["modalidad"] == "presencial" and cdmx["modalidad"] == "presencial"
-    p = Perfil.model_validate(base)
+    # Contrato v49 (decisión de Oscar): sin ciudad en el perfil no llegan presenciales ni híbridas.
+    sin_ciudad = afinidad.evaluar(cdmx, Perfil.model_validate(base), hoy())
+    assert not sin_ciudad["compatible"] and sin_ciudad["motivos"] == ["falta la ciudad en el perfil"]
+    p = Perfil.model_validate({**base, "ciudades": ["Ciudad de México"]})
     assert afinidad.evaluar(cdmx, p, hoy())["compatible"]
     r = afinidad.evaluar(bogota, p, hoy())
     assert not r["compatible"] and "oficina en otro país" in r["motivos"]
-    assert afinidad.evaluar(bogota, Perfil.model_validate({**base, "paises_presenciales_extra": ["CO"]}), hoy())["compatible"]
+    se_mudaria = Perfil.model_validate({**base, "ciudades": ["Ciudad de México", "Bogotá"], "paises_presenciales_extra": ["CO"]})
+    assert afinidad.evaluar(bogota, se_mudaria, hoy())["compatible"]
     # Solo presencial: una remota abierta a México no entra.
     assert not afinidad.evaluar(_vacante_en("Remote - LATAM"), p, hoy())["compatible"]
 
@@ -1208,11 +1212,12 @@ def _vacante_texto(ubicacion, descripcion=""):
 def test_vive_en_alemania_recibe_la_presencial_de_berlin():
     berlin = _vacante_texto("Berlin, Germany (On-site)")
     assert berlin["paises"] == [] and berlin["paises_mundo"] == ["DE"]
-    assert afinidad.evaluar(berlin, _perfil_mundo(vive_en="DE", modalidades=["presencial"]), hoy())["compatible"]
-    assert not afinidad.evaluar(berlin, _perfil_mundo(modalidades=["presencial"]), hoy())["compatible"]
+    en_berlin = {"modalidades": ["presencial"], "ciudades": ["Berlin"]}  # v49: presencial exige la ciudad
+    assert afinidad.evaluar(berlin, _perfil_mundo(vive_en="DE", **en_berlin), hoy())["compatible"]
+    assert not afinidad.evaluar(berlin, _perfil_mundo(vive_en="DE", modalidades=["presencial"]), hoy())["compatible"]
+    assert not afinidad.evaluar(berlin, _perfil_mundo(modalidades=["presencial"], ciudades=["Bogotá"]), hoy())["compatible"]
     # Se mudaría a Alemania aunque viva en Colombia.
-    assert afinidad.evaluar(berlin, _perfil_mundo(modalidades=["presencial"], paises_presenciales_extra=["DE"]),
-                            hoy())["compatible"]
+    assert afinidad.evaluar(berlin, _perfil_mundo(paises_presenciales_extra=["DE"], **en_berlin), hoy())["compatible"]
 
 
 def test_permiso_legal_recibe_la_remota_restringida_a_ese_pais():
@@ -1234,15 +1239,18 @@ def test_horario_compatible_solo_si_el_perfil_acepta_esa_zona():
     assert not afinidad.evaluar(est, _perfil_mundo(vive_en="ES"), hoy())["compatible"]
     r = afinidad.evaluar(est, _perfil_mundo(vive_en="ES", acepta_horario=["us_este"]), hoy())
     assert r["compatible"] and "Remota con horario compatible" in r["pruebas"]
-    # Colombia (UTC-5) ya está dentro de la franja por su propio país.
-    assert afinidad.evaluar(est, _perfil_mundo(), hoy())["compatible"]
+    # Contrato v49 (decisión de Oscar): la zona del país donde vive ya no cuenta sola; hay que marcar el horario.
+    assert not afinidad.evaluar(est, _perfil_mundo(), hoy())["compatible"]
+    assert afinidad.evaluar(est, _perfil_mundo(acepta_horario=["UTC-5"]), hoy())["compatible"]
 
 
-def test_ciudades_descartan_solo_si_el_aviso_nombra_otra():
+def test_ciudades_exigen_que_el_aviso_nombre_la_suya():
     p = _perfil_mundo(modalidades=["presencial"], ciudades=["Medellín"])
     assert not afinidad.evaluar(_vacante_texto("Bogotá, Colombia (On-site)"), p, hoy())["compatible"]
     assert afinidad.evaluar(_vacante_texto("Medellín, Antioquia, Colombia (On-site)"), p, hoy())["compatible"]
-    assert afinidad.evaluar(_vacante_texto("Colombia (On-site)"), p, hoy())["compatible"]
+    # Contrato v49: un aviso presencial que no dice ciudad ya no pasa («exigir ciudad»).
+    sin_ciudad = afinidad.evaluar(_vacante_texto("Colombia (On-site)"), p, hoy())
+    assert not sin_ciudad["compatible"] and sin_ciudad["motivos"] == ["oficina sin ciudad confirmada"]
 
 
 def test_vacantes_sin_campos_del_mundo_siguen_igual():

@@ -1,5 +1,6 @@
 """Validación del mismo contrato para API, demostración y ejecutor."""
 import re
+from functools import lru_cache
 from typing import Literal
 from uuid import UUID
 
@@ -173,7 +174,19 @@ class Ubicacion(Modelo):
     def con_lugar(self):
         if not self.paises and not self.ciudades:
             raise ValueError("Cada ubicación necesita al menos un país o una ciudad.")
+        if not self.paises:
+            # Contrato v49: una fila solo con ciudades toma el país de esas ciudades si todas apuntan al mismo. Antes
+            # quedaba sin país: las remotas nunca le servían y «donde vive» seguía siendo Colombia por defecto.
+            de_ciudades = {pais_de_ciudad(c) for c in self.ciudades}
+            if len(de_ciudades) == 1 and None not in de_ciudades:
+                self.paises = sorted(de_ciudades)
         return self
+
+
+@lru_cache(maxsize=4096)
+def pais_de_ciudad(ciudad):
+    """El país (ISO2) de una ciudad escrita en un perfil, o None si no se reconoce o el nombre es de varios."""
+    return paises.pais_de_lugar(ciudad)
 
 
 class Perfil(Modelo):
@@ -298,14 +311,22 @@ class Perfil(Modelo):
         return self.ubicaciones or self._filas_desde_campos()
 
     def _filas_desde_campos(self):
-        """Contrato v30: un perfil anterior en filas, con el mismo resultado que tenía. Fila 1: donde vive, con sus
-        modalidades y ciudades. Fila 2: los países a los que se mudaría (híbrido/presencial). Fila 3: los países donde
-        puede trabajar legalmente (remoto)."""
-        filas = [Ubicacion(paises=[self.vive_en], ciudades=self.ciudades, modalidades=self.modalidades)]
+        """Contrato v30: un perfil anterior en filas. Fila 1: donde vive, con sus modalidades y ciudades. Fila 2: los
+        países a los que se mudaría (híbrido/presencial). Después, una fila por cada ciudad de otro país (v24: la ciudad
+        implica su país). Al final, los países donde puede trabajar legalmente (remoto).
+        Contrato v49: los países de la fila mandan sobre el nombre de la ciudad, así que cada ciudad queda solo en las
+        filas de su país («Madrid» de quien vive en Colombia es la de España, no la de Cundinamarca)."""
+        def de(codigos):
+            return [c for c in self.ciudades if pais_de_ciudad(c) in (None, *codigos)]
+        filas = [Ubicacion(paises=[self.vive_en], ciudades=de([self.vive_en]), modalidades=self.modalidades)]
         presencial = [m for m in self.modalidades if m != "remoto"]
         if self.paises_presenciales_extra and presencial:
-            filas.append(Ubicacion(paises=self.paises_presenciales_extra, ciudades=self.ciudades,
+            filas.append(Ubicacion(paises=self.paises_presenciales_extra, ciudades=de(self.paises_presenciales_extra),
                                    modalidades=presencial))
+        for ciudad in self.ciudades if presencial else ():
+            pais = pais_de_ciudad(ciudad)
+            if pais and pais not in self.paises_oficina:
+                filas.append(Ubicacion(paises=[pais], ciudades=[ciudad], modalidades=presencial))
         if self.puede_trabajar_en and "remoto" in self.modalidades:
             filas.append(Ubicacion(paises=self.puede_trabajar_en, modalidades=["remoto"]))
         return filas

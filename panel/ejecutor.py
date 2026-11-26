@@ -593,11 +593,12 @@ def _posts(repo, cfg, fecha, estrictas, filas, fila):
             if marca == "sin_confirmar" and sin_confirmar >= TOPE_POSTS_SIN_CONFIRMAR:
                 continue
             match, extra = evaluar_post(row["snapshot"], p, fecha), [{"tipo": "post"}]
-            if not match["compatible"]:
+            # Contrato v49: el tope diario cuenta todo post al que se le perdonó la ubicación, no solo los «sin confirmar».
+            if not match["compatible"] or (match.get("tolerada") and sin_confirmar >= TOPE_POSTS_SIN_CONFIRMAR):
                 continue
             if marca:
                 extra.append({"post_ubicacion": marca, "pista": row["snapshot"].get("ubicacion_deducida", "")})
-                sin_confirmar += marca == "sin_confirmar"
+            sin_confirmar += bool(match.get("tolerada"))
             vistas.add(row["vacante_id"])
             estrictas[p.id] = estrictas.get(p.id, 0) + 1
             filas.append(fila(dict(row, match_grade=entrega.GRADO_CONTRATO.get(afinidad, "close")), p, str(cargo.id),

@@ -379,6 +379,9 @@ PERDIDA = {"con_descripcion": "sin descripción completa (no se sabe el idioma)"
 # Motivo de `panel.afinidad.evaluar` → filtro del perfil (solo categorías genéricas, nunca datos de clientes).
 FILTRO_DE_MOTIVO = {"modalidad diferente": "modalidad", "país sin elegibilidad confirmada": "país",
                     "oficina en otro país": "país", "no admite postular desde su país": "país",
+                    # Contrato v49: presencial/híbrida exige ciudad en el perfil y en el aviso.
+                    "falta la ciudad en el perfil": "ciudad", "oficina sin ciudad confirmada": "ciudad",
+                    "oficina en otra ciudad": "ciudad",
                     "idioma del aviso diferente": "idioma del aviso", "publicación fuera del plazo": "antigüedad",
                     "fecha de publicación sin confirmar": "antigüedad", "experiencia no informada": "años de experiencia",
                     "experiencia fuera del rango": "años de experiencia",

@@ -20,6 +20,8 @@ SUGERENCIAS = {
     "publicación fuera del plazo": "Ampliar la antigüedad de publicación",
     "oficina en otro país": "Añadir una ubicación donde trabajaría",
     "oficina en otra ciudad": "Añadir la ciudad a sus ubicaciones",
+    # Contrato v49 (decisión de Oscar): sin ciudad no llegan presenciales ni híbridas.
+    "falta la ciudad en el perfil": "Escribir la ciudad donde trabajaría (sin ciudad no llegan presenciales ni híbridas)",
     "no admite postular desde su país": "Añadir un país donde puede trabajar en remoto",
     "modalidad diferente": "Aceptar otra modalidad",
     "idioma del aviso diferente": "Aceptar avisos en español e inglés",
