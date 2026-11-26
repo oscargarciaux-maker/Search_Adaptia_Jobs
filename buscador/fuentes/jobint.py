@@ -74,7 +74,7 @@ def vacante(a, pais, nombres, hoy=""):
     modalidad = normalizar.texto(a.get("modalidadTrabajo") or "")
     remoto = True if modalidad == "remoto" else None
     sufijo = " (Remoto)" if remoto else " (Híbrido)" if modalidad == "hibrido" else " (Presencial)" if modalidad == "presencial" else ""
-    lugar = paises.lugar_del_portal(a.get("localizacion"), pais, nombres.get(pais, pais))
+    lugar = paises.lugar_del_portal(a.get("localizacion"), pais, nombres.get(pais, pais), remoto=bool(remoto))
     empresa = str(a.get("empresa") or "").strip()
     return {"titulo": str(a.get("titulo") or "").strip(), "empresa": "" if empresa.lower() == "confidencial" else empresa,
             "ubicacion": lugar + sufijo, "descripcion": _texto(a.get("detalle"))[:30000],

@@ -7,8 +7,9 @@ empresa, ciudad, modalidad, fecha, enlace y descripción. La ficha de cada aviso
 comprobado 24 h: `VISTAS`.
 
 Límite medido el 26 nov: InfoJobs muestra unas cinco páginas de búsqueda por visita y después pide captcha, aunque se
-vaya despacio. Ese control se respeta: una página por nombre, pocas por corrida (`infojobs_busquedas`), con pausa, y
-al primer captcha la fuente se detiene hasta la corrida siguiente. No se reinicia la visita para seguir.
+vaya despacio. Ese control se respeta: una página por nombre, pocas por corrida (`infojobs_busquedas`) y por día
+(`TOPE_DIA`), con pausa, y al primer captcha la fuente se detiene hasta la corrida siguiente. No se reinicia la visita
+para seguir.
 Nada se inventa: lo que el aviso no dice queda vacío, y una página sin esos datos cuenta como bloqueo."""
 import json
 import re
@@ -20,10 +21,11 @@ from buscador import cobertura, normalizar, paises
 NOMBRE = "InfoJobs"
 BUSQUEDA = "https://www.infojobs.net/jobsearch/search-results/list.xhtml"
 PAISES = {"ES"}
-NOMBRES, NOMBRES_ES = 2, 4   # nombres del cargo que se buscan por turno (generales y en español)
+TOPE_DIA = 15                # páginas por día entre todas las corridas (la del día, la segunda pasada, «Buscar ahora»…)
 MIN_DESCRIPCION = 200        # sin tanto texto no se sabe el idioma ni cuenta como vista
-_DATOS = re.compile(r'window\.__INITIAL_PROPS__\s*=\s*JSON\.parse\((".*?")\);', re.S)
-_AVISO = re.compile(r"^(?:https?:)?//www\.infojobs\.net/([a-z0-9-]+/[a-z0-9-]+/of-i[a-z0-9]+)")
+_DATOS = re.compile(r"window\.__INITIAL_PROPS__\s*=\s*JSON\.parse\(\s*")
+_AVISO = re.compile(r"^(?:https?:)?//www\.infojobs\.net/([^/?#\s]+/[^/?#\s]+/of-i[a-z0-9]+)")
+CONTADOR = "~paginas_hoy"    # {fecha, paginas} en el estado de la fuente
 _MODALIDAD = {"solo teletrabajo": (True, " (Remoto)"), "hibrido": (None, " (Híbrido)"), "presencial": (None, " (Presencial)")}
 
 # Avisos que la búsqueda mostró en esta corrida (enlace → comprobación).
@@ -34,8 +36,10 @@ def datos(pagina):
     """Los datos que la página de búsqueda trae para dibujarse, o None si no los trae (bloqueo, captcha u otro diseño)."""
     m = _DATOS.search(pagina or "")
     try:
-        d = json.loads(json.loads(m.group(1))) if m else None
-    except ValueError:
+        # El texto va entre comillas dentro de JSON.parse("…"): se lee como JSON hasta su comilla de cierre (una
+        # descripción puede traer «");» y no es el final).
+        d = json.loads(json.JSONDecoder().raw_decode(pagina, m.end())[0]) if m else None
+    except (ValueError, TypeError):
         return None
     return d if isinstance(d, dict) and isinstance(d.get("offers"), list) else None
 
@@ -56,7 +60,7 @@ def vacante(a, hoy=""):
     descripcion = a.get("description") if isinstance(a.get("description"), str) else ""
     empresa = a.get("companyName") if isinstance(a.get("companyName"), str) else ""
     return {"titulo": " ".join(a["title"].split()), "empresa": empresa.strip(),
-            "ubicacion": paises.lugar_del_portal(a.get("city"), "ES", "España") + sufijo,
+            "ubicacion": paises.lugar_del_portal(a.get("city"), "ES", "España", remoto=bool(remoto)) + sufijo,
             "descripcion": descripcion.strip()[:30000], "fecha": "" if hoy and fecha > hoy else fecha,
             "enlace": "https://www.infojobs.net/" + m.group(1), "enlace_directo": "", "remoto": remoto, "fuente": NOMBRE}
 
@@ -66,8 +70,8 @@ def combinaciones(mapa):
     Como en Computrabajo: los títulos en español tienen su turno («ES:ES») si alguien de España acepta español."""
     salida = []
     for f in mapa:
-        if f.get("paises_objetivo") and not PAISES & set(f["paises_objetivo"]):
-            continue
+        if "paises_objetivo" in f and not PAISES & set(f["paises_objetivo"] or []):
+            continue  # nadie de ese cargo trabajaría en España (sin la clave, modo heredado: todos)
         es = list(f.get("consultas_es") or [])
         resto = [c for c in cobertura.consultas(f) if c not in es]
         if es and ("paises_es" not in f or PAISES & set(f["paises_es"])):
@@ -87,26 +91,29 @@ def buscar(cliente, mapa, estado, presupuesto, hoy=None, max_dias=30, reloj=time
     inicio = reloj()
     desde = (datetime.fromisoformat(hoy) - timedelta(days=max_dias)).date().isoformat()
     todas = cobertura.repartir(combinaciones(mapa), estado, hoy, prioritarias)
-    # Varios nombres por combinación, cada uno con su clave: el primero de cada una, luego el segundo…
-    turnos = [(k, c) for c in todas
-              for k in range(min(len(c[1]), NOMBRES_ES if cobertura.es_espanol(c[2]) else NOMBRES))]
+    # Un nombre por búsqueda, cada uno con su clave: el primero de cada combinación, luego el segundo… Lo ya buscado
+    # hoy no se repite (la segunda pasada del día sigue con los nombres siguientes).
+    turnos = [(k, c) for c in todas for k in range(len(c[1]))]
     turnos.sort(key=lambda t: t[0])  # estable: dentro de cada vuelta, el orden del reparto
     hora = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    contador = estado.get(CONTADOR) if isinstance(estado.get(CONTADOR), dict) else {}
+    del_dia = int(contador.get("paginas") or 0) if contador.get("fecha") == hoy else 0
     crudas, vistos, hechas, bloqueada = [], set(), 0, False
     for k, (familia, consultas, lugar, _) in turnos:
-        if hechas >= presupuesto or bloqueada or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
+        if hechas >= presupuesto or del_dia + hechas >= TOPE_DIA or bloqueada or (
+                limite_segundos is not None and reloj() - inicio >= limite_segundos):
             break
         b = cobertura.siguiente_busqueda(consultas, hoy, 1, f"{familia}@{lugar}", estado, desfase=k, paginada=False)
-        if b is None:  # contrato v47: ya se buscaron hoy todos sus nombres
+        if b is None or estado.get(b.clave_terminos) == hoy:  # ya se buscó hoy con ese nombre
             continue
         # Una página por nombre, de lo más reciente a lo más antiguo (20 avisos).
         r = cliente.get(BUSQUEDA, params={"keyword": b.terminos[0], "sortBy": "PUBLICATION_DATE"}, reintentar_429=False)
         hechas += 1
-        cobertura.anotar_busqueda("infojobs", familia, lugar)
         d = datos(r.text) if r is not None and r.status_code == 200 else None
         if d is None:  # captcha, bloqueo u otro diseño: no se insiste en esta corrida
             bloqueada = True
             break
+        cobertura.anotar_busqueda("infojobs", familia, lugar)
         cobertura.anotar_hecha(estado, b, hoy)
         for a in d["offers"]:
             v = vacante(a, hoy)
@@ -118,5 +125,6 @@ def buscar(cliente, mapa, estado, presupuesto, hoy=None, max_dias=30, reloj=time
             if v["enlace"] not in vistos:
                 vistos.add(v["enlace"])
                 crudas.append(v)
+    estado[CONTADOR] = {"fecha": hoy, "paginas": del_dia + hechas}
     return crudas, {"busquedas": hechas, "bloqueada": bloqueada, "avisos": len(crudas), "vistas": len(VISTAS),
                     "combinaciones_total": len(todas)}

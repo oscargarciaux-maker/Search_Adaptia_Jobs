@@ -220,6 +220,9 @@ def comprobar(url, titulo, *, sesion=None, validar_url=publica, ahora=None, plaz
                 "comprobada_en": ahora.isoformat(timespec="seconds").replace("+00:00", "Z"),
                 "http": codigo, "saltos": max(0, len(ruta) - 1), "ruta": ruta}
     try:
+        if sin_comprobacion_directa(url):
+            # Indeed responde 401 e InfoJobs pide captcha: su ficha no se pide desde ningún camino (v41, v50).
+            return resultado("pendiente", "sin comprobación directa")
         if aviso_linkedin(url):
             ruta.append(url)
             timeout = min(12, max(0.1, plazo - time.monotonic())) if plazo else 12

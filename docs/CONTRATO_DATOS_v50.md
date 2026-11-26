@@ -131,8 +131,10 @@ comprobar. Resultado del 26 nov:
   descansar esa corrida; los demás siguen (el 26 nov el de Argentina respondió con error un rato y los otros no).
 - **Dónde se postula.** En el mismo portal; la vacante lleva su dirección pública (`/empleos/<título>-<id>.html`) y el
   nombre de su portal como fuente.
-- **Ubicación.** «Localidad, Provincia» más el país del portal. Si la localidad se llama como un lugar de otro país
-  («Palermo», «Florida», «Concepción del Uruguay»), se quita: el aviso es del país de su portal y no abre otro.
+- **Ubicación.** «Localidad, Provincia» más el país del portal. En una remota, si la localidad se llama como un lugar
+  de otro país («Palermo», «Florida», «Concepción del Uruguay»), se quita: el aviso es del país de su portal y no abre
+  otro. En una presencial o híbrida la localidad se conserva siempre: sin ciudad no le llega a nadie (v49). Vale igual
+  para InfoJobs («Granada, España» es la ciudad, no la isla).
 - **Fecha.** La de publicación. Una fecha imposible, o posterior a hoy porque el portal va en otra hora, queda vacía.
 - **Comprobación.** La página del aviso se arma en el navegador y no dice nada a una lectura simple. El enlace se
   comprueba, como cualquier otro antes de entregarse, con la ficha de la API del mismo portal: abierto si responde,
@@ -149,14 +151,19 @@ comprobar. Resultado del 26 nov:
 - **Búsqueda.** La página de búsqueda trae cada aviso completo en sus datos: título, empresa, ciudad, modalidad, fecha,
   enlace y descripción. Se busca por los nombres de los cargos con alguien que trabajaría en España; los nombres en
   español tienen su turno si alguien de España acepta español. Una página por nombre (20 avisos, de lo más reciente a
-  lo más antiguo), cada búsqueda con su clave; no se guardan los de más de 30 días.
-- **Comprobación.** La ficha de cada aviso pide captcha: nunca se abre (`verificar_enlaces.SIN_COMPROBACION_DIRECTA`).
+  lo más antiguo), cada búsqueda con su clave; no se guardan los de más de 30 días. Un nombre ya buscado hoy no se
+  repite: la segunda pasada del día sigue con los siguientes.
+- **Comprobación.** La ficha de cada aviso pide captcha: nunca se pide, desde ningún camino
+  (`verificar_enlaces.SIN_COMPROBACION_DIRECTA`; `comprobar` y la lectura de descripciones la saltan, igual que la de
+  Indeed).
   Lo que la búsqueda mostró hoy, con fecha y con descripción de 200 caracteres o más, queda comprobado 24 h («vista hoy
   en la búsqueda de InfoJobs»). Al día siguiente vuelve a quedar sin comprobar si no se vuelve a ver.
 - **Límite medido.** InfoJobs muestra unas cinco páginas de búsqueda y después pide captcha, aunque se vaya despacio; si
-  se insiste, bloquea desde la primera durante un rato. Ese control se respeta: `infojobs_busquedas: 5` por corrida,
-  con pausa, y al primer captcha la fuente se detiene hasta la corrida siguiente y lo dice en el reporte
-  (`bloqueada`). No se reinicia la visita para seguir.
+  se insiste, bloquea desde la primera durante un rato. Ese control se respeta: `infojobs_busquedas: 5` por corrida y
+  15 páginas al día entre todas las corridas, con pausa, y al primer captcha la fuente se detiene hasta la corrida
+  siguiente y lo dice en el reporte (`bloqueada`). No se reinicia la visita para seguir.
+- **Límites conocidos.** No se sabe si la fecha de un aviso republicado es la original o la de republicación. Un aviso
+  de InfoJobs con ciudad de otro país se guarda como de España.
 - **Qué esperar.** Hasta unos 100 avisos vistos por corrida, de los nombres que les toque ese día. Desde los servidores
   de GitHub, que comparten dirección con mucha gente, puede venir bloqueada a menudo: solo las búsquedas reales lo
   dirán. La vía estable sería la API oficial de InfoJobs, que pide registrar una aplicación y guardar su clave como

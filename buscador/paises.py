@@ -412,11 +412,15 @@ MODALIDADES = ("hibrido", "remoto", "presencial", "sin dato")  # explícitas ant
 NOTA_INCIERTA = "confirmar países: fuentes con ubicación incierta"
 
 
-def lugar_del_portal(localizacion, pais, nombre_pais):
+def lugar_del_portal(localizacion, pais, nombre_pais, remoto=False):
     """Contrato v50: la ubicación de un aviso de un portal de un solo país: «Localidad, Provincia» más el país del
-    portal. Si la localidad se llama como un lugar de otro país («Palermo», «Florida», «Concepción del Uruguay»), se
-    quita: el aviso es del país de su portal y no debe abrir otro."""
+    portal. En una remota, si la localidad se llama como un lugar de otro país («Palermo», «Florida», «Concepción del
+    Uruguay»), se quita: el aviso es del país de su portal y no debe abrir otro. En una presencial o híbrida la
+    localidad se conserva siempre: sin ciudad no le llega a nadie (v49), y ahí el país lo decide la ciudad del perfil
+    («Granada, España» se quedaba en «España» por la isla de Granada)."""
     tramos = [t.strip() for t in localizacion.split(",") if t.strip()] if isinstance(localizacion, str) else []
+    if not remoto:
+        return ", ".join([*tramos, nombre_pais])
     for desde in range(len(tramos) + 1):
         lugar = ", ".join([*tramos[desde:], nombre_pais])
         if set(alcance("", lugar).get("paises_mundo") or []) <= {pais}:

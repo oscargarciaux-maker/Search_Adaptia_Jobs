@@ -48,6 +48,7 @@ MAPA = [{"id": "cargo:qa", "consultas": ["qa", "qa engineer", "tester"], "consul
 
 def _buscar(cliente, estado=None, **opciones):
     infojobs.VISTAS.clear()
+    cobertura.BUSQUEDAS.clear()
     return infojobs.buscar(cliente, MAPA, {} if estado is None else estado, hoy="2026-11-26",
                            **{"presupuesto": 10, **opciones})
 
@@ -74,7 +75,8 @@ def test_solo_busca_para_cargos_con_alguien_en_espana_y_con_sus_nombres_en_espan
     _, stats = _buscar(cliente)
     nombres = [p["keyword"] for _, p, _ in cliente.pedidas]
     assert "product manager" not in nombres  # ese cargo solo tiene gente en México
-    assert {"analista qa", "analista de pruebas"} <= set(nombres) and len(nombres) == stats["busquedas"] == 4
+    assert set(nombres) == {"analista qa", "analista de pruebas", "qa", "qa engineer", "tester"}
+    assert len(nombres) == stats["busquedas"] == 5
     # Cada nombre con su clave: la búsqueda para quien falta (v47) no repite lo que ya se buscó hoy.
     estado = {}
     primera = Cliente()
@@ -88,8 +90,22 @@ def test_solo_busca_para_cargos_con_alguien_en_espana_y_con_sus_nombres_en_espan
     finally:
         cobertura.configurar_faltantes(False)
         cobertura.configurar_personas()
-    ya = {p["keyword"] for _, p, _ in primera.pedidas}
-    assert all(p["keyword"] not in ya for _, p, _ in segunda.pedidas)
+    assert segunda.pedidas == []  # ya se buscaron hoy todos sus nombres
+
+
+def test_la_segunda_corrida_del_dia_sigue_con_otros_nombres_y_hay_un_tope_diario():
+    estado = {}
+    primera, segunda, tercera = Cliente(), Cliente(), Cliente()
+    _buscar(primera, estado, presupuesto=2)
+    _buscar(segunda, estado, presupuesto=2)   # p. ej. la pasada de las 8:30: no repite las dos primeras
+    nombres = [p["keyword"] for _, p, _ in primera.pedidas + segunda.pedidas]
+    assert len(nombres) == len(set(nombres)) == 4 and estado[infojobs.CONTADOR] == {"fecha": "2026-11-26", "paginas": 4}
+    estado[infojobs.CONTADOR]["paginas"] = infojobs.TOPE_DIA   # ya se leyeron las del día entre todas las corridas
+    assert _buscar(tercera, estado)[1]["busquedas"] == 0 and tercera.pedidas == []
+    # Al día siguiente el contador empieza de nuevo.
+    otro_dia = Cliente()
+    infojobs.buscar(otro_dia, MAPA, estado, 1, hoy="2026-11-27")
+    assert len(otro_dia.pedidas) == 1 and estado[infojobs.CONTADOR] == {"fecha": "2026-11-27", "paginas": 1}
 
 
 def test_lo_visto_hoy_cuenta_como_comprobado_y_la_ficha_nunca_se_abre():
@@ -110,6 +126,18 @@ def test_lo_visto_hoy_cuenta_como_comprobado_y_la_ficha_nunca_se_abre():
     otra = dict(v, id="otra", enlace="https://www.infojobs.net/madrid/otra/of-izzz999", _enlaces=[])
     assert verificar_enlaces.auditar([otra], {}, ahora=datetime(2026, 11, 26, tzinfo=timezone.utc),
                                      comprobar_url=prohibido) == 0
+
+    class SinRed:
+        def get(self, *a, **k):
+            raise AssertionError("no se pide la ficha de InfoJobs")
+
+        def close(self):
+            pass
+    # Tampoco desde los caminos que llaman a `comprobar` o leen la descripción directamente.
+    directo = verificar_enlaces.comprobar(otra["enlace"], "QA Tester", sesion=SinRed())
+    assert (directo["estado"], directo["motivo"]) == ("pendiente", "sin comprobación directa")
+    from buscador import ficha
+    assert ficha.traer_descripcion([otra["enlace"]], "QA Tester", obtener=prohibido) == ""
     # Indeed sigue marcando solo páginas de Indeed, aunque el enlace de la empresa sea de InfoJobs.
     indeed.VISTAS.clear()
     indeed._anotar_vista("https://es.indeed.com/viewjob?jk=1", "https://www.infojobs.net/madrid/x/of-i1")
@@ -122,16 +150,35 @@ def test_un_aviso_viejo_sin_descripcion_o_raro_no_se_marca_como_visto():
               _aviso(3, publicada="no es una fecha"),                         # sin fecha: tampoco
               _aviso(4, publicada="2026-11-27T02:00:00Z"),                    # fecha futura: queda sin fecha
               {"title": "Sin enlace"}, dict(_aviso(5), link="//www.otro.com/x/y/of-i1"), "x", None,
-              _aviso(6, ciudad="Córdoba")]                                    # hay otra Córdoba en Argentina
+              _aviso(6)]
     crudas, stats = _buscar(Cliente([Respuesta(_pagina(avisos))]), presupuesto=1)
     assert [c["enlace"][-6:] for c in crudas] == ["abc002", "abc003", "abc004", "abc006"]
     assert [c["fecha"] for c in crudas] == ["2026-11-20", "", "", "2026-11-20"]
     assert list(infojobs.VISTAS) == ["https://www.infojobs.net/madrid/qa-tester/of-iabc006"]
-    # Una ciudad con homónima en otro país («Córdoba», «Guadalajara») nunca abre ese país.
+
+
+def test_la_ciudad_se_conserva_en_presencial_e_hibrida_y_una_homonima_no_abre_otro_pais_en_remota():
     from buscador import paises
-    for ciudad in ("Córdoba", "Guadalajara", "Cartagena", "Valencia", "Mérida"):
-        ubicacion = infojobs.vacante(_aviso(7, ciudad=ciudad))["ubicacion"]
+    # «Granada» también es un país del Caribe: en híbrida la ciudad se queda (sin ciudad no le llega a nadie, v49).
+    hibrida = infojobs.vacante(_aviso(7, ciudad="Granada"))
+    assert hibrida["ubicacion"] == "Granada, España (Híbrido)"
+    v = bodega.limpiar([], [hibrida], "2026-11-26", 30, set(), set())[0][0]
+    assert v["paises"] == ["ES"] and v["modalidad"] == "hibrido"
+    # En una remota la ciudad no hace falta y no debe abrir otro país.
+    remota = infojobs.vacante(_aviso(8, ciudad="Granada", modalidad="Solo teletrabajo"))
+    assert remota["ubicacion"] == "España (Remoto)"
+    for ciudad in ("Granada", "Córdoba", "Guadalajara", "Cartagena", "Valencia", "Mérida", "Madrid"):
+        ubicacion = infojobs.vacante(_aviso(9, ciudad=ciudad, modalidad="Solo teletrabajo"))["ubicacion"]
         assert set(paises.alcance("", ubicacion).get("paises_mundo") or []) <= {"ES"}, ubicacion
+    assert infojobs.vacante(_aviso(10, ciudad="Madrid", modalidad="Solo teletrabajo"))["ubicacion"] == "Madrid, España (Remoto)"
+
+
+def test_una_descripcion_con_comillas_y_parentesis_no_se_confunde_con_un_captcha():
+    raro = _aviso(11, descripcion=TEXTO + ' Ejemplo de código: console.log("hola"); y alert("fin");')
+    crudas, stats = _buscar(Cliente([Respuesta(_pagina([raro]))]), presupuesto=1)
+    assert not stats["bloqueada"] and len(crudas) == 1 and 'console.log("hola");' in crudas[0]["descripcion"]
+    punto = dict(_aviso(12), link="//www.infojobs.net/madrid/programador-.net_c%23/of-iabc012?x=1")
+    assert infojobs.vacante(punto)["enlace"] == "https://www.infojobs.net/madrid/programador-.net_c%23/of-iabc012"
 
 
 def test_al_primer_captcha_la_fuente_se_detiene_y_no_insiste():
@@ -141,6 +188,7 @@ def test_al_primer_captcha_la_fuente_se_detiene_y_no_insiste():
     assert len(cliente.pedidas) == 2 and stats == {"busquedas": 2, "bloqueada": True, "avisos": 1, "vistas": 1,
                                                    "combinaciones_total": 2}
     assert len(crudas) == 1
+    assert sum(n for (fuente, _, _), n in cobertura.BUSQUEDAS.items() if fuente == "infojobs") == 1  # la bloqueada no cuenta
     # Un error del sitio o una página sin sus datos también detienen la fuente; nada se inventa.
     for respuesta in (Respuesta("", 503), Respuesta("<html>otro diseño</html>"), None,
                       Respuesta("<script>window.__INITIAL_PROPS__ = JSON.parse(\"no es json\");</script>")):
