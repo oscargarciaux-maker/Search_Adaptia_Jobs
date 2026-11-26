@@ -293,7 +293,7 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
         for n in OMITIDAS_FALTANTES:
             salud[n] = {"omitida": MOTIVO_FALTANTES}
         fuentes = [(n, f) for n, f in fuentes if n not in OMITIDAS_FALTANTES]
-    with ThreadPoolExecutor(11) as ex:
+    with ThreadPoolExecutor(max(11, len(fuentes))) as ex:  # un hilo por fuente: ninguna espera a otra
         tareas = {n: ex.submit(correr, n, f) for n, f in fuentes}
         resultados = {n: t.result() for n, t in tareas.items()}
     crudas, empresas = [], set()
@@ -521,8 +521,6 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     from buscador.fuentes import linkedin_publico
     fichas_incorporadas = verificar_enlaces.incorporar(vacantes, cache_enlaces, linkedin_publico.FICHAS)
     indeed_incorporadas = verificar_enlaces.incorporar(vacantes, cache_enlaces, indeed.VISTAS)  # contrato v41
-    # Contrato v50: lo que la API de Bumeran y sus portales hermanos mostró hoy, con su descripción.
-    jobint_incorporadas = verificar_enlaces.incorporar(vacantes, cache_enlaces, jobint.VISTAS)
     portales_incorporadas = verificar_enlaces.incorporar(  # contrato v42: listado hoy en el portal de la empresa
         vacantes, cache_enlaces, verificar_enlaces.vistas_en_portales(enlaces_ats))
     entregadas_revision = _leer_json(trabajo / "entregadas.json", {})
@@ -733,7 +731,6 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     resumen_revision["rechazos_en_corrida"] = {m: n for m, n in descartes.items() if m in verificar_enlaces.RECHAZOS}
     resumen_revision["fichas_linkedin_incorporadas"] = fichas_incorporadas
     resumen_revision["vistas_indeed_incorporadas"] = indeed_incorporadas
-    resumen_revision["vistas_bumeran_incorporadas"] = jobint_incorporadas
     resumen_revision["vistas_portales_incorporadas"] = portales_incorporadas
     seleccion_actual = {"fecha": lote_actual.get("fecha"), "roles": {}}
     por_id_vigente = {v["id"]: v for v in vacantes}

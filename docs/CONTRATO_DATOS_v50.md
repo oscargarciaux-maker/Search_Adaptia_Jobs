@@ -127,14 +127,18 @@ comprobar. Resultado del 26 nov:
 - **Búsqueda.** La API pública del portal (la misma de su página) devuelve el aviso completo: título, empresa, lugar,
   modalidad, fecha y descripción. Se busca por cargo y país con portal, con varios nombres por turno (3 generales y
   hasta 6 en español), cada búsqueda con su clave; los avisos de más de 30 días no se guardan. Presupuesto:
-  `jobint_busquedas` (120; el panel, hasta 240 según los cargos). Tres fallos seguidos cortan la fuente.
+  `jobint_busquedas` (120; el panel, hasta 240 según los cargos). Tres fallos seguidos de un portal lo dejan
+  descansar esa corrida; los demás siguen (el 26 nov el de Argentina respondió con error un rato y los otros no).
 - **Dónde se postula.** En el mismo portal; la vacante lleva su dirección pública (`/empleos/<título>-<id>.html`) y el
   nombre de su portal como fuente.
-- **Comprobación.** La página del aviso se arma en el navegador y no dice nada a una lectura simple. Por eso:
-  - un aviso que la búsqueda del portal mostró hoy con su descripción cuenta como comprobado 24 h («vista hoy en la
-    búsqueda del portal»), igual que una ficha de LinkedIn leída en la búsqueda (v39);
-  - después se comprueba con la ficha de la misma API: abierto si responde, está «activo» y el título coincide;
-    cerrado si no está activo o no existe; un bloqueo o una respuesta rara nunca aprueban ni cierran.
+- **Ubicación.** «Localidad, Provincia» más el país del portal. Si la localidad se llama como un lugar de otro país
+  («Palermo», «Florida», «Concepción del Uruguay»), se quita: el aviso es del país de su portal y no abre otro.
+- **Fecha.** La de publicación. Una fecha imposible, o posterior a hoy porque el portal va en otra hora, queda vacía.
+- **Comprobación.** La página del aviso se arma en el navegador y no dice nada a una lectura simple. El enlace se
+  comprueba, como cualquier otro antes de entregarse, con la ficha de la API del mismo portal: abierto si responde,
+  está «activo» y el título coincide; cerrado si dice un estado de cierre conocido o no existe. Un bloqueo, una
+  respuesta rara, una ficha sin estado o con un estado desconocido nunca aprueban ni cierran. Verse en la búsqueda
+  **no** cuenta como comprobación (esa regla, la de Indeed en v41, no se decidió para estos portales).
 - **Medido en vivo el 26 nov** (5 cargos, 7 países): 217 búsquedas en 160 segundos, 145 avisos, 120 de un cargo
   buscado y 118 en español (Perú 55, Chile 40, Argentina 21). Son casi todos presenciales o híbridos: sirven a quien
   vive en esa ciudad.

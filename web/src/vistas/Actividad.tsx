@@ -336,6 +336,7 @@ const NOMBRE_GRUPO = {
 const FUENTES_BUSQUEDA: Record<string, string> = {
   linkedin: "LinkedIn",
   indeed: "Indeed",
+  jobint: "Bumeran",
 };
 function textoBusquedas(b?: Record<string, number>) {
   const partes = Object.entries(b || {})

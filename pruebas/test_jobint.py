@@ -32,7 +32,6 @@ PAISES = [("AR", "Argentina"), ("CL", "Chile"), ("CO", "Colombia")]
 
 
 def _buscar(cliente, estado=None, **opciones):
-    jobint.VISTAS.clear()
     return jobint.buscar(cliente, MAPA, PAISES, {} if estado is None else estado, hoy="2026-11-26",
                          dormir=lambda s: None, **{"presupuesto": 50, **opciones})
 
@@ -63,10 +62,33 @@ def test_la_vacante_lleva_pais_modalidad_fecha_descripcion_y_la_direccion_del_po
     vacantes, _, _ = bodega.limpiar([], crudas, "2026-11-26", 30, set(), set())
     v = next(x for x in vacantes if x["titulo"] == "Analista QA")
     assert v["paises"] == ["AR"] and v["modalidad"] == "hibrido" and v["idioma"] == "es" and v["fuente"] == "Bumeran"
-    # Verse hoy en la búsqueda del portal, con su descripción, comprueba el enlace (como una ficha de LinkedIn, v39).
-    cache = {}
-    assert verificar_enlaces.incorporar(vacantes, cache, jobint.VISTAS) >= 1
-    assert cache[v["enlace"]]["estado"] == "verificada"
+    # Verse en la búsqueda no comprueba el enlace: se comprueba después, con la ficha del portal.
+    assert verificar_enlaces.anotar(v, {})["estado"] == "pendiente"
+    # «Confidencial» no es el nombre de una empresa.
+    confidencial = Cliente([{"content": [_aviso(7, empresa="Confidencial")]}])
+    assert _buscar(confidencial, presupuesto=1)[0][0]["empresa"] == ""
+
+
+def test_una_localidad_con_nombre_de_otro_pais_no_abre_ese_pais():
+    from buscador import paises
+    for localizacion, esperado in (("Palermo, Capital Federal", "Capital Federal, Argentina"),
+                                   ("Florida, Buenos Aires", "Buenos Aires, Argentina"),
+                                   ("Concepción del Uruguay, Entre Ríos", "Entre Ríos, Argentina"),
+                                   ("Capital Federal, Buenos Aires", "Capital Federal, Buenos Aires, Argentina")):
+        cruda = jobint.vacante(dict(_aviso(8, modalidad="Remoto"), localizacion=localizacion), "AR", dict(PAISES))
+        assert cruda["ubicacion"] == esperado + " (Remoto)"
+        vacantes, _, _ = bodega.limpiar([], [cruda], "2026-11-26", 30, set(), set())
+        assert vacantes[0]["paises"] == ["AR"] and paises.abiertos(vacantes[0])[0] == {"AR"}
+    assert jobint.vacante(dict(_aviso(9), localizacion=None), "CL", dict(PAISES))["ubicacion"] == "Chile (Híbrido)"
+
+
+def test_una_fecha_imposible_o_futura_queda_vacia():
+    assert jobint._fecha("24-11-2026 10:20:32", "2026-11-26") == "2026-11-24"
+    assert jobint._fecha("99-99-9999") == "" and jobint._fecha(None) == "" and jobint._fecha("ayer") == ""
+    assert jobint._fecha("27-11-2026", "2026-11-26") == ""  # el portal va unas horas adelante
+    raro = Cliente([{"content": [_aviso(5, fecha="99-99-9999"), {"id": 1}, "x", None]}])
+    crudas, _ = _buscar(raro, presupuesto=1)
+    assert len(crudas) == 1 and crudas[0]["fecha"] == ""
 
 
 def test_no_guarda_avisos_viejos_ni_repite_nombres_ya_buscados_hoy_y_se_detiene_si_el_portal_falla():
@@ -87,9 +109,19 @@ def test_no_guarda_avisos_viejos_ni_repite_nombres_ya_buscados_hoy_y_se_detiene_
         cobertura.configurar_faltantes(False)
         cobertura.configurar_personas()
     assert otra.pedidas == []  # la búsqueda para quien falta no repite lo que la noche ya buscó (v47)
-    caido = Cliente([None, None, None, None, None])
-    _, stats = _buscar(caido)
-    assert stats["fallidas"] == 3 and len(caido.pedidas) == 3  # tres fallos seguidos cortan la fuente
+    # Tres fallos seguidos de un portal lo dejan descansar; los demás portales siguen (el 26 nov cayó solo el de AR).
+    class SoloArgentinaCaida(Cliente):
+        def post_json(self, url, cuerpo, headers=None, timeout=None):
+            datos = super().post_json(url, cuerpo, headers, timeout)
+            return None if headers["x-site-id"] == "BMAR" else datos
+    medio = SoloArgentinaCaida()
+    crudas, stats = _buscar(medio)
+    assert [s for _, _, s in medio.pedidas].count("BMAR") == 3 and stats["fallidas"] == 3
+    assert stats["portales_caidos"] == ["AR"] and stats["por_pais"]["CL"] == 3 and {c["fuente"] for c in crudas} == {"Laborum"}
+    sin_tiempo = Cliente()
+    reloj = iter(range(0, 1000, 10))
+    _buscar(sin_tiempo, limite_segundos=25, reloj=lambda: next(reloj))
+    assert 1 <= len(sin_tiempo.pedidas) <= 3  # el tope de tiempo corta aunque quede presupuesto
 
 
 class _Respuesta:
@@ -130,10 +162,16 @@ def test_el_enlace_se_comprueba_con_la_ficha_de_la_api_del_portal():
     r, sesion = _comprobar(_Respuesta({"aviso": {"titulo": "Analista QA", "estado": "activo"}}))
     assert r["estado"] == "verificada" and r["http"] == 200
     assert sesion.pedidas == [("https://www.laborum.cl/api/candidates/fichaAvisoNormalizada/1118600001", "BMCL")]
-    assert _comprobar(_Respuesta({"aviso": {"titulo": "Analista QA", "estado": "finalizado"}}))[0]["motivo"] == "vacante cerrada"
-    assert _comprobar(_Respuesta({}, 404))[0] == {**_comprobar(_Respuesta({}, 404))[0], "estado": "rechazada", "motivo": "enlace roto"}
-    # Un bloqueo, una respuesta rara u otro aviso con ese número nunca aprueban ni cierran.
-    for respuesta in (_Respuesta({}, 403), _Respuesta(None), _Respuesta({"aviso": {}}),
+    cerrado = _comprobar(_Respuesta({"aviso": {"titulo": "Analista QA", "estado": "Finalizado"}}))[0]
+    assert (cerrado["estado"], cerrado["motivo"]) == ("rechazada", "vacante cerrada")
+    roto = _comprobar(_Respuesta({}, 404))[0]
+    assert (roto["estado"], roto["motivo"]) == ("rechazada", "enlace roto")
+    # Un bloqueo, una respuesta rara, una ficha sin estado (o con uno desconocido) u otro aviso con ese número nunca
+    # aprueban ni cierran: si la API cambia, no se cierran todas las vacantes.
+    for respuesta in (_Respuesta({}, 403), _Respuesta(None), _Respuesta({"aviso": {}}), _Respuesta([1]), _Respuesta("x"),
+                      _Respuesta({"aviso": "x"}), _Respuesta({"aviso": {"titulo": "Analista QA"}}),
+                      _Respuesta({"aviso": {"titulo": "Analista QA", "estado": 7}}),
+                      _Respuesta({"aviso": {"titulo": "Analista QA", "estado": "en revisión"}}),
                       _Respuesta({"aviso": {"titulo": "Vendedor de mostrador", "estado": "activo"}})):
         assert _comprobar(respuesta)[0]["estado"] == "pendiente"
 
@@ -141,7 +179,10 @@ def test_el_enlace_se_comprueba_con_la_ficha_de_la_api_del_portal():
 def test_la_fuente_esta_registrada_donde_hace_falta():
     from buscador import enlaces
     from panel import ejecutor
+    from buscador import contrato
     assert bodega.config()["presupuestos"]["jobint_busquedas"] > 0
+    assert {contrato.portal(jobint.enlace(d, "QA", "1118600001")) for d, _, _ in jobint.SITIOS.values()} == {
+        "Bumeran", "Laborum", "Multitrabajos", "Konzerta"}
     for pais, (dominio, _, nombre) in jobint.SITIOS.items():
         assert nombre in ejecutor.fuentes_en(pais)
         assert enlaces.sirve(jobint.enlace(dominio, "Analista QA", "1118600001"))  # se postula en el mismo portal
