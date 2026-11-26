@@ -101,11 +101,12 @@ _RESTRINGE = re.compile(
 _BASADO_ANTES = re.compile(r"\b(?:must be|should be|need to be|needs to be|have to be|has to be|required to be|are|is|"
                            r"be|being|currently)\s*$")
 _BASADO_DESPUES = re.compile(r"\s*(?:candidates?|applicants?|only|residents?|talent|individuals?|professionals?|"
-                             r"citizens?|people|persons?)\b")
+                             r"citizens?|people|persons?|(?:fully\s+)?(?:remote\s+)?(?:roles?|positions?|jobs?))\b")
 # Contrato v49: «Anywhere in France, Belgium, Spain» o «en cualquier parte de México» no es para cualquier país: manda
 # el lugar que nombra después.
 _MUNDO_ACOTADO = re.compile(r"\b(?:anywhere|worldwide|any country|cualquier (?:parte|lugar|pais))\s+"
-                            r"(?:in|within|across|en|de|del|dentro de)\b(?!\s+(?:the world|el mundo|todo el mundo)\b)")
+                            r"(?:in|within|across|en|de|del|dentro de)\b"
+                            r"(?!\s+(?:the\s+)?(?:world|globe|planet)\b|\s+(?:todo\s+)?(?:el\s+)?(?:mundo|planeta)\b)")
 
 
 def abiertos(v):
@@ -119,12 +120,16 @@ def abiertos(v):
     elegibles, nombrados = set(v.get("paises") or []), set(v.get("paises_mundo") or [])
     cubiertos = set(datos()["codigos"])
     acotado = mundo_acotado(v.get("ubicacion"))
-    paises_abiertos = ((elegibles & nombrados) if acotado else elegibles) | (nombrados - cubiertos)
+    # «Anywhere in LATAM» acota a una región que no deja países sueltos en `paises_mundo`: ahí manda `paises`.
+    paises_abiertos = ((elegibles & nombrados) if acotado and nombrados else elegibles) | (nombrados - cubiertos)
     mundial = bool(v.get("alcance_mundial")) and not acotado and (not nombrados or cubiertos <= elegibles)
     return paises_abiertos, mundial, v.get("nota_pais") == NOTA_ZONA and not nombrados
 
 
 NOTA_ZONA = "por zona horaria"
+
+
+_TRAS_ACOTAR = re.compile(r"^\s*(?:in|within|across|en|de|del|dentro de)\s+(?:the\s+|el\s+|la\s+|los\s+|las\s+)?")
 
 
 def mundo_acotado(ubicacion):
@@ -287,15 +292,16 @@ def _por_zona_horaria(t):
     return [c for c in datos()["codigos"] if any(lo <= utc[c] <= hi for lo, hi in rangos)]
 
 
-def _restricciones(desc):
-    """Todas las restricciones reconocidas; una frase comercial no acredita residencia."""
+def _restricciones(desc, titulo=False):
+    """Todas las restricciones reconocidas; una frase comercial no acredita residencia. `titulo`: el texto es el
+    título del aviso; ahí «(USA-based)» habla del puesto y siempre restringe."""
     d = datos()
     restricciones = []
     for m in re.finditer(r"(?=(?P<coincidencia>"+_RESTRINGE.pattern+r"))",desc):
         lugar = (m.group("lugar") or m.group("lugar2") or m.group("lugar3") or m.group("lugar4") or m.group("lugar5") or "").strip()
         coincidencia = m.group("coincidencia")
         contexto = coincidencia[:coincidencia.find(lugar)]
-        if m.group("lugar3") and m.group("marca3") == "based" and not (
+        if not titulo and m.group("lugar3") and m.group("marca3") == "based" and not (
                 _BASADO_ANTES.search(desc[max(0, m.start() - 30):m.start()])
                 or _BASADO_DESPUES.match(desc[m.start() + len(coincidencia):][:30])):
             continue  # contrato v49: describe a la empresa o a sus clientes, no dónde debe vivir la persona
@@ -321,7 +327,13 @@ def _contratacion_remota(desc):
     for m in re.finditer(patron,desc):
         if re.search(r"\b(?:not|no|cannot|can t|unable|except|excluding|sin|tampoco)\b",desc[max(0,m.start()-35):m.start()]):
             continue
-        return m.group("contratacion") or m.group("trabajo") or m.group("remoto_es")
+        hallado = m.group("contratacion") or m.group("trabajo") or m.group("remoto_es")
+        # Contrato v49: «work from anywhere in the US» nombra dónde; no abre el aviso a cualquier país. El alcance es
+        # el lugar que sigue («anywhere in LATAM or Europe» → LATAM; «anywhere in the US» → fuera).
+        if _MUNDO_ACOTADO.match(hallado + desc[m.end():][:40]):
+            lugar = _TRAS_ACOTAR.sub("", desc[m.end():][:60])
+            return re.split(r"\b(?:anywhere|worldwide|cualquier)\b", lugar)[0].strip()  # sin la frase siguiente
+        return hallado
     return ""
 
 
@@ -799,7 +811,7 @@ def alcance(titulo, ubicacion, descripcion=""):
     if metro:  # contrato v32: «Granada y alrededores» es España, no Granada (el país del Caribe)
         hallados = {metro}
     remoto_en = re.search(r"\bremote\s+(?:only\s+)?(?:in|from|within)\s+([a-z /.+]{2,80})", titulo_n)
-    frases = _restricciones(normalizar.texto(descripcion)[:30000]) + _restricciones(titulo_n) + \
+    frases = _restricciones(normalizar.texto(descripcion)[:30000]) + _restricciones(titulo_n, titulo=True) + \
         ([remoto_en.group(1)] if remoto_en else [])
     restriccion = set()  # contrato v49: los países de las frases de residencia, aparte de los de la ubicación
     for frase in frases:
@@ -887,7 +899,7 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
     # Residencia explícita: también restringe ofertas presenciales o híbridas.
     titulo_normalizado = normalizar.texto(titulo)
     remoto_en = re.search(r"\bremote\s+(?:only\s+)?(?:in|from|within)\s+([a-z /.+]{2,80})", titulo_normalizado)
-    restricciones = _restricciones(desc) + _restricciones(titulo_normalizado)
+    restricciones = _restricciones(desc) + _restricciones(titulo_normalizado, titulo=True)
     if remoto_en:
         restricciones.append(remoto_en.group(1))
     def interpretar(restringe):
@@ -941,8 +953,11 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
         return r([c for c in todos if c in permitidos], "alta",
                  "restricción explícita de residencia" if permitidos else "remoto fuera de LATAM y España")
     contratacion = _contratacion_remota(desc)
-    if contratacion:
-        return r(interpretar(contratacion), "alta", "contratación remota explícita")
+    alcance_contratacion = interpretar(contratacion) if contratacion else None
+    if contratacion and alcance_contratacion is None and paises_en_texto(contratacion) - set(todos):
+        alcance_contratacion = []  # «work from anywhere in India»: solo nombra un país de fuera
+    if alcance_contratacion is not None:  # None: nombra un lugar que no se reconoce; deciden las reglas de abajo
+        return r(alcance_contratacion, "alta", "contratación remota explícita")
     if es_mundo or (_REMOTO.search(titulo_normalizado) and _nombra(titulo_normalizado,d["mundo"])
                     and not _MUNDO_ACOTADO.search(titulo_normalizado)):
         return r(todos, "alta", "")

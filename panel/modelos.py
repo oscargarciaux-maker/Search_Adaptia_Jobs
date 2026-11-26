@@ -317,7 +317,10 @@ class Perfil(Modelo):
         Contrato v49: los países de la fila mandan sobre el nombre de la ciudad, así que cada ciudad queda solo en las
         filas de su país («Madrid» de quien vive en Colombia es la de España, no la de Cundinamarca)."""
         def de(codigos):
-            return [c for c in self.ciudades if pais_de_ciudad(c) in (None, *codigos)]
+            # La ciudad va en la fila si su país es uno de la fila, si no se sabe, o si en esos países hay una ciudad
+            # con ese nombre («Mérida» de quien vive en España es la de Extremadura, aunque la de México sea mayor).
+            return [c for c in self.ciudades
+                    if pais_de_ciudad(c) in (None, *codigos) or paises.coordenadas(c, tuple(codigos))]
         filas = [Ubicacion(paises=[self.vive_en], ciudades=de([self.vive_en]), modalidades=self.modalidades)]
         presencial = [m for m in self.modalidades if m != "remoto"]
         if self.paises_presenciales_extra and presencial:

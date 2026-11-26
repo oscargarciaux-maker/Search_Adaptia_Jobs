@@ -128,6 +128,9 @@ GRADO_FUNCIONES = "funciones"  # nunca se entrega solo: va a «Por confirmar» (
 # Contrato v49: lo contrario de «funciones». El título SÍ es del cargo, pero la descripción no trae ninguna de sus
 # funciones y hay una señal de otro oficio. Tampoco se entrega solo: va a «Por confirmar» con su propio motivo.
 GRADO_OTRO_OFICIO = "otro_oficio"
+# Del más fuerte al más débil. Lo usan `clasificar` y `vacante.unir` (al juntar copias gana el más fuerte): un grado
+# nuevo se añade aquí o juntar dos copias falla.
+ORDEN_GRADOS = GRADOS + [GRADO_FUNCIONES, GRADO_OTRO_OFICIO]
 
 
 def _por_descripcion_panel(palabras, descripcion, excluidas):
@@ -206,9 +209,8 @@ def clasificar(titulo, descripcion=""):
                 continue
             if sum(1 for h in fam["_herramientas"] if normalizar.contiene_frase(desc, h)) >= 2:
                 salida[fam["id"]] = "cercano"
-    orden = GRADOS + [GRADO_FUNCIONES, GRADO_OTRO_OFICIO]
     return sorted(({"familia": k, "coincidencia": v} for k, v in salida.items()),
-                  key=lambda x: orden.index(x["coincidencia"]))
+                  key=lambda x: ORDEN_GRADOS.index(x["coincidencia"]))
 
 
 def consultas(familia_id):

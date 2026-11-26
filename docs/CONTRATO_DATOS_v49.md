@@ -38,12 +38,16 @@ rescate, bandeja y lo que muestra el panel). Valen también para lo ya guardado.
   `paises_mundo` vacío) y solo para las zonas de `acepta_horario` (±1 h). La zona del país donde vive deja de contar
   sola (cambia v23 y v35). Sin horario marcado, el aviso sigue «por confirmar» y entra a la bandeja.
 - **Alcance mundial.** «Anywhere in France, Belgium, Spain» o «en cualquier parte de México» no es alcance mundial
-  (`paises.mundo_acotado`): manda el lugar nombrado. `alcance_mundial` vale si el aviso no nombra países o si `paises`
+  (`paises.mundo_acotado`): manda el lugar nombrado. «Anywhere in LATAM» sigue abierta a LATAM y «cualquier parte del
+  mundo» sigue siendo mundial. Lo mismo en la descripción: «work from anywhere in the US» ya no abre el aviso a
+  cualquier país (39 vacantes de fuera llegaban así a LATAM), y «work from anywhere in LATAM or Europe» vale para esa
+  región. `alcance_mundial` vale si el aviso no nombra países o si `paises`
   trae todos los cubiertos.
 - **Residencia obligatoria.** En una remota con frase de residencia, `paises_mundo` son solo los países de esa frase
   (antes se sumaba el de la ubicación: «Colombia» + «must reside in Argentina» llegaba a Colombia).
-- **«US-based».** Solo restringe si habla de la persona («must be US-based», «US-based candidates»). «A leading
-  US-based company» describe a la empresa (243 vacantes quedaban fuera de LATAM solo por eso).
+- **«US-based».** Solo restringe si habla de la persona o del puesto («must be US-based», «US-based candidates»,
+  «US-based remote role», o «(USA-based)» en el título). «A leading US-based company» describe a la empresa (243
+  vacantes quedaban fuera de LATAM solo por eso).
 - **La ciudad no anula el país.** El nombre de una ciudad solo cuenta si el país del aviso es uno de la fila (o el de
   la ciudad, en una fila sin países). «Santiago» de Chile no acepta «Santiago de Cali»; «Valencia» de España no acepta
   «Valencia, CA» ni sus alrededores.
@@ -52,8 +56,10 @@ rescate, bandeja y lo que muestra el panel). Valen también para lo ya guardado.
   La región como ubicación (v19) deja de servir a presenciales. Si la fila no acepta la modalidad, el motivo es el de
   siempre («modalidad diferente»).
 - **País desde la ciudad.** Una fila solo con ciudades toma el país de esas ciudades si todas apuntan al mismo; de ahí
-  sale «donde vive». En un perfil anterior (sin filas), cada ciudad queda en las filas de su país y una ciudad de otro
-  país tiene su propia fila (v24: la ciudad implica su país).
+  sale «donde vive». En un perfil anterior (sin filas), cada ciudad queda en las filas de los países donde existe una
+  ciudad con ese nombre («Mérida» de quien vive en España es la de Extremadura) y, si su país más conocido es otro,
+  además tiene su propia fila (v24: la ciudad implica su país). Para los alrededores (50 km) la ciudad se ubica en su
+  país más conocido y, si el nombre es de varios, en los de la fila.
 - **Posts.** El tope de 2 por perfil al día cuenta todo post al que se le perdonó el país o la modalidad (también los
   «deducidos»).
 - **Admisión.** `bodega._sirve_a_perfiles` conserva por horario solo lo que no nombra país.
@@ -102,7 +108,10 @@ reescriben asignaciones.
   completan hasta la meta diaria del perfil (mínimo 5). Comunidad y los posts siguen en el mínimo. Hasta el mínimo
   siempre cabe; del mínimo a la meta, una vacante que hoy aún no usa nadie solo entra mientras lote + añadidas no pasen
   del techo del día. El rescate comprueba hasta 200 enlaces en 5 minutos (antes 80 en 150 s), por turnos y primero para
-  quien tiene menos candidatas. «Buscar ahora» cuenta como «le falta» a todo el que está bajo su meta.
+  quien tiene menos candidatas. «Buscar ahora» cuenta como «le falta» a todo el que está bajo su meta. Lo asignado
+  en las pasadas anteriores del mismo día (8:30, cada hora, «Buscar ahora») cuenta para la meta y para el techo
+  (`repo.asignadas_de`): cada pasada completa solo lo que falta. Si ese dato no se puede leer, se completa solo hasta
+  el mínimo. «Sirve» en la bandeja asigna también hasta la meta.
 - **Comprobar enlaces por necesidad** (`buscador/verificar_enlaces.py::cola_por_necesidad`, solo modo panel). Antes de
   la cola del lote se comprueban las candidatas de cada persona: las de su cargo que cumplen su idioma y su ubicación,
   aunque otro cliente ya las haya recibido; por turnos, primero quien tiene menos, hasta 2 por cada vacante de su meta
@@ -144,7 +153,8 @@ Computrabajo, `rescatadas` en el resumen).
   - ya hay lote → `enfoque=pedido`: solo para los perfiles activos de ese cliente que no llegan a su meta;
   - todos en su meta → no lanza.
   Los perfiles pedidos se guardan en `panel_ajustes` (clave `busqueda_pedida`, con su fecha); el flujo de GitHub solo
-  recibe la opción cerrada `pedido`. Nunca van identificadores de perfiles en las entradas del flujo ni en sus registros.
+  recibe la opción cerrada `pedido`. Si la búsqueda no se puede lanzar (ya hay una en curso), el pedido que estaba en
+  cola se conserva. Nunca van identificadores de perfiles en las entradas del flujo ni en sus registros.
 - **Formulario.** Una fila con presencial o híbrido pide la ciudad; el panel lista los perfiles a los que les falta.
 
 ## Lo que no cambia

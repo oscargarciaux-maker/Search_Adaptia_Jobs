@@ -179,7 +179,8 @@ def test_fila_solo_con_ciudad_toma_su_pais():
 
 def test_perfil_anterior_con_ciudad_de_otro_pais_la_pone_en_su_fila():
     p = Perfil.model_validate({**BASE, "vive_en": "CO", "modalidades": ["presencial"], "ciudades": ["Medellín", "Madrid"]})
-    assert [(f.paises, f.ciudades) for f in p.filas] == [(["CO"], ["Medellín"]), (["ES"], ["Madrid"])]
+    # «Madrid» también existe en Colombia (Cundinamarca): se queda en su fila y además tiene la de España.
+    assert [(f.paises, f.ciudades) for f in p.filas] == [(["CO"], ["Medellín", "Madrid"]), (["ES"], ["Madrid"])]
     assert sirve(guardada("presencial", ["ES"], ubicacion="Madrid, Comunidad de Madrid, España"), p)
     assert not sirve(guardada("presencial", ["CO"], ubicacion="Bogotá, Colombia"), p)  # ni por cercana a «Madrid» (CO)
 

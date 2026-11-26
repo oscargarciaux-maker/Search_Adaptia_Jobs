@@ -423,6 +423,15 @@ class RepositorioSupabase:
             salida.setdefault(r["cliente_id"], set()).add(r["vacante_id"])
         return salida
 
+    def asignadas_de(self, ejecucion_id):
+        """Contrato v49: {perfil: {vacantes}} ya asignadas en esa ejecución (las pasadas anteriores del día)."""
+        filas = self._paginas("panel_asignaciones", "id", {"ejecucion_id": "eq." + str(ejecucion_id),
+                              "select": "id,perfil_id,vacante_id"}, 1000)
+        salida = {}
+        for r in filas:
+            salida.setdefault(r["perfil_id"], set()).add(r["vacante_id"])
+        return salida
+
     def asignaciones_por_perfil(self, ejecucion_ids):
         """Contrato v37: cuántas vacantes recibió cada perfil en cada búsqueda (solo conteos)."""
         if not ejecucion_ids:

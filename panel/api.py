@@ -655,10 +655,16 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
             # Contrato v49: los perfiles quedan en el servidor (panel_ajustes); el flujo solo recibe «pedido». Se guarda
             # antes de lanzar para que la búsqueda ya los encuentre. Si hoy aún no hay lote, la búsqueda es la completa
             # con ellos primero.
+            anterior = repo.ajuste(CLAVE_PEDIDA, {}) or {}
             repo.guardar_ajuste(CLAVE_PEDIDA, {"fecha": hoy(), "perfiles": plan["perfiles"]})
-            enfoque = ENFOQUE_PEDIDO
-        else:
-            enfoque = ENFOQUE_FALTANTES if plan["tipo"] == "faltantes" else ENFOQUE_COMPLETO
+            try:
+                return {**app.state.acciones.lanzar(ENFOQUE_PEDIDO), "tipo": plan["tipo"]}
+            except Exception:
+                # Si no se pudo lanzar (ya hay una búsqueda, o se pidió hace un momento), el pedido que ya estaba en
+                # cola se conserva: antes un segundo pedido rechazado cambiaba los perfiles de la búsqueda del primero.
+                repo.guardar_ajuste(CLAVE_PEDIDA, anterior)
+                raise
+        enfoque = ENFOQUE_FALTANTES if plan["tipo"] == "faltantes" else ENFOQUE_COMPLETO
         return {**app.state.acciones.lanzar(enfoque), "tipo": plan["tipo"]}
 
     @app.get("/api/ejecuciones")

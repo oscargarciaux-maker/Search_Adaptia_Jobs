@@ -395,14 +395,24 @@ DIAS_REUTILIZAR = 14
 class Completar:
     """Contrato v49 (decisión de Oscar): hasta dónde se completa a cada persona con vacantes de días anteriores y de toda
     la bodega. Hasta su meta diaria (mínimo 5); Comunidad sigue en el mínimo. Del mínimo a la meta, una vacante que hoy
-    aún no usa nadie solo entra mientras lote + añadidas no pasen del techo del día."""
-    def __init__(self, cfg, estrictas, filas, lote):
+    aún no usa nadie solo entra mientras lote + añadidas no pasen del techo del día.
+    `ya_hoy` ({perfil: {vacantes}}): lo asignado en las pasadas anteriores de hoy (8:30, cada hora, «Buscar ahora»).
+    Cuenta para la meta y para el techo: sin esto cada pasada volvía a completar desde cero (un perfil con meta 17
+    quedaba con 17, 33, 49…)."""
+    def __init__(self, cfg, estrictas, filas, lote, ya_hoy=None):
         comunidades = {c.id for c in cfg.clientes if c.comunidad}
         self.estrictas = estrictas
         self.metas = {p.id: MINIMO_POR_PERFIL if p.cliente_id in comunidades
                       else max(MINIMO_POR_PERFIL, int(p.meta_diaria or 0)) for p in cfg.perfiles}
         self.usadas = {f["vacante_id"] for f in filas} | set(lote)
-        self.libre = max(0, int(cfg.techo_diario or 0) - len(set(lote)))
+        en_filas = {(f["perfil_id"], f["vacante_id"]) for f in filas}
+        por_id = {str(p.id): p.id for p in cfg.perfiles}
+        for perfil, vacantes in (ya_hoy or {}).items():
+            antes = {v for v in vacantes if (perfil, v) not in en_filas}  # lo que esta pasada no vuelve a asignar
+            if antes and perfil in por_id:
+                estrictas[por_id[perfil]] = estrictas.get(por_id[perfil], 0) + len(antes)
+            self.usadas |= antes
+        self.libre = max(0, int(cfg.techo_diario or 0) - len(self.usadas))
 
     def objetivo(self, p):
         return self.metas.get(p.id, MINIMO_POR_PERFIL)
@@ -775,7 +785,16 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
             estrictas[p.id] = estrictas.get(p.id, 0) + 1
             filas.append(fila(row, p, cargo_id, match["pruebas"], [{"ampliacion": nivel}]))
     reutilizadas = posts = rescatadas = 0
-    completar = Completar(cfg, estrictas, filas, [r["vacante_id"] for r in seleccionadas])
+    ya_hoy = {}
+    if hasattr(repo, "asignadas_de"):
+        try:  # contrato v49: lo de las pasadas anteriores de hoy cuenta para la meta y el techo
+            ya_hoy = repo.asignadas_de(ejecucion["id"])
+        except Exception as e:  # noqa: BLE001 — sin el dato no se completa de más: solo hasta el mínimo de siempre
+            registro.aviso("ejecutor:ya-hoy", e)
+            ya_hoy = None
+    completar = Completar(cfg, estrictas, filas, [r["vacante_id"] for r in seleccionadas], ya_hoy)
+    if ya_hoy is None:
+        completar.metas = dict.fromkeys(completar.metas, MINIMO_POR_PERFIL)
     try:
         reutilizadas = _reutilizar(repo, cfg, fecha, completar, filas, fila, operativos)
     except Exception as e:  # noqa: BLE001 — completar con días anteriores nunca impide registrar lo del día

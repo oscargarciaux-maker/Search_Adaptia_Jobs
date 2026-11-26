@@ -579,7 +579,7 @@ def decidir(repo, vacante_id, decision, codigos=(), aplicar_a_iguales=False, fec
 
 
 def _asignar(repo, rev, codigos, fecha, por, comprobar):
-    """Asignaciones para los perfiles a los que ayuda la vacante confirmada: solo hasta 5 y sin repetir a nadie."""
+    """Asignaciones para los perfiles a los que ayuda la vacante confirmada: hasta su meta y sin repetir a nadie."""
     from panel.ejecutor import validar_version
     from panel.repositorio import ErrorRepositorio
     if not rev.get("perfiles"):
@@ -600,7 +600,8 @@ def _asignar(repo, rev, codigos, fecha, por, comprobar):
     nuevas = []
     for info in rev.get("perfiles") or []:
         p, cargo = perfiles.get(info["perfil_id"]), cargos.get(info.get("cargo_id"))
-        if not p or not cargo or conteo.get(str(p.id), 0) >= MINIMO_POR_PERFIL:
+        # Contrato v49: hasta la meta diaria del perfil (antes, solo hasta el mínimo de 5).
+        if not p or not cargo or conteo.get(str(p.id), 0) >= max(MINIMO_POR_PERFIL, int(p.meta_diaria or 0)):
             continue
         if rev["vacante_id"] in recibidas.get(str(p.id), set()):
             continue

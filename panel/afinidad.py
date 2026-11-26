@@ -296,7 +296,13 @@ def _cerca(v, ciudades, paises_fila=()):
     for c in ciudades:
         # La ciudad del perfil se ubica primero en su país («Madrid» es España, no el Madrid de Cundinamarca); si el
         # nombre es de varios países, en los de su fila (v49: «Valencia» de España no es la de California).
-        referencia = tuple(sorted(_paises_de_ciudad(c, paises_fila)))
+        # Para los alrededores la ciudad se ubica en su propio país cuando el nombre lo dice («Madrid» es la de
+        # España aunque la fila sea de Colombia: Bogotá no es «alrededores de Madrid»); si el nombre es de varios
+        # países, en los de la fila («Valencia» de España no es la de California).
+        if paises_fila and codigos and not set(paises_fila) & set(codigos):
+            continue  # la fila es de sus países: «Paris» de una fila de EE. UU. no acepta la de Francia
+        suyo = pais_de_ciudad(c)
+        referencia = (suyo,) if suyo else tuple(sorted(paises_fila))
         if referencia and codigos and not set(referencia) & set(codigos):
             continue
         if paises.cerca(ciudad, c, referencia or codigos, estado):
