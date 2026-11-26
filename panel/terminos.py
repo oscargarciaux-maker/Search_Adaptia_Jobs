@@ -144,6 +144,40 @@ def espanol_del_mapa(nombre):
     return tuple(dict.fromkeys(salida))
 
 
+@lru_cache(maxsize=512)
+def hermanos_es(nombre):
+    """Contrato v50 (decisión de Oscar del 26 nov: «aplicar solos, con control»): los nombres en español que un cargo
+    usa sin que el operador los añada, para buscar y para reconocer avisos. Son los títulos exactos en español de su
+    familia del mapa (`espanol_del_mapa`, v44), los similares en español de esa familia de varias palabras y, para un
+    cargo compuesto («AI Product Manager»), los que arma el glosario (`compuestos`). El control es el de v49: sin las
+    funciones del cargo en la descripción la vacante va al final, y con señal de otro oficio va a «Por confirmar».
+    Devuelve ((nombre, origen), …) con origen «mapa» (exacto), «similar» o «glosario»."""
+    base = normalizar.titulo_base(nombre)
+    salida = [(x, "mapa") for x in espanol_del_mapa(nombre)]
+    for nivel, _, f in sorted(_familias_de(base) if base else [], key=lambda x: x[:2]):
+        if nivel == 0:
+            salida += [(x, "similar") for x in f.get("similares", [])
+                       if en_espanol(x) and not en_portugues(x) and len(normalizar.titulo_base(x).split()) > 1]
+    salida += [(x, "glosario") for x in compuestos(nombre)[0]]
+    vistos, unicos = set(), []
+    for x, origen in salida:
+        clave = normalizar.titulo_base(x)
+        if clave and clave not in vistos:
+            vistos.add(clave)
+            unicos.append((x, origen))
+    return tuple(unicos)
+
+
+def hermanos_del_cargo(cargo):
+    """Los `hermanos_es` de un cargo que el operador no excluyó (un nombre que contiene un término excluido no se usa)
+    y que no tiene ya entre sus términos."""
+    excluidos = [_texto(x) for x in cargo.get("terminos_excluidos") or [] if _texto(x)]
+    propios = {_base(x) for x in [cargo.get("nombre") or "", *(cargo.get("terminos_exactos") or []),
+                                  *(cargo.get("terminos_similares") or [])]}
+    return [(x, origen) for x, origen in hermanos_es(cargo.get("nombre") or "")
+            if _base(x) not in propios and not any(normalizar.contiene_frase(_texto(x), e) for e in excluidos)]
+
+
 def sugerir(cargo, sesion=None, consultar_esco=True):
     base = normalizar.titulo_base(cargo)
     exactos, similares, evidencia = variantes(cargo), [], []
@@ -209,6 +243,8 @@ def sugerir(cargo, sesion=None, consultar_esco=True):
     amplios = [x for x in base_titulos if normalizar.titulo_base(x) not in claves]
     return {"terminos_exactos": principales[:30], "terminos_similares": limpios[:30], "terminos_cercanos": vecinos[:30],
             "terminos_es": en_es[:20], "terminos_base": amplios[:8], "familia_base": familia_base,
+            # Contrato v50: los nombres en español que el cargo usa solos (no hace falta añadirlos).
+            "hermanos_es": [_bonito(x) for x, _ in hermanos_es(cargo)],
             "fuentes": list(dict.fromkeys(evidencia)) or ["Variantes de escritura"],
             "requiere_revision": not limpios and not combinados,
             "nota": "Revisa los términos antes de guardar; un equivalente no garantiza pertinencia de cada anuncio."}
@@ -251,10 +287,12 @@ def grado(titulo, cargo, cercanos=False):
             if puntaje >= 90:
                 return "similar", {"regla":"similitud textual", "termino":t, "grado":"similar", "similitud_textual":round(puntaje)}
     # Contrato v44: los títulos en español de la familia del mapa del cargo (los mismos con que se busca en español).
-    for t in espanol_del_mapa(cargo.get("nombre") or ""):
+    # Contrato v50: y sus nombres hermanos en español (similares del mapa y compuestos del glosario), que se usan solos.
+    for t, origen in hermanos_es(cargo.get("nombre") or ""):
         canon = _base(t)
         if canon and normalizar.contiene_frase(base, canon):
-            return "similar", {"regla": "título en español del mapa", "termino": t, "grado": "similar"}
+            regla = "título en español del mapa" if origen == "mapa" else "nombre hermano en español"
+            return "similar", {"regla": regla, "termino": t, "grado": "similar"}
     if cercanos:
         for t in cargo.get("terminos_cercanos", []):
             canon = _base(t)

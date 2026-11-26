@@ -17,7 +17,7 @@ from pathlib import Path
 
 import yaml
 
-from buscador import calidad, contrato, cobertura, enlaces, familias, normalizar, paises, tiempos, vacante
+from buscador import calidad, contrato, cobertura, enlaces, familias, medicion, normalizar, paises, tiempos, vacante
 from buscador.fuentes import (ats, computrabajo, elempleo, getonbrd, sitemaps_empleo, tableros_latam, indeed, linkedin_apify, linkedin_publico, open_seat,
                               publicaciones_apify, remotos)
 from buscador.http import Cliente
@@ -148,8 +148,12 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
         return crudas, stats
 
     def f_indeed():
+        # Contrato v50: en la búsqueda de cada noche Indeed repasa la ventana completa (con tope de tiempo propio).
+        repaso = 0 if solo_mapa else p.get("indeed_repaso", 0)
+        tope = min(limite, p.get("indeed_minutos", 10) * 60) if repaso else limite
         return indeed.buscar(mapa, [c for c, _ in activos], estado["indeed"], p["indeed_busquedas"], hoy=hoy,
-                             max_dias=cfg["dias_maximos"], limite_segundos=limite, prioritarias=prioritarias)
+                             max_dias=cfg["dias_maximos"], limite_segundos=tope, prioritarias=prioritarias,
+                             repaso=repaso)
 
     def f_apify():
         combos = linkedin_publico.combinaciones(mapa, activos)
@@ -753,6 +757,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         "catalogo": resumen_catalogo,
         "capturada_en": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "frescura": tiempos.medir(vacantes),
+        "embudo_idioma": medicion.embudo_idioma(vacantes),  # contrato v50: dónde se pierde cada idioma
         "verificacion_enlaces": resumen_revision,
         "estado_operativo": {"activo": bool(central), "pendientes": {
             "catalogo": len(pendientes_catalogo), "ofertas": len(pendientes_v1), "registro": len(pendientes_registro)},

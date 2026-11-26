@@ -76,6 +76,8 @@ presupuestos:
   magneto_fichas: 60           # v44: fichas de Magneto (Colombia; sitemap + JobPosting)
   pausa_linkedin: [1.0, 2.5]   # segundos entre peticiones a LinkedIn
   indeed_busquedas: 90
+  indeed_repaso: 0             # v50: nombres por combinación que se buscan cada noche con los 30 días completos (el panel lo fija en 4)
+  indeed_minutos: 10           # v50: tope de tiempo del repaso de Indeed
   apify_busquedas: 60          # solo con APIFY_TOKEN
   remotos_paginas: 250         # páginas de tableros remotos que se abren para encontrar el original
   empresas_por_probar: 80      # empresas nuevas que se prueban en los sistemas de postulación

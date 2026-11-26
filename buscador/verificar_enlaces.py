@@ -315,7 +315,10 @@ def anotar(v, cache, ahora=None):
 
 
 def auditar(vacantes, cache, *, maximo=240, segundos=240, hilos=6, comprobar_url=None, ahora=None,
-            vigencia=VIGENCIA_SELECCION):
+            vigencia=VIGENCIA_SELECCION, por_carril=False):
+    """`por_carril` (contrato v50, la cola por persona): `maximo` cuenta solo los sitios que se comprueban en paralelo;
+    LinkedIn, que va de una en una, tiene su propio cupo por el tiempo. Antes los dos compartían el máximo y los avisos
+    de Computrabajo, Elempleo o Get on Board (casi todo en español) perdían el turno frente a los de LinkedIn."""
     ahora = ahora or datetime.now(timezone.utc)
     comprobar_url = comprobar_url or comprobar
     plazo = time.monotonic() + segundos
@@ -327,7 +330,8 @@ def auditar(vacantes, cache, *, maximo=240, segundos=240, hilos=6, comprobar_url
         pendientes = [u for u in urls(v) if not vigente(cache.get(u, {}), v["titulo"], ahora, vigencia)
                       and not sin_comprobacion_directa(u)]
         es_linkedin = bool(pendientes) and all(aviso_linkedin(u) for u in pendientes)
-        if pendientes and len(escogidas) < maximo and not (es_linkedin and de_linkedin >= cupo_linkedin):
+        cabe = (len(escogidas) - de_linkedin < maximo or es_linkedin) if por_carril else len(escogidas) < maximo
+        if pendientes and cabe and not (es_linkedin and de_linkedin >= cupo_linkedin):
             escogidas.append(v)
             de_linkedin += es_linkedin
             for u in pendientes:
@@ -378,7 +382,14 @@ def resumen(vacantes):
     estados = Counter((v.get("verificacion") or {}).get("estado", "pendiente") for v in vacantes)
     motivos = Counter((v.get("verificacion") or {}).get("motivo", "sin comprobación") for v in vacantes
                       if (v.get("verificacion") or {}).get("estado") != "verificada")
-    return {"vacantes": len(vacantes), "estados": dict(estados), "motivos": dict(motivos)}
+    # Contrato v50: cuántas de cada idioma tienen el enlace comprobado (sin descripción no se sabe el idioma).
+    por_idioma = {}
+    for v in vacantes:
+        idioma = v.get("idioma") if v.get("idioma") in ("es", "en") else "otro_o_sin_descripcion"
+        fila = por_idioma.setdefault(idioma, {"vacantes": 0, "comprobadas": 0})
+        fila["vacantes"] += 1
+        fila["comprobadas"] += (v.get("verificacion") or {}).get("estado") == "verificada"
+    return {"vacantes": len(vacantes), "estados": dict(estados), "motivos": dict(motivos), "por_idioma": por_idioma}
 
 
 def cola_de_seleccion(vacantes, entregadas, hoy, cache, iniciales, maximo, ahora=None, limite=None):
@@ -458,7 +469,7 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
         if necesidad and revisadas_n < maximo:
             parte = 3 if incremental else 2
             por_necesidad = auditar(necesidad, cache, maximo=max(1, (maximo - revisadas_n) // parte),
-                                    segundos=max(0, plazo - time.monotonic()) / parte)
+                                    segundos=max(0, plazo - time.monotonic()) / parte, por_carril=True)
             revisadas_n += por_necesidad
     except Exception as e:  # noqa: BLE001 — sin esta cola, la comprobación sigue con la del lote, como antes
         from buscador import registro

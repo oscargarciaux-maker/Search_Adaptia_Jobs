@@ -120,10 +120,35 @@ def evidencias(vacantes, cargos, ejemplos=6):
     return salida
 
 
+def _idioma(v):
+    if len(v.get("_descripcion") or "") < 200:
+        return "sin_descripcion"  # sin texto no se sabe el idioma y no se entrega
+    return v.get("idioma") if v.get("idioma") in ("es", "en") else "otro"
+
+
+def embudo_idioma(vacantes):
+    """Contrato v50: por idioma del aviso y por fuente, cuántas vacantes de un cargo buscado hay guardadas y cuántas
+    tienen el enlace comprobado (las que se pueden entregar hoy). `sin_descripcion`: no se sabe el idioma y no se
+    entregan hasta leer su ficha. Conteos de avisos públicos, sin datos de clientes."""
+    salida = {}
+    for v in vacantes:
+        if v.get("tipo") == "post" or not v.get("familias"):
+            continue
+        idioma = _idioma(v)
+        fuente = (v.get("fuente") or "sin fuente").split(" (")[0]
+        fila = salida.setdefault(idioma, {"con_cargo": 0, "comprobadas": 0, "fuentes": {}})
+        por_fuente = fila["fuentes"].setdefault(fuente, {"con_cargo": 0, "comprobadas": 0})
+        for d in (fila, por_fuente):
+            d["con_cargo"] += 1
+            d["comprobadas"] += _comprobada(v)
+    return salida
+
+
 def medir(vacantes, hoy=None):
     hoy = hoy or max((v.get("visto_ultima_vez") or "")[:10] for v in vacantes)
     cargos = [cargo_ficticio(n, vacantes) for n in CARGOS]
-    return {"fecha": hoy, "vacantes": len(vacantes), "fugas_de_ubicacion": fugas(vacantes, hoy),
+    return {"fecha": hoy, "vacantes": len(vacantes), "embudo_idioma": embudo_idioma(vacantes),
+            "fugas_de_ubicacion": fugas(vacantes, hoy),
             "solo_espanol_remoto": embudo_espanol(vacantes, hoy, cargos), "funciones": evidencias(vacantes, cargos)}
 
 

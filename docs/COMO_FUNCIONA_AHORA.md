@@ -72,6 +72,9 @@ derecha, el botón con el sol o la luna cambia entre modo claro y oscuro (por de
    - Desde el 26 nov (contrato v49) también se leen las funciones del aviso. Si el título coincide pero la
      descripción no trae ninguna función del cargo, llega al final con la etiqueta «Funciones por confirmar». Si
      además parece otro oficio («QA Manufacturing Analyst»), va a «Por confirmar».
+   - Los nombres hermanos en español del cargo («Jefe de producto» para Product Manager, «Ingeniero de pruebas» para
+     QA) se buscan y se reconocen solos (contrato v50), con ese mismo control de funciones. En el diálogo del cargo
+     están en «En español, se usan solos»; tocar uno lo deja de usar.
 2. **La ubicación.**
    - Remota: abierta a su país, al mundo o a un país donde puede trabajar legalmente. Si el aviso nombra un país,
      manda ese país (contrato v49). Una remota que solo dice un horario, sin país, llega solo a quien marcó ese
@@ -169,8 +172,9 @@ El repositorio está preparado para que una IA lo lea y lo cambie con cuidado.
 
 - Uso diario: [GUIA_CLIENTE.md](GUIA_CLIENTE.md) y [PANEL_CONTROL.md](PANEL_CONTROL.md).
 - Qué cambió y cuándo: [HISTORIAL_CAMBIOS.md](HISTORIAL_CAMBIOS.md).
-- Reglas de los datos: [CONTRATO_DATOS_v49.md](CONTRATO_DATOS_v49.md) (ubicación sin fugas, funciones, completar
-  hasta la meta y panel de un botón), [CONTRATO_DATOS_v27.md](CONTRATO_DATOS_v27.md) (qué descarta y qué solo ordena; «Aplicar
+- Reglas de los datos: [CONTRATO_DATOS_v50.md](CONTRATO_DATOS_v50.md) (más vacantes en español: fichas de LinkedIn
+  al cargo, repaso de Indeed, nombres hermanos), [CONTRATO_DATOS_v49.md](CONTRATO_DATOS_v49.md) (ubicación sin fugas,
+  funciones, completar hasta la meta y panel de un botón), [CONTRATO_DATOS_v27.md](CONTRATO_DATOS_v27.md) (qué descarta y qué solo ordena; «Aplicar
   hoy»), [v25](CONTRATO_DATOS_v25.md) (funciones), [v24](CONTRATO_DATOS_v24.md)
   (búsqueda por perfil), [v23](CONTRATO_DATOS_v23.md) (ubicaciones del mundo), [v22](CONTRATO_DATOS_v22.md) (filtros
   del perfil) y [v21](CONTRATO_DATOS_v21.md) (metas y techo).

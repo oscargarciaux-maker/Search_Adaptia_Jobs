@@ -72,13 +72,26 @@ def _limpio(valor):
     return str(valor).strip()
 
 
+# Contrato v50: en el repaso de cada noche, cuántos resultados se piden por búsqueda y cuántos nombres de una
+# combinación en español se buscan (las demás, `repaso` nombres).
+RESULTADOS_REPASO = 100
+NOMBRES_REPASO_ES = 8
+
+
 def buscar(mapa, paises_activos, estado, presupuesto, hoy=None, max_dias=30, por_busqueda=30, reloj=time.monotonic,
-           limite_segundos=None, scrape=None, prioritarias=(), desfase_terminos=0):
-    """Vacantes crudas de Indeed y estadísticas. `scrape` permite probar sin red (por defecto jobspy.scrape_jobs)."""
+           limite_segundos=None, scrape=None, prioritarias=(), desfase_terminos=0, repaso=0):
+    """Vacantes crudas de Indeed y estadísticas. `scrape` permite probar sin red (por defecto jobspy.scrape_jobs).
+    `repaso` (contrato v50, la búsqueda de cada noche): cuántos nombres de cada combinación se buscan con la ventana
+    completa de `max_dias`. Indeed no deja comprobar un aviso directamente (v41): solo cuenta como abierto el día que
+    su búsqueda lo muestra. Pidiendo cada noche solo lo publicado desde la vez anterior, y con un nombre por día, un
+    aviso de hace tres días no volvía a verse: el 26 nov había 259 en español con cargo sin comprobar por eso. Una
+    búsqueda de 30 días tarda 1 segundo. Con 0 (capturas horarias, refuerzo y «Buscar ahora» para quien falta), como
+    antes: un nombre y solo lo nuevo."""
     if scrape is None:
         from jobspy import scrape_jobs as scrape
     hoy = hoy or datetime.now(timezone.utc).date().isoformat()
     inicio = reloj()
+    repaso = 0 if cobertura._FALTANTES else int(repaso or 0)  # v47: la búsqueda para quien falta no repite
     # Contrato v47: cada combinación lleva la lista de nombres; el término lo elige `siguiente_busqueda`.
     combinaciones = [(f["id"], cobertura.consultas(f), p + sufijo)
                      for f in mapa for p in f.get("paises_busqueda") or f.get("paises_objetivo", paises_activos)
@@ -91,48 +104,68 @@ def buscar(mapa, paises_activos, estado, presupuesto, hoy=None, max_dias=30, por
                       for f in mapa if f.get("consultas_es") for p in f.get("paises_es") or [] if p in PAISES
                       for sufijo in (":ES:REMOTO", ":ES")]
     combinaciones = cobertura.repartir(combinaciones, estado, hoy, prioritarias)
+    if repaso:  # primero las combinaciones en español: son las que menos avisos tienen y más se pierden
+        combinaciones.sort(key=lambda c: ":ES" not in c[2])  # estable
     crudas, hechas, fallidas, seguidas = [], 0, 0, 0
     por_familia, por_pais = {}, {}
+    bloqueada = False
+
+    def agotada():
+        return hechas >= presupuesto or seguidas >= 3 or bloqueada or (
+            limite_segundos is not None and reloj() - inicio >= limite_segundos)
     for familia, lista, pais in combinaciones:
-        if hechas >= presupuesto or seguidas >= 3 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
+        if agotada():
             break
         lugar = pais
         pais = lugar.split(":")[0]
         solo_remoto = lugar.endswith(":REMOTO")
-        b = cobertura.siguiente_busqueda(lista, hoy, 1, f"{familia}@{lugar}", estado, desfase=desfase_terminos,
+        # En el repaso, el filtro remoto no añade avisos (la búsqueda sin filtro ya los trae): un solo nombre.
+        cantidad = 1 if not repaso or solo_remoto else NOMBRES_REPASO_ES if ":ES" in lugar else repaso
+        b = cobertura.siguiente_busqueda(lista, hoy, cantidad, f"{familia}@{lugar}", estado, desfase=desfase_terminos,
                                          max_dias=max_dias)
         if b is None:  # contrato v47: ya se buscó hoy y no queda nada nuevo ahí
             continue
-        consulta = b.terminos[0]
-        hechas += 1
-        por_familia[familia] = por_familia.get(familia, 0) + 1
-        por_pais[lugar] = por_pais.get(lugar, 0) + 1
-        cobertura.anotar_busqueda("indeed", familia, lugar)
-        try:
-            df = scrape(site_name=["indeed"], search_term=consulta, hours_old=b.dias * 24, results_wanted=por_busqueda,
-                        country_indeed=PAISES[pais], description_format="markdown", verbose=0,
-                        **({"is_remote": True} if solo_remoto else {}),
-                        **({"offset": b.desde * por_busqueda} if b.desde else {}))
-        except Exception as e:  # noqa: BLE001 — un bloqueo no detiene a las demás fuentes
-            fallidas += 1
-            seguidas += 1
-            if "429" in str(e) or "block" in str(e).lower():
+        dias = max_dias if repaso else b.dias
+        pedir = RESULTADOS_REPASO if repaso else por_busqueda
+        vistos, hecha = set(), False
+        for consulta in b.terminos:
+            if agotada():
                 break
-            continue
-        seguidas = 0
-        cobertura.anotar_hecha(estado, b, hoy)
-        cobertura.anotar_paginas(estado, b, hoy, b.desde + 1, len(df) < por_busqueda)
-        for r in df.to_dict("records"):
-            fecha = r.get("date_posted")
-            _anotar_vista(_limpio(r.get("job_url")), _limpio(r.get("job_url_direct")))
-            crudas.append({
-                "titulo": _limpio(r.get("title")), "empresa": _limpio(r.get("company")),
-                "ubicacion": ubicacion(r.get("location"), pais),
-                "descripcion": _limpio(r.get("description"))[:30000],
-                "fecha": fecha.isoformat()[:10] if hasattr(fecha, "isoformat") else _limpio(fecha)[:10],
-                "enlace": _limpio(r.get("job_url")), "enlace_directo": _limpio(r.get("job_url_direct")),
-                "remoto": bool(r.get("is_remote")) or None, "fuente": NOMBRE,
-                "_busqueda": b.clave,  # contrato v40: de qué búsqueda salió
-            })
-    return crudas, {"busquedas": hechas, "fallidas": fallidas, "avisos": len(crudas),
+            hechas += 1
+            por_familia[familia] = por_familia.get(familia, 0) + 1
+            por_pais[lugar] = por_pais.get(lugar, 0) + 1
+            cobertura.anotar_busqueda("indeed", familia, lugar)
+            try:
+                df = scrape(site_name=["indeed"], search_term=consulta, hours_old=dias * 24, results_wanted=pedir,
+                            country_indeed=PAISES[pais], description_format="markdown", verbose=0,
+                            **({"is_remote": True} if solo_remoto else {}),
+                            **({"offset": b.desde * pedir} if b.desde else {}))
+            except Exception as e:  # noqa: BLE001 — un bloqueo no detiene a las demás fuentes
+                fallidas += 1
+                seguidas += 1
+                bloqueada = "429" in str(e) or "block" in str(e).lower()
+                continue
+            seguidas = 0
+            hecha = True
+            if not repaso:
+                cobertura.anotar_paginas(estado, b, hoy, b.desde + 1, len(df) < pedir)
+            for r in df.to_dict("records"):
+                fecha = r.get("date_posted")
+                enlace = _limpio(r.get("job_url"))
+                _anotar_vista(enlace, _limpio(r.get("job_url_direct")))
+                if enlace in vistos:  # el mismo aviso con otro nombre de la misma combinación
+                    continue
+                vistos.add(enlace)
+                crudas.append({
+                    "titulo": _limpio(r.get("title")), "empresa": _limpio(r.get("company")),
+                    "ubicacion": ubicacion(r.get("location"), pais),
+                    "descripcion": _limpio(r.get("description"))[:30000],
+                    "fecha": fecha.isoformat()[:10] if hasattr(fecha, "isoformat") else _limpio(fecha)[:10],
+                    "enlace": enlace, "enlace_directo": _limpio(r.get("job_url_direct")),
+                    "remoto": bool(r.get("is_remote")) or None, "fuente": NOMBRE,
+                    "_busqueda": b.clave,  # contrato v40: de qué búsqueda salió
+                })
+        if hecha:
+            cobertura.anotar_hecha(estado, b, hoy)
+    return crudas, {"busquedas": hechas, "fallidas": fallidas, "avisos": len(crudas), "repaso": bool(repaso),
                     "combinaciones_total": len(combinaciones), "por_familia": por_familia, "por_lugar": por_pais}

@@ -63,8 +63,10 @@ def test_busqueda_completa_y_vacantes_utilizables():
     cliente, estado = Cliente([_ficha(), _ficha(remota=False, hasta="2026-11-01")]), {}
     crudas, stats = ee.buscar(cliente, mapa, estado, 5, hoy="2026-11-15")
     assert cliente.pedidas[0] == "https://www.elempleo.com/co/ofertas-empleo/trabajo-disenador-ux-ui"  # en español
-    assert stats["busquedas"] == 1 and stats["avisos"] == 2 and stats["cerradas"] == 1 and len(crudas) == 1
-    assert estado["diseno-producto-ux@CO"] == "2026-11-15"
+    # Contrato v50: después, también con los demás nombres del cargo (antes, con títulos en español, solo con esos).
+    assert cliente.pedidas[1] == "https://www.elempleo.com/co/ofertas-empleo/trabajo-product-designer"
+    assert stats["busquedas"] == 2 and stats["avisos"] == 2 and stats["cerradas"] == 1 and len(crudas) == 1
+    assert estado["diseno-producto-ux@CO:ES"] == estado["diseno-producto-ux@CO"] == "2026-11-15"
     vacantes, _, _ = bodega.limpiar([], crudas, "2026-11-15", 30, set(), set())
     v = vacantes[0]
     assert v["paises"] == ["CO"] and v["modalidad"] == "remoto" and v["fuente"] == "Elempleo" and v["idioma"] == "es"

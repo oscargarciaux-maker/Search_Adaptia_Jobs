@@ -199,7 +199,7 @@ def completar_descripciones(cliente, previas, max_fichas, hoy=None, max_dias=30,
                   and ".computrabajo.com/" in (v.get("enlace") or "")
                   and (v.get("fecha_publicacion") or v.get("visto_ultima_vez") or "") >= desde]
     candidatas.sort(key=lambda v: v.get("visto_primera_vez") or "", reverse=True)
-    candidatas.sort(key=lambda v: not cobertura.sirve_a_corta(v))  # estable
+    candidatas = cobertura.por_necesidad(candidatas)  # contrato v50: por turnos entre personas, primero quien va corta
     crudas, peticiones, cerradas, seguidas = [], 0, 0, 0
     for v in candidatas:
         if peticiones >= max_fichas or seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):

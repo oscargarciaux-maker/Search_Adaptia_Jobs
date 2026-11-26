@@ -70,6 +70,8 @@ def test_los_titulos_del_mapa_clasifican_pero_no_se_buscan(cfg):
 
 # ── Español en las fuentes ──────────────────────────────────────────────────────────────────────────────────────────
 def _solo_es(cfg, pais="CO"):
+    for otro in cfg["perfiles"]:  # v50: quien acepta español e inglés también busca en español; aquí, solo este
+        otro["idiomas"] = ["en"]
     p = cfg["perfiles"][0]
     p["idiomas"] = ["es"]
     p["ubicaciones"] = [{"paises": [pais], "ciudades": [], "modalidades": ["remoto"]}]

@@ -115,6 +115,37 @@ def sirve_a_corta(v):
                and (not idioma or idioma in p.get("idiomas", ("es", "en"))) for p in _PERSONAS)
 
 
+def por_necesidad(vacantes):
+    """Contrato v50: el orden en que se releen las vacantes guardadas sin descripción. Por turnos entre las personas
+    (la primera de cada una, luego la segunda…), primero quien va corta y quien tiene menos de dónde elegir, mirando su
+    cargo y su ubicación (y su idioma, si ya se sabe). Después las de un cargo buscado que hoy no le sirven a nadie y,
+    al final, las que no son de ningún cargo. Dentro de cada persona se conserva el orden en que llegan (lo más
+    reciente primero). Antes solo se adelantaba lo de quien iba corto: el 25 nov se releyeron 100 de 1.581 en espera."""
+    vacantes = list(vacantes)
+    datos = []
+    for v in vacantes:
+        abiertos, mundial, _ = paises.abiertos(v)
+        datos.append((v, {f.get("familia") for f in v.get("familias") or [] if isinstance(f, dict)}, abiertos, mundial,
+                      v.get("idioma") or ""))
+    colas = []
+    for p in _PERSONAS:
+        suyas = [v for v, fams, abiertos, mundial, idioma in datos
+                 if p["familia"] in fams and (mundial or abiertos & p["lugares"])
+                 and (not idioma or idioma in p.get("idiomas", ("es", "en")))]
+        if suyas:
+            colas.append((not p.get("corto"), len(suyas), suyas))
+    colas.sort(key=lambda c: c[:2])
+    salida, vistas = [], set()
+    for i in range(max((len(c[2]) for c in colas), default=0)):
+        for _, _, suyas in colas:
+            if i < len(suyas) and id(suyas[i]) not in vistas:
+                vistas.add(id(suyas[i]))
+                salida.append(suyas[i])
+    resto = [v for v in vacantes if id(v) not in vistas]
+    resto.sort(key=lambda v: not v.get("familias"))  # estable
+    return salida + resto
+
+
 # Contrato v47 («Buscar ahora» para quien falta, decisión de Oscar del 18 nov): búsqueda corta y sin repetir. Solo
 # las combinaciones de quienes faltan (sin el resto) y, si una ya se buscó hoy con los mismos términos, los términos
 # siguientes del cargo o la página siguiente. Si cambian las condiciones del perfil, cambian las claves y se busca.
@@ -209,7 +240,10 @@ def de_personas(combinaciones):
     salida = {}
     for i, persona in enumerate(_PERSONAS):
         # «GLOBAL» (Get on Board: todo LATAM y remoto) sirve a cualquier persona del cargo.
+        # Contrato v50: una búsqueda con nombres en español («CO:ES») no es turno de quien no acepta avisos en español.
+        acepta_es = "es" in persona.get("idiomas", ("es",))
         salida[i] = [c for c in combinaciones if c[0] == persona["familia"]
+                     and (acepta_es or ":ES" not in str(c[2]))
                      and (str(c[2]).startswith("GLOBAL") or _claves_lugar(c[2]) & persona["lugares"])]
     return salida
 

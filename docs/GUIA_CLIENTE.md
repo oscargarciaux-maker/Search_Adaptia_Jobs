@@ -222,6 +222,17 @@ La captura horaria no consume Apify. La búsqueda nocturna y la profunda pueden 
 hasta USD 5/mes para este programa. Revisar el gasto global de la cuenta, que puede incluir otros trabajos.
 Las fuentes y variantes rotan; no se recorren todos los títulos de todos los países en cada ejecución.
 
+### Vacantes en español (contrato v50, 26 nov)
+
+- Quien acepta español (solo o junto con inglés) recibe búsquedas con los nombres en español de su cargo.
+- Los nombres en español que conocemos de cada cargo **se usan solos**: no hay que añadirlos. En el diálogo del cargo
+  aparecen en «En español, se usan solos»; toca uno para dejar de usarlo (pasa a «Excluir estos términos»).
+  Si las funciones del aviso no acompañan, la vacante va al final con «Funciones por confirmar» o a «Por confirmar».
+- Los avisos en español casi siempre son de un solo país: a cada persona le sirven los de su país y los que dicen que
+  aceptan su país, LATAM o todo el mundo. Un cargo en un país da de 2 a 4 vacantes nuevas en español al día.
+- En el reporte de cada búsqueda, `embudo_idioma` dice cuántas vacantes en español hay guardadas y cuántas tienen el
+  enlace comprobado.
+
 ### Personas que solo hablan español (contrato v44)
 
 - Al crear un cargo, «Buscar denominaciones afines» muestra primero los nombres **en español** y, si el cargo es un
