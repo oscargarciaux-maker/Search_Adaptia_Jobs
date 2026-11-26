@@ -157,6 +157,19 @@ Computrabajo, `rescatadas` en el resumen).
   cola se conserva. Nunca van identificadores de perfiles en las entradas del flujo ni en sus registros.
 - **Formulario.** Una fila con presencial o híbrido pide la ciudad; el panel lista los perfiles a los que les falta.
 
+## 5. Quitar un cargo el mismo día no tumba la búsqueda
+
+El 25 nov fallaron tres corridas seguidas (la segunda pasada, su respaldo y una captura horaria) con «No se puede
+reemplazar una selección canónica»: el lote de la primera búsqueda tenía 5 vacantes de un cargo que después dejó de
+estar en la configuración (archivado, sin perfiles activos o sin meta). `entrega.elegir` armaba el lote solo con los
+cargos vigentes y la base, que exige que todo lo registrado hoy siga en el lote, lo rechazaba.
+
+- Lo ya entregado hoy de un cargo que salió de la configuración se conserva tal cual en el lote del día (mismo
+  snapshot y coincidencia). No recibe vacantes nuevas ni entra al resumen por cargo; cuenta al calcular lo que sobra del techo para Comunidad.
+- `entrega.filas_de` no arma filas de `ofertas` para ese cargo: ya salieron cuando se eligieron.
+- La regla de la base no cambia (protege lo entregado). Importa más desde v49, porque «Aplicar cambios» rige al
+  instante.
+
 ## Lo que no cambia
 
 - Solo español e inglés; el idioma del perfil sigue siendo un filtro.

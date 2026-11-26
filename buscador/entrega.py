@@ -372,6 +372,12 @@ def elegir(vacantes, entregadas, hoy, cfg=None, iniciales=None, omitir_verificac
         salida[rol["id"]] = variadas(candidatas, meta_de(rol, cfg), cfg.get("max_por_empresa", 2), hoy,
                                       cfg.get("preferir_remotas", False), iniciales.get(rol["id"], []),
                                       perfiles=rol.get("_perfiles", []), cargo=rol.get("_cargo"))
+    # Contrato v49: lo ya entregado hoy de un cargo que salió de la configuración (archivado, sin perfiles activos o sin
+    # meta) se conserva tal cual en el lote. La base exige que todo lo registrado hoy siga ahí, idéntico; sin esto, la
+    # siguiente búsqueda del día se caía en «Entrega del día» («No se puede reemplazar una selección canónica», 25 nov).
+    for rol_id, lista in iniciales.items():
+        if rol_id not in salida:
+            salida[rol_id] = list(lista)
     if panel:
         tomadas = {v["id"] for lista in salida.values() for v, _ in lista}
         libres += [v for lista in por_rol.values() for v, _ in lista if v["id"] not in tomadas]
@@ -492,6 +498,8 @@ def filas_de(elegidas, roles, hoy, capturada):
     nombres = {r["id"]: r["nombre"] for r in roles}
     filas, ids = [], set()
     for rol_id, lista in elegidas.items():
+        if rol_id not in nombres:
+            continue  # contrato v49: cargo que ya no está en la configuración; sus filas salieron cuando se eligieron
         for v, grado in lista:
             for fila in contrato.filas(v, nombres[rol_id], GRADO_CONTRATO.get(grado, grado), hoy,
                                        v.get("_capturada_entrega", capturada)):

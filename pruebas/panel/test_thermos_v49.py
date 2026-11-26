@@ -151,3 +151,44 @@ def test_perfil_anterior_conserva_su_ciudad_aunque_haya_otra_mayor_con_el_mismo_
     assert evaluar(merida, p, hoy())["compatible"]  # antes: «falta la ciudad en el perfil»
     assert sirve(guardada("presencial", ["ES"], ubicacion="Guadalajara, Castilla-La Mancha, España"), p)
     assert not sirve(guardada("presencial", ["ES"], ubicacion="Sevilla, Andalucía, España"), p)
+
+
+# 25 nov ── Quitar un cargo el mismo día en que ya tuvo entregas tumbaba las búsquedas siguientes ─────────────────────
+def test_un_cargo_retirado_hoy_conserva_su_lote_y_no_tumba_la_busqueda(cfg):  # noqa: F811
+    """Tres corridas fallaron el 25 nov con «No se puede reemplazar una selección canónica»: el lote de la mañana tenía
+    5 vacantes de un cargo que por la tarde ya no estaba en la configuración."""
+    from buscador import entrega
+    ya = _vacante(90, empresa="Empresa del cargo retirado")
+    ya["_capturada_entrega"] = "2026-11-25T19:10:00+00:00"
+    retirado = "cargo:00000000-0000-0000-0000-00000000dead"  # ya no está en la configuración
+    lote = {"fecha": hoy(), "elegidas": {retirado: [[ya, "exacto"]]}}
+    guardados = []
+
+    def persistir_lote(nuevo):
+        # La misma regla de la base (SQL 003/017): todo lo ya registrado hoy sigue en el lote, idéntico.
+        for rol_id, lista in lote["elegidas"].items():
+            for v, grado in lista:
+                presentes = [(x, g) for x, g in nuevo["elegidas"].get(rol_id, []) if x["id"] == v["id"]]
+                if not presentes or presentes[0] != (v, grado):
+                    raise RuntimeError("No se puede reemplazar una selección canónica; releer el lote del día")
+        guardados.append(nuevo)
+    with ejecutor.activar({"revision": 1, "configuracion": cfg}, hoy()):
+        nuevas = [_vacante(n) for n in range(1, 4)]
+        resumen = entrega.correr(nuevas + [ya], {}, hoy(), "2026-11-25T23:00:00+00:00", None, lote=lote,
+                                 persistir_lote=persistir_lote)
+        roles = entrega.config()["roles"]
+    elegidas = guardados[0]["elegidas"]
+    assert [v["id"] for v, _ in elegidas[retirado]] == [ya["id"]]  # antes: el cargo desaparecía del lote y la base fallaba
+    assert retirado not in resumen["roles"] and resumen["vacantes"] == sum(len(x) for x in elegidas.values())
+    # Sus filas de `ofertas` ya salieron cuando se eligieron: no se vuelven a armar (ni fallan por no tener nombre).
+    assert isinstance(entrega.filas_de(elegidas, roles, hoy(), ""), list)  # antes: KeyError con el cargo retirado
+    assert entrega.filas_de({retirado: elegidas[retirado]}, roles, hoy(), "") == []
+    # La asignación por persona no reparte nada a nombre de ese cargo; si otro cargo vigente la reconoce (v43), le
+    # llega a sus perfiles con su propio cargo.
+    repo = Repo()
+    repo.pedir = lambda metodo, ruta, **op: (
+        [{"role_id": retirado, "vacante_id": ya["id"], "match_grade": "exact", "snapshot": ya}]
+        if ruta == "entregas_diarias" else Repo.pedir(repo, metodo, ruta, **op))
+    ejecutor.registrar(repo, {"revision": 1, "configuracion": cfg}, hoy())
+    assert repo.ejecucion["resumen"]["vacantes_anteriores"] == 1 and repo.ejecucion["resumen"]["vacantes_vigentes"] == 0
+    assert all(a["cargo_id"] != retirado.split(":")[1] for a in repo.asignaciones)
