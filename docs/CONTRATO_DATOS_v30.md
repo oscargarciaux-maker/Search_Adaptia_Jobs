@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v30: dónde trabajaría, en filas
 
 **Fecha:** 16 de noviembre de 2026.

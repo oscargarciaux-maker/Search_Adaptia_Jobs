@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Inglés exigido precalculado en el catálogo — v7
 
 Revisión del 11 de noviembre de 2026. Amplía el catálogo v2 (`catalogo_vacantes.datos`) sin cambiar columnas ni SQL.

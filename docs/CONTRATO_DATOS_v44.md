@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v44 — vacantes para quien solo habla español, en cualquier país (18 nov 2026)
 
 Pedido de Oscar: «cualquier persona que coloque reciba vacantes; en este caso en español; que abarque todos los países».

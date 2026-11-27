@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v45 — «Buscar ahora» que decide solo (18 nov 2026)
 
 > Desde v47 la búsqueda para quien falta es corta y no repite lo ya buscado hoy: ya no duplica los presupuestos ni

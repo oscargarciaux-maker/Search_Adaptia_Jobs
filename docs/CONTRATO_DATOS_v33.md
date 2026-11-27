@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v33: el nivel de inglés ordena, no descarta
 
 **Fecha:** 16 de noviembre de 2026. **Corrige:** el punto 1 de [v32](CONTRATO_DATOS_v32.md). **Sin SQL ni IA.**

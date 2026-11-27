@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v23 — ubicaciones del mundo, permiso legal y horario compatible
 
 Vigente desde el 15 nov 2026, por decisión de Oscar tras la reunión con el cliente (punto 4). Amplía el perfil del

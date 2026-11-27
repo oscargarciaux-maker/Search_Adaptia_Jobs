@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato público v3: verificación de enlaces
 
 Extensión compatible de los campos públicos v2. No cambia las columnas de `ofertas` ni la selección histórica.

@@ -1,151 +1,81 @@
 # CLAUDE.md — Buscador de vacantes LATAM
 
-## Qué es y decisión vigente
-Desde la petición del 6 de noviembre, existe un panel de control privado para el operador: clientes con perfiles,
-cargos abiertos y metas diarias por perfil bajo un techo del día (v21; antes cupos por cargo que sumaban 120), filtros por país/modalidad/idioma/publicación/experiencia/inglés,
-y copia manual de WhatsApp. La retirada de la web histórica no prohíbe esta nueva plataforma expresamente solicitada.
-No reintroducir Pages/Cloudflare antiguos, Excel, envío automático de WhatsApp ni seguimiento de candidaturas.
-Panorama vigente y corto: docs/COMO_FUNCIONA_AHORA.md. Leer primero docs/PANEL_CONTROL.md y docs/CONTRATO_DATOS_v6.md. Estos prevalecen sobre restricciones históricas
-que prohibían filtrar experiencia/inglés o fijaban seis cargos. El acceso real queda cerrado hasta configurar login,
-por decisión del propietario; --demo usa datos ficticios y no toca Supabase. No abrir datos reales sin autorización.
+## Qué es
+Cada mañana el sistema busca vacantes en portales públicos y, con los criterios de cada cliente, asigna las que le
+sirven. Un panel privado (React/Vite + FastAPI) deja al operador gestionar clientes, perfiles, cargos y metas diarias
+bajo un techo del día, revisar vacantes, descargar CSV y copiar el WhatsApp de cada cliente para enviarlo a mano.
+Sin versión de panel vigente sigue la captura heredada: seis cargos fijos, veinte vacantes por cargo.
 
-La captura heredada mantiene seis cargos por veinte hasta existir una versión privada vigente; panel.ejecutor carga
-la versión activa desde Supabase, sustituye cargos/lugares/cupos y asigna resultados compatibles por perfil.
-Búsqueda y afinidad sin IA; variantes/ESCO/términos editables para cargos nuevos. No inventar equivalentes ni un score
-personal de contratación. No persistir datos de clientes en reportes/cachés públicos de la captura.
-La configuración y asignaciones viven en Supabase; SQL 009 añade cuatro tablas privadas. UI React/Vite, API FastAPI,
-servidor con credencial de servicio; nunca compartirla al navegador. Docker y guía de despliegue sin proveedor obligatorio.
-«Aplicar cambios» (v49; antes «Confirmar y aplicar», v43, SQL 019) guarda y fija la versión desde hoy en Bogotá: la próxima búsqueda la usa, lo entregado no cambia y una búsqueda en curso asigna con la más nueva sin caerse.
+**Las reglas vigentes están en `docs/CONTRATO_VIGENTE.md`: es la fuente principal y gana sobre cualquier otro
+documento.** Los `docs/CONTRATO_DATOS_vNN.md` son históricos (el código los cita): no se editan.
+Panorama para el operador: `docs/COMO_FUNCIONA_AHORA.md`. `docs/PLAN.md` es diseño histórico y no prevalece.
 
-Leer antes de trabajar `docs/GUIA_CLIENTE.md`, `docs/OPERACION_Y_RECUPERACION.md` y `docs/ACEPTACION_Y_ESTADO.md`.
-Riesgos y prioridades de mantenimiento: `docs/REVISION_FIABILIDAD.md`.
-Para reservas y pendientes centrales, leer `docs/CONTRATO_ESTADO_OPERATIVO.md` y `docs/ACTIVAR_ESTADO_OPERATIVO.md`.
-Entrega al cliente y traspaso a su Supabase: `docs/ENTREGA_AL_CLIENTE.md` y flujo `traspaso.yml` (destino vacío y propio; el origen trasladado detiene las capturas). Ceder el mismo proyecto sin copiar (transferir Supabase, repositorio y panel, y qué llaves cambian): `docs/CEDER_EL_PROYECTO.md`. Camino preferido de instalación: `docs/INSTALACION_AUTOMATICA.md`. `SUPABASE_DB_URL` y `SUPABASE_BACKUP_KEY` se configuran
-una vez como Secrets. Preparar Supabase sube respaldo cifrado antes de SQL, registra hashes en `adaptia_migraciones`
-y activa por marca privada; no pedir copiar 002/003 ni variables manuales para este camino. No modificar SQL ya registrado:
-añadir migración. Clave administrativa limitada a preparación; no se entrega a fuentes, navegador ni logs. Tras el
-instalador los cortes contienen dieciséis tablas (SQL 014 añade `panel_revisiones` y `panel_reglas_ubicacion`; SQL 015 a 020 no añaden tablas) y tres secuencias (SQL 020 añade `catalogo_vacantes_numero_seq`, el «ID N» de cada vacante). Probar `python -m pruebas.probar_migraciones` solo en PG aislado.
-SQL 003 + `ESTADO_SUPABASE_ACTIVO=true` activan el modo; no asumir que está desplegado. No volver al contador local
-como alternativa silenciosa ni vaciar reservas/colas para resolver errores. El arranque importa un corte coherente.
-`docs/PLAN.md` se conserva como diseño histórico: sus instrucciones antiguas no prevalecen sobre decisiones actuales.
+## Reglas innegociables
+- **Sin IA en la búsqueda, la afinidad ni el aprendizaje.** Todo es código con pruebas. La IA solo amplía el mapa de
+  cargos leyendo archivos cortos (`reportes/`), nunca la bodega completa. No inventar sinónimos ni un puntaje de
+  contratación.
+- **Nada se envía solo.** WhatsApp solo con `wa.me` y a mano; no hay API de WhatsApp ni automatización de mensajes.
+- **LinkedIn nunca con la sesión ni la cookie de nadie** (`li_at` incluida), ni actores de Apify que la pidan.
+- **No modificar SQL ya registrado** en `supabase/migraciones/`: se añade una migración nueva (y se agrega a
+  `ENSAYABLES` y a `pruebas/test_migraciones.py`). `ofertas` conserva sus columnas v1.
+- **Traspasable, sin claves en el repo:** nada depende de las cuentas personales de Oscar. Ninguna clave, ID, correo,
+  teléfono ni dato de clientes en el repositorio, en registros de Actions, en reportes públicos, `trabajo/` ni la rama
+  `publicado`; las claves van en los secretos. `pruebas/test_repositorio.py` lo revisa. La credencial de servicio y la
+  clave administrativa nunca llegan al navegador, a las fuentes ni a los logs.
+- **Solo enlaces donde se postula de verdad** (portal de la empresa o portal donde se postula ahí mismo); nunca
+  agregadores ni sitios de pago. Sin comprobación vigente no se entrega ni se comparte; un bloqueo no es cierre.
+- **No inventar datos:** lo que el aviso no dice queda vacío (ni la moneda de un «$» solo, ni la modalidad).
+- **No borrar para arreglar:** ni lo entregado, ni el historial, snapshots, reservas o colas; no ocultar déficit.
+- **Prohibido reintroducir:** la web de Pages/Cloudflare, Excel, el envío automático de WhatsApp y el seguimiento de
+  postulaciones. No tocar ni depender del repositorio `ux_job_agent`.
+- **Datos reales:** no abrirlos sin autorización; para probar, `--demo` (datos ficticios, no toca Supabase). El acceso
+  real queda cerrado hasta configurar el inicio de sesión.
+- **No afirmar que algo está activo** porque el código existe: la activación requiere migración y variable y se
+  acredita con su ejecución (`docs/ACEPTACION_Y_ESTADO.md`).
+- Si falta una decisión o algo no está claro, se pregunta antes de inventar una regla.
 
-## Decisiones vigentes de cobertura e integridad
-
-Leer `docs/CONTRATO_DATOS_v51.md` (27 nov, decisión de Oscar: la hora la marca algo dentro de GitHub, sin servicios externos. Desde el 17 nov GitHub dispara los horarios del repositorio cada 8 a 12 horas, pero lo pedido —`workflow_dispatch`— arranca al momento. «Reloj» —`reloj.yml`—: cadena de relevos que espera con el temporizador del entorno `reloj` (30 min, se crea a mano: `docs/ACTIVAR_RELOJ.md`), pide el siguiente relevo y luego la captura horaria o, desde las 6:30 de Bogotá, la búsqueda diaria si hoy no corrió; reglas en `buscador/arranque.py` —`relevo`, `toca_captura`, `toca_diaria`, `hace_falta_revivir`—: sin temporizador no sigue, de los relevos vivos solo sigue el de número más alto, una búsqueda que falló no se repite sola, el vigía usa la misma `toca_diaria`, y no usa el grupo `publicar`. Las fuentes dejan el motivo del fallo —`http.motivo_del_fallo`— y Bumeran reintenta una vez al final; `Central.rpc` abre conexión nueva tras 120 s sin uso, sin reintentar; `verificacion_enlaces.en_la_corrida` (`medicion.enlaces_de_la_corrida`) suma toda la corrida y el embudo por cargo trae `por_idioma`). Leer `docs/CONTRATO_DATOS_v50.md` (26 nov, decisiones de Oscar para traer más vacantes en español en cualquier país de LATAM y España: LinkedIn lee primero las fichas de avisos cuyo título es de un cargo buscado; la relectura va por turnos entre personas (`cobertura.por_necesidad`); Indeed repasa cada noche los 30 días completos con varios nombres, cada búsqueda con su clave —`indeed_repaso` en `datos/config.yaml`, solo en la búsqueda completa del panel—; en la cola de enlaces por persona el máximo cuenta solo los sitios en paralelo y LinkedIn va aparte (`auditar(linkedin_aparte=True)`); quien acepta español e inglés también busca con nombres en español; los nombres hermanos en español —`terminos.hermanos_es`: exactos del mapa y compuestos del glosario, nunca los «similares»— se usan solos con el control de funciones de v49, salvo los excluidos; la letra pequeña en español que nombra desde dónde postular solo suma países a una remota con país concreto, nunca recorta, y las frases de la empresa, de beneficios o vagas no abren nada; `embudo_idioma` en cada reporte; el remoto de otro país sigue la regla de v49, sin excepción por idioma). Leer `docs/CONTRATO_DATOS_v49.md` (26 nov, decisiones de Oscar: si el aviso nombra un país, manda ese país —el horario solo abre una remota sin país y solo para las zonas que el perfil marcó; «anywhere in <lugar>» no es mundial; la ciudad no anula el país; presencial e híbrida exigen ciudad en el perfil y en el aviso—; afinidad por funciones con `panel/contenido.py` —cargo operativo único, huella propia, del mapa o calculada de noche en `panel_ajustes.huellas_cargos`; sin evidencia la vacante va al final con «Funciones por confirmar» y con señal de otro oficio (`datos/oficios_ajenos.yaml`) va a «Por confirmar»; nunca descarta—; a quien va corto se le completa hasta su meta diaria sin pasar el techo y sus candidatas se comprueban primero (`verificar_enlaces.cola_por_necesidad`); Computrabajo lee solo fichas de cargos buscados y relee las guardadas; en español solo se busca lo que se reconoce, con plurales y `datos/titulos_idioma.yaml`; un solo «Aplicar cambios» y «Buscar ahora» por cliente con `enfoque=pedido` —los perfiles pedidos van en `panel_ajustes.busqueda_pedida`, nunca en las entradas del flujo—; medición reproducible `python -m buscador.medicion --bodega …`). Leer `docs/CONTRATO_DATOS_v48.md` (22 nov, decisiones de Oscar: cada vacante tiene un número corto y fijo —SQL 020 `catalogo_vacantes.numero`— que va como «(ID 1234)» en los mensajes de WhatsApp, en Vacantes, en «Por confirmar» y en los CSV; «Tomar vacantes» de cualquier día desde el detalle del cliente y calendario en Vacantes: de un día anterior entran las entregadas, comprobadas al momento si no tienen 24 h, sin las cerradas; en «Buscar ahora» para quien falta el tope de comprobar enlaces incluye ordenar las candidatas y deja 60 s al refuerzo —la #41 tardó 19 min—, la búsqueda de la mañana no cambia). Leer `docs/CONTRATO_DATOS_v47.md` (18 nov, decisión de Oscar: «Buscar ahora» para quien falta es corta y no repite —solo sus combinaciones sin el resto, lo ya buscado hoy con los mismos nombres pasa a otros nombres o a la página siguiente (`cobertura.siguiente_busqueda`, `~paginas`), sin portales ATS/listas/tableros/sitemaps, 12 min por fuente y una ronda de refuerzo; corrige el doble presupuesto y los 30 días forzados de v45—). Leer `docs/CONTRATO_DATOS_v46.md` (18 nov, decisión de Oscar: «Mandarme todos a mi WhatsApp» en UN mensaje con un enlace corto por cliente `/w/<borrador>.<firma>` —HMAC con llave derivada de la credencial de servicio en el servidor, válido solo hoy y mientras el mensaje esté pendiente/abierto, redirige a wa.me con el texto actual, sin sesión ni datos en registros—; Mensajes y Resumen dicen cuántas son de hoy y cuántas de días anteriores; reemplaza las partes de v31). Leer `docs/CONTRATO_DATOS_v45.md` (18 nov, decisión de Oscar: un solo «Buscar ahora» que decide en el servidor —sin búsqueda terminada hoy → completa; ya corrió y hay perfiles bajo su meta → `enfoque=faltantes`: solo ellos con turnos, 30 días, doble presupuesto, mismo mapa y lote; todos cumplen → no lanza—). Leer `docs/CONTRATO_DATOS_v44.md` (18 nov, decisiones de Oscar: quien solo habla español recibe vacantes en cualquier país —sugerencias en español compuestas con `datos/glosario_cargos.yaml` (solo sugerencias), títulos en español exactos de la familia del mapa reconocidos solos, español en Indeed/Get on Board/Computrabajo/Apify, `fuentes_en(país)` mínimo LinkedIn+portales+Get on Board en los 249 países; fuentes Hireline y Magneto (sitemap + JobPosting) y RemotosLatam/WeRemoto solo para descubrir empresas, nunca sus avisos; «Qué hacer» por persona con cifras, nada se aplica solo—). Leer `docs/CONTRATO_DATOS_v43.md` (18 nov, decisiones de Oscar: confirmar rige desde hoy y «Aplicar hoy» es el mismo botón; la búsqueda relee la versión antes de asignar y no se cae; una captura horaria arma lote solo si la configuración cambió después del lote del día —única excepción a «no crea entregas»—; Comunidad después de los reales y hasta su meta; una vacante del lote llega a perfiles de otro cargo que la reconoce exacta o similar; WhatsApp manual elige cuántas). Leer `docs/CONTRATO_DATOS_v42.md` (18 nov, aprobado por Oscar: un aviso que el portal de la propia empresa —Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Recruitee— listó hoy cuenta como comprobado 24 h; Computrabajo y Get on Board no). Leer `docs/CONTRATO_DATOS_v41.md` (17 nov, aprobado por Oscar: un aviso que la búsqueda de Indeed mostró hoy cuenta como comprobado 24 h —Indeed responde 401 a toda comprobación—; LinkedIn se comprueba en su propia fila y con cupo según su pausa, los demás sitios con todos los hilos; primero lo de quien va corto). Leer `docs/CONTRATO_DATOS_v40.md` (17 nov: lugares de búsqueda desde TODAS las filas del perfil —remoto por país, oficinas y ciudades, regiones de `datos/regiones_busqueda.yaml` como región + países principales, «remoto LATAM» solo si vive en LATAM—; turnos ponderados por persona en todas las fuentes —meta, ×2 corta, ×2 sin fuentes propias, búsqueda compartida cuenta para cada una—; rendimiento por combinación en `estado["rendimiento"]`; Indeed en los 62 países de JobSpy; relectura primero para quien va corta; «Búsquedas hoy» en la cobertura, solo en el resumen privado; el final de `limpiar` conserva en modo panel las vacantes sin país cubierto que sirven a un perfil —antes las archivaba—). Leer `docs/CONTRATO_DATOS_v39.md` (17 nov: la ficha pública de LinkedIn —`jobs-guest/jobs/api/jobPosting`— leída en la búsqueda o la relectura cuenta como comprobación del enlace si trae el título y la descripción, o como cierre; la comprobación de LinkedIn lee esa ficha, de una en una y con pausa; Indeed no se comprueba directo y vale su `enlace_directo`; 800 enlaces en 10 min). Leer `docs/CONTRATO_DATOS_v38.md` (17 nov: cualquier ciudad del mundo dice su país —GeoNames, 5× más habitantes que otro país, 20× frente a uno cubierto, si no queda sin país—; códigos postales, provincias de Canadá y Australia, «US-Remote», alias editables; sigla de estado manda sobre la ciudad homónima; alrededores a 50 km de la ciudad del perfil). Leer `docs/CONTRATO_DATOS_v37.md` (17 nov: lugares de los perfiles que quedaron bajo 5 o son nuevos van primero en cada fuente; LinkedIn busca hasta la mitad de su tiempo y lee fichas el resto; `/api/cobertura` por persona solo con lo medido; femenino/masculino general; cargos que solo buscan por su nombre lo avisan). Leer `docs/CONTRATO_DATOS_v36.md` (17 nov, caso Danna: quien queda bajo 5 se completa con TODA la bodega —no solo lotes—, sin repetir a la persona, 2 por empresa, enlace de 24 h comprobado al momento y guardado en el catálogo; Indeed busca también en EE. UU. y otros países de los perfiles; LinkedIn reparte las fichas entre lugares). Leer `docs/CONTRATO_DATOS_v35.md` (16 nov: `acepta_horario` con zonas `UTC±H` —las antiguas se leen como UTC-5/UTC-8/UTC+1— y ±1 h; restricción «otra» en texto libre que solo ordena; vista previa con `ultimos_30` y `por_dia`; WhatsApp con país en lista). Leer `docs/CONTRATO_DATOS_v34.md` (16 nov: SQL 018 `panel_revisiones.resumen` guardado de noche y lista sin catálogo, con respaldo sin la columna; «Cargar todas» por páginas sin agotar memoria; LinkedIn conserva saltos, viñetas y `**negritas**`). Leer `docs/CONTRATO_DATOS_v33.md` (16 nov: el nivel de inglés ORDENA y deja etiqueta, nunca descarta; corrige v32). Leer `docs/CONTRATO_DATOS_v32.md` (16 nov: [punto del inglés corregido por v33]; áreas metropolitanas de LinkedIn en `datos/areas_metropolitanas.yaml` —«Roma y alrededores» = IT—; sugerencias claras de la bandeja se aplican solas de noche sin enseñar al aprendizaje; un tiempo restante de 0 detiene la fuente y LinkedIn reparte ~65 % buscar / resto releer). Leer `docs/CONTRATO_DATOS_v31.md` (16 nov: WhatsApp hasta 10 por cliente y 2 por empresa con «Tengo más…»; enlace compartible si se comprobó en 24 h, antes 6 h; «Mandarme todos a mi WhatsApp» con el número del operador en `panel_ajustes.operador`, sin enviar nada solo —en un solo mensaje desde v46—; embudo con nombres claros y «Qué hacer»; sesión con cookie de renovación de 30 días hasta «Cerrar sesión»). Leer `docs/CONTRATO_DATOS_v30.md` (16 nov: dónde trabajaría en filas `Perfil.ubicaciones` {países, ciudades, modalidades}, la primera donde vive; la ubicación cumple si alguna fila acepta la vacante; con filas, vive_en/modalidades/ciudades/mudanza/permiso se calculan desde ellas; sin filas, `Perfil.filas` las arma con el mismo resultado de antes; el importador conserva sus columnas). Leer `docs/CONTRATO_DATOS_v29.md` (16 nov: ficha de una vacante con la descripción en bloques sin HTML, traída una vez de la ficha original solo de la lista fija de dominios y guardada si faltaba; «Por confirmar» completa por páginas con total real y conteo por cliente; copias cortas en memoria; vista dividida en el panel; 300 fichas por noche para confirmar ubicación). Leer `docs/CONTRATO_DATOS_v28.md` (16 nov: posts con pistas de ubicación por reglas —país de fuera nombrado, autor, prefijo, moneda, dominio, empresa en el catálogo, ficha enlazada—; un post sin pistas completa el mínimo de 5 marcado «ubicación sin confirmar», máx. 2 por perfil al día; posts siguen fuera de `ofertas`/CSV/cupo; `posts_rescate` 50). Leer primero `docs/CONTRATO_DATOS_v27.md` (16 nov: solo la ubicación, el idioma del aviso y las reglas del sistema —abierta, enlace, sin repetir, fecha confirmada, 30 días— descartan; años, nivel, inglés, restricciones y antigüedad del perfil ordenan y dejan etiqueta; cercanos entran directo; la ampliación queda en remota cercana y 4 por empresa; el importador añade nombres/funciones a cargos existentes sin quitar; SQL 016 «Aplicar hoy» con vigencia hoy en Bogotá, sin tocar lo entregado). Donde v20/v22/v26 dicen «descarta», desde v27 solo ordena. Leer también `docs/CONTRATO_DATOS_v26.md` (salario mínimo comparado en cualquier moneda con `datos/tasas_cambio.yaml`, margen del 10 %, sin convertir monedas inestables ni con tasas de más de 120 días; `puede_trabajar_en` hasta 60 países y regiones en el importador), `docs/CONTRATO_DATOS_v25.md` (huella de funciones por cargo, propuesta y editable; título genérico + descripción que nombra el cargo = similar; coincidencia solo por funciones = grado `funciones` que nunca se entrega solo y va a «Por confirmar»; aprobarla aprende el título en `panel_ajustes.titulos_aprendidos`; sin IA), `docs/CONTRATO_DATOS_v24.md` (en modo panel LinkedIn busca con los lugares y ciudades de cada perfil, países de fuera por su nombre en inglés; ciudades = donde trabajaría, incluida la mudanza, y la ciudad implica el país; la admisión conserva avisos de los países objetivo de los perfiles y la selección acepta `paises_mundo`/horario; el modo heredado no cambia), `docs/CONTRATO_DATOS_v23.md` (residencia en cualquier país, decisión del 15 nov; vacante con `paises_mundo`, `alcance_mundial` y `zona_utc`; perfil con ciudades, permiso legal para trabajar en otros países y horarios aceptados: una remota con horario compatible sí sirve si el perfil acepta esa zona; varias etiquetas de lugar en «Por confirmar»), `docs/CONTRATO_DATOS_v22.md` (restricciones por perfil que descartan solo con evidencia: salario mínimo (en cualquier moneda desde v26), palabras y tipo de contrato; sectores y palabras preferidas que solo ordenan; margen de años 3 o 4; con 5+ años se descartan junior/prácticas y con 2 o menos no se filtra experiencia), `docs/CONTRATO_DATOS_v21.md` (metas diarias por perfil y techo del día editable, 120 por defecto, en lugar de cupos por cargo que suman 120; cliente «Comunidad» que recibe después de los reales y con el sobrante del techo; SQL 015 solo reemplaza las comprobaciones de guardar y programar), `docs/CONTRATO_DATOS_v20.md` (un solo campo «Años de experiencia» en el perfil: el servidor busca de 3 años menos a 3 más; los perfiles antiguos conservan su rango hasta que se edita), `docs/CONTRATO_DATOS_v19.md` (municipios y ciudades de GeoNames CC BY 4.0 solo como último recurso y solo con la ubicación, ambiguos descartados; región como ubicación salvo presencial/híbrida explícita; regiones en el panel; la bandeja no pregunta lo cerrado ni lo ya resuelto), `docs/CONTRATO_DATOS_v18.md` (política remota de Get on Board: `fully_remote` = cualquier país, `remote_local` = países de `location_tenants`; regiones combinadas; la bandeja retira sola lo ya resuelto), `docs/CONTRATO_DATOS_v17.md` (aprendizaje de ubicaciones solo con código: reglas del operador y aprendidas que solo resuelven lo «por confirmar» y nunca pisan la tabla; aprendizaje nocturno determinista con mínimo de evidencias, conflictos que desactivan y sin reactivación automática; CSV de revisión masiva; **no requiere IA**), `docs/CONTRATO_DATOS_v16.md` (confirmación automática de ubicación leyendo el JobPosting de la ficha; bandeja «Por confirmar» en el panel: SQL 014 `panel_revisiones`/`panel_reglas_ubicacion`, cola diaria de hasta 10 priorizando perfiles bajo 5, decisiones de un clic, reglas por ubicación exacta y nunca con ubicaciones genéricas), `docs/CONTRATO_DATOS_v15.md` (idioma: solo `es`/`en` con evidencia positiva frente a perfiles de 14 idiomas; tabla ISO completa `datos/paises_mundo.yaml` con siglas, nombres y subdivisiones; ambigüedad calculada por código y lista editable; AR/CO/PA tras palabra por confirmar), `docs/CONTRATO_DATOS_v14.md` (códigos sueltos de 2/3 letras, ubicaciones repetidas, ciudad dentro del texto si apunta a un único país y nunca por nombres ambiguos, «trabajar en el país» = país del aviso; el flujo de limpieza avisa si no se marcó «aplicar»), `docs/CONTRATO_DATOS_v13.md` (ubicaciones extranjeras reconocidas en español, por código ISO final o estado de EE. UU.; idiomas fr/de/it detectados; revisión de `ofertas` con `limpiar_fuera_objetivo.yml`: listado, huella, conservar/borrar_tambien, copia cifrada y BORRAR), `docs/CONTRATO_DATOS_v12.md` (solo español e inglés con detector de idioma por palabras propias; Brasil se reconoce pero no se cubre: solo cuenta dentro de remotas de varios países), `docs/CONTRATO_DATOS_v11.md` (rescate por persona hasta 5: experiencia ±2, hasta 4 por empresa, reutilizar entre personas sin repetir a la misma, Apify dirigido solo a perfiles con déficit; posts de LinkedIn etiquetados «Post» como último recurso), `docs/CONTRATO_DATOS_v10.md` (ajustes `panel_ajustes` SQL 012 y alertas por correo con Resend; contactos y borradores de WhatsApp SQL 013), `docs/CONTRATO_DATOS_v9.md` (mínimo de 5 por perfil con ampliación marcada; comprobación 24 h para seleccionar y 6 h para compartir), `docs/CONTRATO_DATOS_v8.md` (perfil por país de residencia y modalidades), `docs/CONTRATO_DATOS_v7.md` (inglés exigido precalculado para estimar), `docs/CONTRATO_DATOS_v6.md` y `docs/CONTRATO_DATOS_v5.md`: una fila por vacante en `ofertas`, archivo íntegro de enlaces duplicados,
-IDs agrupados y selección sin contar copias. No borrar archivos históricos ni snapshots para ocultar déficit.
-Leer también `docs/CONTRATO_DATOS_v4.md`: vistas privadas de disponibilidad, afinidad vigente y reporte por rol.
-SQL 004 es aditivo y automático; no modificar SQL registrado ni el estado histórico v1. SQL 010 optimiza el grafo de aliases;
-SQL 011 lo recorre solo desde ofertas y referencias explícitas con índices (010 leía todo el catálogo y agotaba 3 s);
-comprobar instalación y captura posterior antes de afirmar recuperación. Conservar variantes pertinentes;
-desarrollo genérico no cuenta como QA/IA.
-Leer `docs/CONTRATO_DATOS_v3.md` y `docs/CONTROL_CALIDAD_ENLACES.md`: comprobar enlaces antes de nuevas entregas,
-no confundir HTTP 200 con ficha vigente ni 403 con cierre. La verificación tiene caducidad y presupuesto, no usa Apify
-ni envía formularios. Los snapshots históricos no se reescriben; un futuro bot debe consultar el catálogo y sus enlaces
-con comprobación vigente, no deducir disponibilidad del `status=active` inmutable de `ofertas` v1.
-
-Leer `docs/REVISION_PRODUCTO.md`, `docs/CONTRATO_DATOS_v2.md` y `docs/ACTIVAR_CAPTURA_HORARIA.md`.
-El catálogo v2 es aditivo; no cambiar las columnas de `ofertas` v1. La captura horaria gratuita no consume Apify ni
-crea entregas (salvo v43: configuración confirmada después del lote del día). Repetir el día solo completa/reintenta el mismo lote. No confundir publicación con actualización o
-detección, ni selección con envío WhatsApp. La activación requiere migración y variable; no afirmar que esté activa
-solo porque el código existe. Las notas de instalación pendiente del estado histórico no prueban el estado actual.
-
-Leer también `docs/COBERTURA_HISTORICO.md`: LATAM y España más remotas mundiales, prioridad remota,
-rotación de cargos exactos/similares/cercanos, identidad por enlace y evidencia de contenido, cola de reintentos
-a Supabase y conservación sin borrado automático de ofertas de la base. No construir seguimiento de postulaciones
-en esta etapa. El horario de Bogotá solo programa la ejecución; no limita los países. La admisión exige ubicación positiva:
-locales/híbridas en cobertura, remotas con alcance pertinente; país desconocido no completa la meta y horario compatible solo cuando el perfil acepta esa zona (v23).
-Apify usa curious_coder/linkedin-jobs-scraper con permisos limitados para fichas formales, sin cookies y con tope USD 5/mes. El feed pagado queda
-desactivado por defecto. Un post solo aporta una oferta (cupo/`ofertas`) si se recupera su ficha formal; sin ella, desde v11
-solo llega etiquetado «Post» a perfiles con déficit, hasta completar 5, tras el filtro estricto contra basura.
-La entrega normal comprueba Supabase antes de recoger; la validación final falla si hay déficit o sincronización pendiente.
-
-## Reglas de integridad y modo heredado
-- **Modo heredado sin versión de panel.** Solo filtran: el cargo (mapa de cargos), 30 días de antigüedad, que siga abierta, que no
-  esté repetida, que tenga un enlace comprobado para nuevas entregas y que se pueda aplicar desde el país elegido.
-  Inglés, nivel y años se muestran como columnas. Con panel activo, los filtros explícitos de cada perfil sí se aplican.
-- **Contrato v1 + ampliaciones v5/v6** en la entrega: nombres y valores compatibles, una fila por vacante reconocida; lo que el aviso no dice queda vacío (nunca se
-  inventa: ni la moneda de un "$" solo, ni la modalidad que el aviso no dice). Un campo nuevo se agrega primero al
-  contrato (versión nueva) y después al código. Solo ofertas en español o inglés.
-- **Entrega diaria:** cupos por cargo calculados con las metas de cada perfil y el techo del día en el panel (v21) o `por_rol` en legado, nuevas por rol, nunca repetidas (`trabajo/entregadas.json`), variadas (idioma, nivel,
-  país, modalidad, fuente, máximo 2 por empresa; hasta 4 solo como último recurso v11). Por persona, una vacante de días
-  anteriores puede reasignarse a quien nunca la recibió (v11); nunca dos veces a la misma persona. Países: LATAM hispanohablante y España (decisión de Oscar, 5 nov 2026); desde el 12 nov, Brasil solo dentro de remotas abiertas a varios países (v12); desde el 15 nov, la residencia de un perfil puede ser cualquier país (v23).
-- **Solo enlaces donde se postula de verdad:** el sistema de postulación de la empresa (Greenhouse, Lever, Ashby…), su
-  página de empleo o un portal donde se postula ahí mismo (LinkedIn, Indeed, Computrabajo…). Nunca agregadores ni sitios
-  de pago (Jooble, BeBee, trabajo.org, JobLeads, Talent.com…): se rastrea el original o la vacante no se guarda.
-- **Enlace principal = LinkedIn** cuando la vacante está ahí; el directo de la empresa va en `enlace_directo`.
-- **LinkedIn nunca con la sesión ni la cookie de nadie** (`li_at` incluida). Ni actores de Apify que la pidan.
-- **Nada se envía solo:** desde el 12 nov hay borradores diarios de WhatsApp por cliente (contrato v10) que el operador
-  abre con un botón (wa.me) y envía a mano. No hay API de WhatsApp ni automatización que envíe mensajes.
-- **La búsqueda no usa IA.** Todo es código con pruebas; el aprendizaje de ubicaciones también (v17). La IA solo construye y amplía el mapa de cargos leyendo
-  archivos cortos (`reportes/`), nunca la bodega completa.
-- **Traspasable:** nada depende de las cuentas personales de Oscar. Ninguna clave, ID, correo ni dato de clientes en el
-  repositorio (las claves van en los secretos de GitHub). `pruebas/test_repositorio.py` lo revisa.
-- **No se toca ni se depende del repositorio `ux_job_agent`** (el agente personal de Oscar): si se necesita código de
-  allá, se lee y se copia aquí. Este repositorio es independiente.
-- Si algo del plan no está claro o falta una decisión, se pregunta antes de inventar una regla.
+## Cómo se decide algo nuevo
+**Una decisión nueva se escribe editando `docs/CONTRATO_VIGENTE.md` + una línea en `docs/HISTORIAL_CAMBIOS.md`. Ya
+no se crean archivos `CONTRATO_DATOS_vNN.md`.** Un campo nuevo de la entrega va primero a `docs/CONTRATO_VIGENTE.md`
+y después al código. Si una regla nueva contradice otra, se reemplaza la vieja en su sección (no se apila).
 
 ## Cómo se trabaja
-- Calidad (PR 1.5, 16 nov): dependencias en `requirements.in` compiladas con huella en `requirements.txt` (pip-compile; regenerar con el comando de
-  `pruebas/test_dependencias.py`; nunca `pip install` sin `--require-hashes`); job `auditoria` en CI (ruff, pip-audit,
-  bandit alto, eslint, npm audit bloquean; vulture y knip informan); prueba axe; errores tolerados dejan
-  `registro.aviso`; skill `auditoria-codigo`, lista `docs/estandares/LISTA_DE_CONTROL.md` y flujo «Inventario de la
-  base» (solo lectura). JobSpy no se copia al repo: su parte de Indeed trae la clave de la app de Indeed.
-- Completar el alcance autorizado en una rama, con un PR que Oscar revisa y fusiona; no auto-fusionar.
-- Antes de abrir cada PR: skill `thermos` (`.claude/skills/thermos/`, adaptada de Cursor, MIT) — dos revisores de solo
-  lectura en paralelo (`.claude/agents/thermos-errores.md` y `thermos-calidad.md`) sobre `git diff origin/main...HEAD`;
-  lo grave se arregla antes de pedir la revisión de Oscar.
-- Pruebas obligatorias antes de cada push: `python -m pytest -q`; CI también comprueba PostgreSQL. La interfaz nueva requiere Node 24 para compilar; CI verifica formato, compilación y recorridos Playwright.
-- Prueba en vivo corta (unos 5 minutos, con internet): `python -m buscador.bodega --salida /tmp/prueba --prueba`.
+- Una rama por alcance autorizado y un PR que Oscar revisa y fusiona. Nunca auto-fusionar.
+- Antes de abrir cada PR: skill `thermos` (`.claude/skills/thermos/`) con sus dos revisores de solo lectura
+  (`.claude/agents/thermos-errores.md` y `thermos-calidad.md`) sobre `git diff origin/main...HEAD`; lo grave se arregla
+  antes de pedir revisión.
+- Antes de cada push: `python -m pytest -q`. CI también prueba PostgreSQL; la interfaz necesita Node 24 y CI revisa
+  formato, compilación y recorridos Playwright. `python -m pruebas.probar_migraciones` solo en PostgreSQL aislado.
+- **Dependencias con huella:** `requirements.in` compilado con pip-compile en `requirements.txt` (comando en
+  `pruebas/test_dependencias.py`); nunca `pip install` sin `--require-hashes`. JobSpy no se copia al repo.
+- Calidad: job `auditoria` en CI (ruff, pip-audit, bandit alto, eslint y npm audit bloquean; vulture y knip informan),
+  prueba axe, `docs/estandares/LISTA_DE_CONTROL.md` y skill `auditoria-codigo`. Un error tolerado deja `registro.aviso`.
+- Prueba en vivo corta (unos 5 min, con internet): `python -m buscador.bodega --salida /tmp/prueba --prueba`.
 - Lo que cambia sin tocar código vive en `datos/` (mapa de cargos, países, dominios, empresas, `config.yaml`).
 - Respuestas a Oscar en español y en lenguaje sencillo.
 
 ## Estructura
-- `docs/` plan, instalación y traspaso · `datos/` archivos editables · `buscador/` Python (fuentes, normalizar,
-  familias, paises, enlaces, etiquetas, bodega, publicar, diagnostico) · `pruebas/` · `reportes/` (los escribe la bodega) · `.claude/skills/` · `.github/workflows/`.
+- `buscador/` búsqueda en Python: `fuentes/`, `bodega.py`, `vacante.py`, `paises.py`, `etiquetas.py`,
+  `verificar_enlaces.py`, `entrega.py`, `contrato.py`, `arranque.py`, `estado_operativo.py`, `migraciones.py`,
+  `preparar.py`, `respaldo.py`.
+- `panel/` servidor del panel (modelos, afinidad, ejecutor, bandeja, borradores) · `web/` interfaz (`web/tests/`
+  Playwright).
+- `datos/` archivos editables · `supabase/migraciones/` una migración por cambio · `pruebas/` · `reportes/` (los
+  escribe la bodega).
+- `.github/workflows/`: `bodega.yml` (búsqueda diaria y «Buscar ahora»), `incremental.yml` (captura horaria),
+  `reloj.yml` (relevos de 30 min), `mensajes.yml`, `profunda.yml`, `diagnostico.yml`, `preparar.yml`, `respaldo.yml`,
+  `traspaso.yml`, `limpiar_fuera_objetivo.yml`, `inventario.yml`.
+- `.claude/skills/`: `nueva-familia`, `ampliar-mapa`, `diagnostico`, `nueva-fuente` (leen archivos cortos),
+  `auditor-ux` (no implementa sin aprobación), `auditoria-codigo`, `thermos`.
 
-## Cómo funciona (estado vigente)
-- **Bodega nocturna** (`.github/workflows/bodega.yml`, 6:30 a. m. Bogotá; segunda pasada 8:30; respaldos 7:15/7:50/9:30 que solo trabajan si la anterior no corrió, y la captura horaria la lanza una vez si hoy no corrió —`buscador/arranque.py`, 18 nov—): `buscador/bodega.py` corre en paralelo las fuentes
-  de `buscador/fuentes/` —LinkedIn público (rotación familia × país, consultas con OR), Indeed (JobSpy, 62 países desde v40),
-  portales de empresas (`ats.py`: Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Recruitee; la lista crece sola
-  probando las empresas que traen las demás fuentes), tableros remotos (Remotive y Working Nomads con el enlace
-  original), Get on Board, Bumeran y sus portales hermanos (v50, `jobint.py`: Bumeran AR/MX/PE/VE, Laborum CL, Multitrabajos EC y Konzerta PA; la API del portal trae el aviso completo y el enlace se comprueba con su ficha —activo y mismo título—; verse en la búsqueda no cuenta como comprobación), InfoJobs (v50, España, `infojobs.py`: la búsqueda trae el aviso completo y, por decisión de Oscar, lo visto hoy cuenta como comprobado 24 h como en Indeed; pide captcha tras unas cinco páginas: se respeta, cinco por corrida y se detiene al primer captcha; con los secretos `INFOJOBS_CLIENT_ID`/`INFOJOBS_CLIENT_SECRET` usa su API oficial —`docs/ACTIVAR_INFOJOBS_API.md`— y comprueba el enlace con la ficha de la API), Tecnoempleo (v50, España, `tecnoempleo.py`: por decisión de Oscar pasó de agregador a portal; búsqueda por nombre y ficha con JobPosting), Open Seat (desde el 17 nov: su lista pública de empresas que contratan en LATAM, `data/companies.json`, se suma a los portales que lee `ats.py`; sus avisos no se toman), Computrabajo (17 países, fecha de `datePosted`, nunca la de actualización), Elempleo (Colombia, `ItemList`/`JobPosting`, cierre por `validThrough`; desde el 16 nov), Hireline y Magneto (v44, `sitemaps_empleo.py`), RemotosLatam y WeRemoto (v44, solo empresas para `ats.py`), y Apify si existe `APIFY_TOKEN` (Brave y los avisos por correo con Resend se retiraron el 16 nov)—; `vacante.py` arma cada vacante
-  (familias, países, etiquetas) y junta copias; `limpiar` quita viejas, cerradas y las que no sirven desde LATAM;
-  `publicar.py` conserva `datos/salud.json` y `trabajo/` en la rama histórica `publicado` para la siguiente captura;
-  retira los archivos antiguos de la interfaz sin borrar inventario, colas ni reservas. Presupuestos de cada fuente en `datos/config.yaml`. Las familias de los roles de la entrega se buscan
-  primero, todas las noches (LinkedIn e Indeed), y sus avisos reciben primero la descripción completa.
-- **Entrega diaria** (`entrega.py`, `contrato.py`, `supabase.py`; configuración en `datos/entrega.yaml`): al final de la
-  bodega elige las vacantes, sube las filas a la
-  tabla `ofertas` de Supabase (`supabase/esquema.sql`; secretos `SUPABASE_URL`, `SUPABASE_SECRET_KEY`; nunca
-  sobrescribe: external_id repetido se ignora). En `--prueba` no marca entregadas ni sube.
-- **Apify formal**: `curious_coder/linkedin-jobs-scraper`, build `1.7.18`, USD 5/mes de reservas durables compartidas
-  entre nocturna/búsquedas profundas. El feed `harvestapi/linkedin-post-search` sigue implementado pero desactivado
-  (`publicaciones_por_dia=0`); solo una ficha formal recuperada puede aportar una oferta. Desde v11, `posts_rescate`
-  busca posts para perfiles bajo 5 y los guarda en el catálogo con `tipo="post"` (fuera del cupo, de `ofertas` y de `trabajo/`).
-- **Catálogo/horario**: SQL 002 aditivo, `catalogo_vacantes` y `entregas_diarias`; `CAPTURA_HORARIA_ACTIVA=true` activa
-  el horario y el catálogo v2 nocturno. `ofertas` permanece v1; verificación pública v3 se almacena en JSON, sin SQL nuevo.
-- **Enlaces**: `verificar_enlaces.py`, presupuestos en `datos/config.yaml`, caché en `trabajo/`; no confundir datos
-  antiguos con comprobación vigente. El control del lote actual no reescribe sus snapshots históricos.
-- **Estado operativo optativo**: SQL 003, `estado_operativo.py`, variable `ESTADO_SUPABASE_ACTIVO`; reservas/colas/lote
-  sin confirmar centrales, recuperación por snapshot, revisión contra confirmaciones atrasadas. Tras 003, respaldar
-  cinco tablas y dos secuencias. GitHub conserva inventario, rotaciones, verificación y métricas auxiliares.
-- **Instalación automática**: `migraciones.py`, `preparar.py`, `respaldo.py` y acción compartida: claves iniciales,
-  plan/corte cifrado confirmado, migraciones transaccionales, versiones y activación sin variables. El horario consulta
-  la marca incluso si no existe la variable antigua. Respaldo previo a cambios no equivale a backups periódicos.
-- **«Buscar ahora»** (Resumen, 18 nov; v45 decide solo: completa o `enfoque=faltantes`; v49: también por cliente desde su detalle, `enfoque=pedido`): el servidor del panel lanza `bodega.yml` (modo diario) con su llave `GITHUB_ACCIONES_TOKEN` (token fino del repositorio, solo «Actions»; `panel/acciones.py`); sin la llave el botón no aparece; nunca va al navegador.
-- **Reloj** (`reloj.yml`, v51): cadena de relevos cada 30 min con el entorno `reloj`; pide la captura horaria y la búsqueda diaria a su hora porque el cron de GitHub llega con horas de retraso. Si se corta, lo reanudan las búsquedas reales (trabajo `reloj` de `bodega.yml`) y su propio horario.
-- **Búsqueda profunda** (`profunda.yml`): un cargo a pedido, en vivo. **Diagnóstico** (`diagnostico.yml`).
-- Skills del proyecto: `nueva-familia`, `ampliar-mapa`, `diagnostico`, `nueva-fuente` (leen archivos cortos, no la bodega),
-  `auditor-ux` (auditoría UX/accesibilidad con capturas en modo demo; no implementa sin aprobación), `thermos`
-  (revisión a fondo de la rama antes de cada PR).
-- Instalación y traspaso: `docs/INSTALACION.md`, `docs/TRASPASO.md`.
-
-## Estado
-- Versión 1 construida el 28 oct 2026 (pasos 1 a 11 del plan); corre cada noche desde el 29 oct.
-- 5 nov 2026: PR 6–11 fusionados; catálogo/horario/Supabase/Pages observados y control de enlaces probado/fusionado.
-  La evidencia fechada y los pendientes están en `docs/ACEPTACION_Y_ESTADO.md`; no afirmar siete días ni activación
-  productiva de un cambio hasta comprobar sus ejecuciones. El traspaso exige las tablas, memoria/colas y reservas,
-  no solo reemplazar secretos o importar `ofertas`. Manuales y cambios: `docs/GUIA_CLIENTE.md` y `docs/HISTORIAL_CAMBIOS.md`.
-- Hallazgos de las pruebas en vivo: LinkedIn acepta consultas con OR; su página pública no muestra el enlace externo de
-  postulación (sale de juntar con el portal de la empresa); Indeed bloquea la web (403) pero JobSpy funciona; Himalayas,
-  We Work Remotely, RemoteOK y Jobicy no dejan ver el original (aportan nombres de empresas); Workable responde 429 si se
-  le pregunta mucho (no se insiste en la misma corrida).
+## Dónde leer más
+Leer antes de trabajar: `docs/GUIA_CLIENTE.md`, `docs/OPERACION_Y_RECUPERACION.md` y `docs/ACEPTACION_Y_ESTADO.md`.
+- Uso y panel: `docs/GUIA_CLIENTE.md`, `docs/PANEL_CONTROL.md`.
+- Operación e incidentes: `docs/OPERACION_Y_RECUPERACION.md`; riesgos: `docs/REVISION_FIABILIDAD.md`.
+- Estado comprobado y pendientes: `docs/ACEPTACION_Y_ESTADO.md`; cambios: `docs/HISTORIAL_CAMBIOS.md`.
+- Reservas y pendientes centrales: `docs/CONTRATO_ESTADO_OPERATIVO.md`, `docs/ACTIVAR_ESTADO_OPERATIVO.md`.
+- Instalación: `docs/INSTALACION_AUTOMATICA.md` (camino preferido), `docs/INSTALACION.md`.
+- Entrega, traspaso y cesión: `docs/ENTREGA_AL_CLIENTE.md`, `docs/TRASPASO.md`, `docs/CEDER_EL_PROYECTO.md`.
+- Enlaces: `docs/CONTROL_CALIDAD_ENLACES.md`; cobertura histórica: `docs/COBERTURA_HISTORICO.md`;
+  alternativas de producto: `docs/REVISION_PRODUCTO.md`.
+- Activaciones: `docs/ACTIVAR_RELOJ.md`, `docs/ACTIVAR_CAPTURA_HORARIA.md`, `docs/ACTIVAR_INFOJOBS_API.md`.

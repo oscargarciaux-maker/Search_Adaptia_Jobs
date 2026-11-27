@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Confirmación automática por la ficha y bandeja «Por confirmar» — v16
 
 Revisión del 13 de noviembre de 2026 (plan acordado con Oscar). Amplía v15. **SQL 014** añade dos tablas privadas.

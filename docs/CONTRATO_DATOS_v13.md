@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Ubicaciones extranjeras reconocidas y limpieza revisada de `ofertas` — v13
 
 Revisión del 12 de noviembre de 2026 (pedido de Oscar). Amplía v12. Sin SQL nuevo.

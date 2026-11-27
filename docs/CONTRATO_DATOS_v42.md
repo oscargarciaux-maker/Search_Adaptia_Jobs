@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v42: portales de empresas comprobados por su propio listado
 
 **Fecha:** 18 de noviembre de 2026. **Sin SQL ni IA.** Aprobado por Oscar tras la búsqueda #32.

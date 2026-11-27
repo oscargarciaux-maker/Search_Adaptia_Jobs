@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Ubicaciones a prueba de abreviaturas, ciudades y repeticiones — v14
 
 Revisión del 12 de noviembre de 2026. Amplía v13. Sin SQL nuevo. Origen: la vacante 82 del listado de revisión

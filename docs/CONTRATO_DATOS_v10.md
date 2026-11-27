@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Ajustes del operador y alertas por correo — v10
 
 Revisión del 12 de noviembre de 2026. Añade las tablas privadas `panel_ajustes` (SQL 012), `panel_contactos` y `panel_borradores` (SQL 013). No cambia el catálogo, las

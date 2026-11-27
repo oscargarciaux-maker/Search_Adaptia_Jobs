@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Solo español e inglés; Brasil solo en remotas de varios países — v12
 
 Revisión del 12 de noviembre de 2026 (decisión de Oscar). Amplía v1 (idioma), v8 (país de residencia) y la cobertura

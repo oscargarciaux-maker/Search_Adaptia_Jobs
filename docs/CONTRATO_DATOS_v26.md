@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v26: salario mínimo en cualquier moneda
 
 **Fecha:** 15 de noviembre de 2026. **Amplía:** [v22](CONTRATO_DATOS_v22.md), en lo que toca a la restricción

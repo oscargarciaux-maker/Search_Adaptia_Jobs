@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Perfil por país de residencia y modalidades — v8
 
 Revisión del 11 de noviembre de 2026. Cambia la forma del perfil de cliente del contrato v6. No cambia el catálogo ni SQL.

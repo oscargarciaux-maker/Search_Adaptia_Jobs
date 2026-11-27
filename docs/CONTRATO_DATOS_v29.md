@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v29: Vacantes y «Por confirmar» rápidos y tipo LinkedIn
 
 **Fecha:** 16 de noviembre de 2026. **Amplía:** [v16](CONTRATO_DATOS_v16.md) (bandeja «Por confirmar») y

@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v35: formulario del cliente más claro
 
 **Fecha:** 16 de noviembre de 2026. **Sin SQL ni IA.** Los perfiles guardados siguen valiendo sin cambios.

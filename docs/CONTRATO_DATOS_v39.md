@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v39: comprobar enlaces de LinkedIn sin que nos bloqueen
 
 **Fecha:** 17 de noviembre de 2026. **Sin SQL ni IA.** Viene del embudo de la búsqueda #30 del 17 nov.

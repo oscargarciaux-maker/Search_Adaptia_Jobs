@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v22 — restricciones, prioridades, margen de años y nivel según la experiencia
 
 Vigente desde el 14 nov 2026, a pedido del cliente en la reunión del 14 nov (puntos 3.2 y 5). Amplía el perfil del

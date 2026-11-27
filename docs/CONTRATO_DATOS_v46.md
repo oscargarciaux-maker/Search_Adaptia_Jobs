@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v46 — «Mandarme todos» en un solo mensaje y Mensajes que cuadran con el Resumen (18 nov 2026)
 
 Decisión de Oscar (18 nov): «Mandarme todos a mi WhatsApp» debe llegar en **un solo mensaje y con un solo clic**,

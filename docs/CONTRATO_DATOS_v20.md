@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v20 — años de experiencia en un solo campo (±3)
 
 Vigente desde el 13 nov 2026. Amplía el perfil del panel (contratos v6 y v8). Sin columnas nuevas en `ofertas` ni SQL

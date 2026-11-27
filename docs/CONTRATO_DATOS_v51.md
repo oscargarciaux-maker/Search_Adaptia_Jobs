@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v51 — la búsqueda arranca a su hora sin depender del horario de GitHub (27 nov 2026)
 
 Decisión de Oscar (27 nov): la hora la marca algo **dentro de GitHub**, sin servicios externos. Sin IA, sin SQL nuevo y

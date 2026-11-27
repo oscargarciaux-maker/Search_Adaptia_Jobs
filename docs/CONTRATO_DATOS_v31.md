@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v31: mensajes, Actividad y sesión
 
 **Fecha:** 16 de noviembre de 2026.

@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v21 — metas diarias por perfil, techo del día y cliente Comunidad
 
 Vigente desde el 14 nov 2026, a pedido del cliente en la reunión del 14 nov. Amplía la configuración del panel

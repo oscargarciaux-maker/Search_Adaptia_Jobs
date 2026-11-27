@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v48 — «(ID N)» en cada vacante, mensajes de días anteriores y tope de comprobación en «Buscar ahora» (22 nov 2026)
 
 Decisiones de Oscar del 22 nov. Sin IA. Añade la SQL 020; no modifica ninguna migración registrada.

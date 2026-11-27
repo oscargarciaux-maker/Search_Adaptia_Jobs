@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v18 — política remota de Get on Board y regiones combinadas
 
 Vigente desde el 13 nov 2026. Amplía v17 y versiones anteriores, sin columnas nuevas en `ofertas` ni SQL nuevo. Cambia

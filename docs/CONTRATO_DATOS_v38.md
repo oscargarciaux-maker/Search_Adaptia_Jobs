@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v38: cualquier ciudad del mundo dice su país
 
 **Fecha:** 17 de noviembre de 2026. **Sin SQL ni IA.** Pedido de Oscar: «que el sistema reconozca bien cualquier parte

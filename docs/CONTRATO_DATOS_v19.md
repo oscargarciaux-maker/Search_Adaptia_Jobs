@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v19 — lugares del mundo, regiones y una bandeja sin ruido
 
 Vigente desde el 13 nov 2026. Amplía v18 y versiones anteriores, sin columnas nuevas en `ofertas` ni SQL nuevo. Nace

@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v40: la búsqueda se arma leyendo a cada persona
 
 **Fecha:** 17 de noviembre de 2026. **Sin SQL ni IA.** Pedido de Oscar: «un plan que sirva para cualquier cargo… que
