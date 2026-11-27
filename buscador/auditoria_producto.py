@@ -1,6 +1,7 @@
 """Diagnóstico manual en solo lectura; SQL devuelve solo agregados y fichas públicas acotadas."""
 import json
 import os
+import sys
 from urllib.parse import parse_qs, urlparse
 
 from buscador import migraciones, supabase, paises
@@ -106,6 +107,7 @@ def consultar(conn, url=""):
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8")  # el JSON lleva tildes: en Windows la salida redirigida es cp1252
     try:
         with migraciones.conexion(os.environ.get("SUPABASE_DB_URL", ""),
                 supabase.base(os.environ.get("SUPABASE_URL", ""))) as conn:

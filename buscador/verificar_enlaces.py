@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 import socket
 from threading import BoundedSemaphore, Lock
+import sys
 import time
 from urllib.parse import urldefrag, urljoin, urlparse
 
@@ -542,6 +543,7 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8")  # el JSON lleva tildes: en Windows la salida redirigida es cp1252
     p = argparse.ArgumentParser(description="Auditoría de solo lectura de un lote diario, sin Supabase ni Apify")
     p.add_argument("--lote", required=True)
     p.add_argument("--salida", required=True)

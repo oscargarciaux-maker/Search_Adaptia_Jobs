@@ -348,7 +348,7 @@ def test_cierre_confirmado_se_guarda_sin_borrar_snapshot_historico(monkeypatch, 
     trabajo.mkdir()
     archivo = trabajo / "lote_entrega.json"
     original = json.dumps(lote)
-    archivo.write_text(original)
+    archivo.write_text(original, encoding="utf-8")
     monkeypatch.setattr(supabase, "exigir_conexion", lambda: None)
     monkeypatch.setattr(supabase, "exigir_catalogo", lambda: None)
     monkeypatch.setattr(incremental, "recoger", lambda *a, **k: ([dict(titulo=v["titulo"], empresa=v["empresa"],
@@ -362,7 +362,7 @@ def test_cierre_confirmado_se_guarda_sin_borrar_snapshot_historico(monkeypatch, 
     monkeypatch.setattr(supabase, "subir_catalogo", subir)
     r = bodega.correr(tmp_path, modo="incremental", hoy="2026-11-05")
     assert r["vacantes_en_bodega"] == 0 and filas[0]["status"] == "closed"
-    assert archivo.read_text() == original
+    assert archivo.read_text(encoding="utf-8") == original
     assert r["verificacion_enlaces"]["seleccion_del_dia"]["estados"] == {"rechazada": 1}
     assert r["seleccion_actual"]["roles"]["ux-ui-designer"]["vacantes"][0]["verificacion"]["estado"] == "rechazada"
     assert r["seleccion_actual"]["roles"]["ux-ui-designer"]["vacantes"][0]["catalog_status"] == "closed"

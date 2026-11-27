@@ -9,9 +9,7 @@ from pathlib import Path
 import pytest
 
 RAIZ = Path(__file__).resolve().parent.parent
-CARPETAS = ["buscador", "panel", "pruebas"]
-# Archivos que hoy cambia el PR abierto #154: se corrigen en un PR aparte cuando se fusione, y entonces se quitan de aquí.
-PENDIENTES = {"pruebas/test_calidad_arranque.py", "pruebas/test_verificar_enlaces.py", "panel/ejecutor.py"}
+CARPETAS = ["buscador", "panel", "pruebas", ".claude/hooks"]
 
 # Funciones que abren archivos: (posición del modo, modo si no se dice). Los temporales son binarios por defecto.
 ABREN = {"open": (1, "r"), "fdopen": (1, "r"), "NamedTemporaryFile": (0, "w+b"), "TemporaryFile": (0, "w+b"),
@@ -70,7 +68,7 @@ def _hallazgos():
 
 
 def test_todo_texto_se_abre_con_codificacion_utf8():
-    faltan = [f"{ruta}:{linea} {op}" for ruta, linea, op in _hallazgos() if ruta not in PENDIENTES]
+    faltan = [f"{ruta}:{linea} {op}" for ruta, linea, op in _hallazgos()]
     assert not faltan, "añade encoding=\"utf-8\" en:\n" + "\n".join(faltan)
 
 

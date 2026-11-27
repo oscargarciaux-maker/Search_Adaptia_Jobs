@@ -1004,7 +1004,7 @@ def main():
     if args.config:
         if not args.prueba: parser.error("--config requiere --prueba; producción lee únicamente Supabase")
         import json
-        version = json.loads(Path(args.config).read_text())
+        version = json.loads(Path(args.config).read_text(encoding="utf-8"))
         with activar(version,hoy()): bodega.correr(args.salida,modo=args.modo,prueba=True)
     else:
         correr(args.salida, args.modo, args.prueba, enfoque=args.enfoque)
