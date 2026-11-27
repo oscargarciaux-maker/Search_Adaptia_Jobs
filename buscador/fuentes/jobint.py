@@ -185,9 +185,12 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_dia
         stats["motivos_por_pais"] = dict(sorted(motivos.items()))
     if reintentados:
         stats["reintentados"] = sorted(reintentados)
-    if caidos:
+    if motivos:
+        # Siempre que un portal terminó fallando, aunque no llegara a descansar: en una corrida corta (6 búsquedas
+        # repartidas entre portales) ninguno suma tres fallos y el motivo no quedaba en el registro.
         registro.aviso("jobint", RuntimeError("portales sin respuesta: " + ", ".join(
-            f"{p} ({SITIOS[p][0]}): {motivos.get(p, 'sin respuesta')}" for p in caidos)))
+            f"{p} ({SITIOS[p][0]}): {motivo}{' — en descanso' if p in caidos else ''}"
+            for p, motivo in sorted(motivos.items()))))
     return crudas, stats
 
 

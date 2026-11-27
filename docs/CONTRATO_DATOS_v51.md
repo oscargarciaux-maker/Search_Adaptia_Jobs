@@ -106,6 +106,9 @@ vistos; InfoJobs trajo 51 sin captcha; fugas de ubicación en 0. No apareció el
 - `Cliente.post_json` ya no falla si el portal responde un error con texto en vez de un objeto (antes la fuente entera
   terminaba en error y sin motivo).
 - **Get on Board** (`getonbrd.py`): `fallidas` y `motivos` (motivo → cuántas búsquedas).
+- El registro nombra a todo portal que terminó fallando, con su motivo, aunque no haya llegado a descansar. La corrida
+  de prueba del 27 nov (45941716018) hizo 6 búsquedas repartidas entre portales, trajo 0 avisos y no dejó ni una línea
+  que dijera por qué: solo se avisaba con tres fallos seguidos, y una prueba no publica su reporte.
 - Con el motivo a la vista se decide. Un bloqueo a las direcciones de GitHub se respeta.
 
 ## 3. Reserva de Apify
@@ -131,4 +134,5 @@ vistos; InfoJobs trajo 51 sin captcha; fugas de ubicación en 0. No apareció el
 ## Sin comprobar
 - El Reloj en GitHub real: necesita el entorno `reloj` y estar en la rama principal.
 - Por qué GitHub retrasa los horarios desde el 17 nov.
-- El motivo real de los fallos de Bumeran y Get on Board desde GitHub (lo dirá la primera corrida con este código).
+- El motivo real de los fallos de Bumeran y Get on Board desde GitHub: la corrida de prueba no lo mostró (ver §2); lo
+  dirá la primera búsqueda real con este código.

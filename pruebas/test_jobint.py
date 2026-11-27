@@ -249,3 +249,20 @@ def test_se_guarda_una_busqueda_para_la_ultima_oportunidad_del_portal_en_descans
     _, stats = _buscar(sin_tiempo, limite_segundos=50, reloj=lambda: next(reloj))
     assert "reintentados" not in stats
 
+
+def test_el_motivo_queda_en_el_registro_aunque_ningun_portal_llegue_a_descansar(capsys):
+    # La corrida de prueba del 27 nov hizo 6 búsquedas repartidas entre portales: 0 avisos y ni una línea que dijera
+    # por qué, porque solo se avisaba con tres fallos seguidos del mismo portal.
+    class TodoCaido(Cliente):
+        ultimo_error = {"http": 403}
+
+        def post_json(self, url, cuerpo, headers=None, timeout=None):
+            self.pedidas.append((url, cuerpo["query"], headers["x-site-id"]))
+            return None
+    _, stats = _buscar(TodoCaido(), presupuesto=2)
+    assert stats["fallidas"] == 2 and stats["portales_caidos"] == [] and "reintentados" not in stats
+    aviso = capsys.readouterr().err
+    assert "[aviso] jobint" in aviso and "HTTP 403" in aviso and "en descanso" not in aviso
+    for pais in stats["motivos_por_pais"]:
+        assert f"{pais} (" in aviso
+
