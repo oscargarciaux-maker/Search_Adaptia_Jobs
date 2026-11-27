@@ -3,14 +3,12 @@ import { createRoot } from "react-dom/client";
 import {
   ArrowLeft,
   ArrowRight,
-  Archive,
   Moon,
   Sun,
   Check,
   Loader2,
   LogOut,
   ShieldCheck,
-  Trash2,
   X,
 } from "lucide-react";
 import { api } from "./api";
@@ -28,7 +26,7 @@ import type {
   Revisiones,
   ResumenClientes,
 } from "./types";
-import { Dialog, fijarLugares, fijarMundo } from "./comunes";
+import { fijarLugares, fijarMundo } from "./comunes";
 import { PorConfirmar } from "./vistas/PorConfirmar";
 import { BuscarAhora } from "./vistas/BuscarAhora";
 import { Mensajes } from "./vistas/Mensajes";
@@ -44,6 +42,7 @@ import { Clientes } from "./vistas/Clientes";
 import { SeccionVacantes } from "./vistas/SeccionVacantes";
 import { useDescargaCsv } from "./descargaCsv";
 import { useWhatsApp, DialogoWhatsApp } from "./vistas/DialogoWhatsApp";
+import { EliminarCargoDialog, ArchivarDialog } from "./vistas/DialogosArchivo";
 import "./style.css";
 
 const vacio: Configuracion = { clientes: [], cargos: [], perfiles: [] };
@@ -976,105 +975,23 @@ function App() {
         />
       )}
       {borrarCargo && (
-        <Dialog
-          titulo={"Eliminar " + borrarCargo.nombre}
-          subtitulo="Se quita de la configuración para siempre. Lo ya entregado y el historial se conservan."
-          onClose={() => setBorrarCargo(null)}
-        >
-          {(() => {
-            const suyos = draft.perfiles.filter(
-              (p) => p.cargo_id === borrarCargo.id,
-            ).length;
-            return (
-              <p className="helper">
-                {suyos
-                  ? `También se quitan ${suyos} ${suyos === 1 ? "perfil de cliente que buscaba" : "perfiles de clientes que buscaban"} este cargo; sus clientes conservan los demás perfiles.`
-                  : "Ningún cliente busca este cargo."}{" "}
-                Se aplica al pulsar «Aplicar cambios».
-              </p>
-            );
-          })()}
-          <div className="dialog-actions">
-            <button
-              className="button secondary"
-              onClick={() => setBorrarCargo(null)}
-            >
-              Cancelar
-            </button>
-            <button
-              className="button danger-button"
-              onClick={() => {
-                const id = borrarCargo.id;
-                cambiar({
-                  ...draft,
-                  cargos: draft.cargos.filter((x) => x.id !== id),
-                  perfiles: draft.perfiles.filter((p) => p.cargo_id !== id),
-                });
-                notify(
-                  `«${borrarCargo.nombre}» se eliminó. Pulsa «Aplicar cambios» para que la búsqueda lo use.`,
-                );
-                setBorrarCargo(null);
-              }}
-            >
-              <Trash2 size={16} />
-              Eliminar definitivamente
-            </button>
-          </div>
-        </Dialog>
+        <EliminarCargoDialog
+          borrarCargo={borrarCargo}
+          setBorrarCargo={setBorrarCargo}
+          draft={draft}
+          cambiar={cambiar}
+          notify={notify}
+        />
       )}
       {modal === "archivo" && archive && (
-        <Dialog
-          titulo={"Archivar " + archive.tipo}
-          onClose={() => setModal(null)}
-        >
-          <p className="dialog-copy">
-            {archive.tipo === "cliente"
-              ? `Cuando pulses «Aplicar cambios», «${archive.nombre}» deja de recibir vacantes desde la próxima búsqueda. Las vacantes que ya recibió se conservan y puedes reactivarlo cuando quieras.`
-              : `Cuando pulses «Aplicar cambios», se deja de buscar «${archive.nombre}» desde la próxima búsqueda. Las vacantes ya entregadas se conservan.`}
-          </p>
-          {archive.tipo === "cargo" && clientCount(archive.id) > 0 && (
-            <p className="role-warning" role="alert">
-              Atención: {clientCount(archive.id)}{" "}
-              {clientCount(archive.id) === 1
-                ? "cliente tiene"
-                : "clientes tienen"}{" "}
-              este cargo. Dejarán de recibir sus vacantes hasta que vuelvas a
-              activarlo o les asignes otro.
-            </p>
-          )}
-          <div className="dialog-actions">
-            <button className="button secondary" onClick={() => setModal(null)}>
-              Cancelar
-            </button>
-            <button
-              className="button danger-button"
-              onClick={() => {
-                cambiar(
-                  archive.tipo === "cliente"
-                    ? {
-                        ...draft,
-                        clientes: draft.clientes.map((c) =>
-                          c.id === archive.id ? { ...c, activo: false } : c,
-                        ),
-                      }
-                    : {
-                        ...draft,
-                        cargos: draft.cargos.map((c) =>
-                          c.id === archive.id ? { ...c, activo: false } : c,
-                        ),
-                      },
-                );
-                setModal(null);
-                notify(
-                  "Archivado. Sus vacantes ya recibidas se conservan. Pulsa «Aplicar cambios» para que la búsqueda lo use.",
-                );
-              }}
-            >
-              <Archive size={16} />
-              Archivar
-            </button>
-          </div>
-        </Dialog>
+        <ArchivarDialog
+          archive={archive}
+          clientCount={clientCount}
+          setModal={setModal}
+          draft={draft}
+          cambiar={cambiar}
+          notify={notify}
+        />
       )}
       {modal === "whatsapp" && (
         <DialogoWhatsApp
