@@ -121,7 +121,7 @@ def test_no_guarda_avisos_viejos_ni_repite_nombres_ya_buscados_hoy_y_se_detiene_
     assert [s for _, _, s in medio.pedidas].count("BMAR") == 4 and stats["fallidas"] == 4
     assert [s for _, _, s in medio.pedidas][-1] == "BMAR"  # el reintento va al final, después de los demás portales
     assert stats["portales_caidos"] == ["AR"] and stats["por_pais"]["CL"] == 3 and {c["fuente"] for c in crudas} == {"Laborum"}
-    assert stats["motivos"] == {"AR": "HTTP 403"} and stats["reintentados"] == ["AR"]
+    assert stats["motivos_por_pais"] == {"AR": "HTTP 403"} and stats["reintentados"] == ["AR"]
     sin_tiempo = Cliente()
     reloj = iter(range(0, 1000, 10))
     _buscar(sin_tiempo, limite_segundos=25, reloj=lambda: next(reloj))
@@ -209,7 +209,7 @@ def test_un_portal_que_falla_al_empezar_y_luego_responde_recupera_sus_turnos_al_
     crudas, stats = _buscar(cliente)
     sitios = [s for _, _, s in cliente.pedidas]
     assert sitios.count("BMAR") > 4 and stats["fallidas"] == 3  # tras responder, siguen sus turnos pendientes
-    assert stats["portales_caidos"] == [] and "motivos" not in stats and stats["reintentados"] == ["AR"]
+    assert stats["portales_caidos"] == [] and "motivos_por_pais" not in stats and stats["reintentados"] == ["AR"]
     assert "Bumeran" in {c["fuente"] for c in crudas}
     assert "[aviso] jobint" not in capsys.readouterr().err  # nada que avisar: terminó respondiendo
 
@@ -223,10 +223,10 @@ def test_el_registro_dice_que_portal_no_respondio_y_por_que_sin_claves(capsys):
             return None
     crudas, stats = _buscar(TodoCaido())
     assert crudas == [] and stats["portales_caidos"] == ["AR", "CL"]
-    assert stats["motivos"] == {"AR": "HTTP 530 (respuesta no JSON)", "CL": "HTTP 530 (respuesta no JSON)"}
+    assert stats["motivos_por_pais"] == {"AR": "HTTP 530 (respuesta no JSON)", "CL": "HTTP 530 (respuesta no JSON)"}
     aviso = capsys.readouterr().err
     assert "[aviso] jobint" in aviso and "www.bumeran.com.ar" in aviso and "HTTP 530" in aviso
     # Una respuesta que llega pero no trae avisos también se cuenta, con su propio motivo.
     crudas, stats = _buscar(Cliente([{"error": "x"}] * 20))
-    assert stats["motivos"]["AR"] == "respuesta sin avisos"
+    assert stats["motivos_por_pais"]["AR"] == "respuesta sin avisos"
 

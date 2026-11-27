@@ -41,16 +41,28 @@ def test_sin_temporizador_el_relevo_no_hace_nada_y_no_sigue():
 
 
 @pytest.mark.parametrize("otro,sigue", [
-    (_corrida(10, "waiting", numero=51), False),      # el horario de respaldo dejó otro relevo esperando: se queda ese
+    (_corrida(10, "waiting", numero=51), False),      # el horario de respaldo dejó un relevo más nuevo: se queda ese
     (_corrida(1, "queued", numero=51), False),
-    (_corrida(30, "in_progress", numero=49), False),  # dos a la vez: sigue el más antiguo…
-    (_corrida(30, "in_progress", numero=51), True),   # …que es este
+    (_corrida(30, "in_progress", numero=51), False),
+    (_corrida(30, "in_progress", numero=49), True),   # de dos que corren a la vez sigue el de número más alto: este
+    (_corrida(45, "waiting", numero=49), True),
     (_corrida(10, "waiting", numero=51, rama="otra"), True),  # una prueba en otra rama no es otra cadena
-    (_corrida(40, "completed", numero=49), True),
+    (_corrida(5, "completed", numero=51), True),
 ])
 def test_nunca_dos_cadenas_pero_el_relevo_que_se_retira_si_cumple_con_lo_que_toca(otro, sigue):
     actuar, seguir, _, falta = arranque.relevo(50, [_yo(), otro], "main", AHORA)
     assert actuar is True and seguir is sigue and falta is False
+
+
+@pytest.mark.parametrize("estado_a", ["in_progress", "waiting", "queued"])
+@pytest.mark.parametrize("estado_b", ["in_progress", "waiting", "queued"])
+def test_de_dos_relevos_vivos_sigue_exactamente_uno_los_vea_como_los_vea_cada_cual(estado_a, estado_b):
+    # Cada relevo decide por su cuenta y puede ver al otro esperando o corriendo. Con una regla por estado, los dos
+    # podían retirarse a la vez y la cadena se cortaba.
+    a, b = _corrida(31, estado_a, numero=50), _corrida(30, estado_b, numero=51)
+    sigue_a = arranque.relevo(50, [a, b], "main", AHORA)[1]
+    sigue_b = arranque.relevo(51, [a, b], "main", AHORA)[1]
+    assert (sigue_a, sigue_b) == (False, True)
 
 
 @pytest.mark.parametrize("relojes,rama", [
@@ -86,6 +98,8 @@ def test_la_captura_se_pide_cada_hora_y_nunca_encima_de_otra(capturas, diarias, 
     (None, [], AHORA, True),                                                  # 7:00 de Bogotá y hoy no corrió
     (None, [], datetime(2026, 11, 27, 11, 30, tzinfo=timezone.utc), True),    # 6:30 en punto
     (None, [], datetime(2026, 11, 27, 11, 29, tzinfo=timezone.utc), False),   # aún no
+    (None, [], datetime(2026, 11, 27, 23, 59, tzinfo=timezone.utc), True),    # 18:59 de Bogotá: aún se puede
+    (None, [], datetime(2026, 11, 28, 0, 0, tzinfo=timezone.utc), False),     # 19:00: ya es tarde para empezarla
     (None, [], datetime(2026, 11, 27, 4, 0, tzinfo=timezone.utc), False),     # 23:00 del día anterior en Bogotá
     (HECHA, [], AHORA, False),                                                # ya terminó
     (None, [_corrida(20, "in_progress")], AHORA, False),                      # está corriendo
@@ -116,41 +130,49 @@ def _salidas(texto):
     return dict(linea.split("=") for linea in texto.splitlines())
 
 
+def _archivos(carpeta, relojes, diarias=(), capturas=()):
+    for nombre, lista in (("relojes", relojes), ("diarias", diarias), ("capturas", capturas)):
+        (carpeta / f"{nombre}.json").write_text(json.dumps(list(lista)))
+    return ["--trabajo", str(carpeta), "--reloj", str(carpeta), "--yo", "50", "--rama", "main"]
+
+
 def test_linea_de_comandos_del_reloj(tmp_path, capsys):
-    ahora = datetime.now(timezone.utc)
-    (tmp_path / "relojes.json").write_text(json.dumps([_yo(ahora=ahora)]))
-    (tmp_path / "diarias.json").write_text(json.dumps([_corrida(5, "in_progress", ahora=ahora)]))
-    (tmp_path / "capturas.json").write_text("[]")
-    arranque.main(["--trabajo", str(tmp_path), "--reloj", str(tmp_path), "--yo", "50", "--rama", "main"])
+    # 7:00 de Bogotá, hoy no ha corrido la búsqueda: se pide, y con ella no se pide también la captura (en la cola del
+    # grupo «publicar» solo cabe una corrida en espera: la segunda cancelaría a la primera).
+    arranque.main(_archivos(tmp_path, [_yo()]), ahora=AHORA)
     salida = capsys.readouterr()
-    # Con una búsqueda diaria en marcha no pide ni otra ni la captura; la cadena sigue.
-    assert _salidas(salida.out) == {"actuar": "true", "seguir": "true", "captura": "false", "diaria": "false",
+    assert _salidas(salida.out) == {"actuar": "true", "seguir": "true", "captura": "false", "diaria": "true",
                                     "falta_temporizador": "false"}
     assert "::notice::" in salida.err and "=" not in salida.err.replace("::", "")  # los motivos no van a GITHUB_OUTPUT
 
-    (tmp_path / "relojes.json").write_text(json.dumps([_yo(0, ahora=ahora)]))
-    arranque.main(["--trabajo", str(tmp_path), "--reloj", str(tmp_path), "--yo", "50", "--rama", "main"])
+    # Con la búsqueda diaria en marcha no se pide ni otra ni la captura; la cadena sigue.
+    arranque.main(_archivos(tmp_path, [_yo()], diarias=[_corrida(5, "in_progress")]), ahora=AHORA)
+    assert _salidas(capsys.readouterr().out) == {"actuar": "true", "seguir": "true", "captura": "false",
+                                                 "diaria": "false", "falta_temporizador": "false"}
+
+    # Con la búsqueda de hoy ya terminada (el registro del día lo dice), toca la captura de la hora.
+    (tmp_path / "metricas_entrega.json").write_text(json.dumps({arranque.hoy_bogota(AHORA): HECHA}))
+    arranque.main(_archivos(tmp_path, [_yo()], diarias=[_corrida(100)], capturas=[_corrida(70)]), ahora=AHORA)
+    assert _salidas(capsys.readouterr().out) == {"actuar": "true", "seguir": "true", "captura": "true",
+                                                 "diaria": "false", "falta_temporizador": "false"}
+
+    # Sin temporizador: nada, y se dice como error.
+    arranque.main(_archivos(tmp_path, [_yo(0)]), ahora=AHORA)
     salida = capsys.readouterr()
     assert _salidas(salida.out) == {"actuar": "false", "seguir": "false", "captura": "false", "diaria": "false",
                                     "falta_temporizador": "true"}
     assert "::error::" in salida.err
 
-    arranque.main(["--trabajo", str(tmp_path), "--reloj-vivo", str(tmp_path / "capturas.json"), "--rama", "main"])
+
+def test_linea_de_comandos_para_reanudar_no_necesita_la_carpeta_de_trabajo(tmp_path, capsys):
+    (tmp_path / "relojes.json").write_text("[]")
+    arranque.main(["--reloj-vivo", str(tmp_path / "relojes.json"), "--rama", "main"])
     assert capsys.readouterr().out == "revivir=true\n"
-    arranque.main(["--trabajo", str(tmp_path), "--reloj-vivo", str(tmp_path / "no-existe.json"), "--rama", "main"])
+    (tmp_path / "relojes.json").write_text(json.dumps([_corrida(10, "waiting")]))
+    arranque.main(["--reloj-vivo", str(tmp_path / "relojes.json"), "--rama", "main"])
     assert capsys.readouterr().out == "revivir=false\n"
-
-
-def test_si_toca_la_diaria_no_se_pide_tambien_la_captura(tmp_path, capsys, monkeypatch):
-    # En la cola del grupo «publicar» solo cabe una corrida en espera: la segunda cancelaría a la primera.
-    ahora = datetime.now(timezone.utc)
-    monkeypatch.setattr(arranque, "DIARIA_DESDE_UTC", (0, 0))
-    monkeypatch.setattr(arranque, "hoy_bogota", lambda _ahora=None: "2026-01-01")  # ninguna corrida es «de hoy»
-    for nombre, lista in (("relojes", [_yo(ahora=ahora)]), ("diarias", []), ("capturas", [])):
-        (tmp_path / f"{nombre}.json").write_text(json.dumps(lista))
-    arranque.main(["--trabajo", str(tmp_path), "--reloj", str(tmp_path), "--yo", "50", "--rama", "main"])
-    salida = _salidas(capsys.readouterr().out)
-    assert salida["diaria"] == "true" and salida["captura"] == "false"
+    arranque.main(["--reloj-vivo", str(tmp_path / "no-existe.json"), "--rama", "main"])
+    assert capsys.readouterr().out == "revivir=false\n"
 
 
 def _flujo(nombre):
@@ -180,13 +202,20 @@ def test_el_flujo_del_reloj_espera_en_su_entorno_y_solo_puede_pedir_flujos():
     assert "secrets." not in texto and "SUPABASE" not in texto  # no usa ninguna clave ni datos de clientes
 
 
-def test_la_busqueda_y_la_captura_programada_reanudan_el_reloj_con_el_permiso_minimo():
+def test_una_busqueda_real_reanuda_el_reloj_con_el_permiso_minimo():
     bodega = _flujo("bodega.yml")
     trabajo = bodega["jobs"]["reloj"]
     assert trabajo["permissions"] == {"actions": "write", "contents": "read"}
     assert trabajo["if"] == "${{ !inputs.prueba }}"  # una corrida de prueba no arranca nada
-    texto = json.dumps(trabajo)
-    assert "--reloj-vivo" in texto and "gh workflow run reloj.yml" in texto and "secrets." not in texto
+    pasos = {p.get("name"): p for p in trabajo["steps"]}
+    assert "--reloj-vivo" in pasos["Mirar si el reloj está parado"]["run"]
+    reanudar = pasos["Reanudar el reloj"]
+    assert reanudar["if"] == "steps.reloj.outputs.revivir == 'true'"
+    assert "gh workflow run reloj.yml" in reanudar["run"] and "origen=reanudar" in reanudar["run"]
+    assert "secrets." not in json.dumps(trabajo)
     assert "permissions" not in bodega["jobs"]["bodega"]  # la búsqueda sigue sin permiso de lanzar flujos
+    # El vigía no reanuda: cuando GitHub dispara un horario, el del propio Reloj hace ese trabajo. Su lista de corridas
+    # trae el estado, que la regla compartida usa para saber si hay una búsqueda en marcha.
     vigia = json.dumps(_flujo("incremental.yml")["jobs"]["vigia"])
-    assert "--reloj-vivo" in vigia and "gh workflow run reloj.yml" in vigia
+    assert "reloj.yml" not in vigia and "headBranch,status" in vigia
+    assert _flujo("reloj.yml")[True]["schedule"]  # PyYAML lee «on» como True

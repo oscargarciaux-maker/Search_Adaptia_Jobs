@@ -144,6 +144,28 @@ def embudo_idioma(vacantes):
     return salida
 
 
+def enlaces_de_la_corrida(cache, desde):
+    """Contrato v51: los enlaces comprobados desde `desde` (instante ISO en UTC, como `tiempos.ahora()`), por sitio y
+    resultado. El resumen de `verificar_enlaces.preparar` es de su última llamada y una corrida lo llama varias veces
+    (lote, cola por persona, refuerzos): el reporte mostraba solo el último paso. Aquí se cuentan resultados guardados,
+    no enlaces escogidos: uno que no alcanzó a abrirse no aparece. Los que valen por verse hoy en la búsqueda de su
+    sitio van aparte (`vistas_en_busqueda`) y no entran en `comprobados` ni en `por_sitio`."""
+    from buscador import contrato, enlaces
+    from buscador.verificar_enlaces import VISTA_HOY
+    por_sitio, vistas = {}, 0
+    for url, r in (cache or {}).items():
+        if not isinstance(r, dict) or str(r.get("comprobada_en") or "") < desde:
+            continue
+        if str(r.get("motivo") or "").startswith(VISTA_HOY):
+            vistas += 1
+            continue
+        nombre = contrato.portal(url)  # un sitio que no es un portal conocido devuelve su propio dominio
+        sitio = por_sitio.setdefault("Otros sitios" if nombre == enlaces.host(url) else nombre, Counter())
+        sitio[r.get("estado") or "pendiente"] += 1
+    return {"comprobados": sum(sum(c.values()) for c in por_sitio.values()), "vistas_en_busqueda": vistas,
+            "por_sitio": {s: dict(c) for s, c in sorted(por_sitio.items(), key=lambda par: -sum(par[1].values()))}}
+
+
 def medir(vacantes, hoy=None):
     hoy = hoy or max((v.get("visto_ultima_vez") or "")[:10] for v in vacantes)
     cargos = [cargo_ficticio(n, vacantes) for n in CARGOS]

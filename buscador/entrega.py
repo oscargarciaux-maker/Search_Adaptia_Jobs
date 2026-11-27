@@ -472,17 +472,14 @@ def embudo(vacantes, entregadas, hoy, cfg=None, resumen=None):
                 salida[r["id"]][e] += 1
             if "nuevas" not in pasos:
                 continue
-            idioma = por_idioma[r["id"]].get(v.get("idioma"))  # «nuevas» ya son entregables: su idioma es uno de estos
-            if idioma is not None:
-                idioma["nuevas"] += 1
+            idioma = por_idioma[r["id"]][v["idioma"]]  # «nuevas» ya son entregables: su idioma es uno de `idiomas`
+            idioma["nuevas"] += 1
             if any(x is r for x in aceptan):
                 salida[r["id"]]["cumplen_filtros"] += 1
-                if idioma is not None:
-                    idioma["cumplen_filtros"] += 1
+                idioma["cumplen_filtros"] += 1
                 if verificada:
                     salida[r["id"]]["enlace_comprobado"] += 1
-                    if idioma is not None:
-                        idioma["enlace_comprobado"] += 1
+                    idioma["enlace_comprobado"] += 1
             elif "_perfiles" in r:
                 from panel.afinidad import evaluar
                 categorias = {FILTRO_DE_MOTIVO.get(m, "otros") for p in r["_perfiles"]

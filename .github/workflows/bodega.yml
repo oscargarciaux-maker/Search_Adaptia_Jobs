@@ -157,12 +157,14 @@ jobs:
       GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v5
-      - name: Reanudar el reloj si está parado
+      - name: Mirar si el reloj está parado
+        id: reloj
         run: |
           rama=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
-          gh run list --workflow reloj.yml --limit 40 --json databaseId,status,createdAt,headBranch > "$RUNNER_TEMP/relojes.json"
-          python3 -m buscador.arranque --trabajo "$RUNNER_TEMP" --reloj-vivo "$RUNNER_TEMP/relojes.json" --rama "$rama" > "$RUNNER_TEMP/salida"
-          cat "$RUNNER_TEMP/salida"
-          if grep -qx "revivir=true" "$RUNNER_TEMP/salida"; then
-            gh workflow run reloj.yml --ref "$rama" -f origen=reanudar
-          fi
+          echo "rama=$rama" >> "$GITHUB_OUTPUT"
+          gh run list --workflow reloj.yml --limit 60 --json databaseId,status,createdAt,headBranch > "$RUNNER_TEMP/relojes.json"
+          python3 -m buscador.arranque --reloj-vivo "$RUNNER_TEMP/relojes.json" --rama "$rama" >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+      - name: Reanudar el reloj
+        if: steps.reloj.outputs.revivir == 'true'
+        run: gh workflow run reloj.yml --ref "${{ steps.reloj.outputs.rama }}" -f origen=reanudar

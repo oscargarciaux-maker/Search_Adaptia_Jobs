@@ -87,13 +87,18 @@ def sin_comprobacion_directa(url):
     return any(de_dominio(url, d) for d in SIN_COMPROBACION_DIRECTA)
 
 
+# Así empieza el motivo de un enlace que vale por haberse visto hoy en la búsqueda de su sitio (v41 Indeed, v42 portales
+# de empresa, v50 InfoJobs). La medición de la corrida los separa de los que se comprobaron abriendo la ficha.
+VISTA_HOY = "vista hoy"
+
+
 def vistas_en_portales(enlaces_vistos, ahora=None):
     """Contrato v42: los avisos que el portal de empleo de la propia empresa (Greenhouse, Lever, Ashby, Workable,
     SmartRecruiters, Recruitee) listó en esta corrida cuentan como abiertos 24 h. Esas API públicas solo listan avisos
     activos y son el mismo sitio donde se postula. Computrabajo y Get on Board no entran: sus listados pueden traer
     avisos viejos. Devuelve {enlace: comprobación} para `incorporar`."""
     hora = (ahora or datetime.now(timezone.utc)).isoformat(timespec="seconds").replace("+00:00", "Z")
-    return {u: {"estado": "verificada", "motivo": "vista hoy en el portal de la empresa", "comprobada_en": hora,
+    return {u: {"estado": "verificada", "motivo": f"{VISTA_HOY} en el portal de la empresa", "comprobada_en": hora,
                 "destino": u}
             for u in enlaces_vistos
             if u and enlaces.sirve(u) and not enlaces.es_linkedin(u) and not sin_comprobacion_directa(u)}
@@ -415,26 +420,6 @@ def resumen(vacantes):
     motivos = Counter((v.get("verificacion") or {}).get("motivo", "sin comprobación") for v in vacantes
                       if (v.get("verificacion") or {}).get("estado") != "verificada")
     return {"vacantes": len(vacantes), "estados": dict(estados), "motivos": dict(motivos)}
-
-
-def resumen_corrida(cache, desde):
-    """Contrato v51: lo que se comprobó de verdad desde `desde` (instante ISO en UTC), por sitio y resultado. El
-    resumen de `preparar` es de su última llamada; una corrida lo llama varias veces (lote, cola por persona, refuerzos)
-    y el reporte mostraba solo el último paso. Cuenta resultados guardados, no enlaces escogidos: uno que no alcanzó a
-    abrirse no aparece. `vistas_en_busqueda`: los que valen por verse hoy en la búsqueda de su sitio (v41, v42, v50)."""
-    from buscador import contrato, enlaces
-    por_sitio, vistas, total = {}, 0, 0
-    for url, r in (cache or {}).items():
-        if not isinstance(r, dict) or str(r.get("comprobada_en") or "") < desde:
-            continue
-        total += 1
-        if str(r.get("motivo") or "").startswith("vista hoy"):
-            vistas += 1
-        nombre = contrato.portal(url)
-        sitio = por_sitio.setdefault("Otros sitios" if nombre == enlaces.host(url) else nombre, Counter())
-        sitio[r.get("estado") or "pendiente"] += 1
-    return {"enlaces": total, "vistas_en_busqueda": vistas,
-            "por_sitio": {s: dict(c) for s, c in sorted(por_sitio.items(), key=lambda par: -sum(par[1].values()))}}
 
 
 def cola_de_seleccion(vacantes, entregadas, hoy, cache, iniciales, maximo, ahora=None, limite=None):

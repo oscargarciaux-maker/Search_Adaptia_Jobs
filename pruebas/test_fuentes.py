@@ -283,7 +283,7 @@ def test_getonbrd_dice_cuantas_busquedas_no_respondieron_y_por_que(capsys):
             return {"data": []}
     _, stats = getonbrd.buscar(Bien(), ["qa"])
     assert stats["fallidas"] == 0 and "motivos" not in stats and capsys.readouterr().err == ""
-    # El motivo es corto y nunca lleva direcciones ni claves.
+    # El motivo se arma solo con el tipo de fallo y el código de respuesta.
     assert motivo_del_fallo(object()) == "sin respuesta"
     assert motivo_del_fallo(type("C", (), {"ultimo_error": {"tipo": "ConnectTimeout"}})()) == "ConnectTimeout"
     assert motivo_del_fallo(type("C", (), {"ultimo_error": {"http": 200, "tipo": "respuesta no JSON"}})()) == \

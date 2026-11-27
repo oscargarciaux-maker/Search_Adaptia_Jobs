@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from html import unescape
 
 from buscador import registro
+from buscador.http import motivo_del_fallo
 
 NOMBRE = "Get on Board"
 URL = "https://www.getonbrd.com/api/v0/search/jobs"
@@ -59,7 +60,6 @@ def vacante(item):
 
 def buscar(cliente, consultas):
     """Vacantes crudas y estadísticas; `respondidas` (contrato v47): las consultas que sí respondieron."""
-    from buscador.http import motivo_del_fallo
     vistos, crudas, respondidas, motivos = set(), [], [], Counter()
     for q in consultas:
         datos = cliente.json(URL, params={"query": q, "per_page": 100, "expand": '["company","location_tenants"]'})

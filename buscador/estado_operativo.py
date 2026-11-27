@@ -53,9 +53,7 @@ class Central:
         # petición que falla sigue sin repetirse sola.
         ahora = time.monotonic()
         if self._ultimo_uso is not None and ahora - self._ultimo_uso > INACTIVIDAD:
-            cerrar = getattr(self.sesion, "close", None)
-            if callable(cerrar):
-                cerrar()  # requests abre una conexión nueva en la siguiente petición
+            self.sesion.close()  # requests abre una conexión nueva en la siguiente petición
         try:
             r = self.sesion.post(f"{self.url}/rest/v1/rpc/{nombre}", json=cuerpo, headers=self.cabeceras, timeout=45)
         except requests.RequestException as e:

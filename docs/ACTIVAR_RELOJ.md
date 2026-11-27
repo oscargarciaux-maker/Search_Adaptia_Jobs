@@ -27,13 +27,14 @@ Dos minutos y permiso de administrador en el repositorio. Se hace una sola vez.
 | No hay ninguna corrida del Reloj esperando | La cadena se cortó | Se reanuda sola con la siguiente búsqueda, con «Buscar ahora» o cuando GitHub dispare un horario. Para no esperar: Actions → Reloj → Run workflow |
 | Hay dos corridas esperando | Una es de respaldo | Nada: al llegar su turno, una de las dos se retira |
 | La búsqueda de hoy falló y el Reloj no la repite | Es a propósito: una búsqueda que falla se revisa antes de repetirla | Mira el fallo y usa «Buscar ahora» |
+| Son más de las 7:00 p. m. y la búsqueda de hoy no corrió | A esa hora el Reloj ya no la empieza | Usa «Buscar ahora» si aún la quieres hoy |
 
 ## Detenerlo
 Actions → Reloj → menú «…» → **Disable workflow**. Los horarios normales de GitHub siguen como respaldo.
 
 ## Qué hace exactamente
 Cada 30 minutos: pide el siguiente relevo; si pasó una hora desde la última captura, pide la captura horaria; y desde
-las 6:30 a. m. de Bogotá, si hoy no hay búsqueda diaria hecha ni en marcha, la pide. No usa claves ni lee datos de
+las 6:30 a. m. de Bogotá (y hasta las 7:00 p. m.), si hoy no hay búsqueda diaria hecha ni en marcha, la pide. No usa claves ni lee datos de
 clientes. Deja unas 48 corridas cortas al día en Actions y en «Deployments»; la espera no gasta minutos.
 
 ## Si el proyecto se traspasa

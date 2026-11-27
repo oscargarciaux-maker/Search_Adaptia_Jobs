@@ -9,8 +9,8 @@ name: Reloj
 #
 # Activarlo una vez: Settings → Environments → New environment «reloj» → Wait timer 30 (docs/ACTIVAR_RELOJ.md), y
 # después Actions → Reloj → Run workflow. Sin el temporizador el relevo no sigue (no gira sin pausa).
-# Si la cadena se corta la reanudan el horario de abajo (cuando GitHub lo dispare), la búsqueda diaria y la captura
-# horaria programada. Para detenerlo: Actions → Reloj → «Disable workflow».
+# Si la cadena se corta la reanudan el horario de abajo (cuando GitHub lo dispare) y cualquier búsqueda real, incluida
+# «Buscar ahora» (trabajo «reloj» de bodega.yml). Para detenerlo: Actions → Reloj → «Disable workflow».
 
 on:
   workflow_dispatch:
@@ -40,7 +40,9 @@ jobs:
       - name: Decidir qué toca
         id: decidir
         run: |
-          rama=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
+          # Un tropiezo de la API de GitHub no debe cortar la cadena: cada consulta se intenta hasta tres veces.
+          pedir() { for intento in 1 2 3; do "$@" && return 0; sleep 10; done; return 1; }
+          rama=$(pedir gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
           echo "rama=$rama" >> "$GITHUB_OUTPUT"
           datos="$RUNNER_TEMP/reloj"
           mkdir -p "$datos/trabajo"
@@ -48,9 +50,9 @@ jobs:
             git show FETCH_HEAD:trabajo/metricas_entrega.json > "$datos/trabajo/metricas_entrega.json" 2>/dev/null || true
           fi
           campos=databaseId,status,conclusion,createdAt,event,headBranch
-          gh run list --workflow reloj.yml --limit 40 --json "$campos" > "$datos/relojes.json"
-          gh run list --workflow bodega.yml --limit 40 --json "$campos" > "$datos/diarias.json"
-          gh run list --workflow incremental.yml --limit 20 --json "$campos" > "$datos/capturas.json"
+          pedir gh run list --workflow reloj.yml --limit 60 --json "$campos" > "$datos/relojes.json"
+          pedir gh run list --workflow bodega.yml --limit 40 --json "$campos" > "$datos/diarias.json"
+          pedir gh run list --workflow incremental.yml --limit 20 --json "$campos" > "$datos/capturas.json"
           python3 -m buscador.arranque --trabajo "$datos/trabajo" --reloj "$datos" --yo "$GITHUB_RUN_ID" \
             --rama "$rama" >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"

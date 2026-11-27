@@ -439,7 +439,7 @@ PRUEBA = {"minutos_por_fuente": 3, "linkedin_busquedas": 6, "linkedin_fichas": 8
 
 def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=False):
     inicio = time.monotonic()
-    inicio_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    inicio_utc = tiempos.ahora()
     cfg = config()
     if prueba:
         cfg["presupuestos"].update(PRUEBA)
@@ -765,7 +765,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     resumen_revision["vistas_portales_incorporadas"] = portales_incorporadas
     # Contrato v51: `candidatas_programadas` y `por_necesidad` son de la última llamada; esto suma toda la corrida.
     resumen_revision["en_la_corrida"] = {**revision_corrida,
-                                         **verificar_enlaces.resumen_corrida(cache_enlaces, inicio_utc)}
+                                         **medicion.enlaces_de_la_corrida(cache_enlaces, inicio_utc)}
     seleccion_actual = {"fecha": lote_actual.get("fecha"), "roles": {}}
     por_id_vigente = {v["id"]: v for v in vacantes}
     estados_catalogo = {v["id"]: estado for v, estado, _ in retiradas}

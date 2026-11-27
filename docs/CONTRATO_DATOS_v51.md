@@ -54,22 +54,26 @@ vistos; InfoJobs trajo 51 sin captcha; fugas de ubicación en 0. No apareció el
    - **Captura horaria** (`toca_captura`): si no hay una búsqueda diaria ni otra captura en marcha y la última captura
      que no se canceló empezó hace 55 minutos o más. Se pide con `prueba=false` (a mano su valor por defecto es de
      prueba).
-   - **Búsqueda diaria** (`toca_diaria`): desde las 6:30 a. m. de Bogotá (11:30 UTC), si hoy no terminó ninguna y en la
-     rama principal no hay una de hoy en marcha ni terminada. Una que falló **no** se repite sola: se revisa. Una que
-     GitHub canceló en la cola no cuenta, pero no se pide más de 3 veces al día. Es la búsqueda completa de siempre.
+   - **Búsqueda diaria** (`toca_diaria`): entre las 6:30 a. m. y las 7:00 p. m. de Bogotá, si hoy no terminó ninguna y
+     en la rama principal no hay una de hoy en marcha ni terminada. Una que falló **no** se repite sola: se revisa. Una
+     que GitHub canceló en la cola no cuenta, pero no se pide más de 3 veces al día. Después de las 7:00 p. m. no se
+     empieza (terminaría de noche, cerca del cambio de día): queda «Buscar ahora». Es la búsqueda completa de siempre.
+   - **Una sola regla para el Reloj y el vigía.** El vigía (`hace_falta_lanzar`) es `toca_diaria` desde las 7:00 a. m.
+     y sin insistir (una pedida al día); su comportamiento no cambia. Su lista de corridas ahora trae `status`.
    - Si toca la diaria no se pide a la vez la captura: en la cola del grupo `publicar` solo cabe una corrida en espera
      y la segunda cancelaría a la primera.
 3. **Seguros** (`relevo`):
    - Un relevo que esperó menos de 20 minutos está en un entorno sin temporizador: no hace nada y **no pide otro**
      (sin esto la cadena giraría sin pausa). Se marca en rojo solo si lo arrancó una persona.
-   - Nunca dos cadenas: si hay otro relevo vivo, este cumple con lo que toque y no pide el siguiente; de dos que corren
-     a la vez, sigue el más antiguo.
+   - Nunca dos cadenas: de los relevos vivos (esperando o corriendo) solo pide el siguiente el de número más alto.
+     Los demás cumplen con lo que toque y se retiran. Así nunca se retiran todos a la vez y, si llegaran a quedar dos
+     cadenas, en la ronda siguiente queda una.
    - Sin su propio registro, sin la lista de corridas o fuera de la rama principal, no hace nada a ciegas.
-   - El relevo se pide **antes** que la captura o la búsqueda: si algo falla después, la cadena ya sigue.
-4. **Si la cadena se corta** la reanudan: el horario propio del Reloj y la captura horaria programada (cuando GitHub
-   los dispare) y cualquier búsqueda real, incluida «Buscar ahora» (trabajo `reloj` de `bodega.yml`, aparte y con
-   permiso solo de `actions: write`; la búsqueda no recibe ese permiso). `hace_falta_revivir`: solo si no queda ningún
-   relevo vivo.
+   - El relevo se pide **antes** que la captura o la búsqueda: si algo falla después, la cadena ya sigue. Las
+     consultas a GitHub se intentan hasta tres veces.
+4. **Si la cadena se corta** la reanudan: el horario propio del Reloj (cuando GitHub lo dispare) y cualquier búsqueda
+   real, incluida «Buscar ahora» (trabajo `reloj` de `bodega.yml`, aparte y con permiso solo de `actions: write`; la
+   búsqueda no recibe ese permiso). `hace_falta_revivir`: solo si no queda ningún relevo vivo.
 5. **Lo que no cambia.** Los horarios de `bodega.yml`, sus respaldos y el vigía siguen; `hace_falta_pasada` ya evita
    repetir la búsqueda del día. La segunda pasada (8:30) sigue con el horario de GitHub. «Buscar ahora» no cambia.
    El Reloj no usa el grupo `publicar`: no cancela búsquedas ni capturas en espera.
@@ -85,28 +89,29 @@ vistos; InfoJobs trajo 51 sin captcha; fugas de ubicación en 0. No apareció el
 
 - `buscador/http.py::motivo_del_fallo(cliente)`: por qué falló la última petición, corto y sin direcciones ni claves
   («HTTP 403», «HTTP 200 (respuesta no JSON)», «ConnectTimeout»). `Cliente.get` y `Cliente.json` ahora lo anotan.
-- **Bumeran y portales hermanos** (`jobint.py`): el reporte añade `motivos` por país y `reintentados`, y el registro
+- **Bumeran y portales hermanos** (`jobint.py`): el reporte añade `motivos_por_pais` y `reintentados`, y el registro
   nombra el portal que no respondió. Un portal en descanso (3 fallos seguidos) recibe **una** oportunidad más al final
   de la corrida: si responde, siguen sus turnos; si vuelve a fallar, descansa hasta la siguiente. No se insiste contra
   un bloqueo ni se cambia la forma de pedir.
-- **Get on Board** (`getonbrd.py`): `fallidas` y `motivos`.
+- **Get on Board** (`getonbrd.py`): `fallidas` y `motivos` (motivo → cuántas búsquedas).
 - Con el motivo a la vista se decide. Un bloqueo a las direcciones de GitHub se respeta.
 
 ## 3. Reserva de Apify
 
 - `estado_operativo.Central.rpc`: tras 120 segundos sin usar la conexión con Supabase se abre una nueva **antes** de
   pedir. No es un reintento: la regla «sin reintento automático» de una reserva ambigua no cambia.
-- El código de respuesta se mira antes de leer el cuerpo, y el mensaje dice la causa
-  («apify_reservar: ReadTimeout», «apify_reservar: HTTP 502 sin datos»), nunca la dirección ni la clave.
+- El mensaje dice la causa: el tipo de fallo de conexión («apify_reservar: ReadTimeout») o, si la respuesta no trae
+  datos, su código («apify_reservar: HTTP 502 sin datos»). Nunca la dirección ni la clave.
 - La causa (conexión vieja) es la hipótesis más probable, no un hecho comprobado: si fuera otra, el reporte siguiente
   la dirá.
 
 ## 4. Medición
 
-- `verificacion_enlaces.en_la_corrida`: `llamadas`, `programadas` (suma de todas las llamadas), `enlaces` (resultados
-  guardados desde que empezó la corrida), `vistas_en_busqueda` y `por_sitio` con sus estados
-  (`verificar_enlaces.resumen_corrida`). No incluye lo que comprueba «completar a quien va corto» en el panel, que
-  guarda sus resultados en el catálogo.
+- `verificacion_enlaces.en_la_corrida`: `llamadas`, `programadas` (suma de todas las llamadas), `comprobados`
+  (resultados guardados desde que empezó la corrida, abriendo la ficha) y `por_sitio` con sus estados; aparte,
+  `vistas_en_busqueda` (los que valen por verse hoy en la búsqueda de su sitio). Lo calcula
+  `medicion.enlaces_de_la_corrida`. No incluye lo que comprueba «completar a quien va corto» en el panel, que guarda
+  sus resultados en el catálogo.
 - `entrega.embudo[cargo].por_idioma`: por idioma del aviso, `nuevas`, `cumplen_filtros`, `enlace_comprobado` y
   `entregadas`. Solo cuentas por cargo, sin datos de clientes.
 - No se añade una cola para comprobar vacantes que no le sirven a nadie: no entregaría más.
