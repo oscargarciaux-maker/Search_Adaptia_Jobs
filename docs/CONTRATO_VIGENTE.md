@@ -382,7 +382,8 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
   y la captura posterior antes de afirmar una recuperación (v5).
 - **La reconciliación va por lotes (SQL 021, 27 nov):** la API llama de a 5.000 referencias explícitas y luego de a 500
   ofertas; cada lote es una transacción corta e idempotente, con un solo reintento si Supabase lo corta (57014). Así
-  ninguna llamada crece con el catálogo ni con las ofertas. Mismas reglas de identidad, rechazos y archivo que 011;
+  ninguna llamada crece con el catálogo ni con las ofertas. Mismas reglas de identidad, rechazos y archivo que 011,
+  pero un rechazo en un lote deja confirmados los lotes anteriores (la corrida sigue en AVERÍA y repetir es seguro);
   `reconciliar_ofertas()` sigue existiendo para el instalador y el diagnóstico (todo en una transacción).
 - El arranque importa un corte coherente; un respaldo previo a cambios no equivale a copias periódicas (domingos,
   `respaldo.yml`). El traspaso (`traspaso.yml`) va a un destino vacío y propio, exige tablas, memoria, colas y reservas

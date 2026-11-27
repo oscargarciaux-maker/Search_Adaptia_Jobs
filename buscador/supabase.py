@@ -193,21 +193,24 @@ def reconciliar_ofertas(sesion=None, pausa=20):
     """Consolidar copias por lotes (SQL 021). Cada lote es transaccional e idempotente: un lote cancelado no deja
     cambios y se reintenta una sola vez tras `pausa` si Supabase lo corta por tiempo (57014); si vuelve a fallar, el
     error sigue visible y no se insiste. Sin SQL 021 instalado se usa la función de una sola llamada."""
-    archivadas, lotes, reintento = 0, 0, False
-    resultado = {}
+    archivadas, lotes, reintento, resultado = 0, 0, False, {}
     for funcion, desde, limite in LOTES_RECONCILIACION:
         while True:
-            resultado, otra_vez = _lote_con_reintento(sesion, funcion, {"desde": desde, "limite": limite}, pausa)
-            reintento = reintento or otra_vez
+            resultado = _lote_con_reintento(sesion, funcion, {"desde": desde, "limite": limite}, pausa)
             if lotes == 0 and _falta_funcion(resultado):
-                return _con_reintento(sesion, "reconciliar_ofertas", {}, pausa)
+                return _lote_con_reintento(sesion, "reconciliar_ofertas", {}, pausa)
             lotes += 1
-            if resultado.get("errores"):
-                return dict(resultado, lotes=lotes, **({"reintento_por_tiempo": True} if reintento else {}))
+            reintento = reintento or bool(resultado.get("reintento_por_tiempo"))
+            if resultado.get("errores"):  # lo de los lotes anteriores ya quedó confirmado y se informa
+                return dict(resultado, archivadas=archivadas, lotes=lotes)
             archivadas += int(resultado.get("archivadas") or 0)
-            desde = resultado.get("siguiente")
-            if desde is None:
+            siguiente = resultado.get("siguiente")
+            if siguiente is None:
                 break
+            if siguiente <= desde:
+                return {"errores": ["Reconciliación no confirmada (el lote no avanzó)"], "archivadas": archivadas,
+                        "lotes": lotes}
+            desde = siguiente
     final = {"archivadas": archivadas, "filas_unicas": resultado.get("filas_unicas"),
              "sin_identificar": resultado.get("sin_identificar"), "lotes": lotes}
     return dict(final, reintento_por_tiempo=True) if reintento else final
@@ -217,31 +220,26 @@ def _falta_funcion(resultado):
     return any("PGRST202" in str(e) for e in resultado.get("errores") or [])
 
 
-def _con_reintento(sesion, funcion, cuerpo, pausa):
-    resultado, otra_vez = _lote_con_reintento(sesion, funcion, cuerpo, pausa)
-    return dict(resultado, reintento_por_tiempo=True) if otra_vez else resultado
-
-
 def _lote_con_reintento(sesion, funcion, cuerpo, pausa):
-    """Una llamada y, solo ante 57014, un único reintento. Devuelve (resultado, hubo_reintento)."""
+    """Una llamada y, solo ante 57014, un único reintento, que queda anotado en `reintento_por_tiempo`."""
     resultado = _reconciliar_una_vez(sesion, funcion, cuerpo)
     if not any("57014; tiempo_consulta" in str(e) for e in resultado.get("errores") or []):
-        return resultado, False
+        return resultado
     import time
     time.sleep(pausa)
     segundo = _reconciliar_una_vez(sesion, funcion, cuerpo)
     if segundo.get("errores"):
-        return dict(segundo, errores=[*resultado["errores"], *segundo["errores"]]), True
-    return segundo, True
+        return dict(segundo, errores=[*resultado["errores"], *segundo["errores"]], reintento_por_tiempo=True)
+    return dict(segundo, reintento_por_tiempo=True)
 
 
-def _reconciliar_una_vez(sesion=None, funcion="reconciliar_ofertas", cuerpo=None):
+def _reconciliar_una_vez(sesion, funcion, cuerpo):
     url, clave = credenciales()
     cabeceras = {"apikey": clave}
     if clave and clave.startswith("eyJ"):
         cabeceras["Authorization"] = f"Bearer {clave}"
     try:
-        r = (sesion or requests).post(f"{url}/rest/v1/rpc/{funcion}", headers=cabeceras, json=cuerpo or {}, timeout=60)
+        r = (sesion or requests).post(f"{url}/rest/v1/rpc/{funcion}", headers=cabeceras, json=cuerpo, timeout=60)
         datos = r.json()
         if r.status_code != 200 or not isinstance(datos, dict):
             import re

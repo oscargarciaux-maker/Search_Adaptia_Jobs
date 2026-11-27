@@ -11,15 +11,16 @@ from buscador import migraciones, supabase
 
 def medir_lotes(conn):
     """Recorrer los lotes de SQL 021 como la API: cada uno es una sentencia con su propio límite de tiempo."""
-    from buscador.supabase import LOTES_RECONCILIACION
     lotes, mas_lento, archivadas, r = 0, 0, 0, {}
-    for funcion, desde, limite in LOTES_RECONCILIACION:
+    for funcion, desde, limite in supabase.LOTES_RECONCILIACION:
         while desde is not None:
             t0 = time.perf_counter()
             consulta = sql.SQL("select public.{}(%s,%s)").format(sql.Identifier(funcion))
             r = conn.execute(consulta, (desde, limite)).fetchone()[0]
             mas_lento = max(mas_lento, round((time.perf_counter() - t0) * 1000))
-            lotes, archivadas, desde = lotes + 1, archivadas + int(r.get("archivadas") or 0), r.get("siguiente")
+            lotes += 1
+            archivadas += int(r.get("archivadas") or 0)
+            desde = r.get("siguiente")
     return {"lotes": lotes, "lote_mas_lento_ms": mas_lento, "archivadas": archivadas,
             "filas_unicas": r.get("filas_unicas"), "sin_identificar": r.get("sin_identificar")}
 
@@ -54,7 +55,7 @@ def perfilar(conn):
                   ("with recursive recorrido", "identidades"), ("with destinos", "resolver_urls"),
                   ("update public.ofertas", "actualizar_enlaces")]
         etapa = next((nombre for marca,nombre in etapas if marca in contexto.lower()), "sin_identificar")
-        linea = re.search(r'function (?:public\.)?reconciliar_ofertas\(\) line (\d+)', contexto)
+        linea = re.search(r'function (?:public\.)?reconciliar_(?:ofertas|ofertas_lote|referencias_lote)\([^)]*\) line (\d+)', contexto)
         print({"perfil_revertido_ms":round((time.perf_counter()-t0)*1000),"codigo":e.sqlstate,
                "etapa":etapa,"linea":int(linea[1]) if linea else None},flush=True)
         return False
