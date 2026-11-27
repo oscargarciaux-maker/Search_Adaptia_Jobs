@@ -1,6 +1,12 @@
 # Contrato vigente — las reglas de hoy, ya resueltas
 
-Fuente principal de las reglas del proyecto (estado al 27 nov 2026, hasta v51). Cada regla dice cómo es **hoy**; entre
+**Objetivo del producto (decisión 27 nov):** una persona de cualquier país crea su perfil y recibe vacantes que le
+sirven según sus características. Si pide remoto mundial, le llegan de todo el mundo. El idioma lo decide el perfil,
+no el país donde vive: si pide español, solo en español aunque viva en un país que no habla español; si pide inglés,
+le llegan en inglés aunque viva en un país hispanohablante, en Brasil o en cualquier otro. El origen LATAM/España es
+histórico. Los idiomas de aviso aceptados siguen siendo solo español e inglés.
+
+Fuente principal de las reglas del proyecto (estado al 27 nov 2026, hasta v52 y la decisión del 27 nov). Cada regla dice cómo es **hoy**; entre
 paréntesis va el contrato de donde sale, por si hace falta el detalle. Si una versión posterior corrigió a otra, aquí
 solo queda la posterior. Los `docs/CONTRATO_DATOS_vNN.md` son históricos: se conservan porque el código y las pruebas
 los citan, pero no se editan ni se crean nuevos.
@@ -19,17 +25,17 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
 - **Modo panel** (hay una versión de configuración vigente en Supabase): clientes con perfiles, cargos y metas; la
   captura busca solo los cargos y lugares de esa versión y asigna por perfil (v6, v21).
 - **Modo heredado** (sin versión vigente): seis cargos fijos, veinte vacantes por cargo. Solo filtran el cargo (mapa de cargos), 30
-  días, que siga abierta, sin repetir, enlace comprobado y que se pueda postular desde LATAM o España. Inglés, nivel y
+  días, que siga abierta, sin repetir, enlace comprobado y que se pueda postular desde el país elegido. Inglés, nivel y
   años solo se muestran como columnas. Nada de lo que sigue cambia este modo salvo que se diga (v6, v24).
 - La captura no guarda perfiles ni datos de clientes en su estado público, reportes ni cachés (v6).
 
 ## 2. Ubicación y países
 
-- **Cobertura de búsqueda:** cualquier país de LATAM hispanohablante y España (decisión del 5 nov); la búsqueda
-  prioriza esos países y las remotas para varios países. La residencia de un perfil puede ser **cualquier país** del
-  mundo (v23, v50).
-- **Brasil** se reconoce pero no es país de cobertura: no se busca allí y una vacante solo para Brasil no se entrega;
-  una remota abierta a varios países que incluye Brasil se conserva para los demás (v12). Ver «Dudas».
+- **Cualquier país:** la residencia de un perfil y los lugares donde trabajaría pueden ser de **cualquier país** del
+  mundo; una vacante sirve si cumple el perfil, no por ser de LATAM o España (decisión 27 nov; v23, v40).
+- **Brasil es un país como cualquier otro:** quien vive en Brasil recibe remotas mundiales y vacantes de Brasil, en
+  español o inglés según su perfil. Deja de valer la restricción de v12 (Brasil solo dentro de remotas para varios
+  países) (decisión 27 nov).
 - **Dónde trabajaría:** el perfil tiene hasta 10 filas `{países, ciudades, modalidades}`; la primera es donde vive.
   Cada fila necesita un país o una ciudad y al menos una modalidad; las regiones se convierten en sus países al guardar.
   La ubicación cumple si **alguna fila** acepta la vacante; si ninguna, los motivos son los de la primera. Los perfiles
@@ -69,13 +75,15 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
 - **Get on Board:** `fully_remote` = cualquier país; `remote_local` = los países de `location_tenants`; sin país,
   «por confirmar» (v18).
 - **Admisión y limpieza:** en modo panel se conserva una vacante de fuera si sirve a algún perfil (`_sirve_a_perfiles`;
-  por horario, solo si no nombra país). En modo heredado se archiva lo que no sirve desde LATAM o España (v24, v40, v49).
+  por horario, solo si no nombra país). Una vacante se conserva si sirve a algún perfil, sea del país que sea
+  (decisión 27 nov; v24, v40, v49).
 - **En caso de duda, no entra.** Un país desconocido nunca completa la meta (excepción: los posts, §10) (v17, v23, v28).
 
 ## 3. Idioma
 
 - Solo se entregan avisos en **español o inglés**, y solo los idiomas que acepta el perfil: a quien solo acepta
-  español nunca le llega un aviso en inglés (v12, v27, v44).
+  español nunca le llega un aviso en inglés (v12, v27, v44). **El idioma lo decide el perfil, no el país donde vive**
+  (decisión 27 nov).
 - `es` o `en` solo con **evidencia positiva**: palabras exclusivas, proporción mínima y ventaja frente a 14 idiomas de
   referencia. Sin evidencia, el idioma queda vacío y no se entrega. Un bilingüe español-inglés pasa (v15).
 - Sin descripción no se sabe el idioma y la vacante no se entrega (v40, v50).
@@ -161,9 +169,22 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
   dejara nada útil: entonces pide los 30 días; una combinación con 3 búsquedas seguidas sin nada útil pasa al final de
   los turnos de su persona hasta que vuelva a traer algo (`estado["rendimiento"]`) (v40). Los lugares salen de todas las filas del perfil y de las regiones de
   `datos/regiones_busqueda.yaml`; «remoto LATAM» solo para quien vive en LATAM (v40).
-- La entrega diaria comprueba Supabase antes de recoger; la validación final falla si queda un enlace de la selección
-  sin comprobar, una vacante que ya no encaja o sincronización pendiente; una elegida que después cerró es un aviso
-  (v40; reglas de integridad).
+- La entrega diaria comprueba Supabase antes de recoger (reglas de integridad). Una elegida que después cerró es un
+  aviso y no se comparte (v40).
+- **Cómo termina la búsqueda diaria: tres estados** (`buscador/validacion.py`, paso «Comprobar meta y
+  sincronización» de `bodega.yml`) (v52):
+  - **COMPLETA:** todo bien → corrida en verde y ping de éxito a Healthchecks.
+  - **CORTA:** meta del día incompleta o vacantes de la selección con el enlace sin comprobar (siguen sin compartirse
+    hasta comprobarlas) → corrida en verde con `::warning::` y resumen de qué faltó por cargo (sin datos de clientes);
+    ping de éxito. El déficit **no** hace fallar la corrida.
+  - **AVERÍA:** sincronización con Supabase o catálogo sin confirmar, reconciliación sin confirmar (incluido el 57014),
+    selección no registrada, operaciones centrales pendientes, sin catálogo válido o vacantes de hoy que ya no encajan
+    en el perfil → corrida en rojo y aviso `/fail`. **Solo una avería hace fallar la corrida**; si hay avería y falta a
+    la vez, manda la avería.
+  - La segunda pasada (8:30) y su respaldo completan la meta según `trabajo/metricas_entrega.json`
+    (`arranque.falta_completar`), no según el color de la corrida; un día CORTO solo por enlaces sin comprobar (meta
+    cumplida) no la pide. En el panel un día corto sigue como «parcial» y «Buscar ahora» ofrece completar (v52).
+  - Las demás partes que fallan (búsqueda, publicación) siguen poniendo la corrida en rojo (v52).
 - Repetir el día solo completa o reintenta el mismo lote; nunca añade otro lote (v2). Un lote ya elegido no se reescribe
   para ocultar cierres o déficit; el déficit se informa (v3, v4).
 - No se borran archivos históricos ni snapshots para ocultar déficit (v5).
@@ -351,7 +372,9 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
   ejecución (v2).
 - `python -m pruebas.probar_migraciones` solo en PostgreSQL aislado.
 - Limpiezas de `ofertas` solo con su flujo manual (huella + `BORRAR` + copia cifrada); `entregas_diarias` y
-  `panel_asignaciones` no se tocan (v12, v13). Fuera de eso, la limpieza de 30 días solo afecta al buscador activo:
+  `panel_asignaciones` no se tocan (v12, v13). El objetivo de v13 (borrar lo de fuera de LATAM y España) deja de
+  valer: una vacante que sirve a algún perfil no se borra por su país; solo por idioma distinto de español o inglés
+  (decisión 27 nov). Fuera de eso, la limpieza de 30 días solo afecta al buscador activo:
   no se borran ofertas de Supabase (cobertura).
 - La entrega sube a `ofertas` sin sobrescribir (un `external_id` repetido se ignora); hay cola de reintentos a
   Supabase; `--prueba` no marca entregadas ni sube (v1; reglas de integridad).
@@ -388,14 +411,12 @@ Las «Reglas innegociables» de `CLAUDE.md` son el resumen de esta sección: si 
   `verificacion_enlaces.en_la_corrida` (v51). Cifras por persona solo en el resumen privado (v40).
 - `python -m buscador.medicion --bodega …` mide sobre una bodega guardada (v49).
 
+## Decisiones recientes
+
+- **27 nov — objetivo mundial** (ver arriba). Resuelve las dos dudas anteriores: una vacante se conserva si sirve a
+  algún perfil (deja de valer el borrado por país de v13) y Brasil es un país como cualquier otro (deja de valer la
+  restricción de v12). El código todavía aplica parte de esas restricciones: ver la lista del PR que lo registró.
+
 ## Dudas para Oscar
 
-1. **Limpieza de `ofertas` (v13) frente a residencia en cualquier país (v23, v24, v40).** El flujo «Revisar y limpiar
-   vacantes fuera del objetivo» propone borrar presenciales o híbridas fuera de LATAM y España y remotas solo para
-   otros países. Desde v23 esas vacantes pueden entregarse a quien vive fuera (por ejemplo, Chicago), y v40 dejó de
-   archivarlas en modo panel. ¿La limpieza debe seguir con el objetivo de v13 o respetar los perfiles?
-2. **Brasil como residencia (v12 frente a v23).** v12 dice que el panel no ofrece Brasil como residencia y que una
-   vacante solo para Brasil no se entrega; v23 abre la residencia a cualquier país. ¿Quien vive en Brasil puede recibir
-   vacantes de Brasil?
-
-Mientras Oscar no decida, no se cambia el código actual en ninguno de los dos puntos.
+Ninguna abierta.

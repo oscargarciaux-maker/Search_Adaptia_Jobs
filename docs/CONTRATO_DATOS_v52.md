@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v52 — tres estados al terminar la búsqueda diaria (27 nov 2026)
 
 Decisión de Oscar (27 nov). Sin IA, sin SQL nuevo, sin claves nuevas y sin campos nuevos en `salud.json`. Cambia solo

@@ -1,6 +1,10 @@
-# CLAUDE.md — Buscador de vacantes LATAM
+# CLAUDE.md — Buscador de vacantes
 
 ## Qué es
+**Objetivo (decisión 27 nov):** una persona de cualquier país crea su perfil y recibe vacantes que le sirven según sus
+características; si pide remoto mundial, le llegan de todo el mundo. El idioma lo decide el perfil, no el país donde
+vive (solo español o inglés). El origen LATAM/España es histórico.
+
 Cada mañana el sistema busca vacantes en portales públicos y, con los criterios de cada cliente, asigna las que le
 sirven. Un panel privado (React/Vite + FastAPI) deja al operador gestionar clientes, perfiles, cargos y metas diarias
 bajo un techo del día, revisar vacantes, descargar CSV y copiar el WhatsApp de cada cliente para enviarlo a mano.
