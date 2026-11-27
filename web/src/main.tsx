@@ -1,11 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  ArrowDownToLine,
   ArrowLeft,
   ArrowRight,
   Archive,
-  BriefcaseBusiness,
   Moon,
   Sun,
   Check,
@@ -14,8 +12,6 @@ import {
   Loader2,
   LogOut,
   MessageCircle,
-  RefreshCw,
-  Search,
   ShieldCheck,
   Trash2,
   X,
@@ -35,15 +31,7 @@ import type {
   Revisiones,
   ResumenClientes,
 } from "./types";
-import {
-  Ayuda,
-  Dialog,
-  Empty,
-  fecha,
-  fijarLugares,
-  fijarMundo,
-  hoyBogota,
-} from "./comunes";
+import { Dialog, fijarLugares, fijarMundo } from "./comunes";
 import { PorConfirmar } from "./vistas/PorConfirmar";
 import { BuscarAhora } from "./vistas/BuscarAhora";
 import { Mensajes } from "./vistas/Mensajes";
@@ -52,51 +40,15 @@ import { ClienteDetalle } from "./vistas/ClienteDetalle";
 import { ClienteDialog } from "./vistas/ClienteFormulario";
 import { conMetas } from "./perfiles";
 import { useVistaPrevia } from "./vistaPrevia";
-import { ListaVacantes } from "./vistas/Vacantes";
 import { TarjetasResumen, resumenDeClientes } from "./vistas/Resumen";
 import { Historial, AvisoUltimaBusqueda } from "./vistas/Historial";
 import { CargosYMetas } from "./vistas/CargosYMetas";
 import { Clientes } from "./vistas/Clientes";
+import { SeccionVacantes } from "./vistas/SeccionVacantes";
+import { useDescargaCsv } from "./descargaCsv";
 import "./style.css";
 
 const vacio: Configuracion = { clientes: [], cargos: [], perfiles: [] };
-// Nombre de archivo sin tildes ni espacios: el CSV solo queda en el equipo del operador.
-function slug(texto: string) {
-  return (
-    texto
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "") || "cliente"
-  );
-}
-// Por qué no hay vacantes: sin configuración, a la espera de la primera búsqueda o sin coincidencias.
-function vacioVacantes(estado: EstadoConfig | null, r: Resultados | null) {
-  if (!estado?.publicada)
-    return {
-      title: "Aplica la configuración para empezar",
-      texto:
-        "Las vacantes de cada cliente aparecen después de la primera búsqueda (6:30 a. m.) con su configuración. Revisa «Clientes» y «Cargos y metas» y pulsa «Aplicar cambios».",
-    };
-  const desde = estado.publicada.vigente_desde;
-  if (!r?.ejecucion || r.ejecucion.fecha < desde)
-    return {
-      title: "Aún no hay búsqueda para este cliente",
-      texto:
-        "La primera búsqueda con tu configuración será el " +
-        fecha(desde) +
-        " a las 6:30 a. m. (hora Colombia). Después aparecerán aquí sus vacantes.",
-    };
-  return {
-    title: "La búsqueda no encontró vacantes para este cliente",
-    texto:
-      "La búsqueda del " +
-      fecha(r.ejecucion.fecha) +
-      " no trajo vacantes que cumplan los filtros de este cliente. Revisa sus filtros en «Clientes» con la estimación.",
-  };
-}
-
 // Contrato v22: prioridades que solo ordenan y restricciones que descartan con evidencia clara.
 // Sección 5 (13 nov): sin menú propio; cada sección tiene su dirección y se abre desde las tarjetas del resumen.
 const secciones: Record<string, string> = {
@@ -521,56 +473,17 @@ function App() {
       setBusy(false);
     }
   }
-  const [descargandoBase, setDescargandoBase] = useState(false);
+  const {
+    descargandoBase,
+    csvFecha,
+    setCsvFecha,
+    csvTodo,
+    setCsvTodo,
+    csvCliente,
+    setCsvCliente,
+    descargarBase,
+  } = useDescargaCsv(clientes, notify);
   const [abriendoWhatsApp, setAbriendoWhatsApp] = useState(false);
-  // Reunión del 14 nov: CSV general o de un cliente, del día elegido o de toda la base, con el formato del contrato.
-  const [csvFecha, setCsvFecha] = useState(hoyBogota());
-  const [csvTodo, setCsvTodo] = useState(false);
-  const [csvCliente, setCsvCliente] = useState("");
-  async function descargarBase(soloCliente?: string) {
-    // Desde el detalle de un cliente (paso 8): las de hoy de ese cliente.
-    const cliente = soloCliente ?? csvCliente,
-      todo = soloCliente ? false : csvTodo,
-      dia = soloCliente ? hoyBogota() : csvFecha;
-    setDescargandoBase(true);
-    try {
-      const q = new URLSearchParams();
-      if (todo) q.set("todo", "true");
-      else q.set("fecha", dia);
-      if (cliente) q.set("cliente", cliente);
-      const r = await fetch("/api/base.csv?" + q.toString(), {
-        credentials: "same-origin",
-      });
-      if (!r.ok)
-        throw new Error("No se pudo descargar el CSV. Inténtalo de nuevo.");
-      const incluidas = r.headers.get("X-Incluidas") || "?";
-      const omitidas = Number(r.headers.get("X-Omitidas-Sin-Confirmar") || 0);
-      const sinFila = Number(r.headers.get("X-Sin-Fila") || 0);
-      const nombreCliente = clientes.find((c) => c.id === cliente)?.nombre;
-      const url = URL.createObjectURL(await r.blob());
-      const enlace = document.createElement("a");
-      enlace.href = url;
-      enlace.download =
-        "vacantes-" +
-        (todo ? "base" : dia) +
-        "-" +
-        (nombreCliente ? slug(nombreCliente) : "todas") +
-        ".csv";
-      enlace.click();
-      URL.revokeObjectURL(url);
-      const notas = [
-        omitidas ? `${omitidas} sin confirmar quedaron fuera` : "",
-        sinFila ? `${sinFila} sin ficha en la base (posts)` : "",
-      ].filter(Boolean);
-      notify(
-        `CSV descargado: ${incluidas} vacantes${notas.length ? " (" + notas.join("; ") + ")" : ""}.`,
-      );
-    } catch (e) {
-      notify((e as Error).message, true);
-    } finally {
-      setDescargandoBase(false);
-    }
-  }
   async function abrirWhatsApp() {
     // 18 nov: la carga se ve en el botón; el resto de la página sigue usable.
     setAbriendoWhatsApp(true);
@@ -979,200 +892,39 @@ function App() {
             />
           )}
           {tab === "Vacantes" && (
-            <>
-              {/* Lista grande, PR 3: «Oportunidades para» más angosto y el CSV arriba a la derecha. */}
-              <div className="vacantes-cabecera">
-                <div className="results-control card">
-                  <div className="field">
-                    <label htmlFor="result-cliente">
-                      MOSTRAR OPORTUNIDADES PARA
-                    </label>
-                    <select
-                      id="result-cliente"
-                      value={selectedClient}
-                      onChange={(e) => setSelectedClient(e.target.value)}
-                    >
-                      {/* Lista grande (17 nov): solo los clientes de hoy; los de configuraciones anteriores (CSV viejo) ya no
-                          aparecen con «pendiente». */}
-                      {clientes.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.nombre}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="results-count">
-                    <strong>{paraCopiar}</strong>
-                    <span>
-                      {diaAnterior
-                        ? "de ese día (se comprueban al copiar)"
-                        : "listas para compartir"}
-                    </span>
-                  </div>
-                  <label className="cuantas-whatsapp">
-                    Cuántas
-                    <input
-                      type="number"
-                      min={1}
-                      max={Math.max(1, paraCopiar || 1)}
-                      value={cuantasWhats}
-                      // Thermos (18 nov): el campo se puede vaciar mientras se escribe; vacío vale 10.
-                      onChange={(e) => setCuantasWhats(e.target.value)}
-                    />
-                  </label>
-                  <button
-                    ref={botonWhatsApp}
-                    className="button whatsapp"
-                    disabled={
-                      !selectedClient ||
-                      !paraCopiar ||
-                      busy ||
-                      loadingResults ||
-                      abriendoWhatsApp
-                    }
-                    aria-busy={abriendoWhatsApp || undefined}
-                    onClick={abrirWhatsApp}
-                  >
-                    <MessageCircle size={18} />
-                    {abriendoWhatsApp
-                      ? diaAnterior
-                        ? "Comprobando enlaces…"
-                        : "Preparando…"
-                      : "Copiar WhatsApp"}
-                  </button>
-                </div>
-                <div className="csv-descarga card">
-                  <div className="csv-titulo">
-                    <strong>Descargar CSV</strong>
-                    <Ayuda etiqueta="Descargar CSV">
-                      Usa las columnas del contrato, listas para subir a la
-                      plataforma de los candidatos. Una fila por vacante; no
-                      incluye las que tienen el país sin confirmar.
-                    </Ayuda>
-                  </div>
-                  <div className="field">
-                    <label htmlFor="csv-fecha">Fecha</label>
-                    <input
-                      id="csv-fecha"
-                      type="date"
-                      value={csvFecha}
-                      max={hoyBogota()}
-                      disabled={csvTodo}
-                      onChange={(e) =>
-                        setCsvFecha(e.target.value || hoyBogota())
-                      }
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="csv-cliente">Clientes</label>
-                    <select
-                      id="csv-cliente"
-                      value={csvCliente}
-                      onChange={(e) => setCsvCliente(e.target.value)}
-                    >
-                      <option value="">Todos los clientes</option>
-                      {clientes.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.nombre}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <label className="csv-todo">
-                    <input
-                      type="checkbox"
-                      checked={csvTodo}
-                      onChange={(e) => setCsvTodo(e.target.checked)}
-                    />
-                    Toda la base
-                  </label>
-                  <button
-                    className="button secondary"
-                    onClick={() => descargarBase()}
-                    disabled={descargandoBase}
-                  >
-                    <ArrowDownToLine size={16} />
-                    {descargandoBase ? "Descargando…" : "Descargar CSV"}
-                  </button>
-                </div>
-              </div>
-              <div className="toolbar">
-                <div className="search-input">
-                  <Search size={17} />
-                  <input
-                    placeholder="Buscar por cargo o empresa…"
-                    aria-label="Buscar vacante"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
-                <div className="results-tools">
-                  {/* Contrato v48: cualquier día en un calendario, como en la descarga del CSV. */}
-                  <label className="fecha-resultados">
-                    <span className="visually-hidden">Día de la búsqueda</span>
-                    <input
-                      type="date"
-                      aria-label="Día de la búsqueda"
-                      value={resultDate || diaResultados}
-                      max={hoyBogota()}
-                      onChange={(e) => setResultDate(e.target.value)}
-                    />
-                  </label>
-                  {resultDate &&
-                    results &&
-                    !loadingResults &&
-                    !results.ejecucion && (
-                      <span className="fecha-sin-busqueda" role="status">
-                        Ese día no hubo búsqueda.
-                      </span>
-                    )}
-                  <button
-                    className="button secondary"
-                    onClick={cargarResultados}
-                  >
-                    <RefreshCw size={15} />
-                    Recargar lista
-                  </button>
-                  <Ayuda etiqueta="Recargar lista">
-                    Vuelve a leer las vacantes de este día desde la base. No
-                    busca vacantes nuevas ni vuelve a comprobar los enlaces: eso
-                    lo hacen las búsquedas de cada día.
-                  </Ayuda>
-                </div>
-              </div>
-              {results?.ejecucion && (
-                <div className="results-date">
-                  {sesion.demo ? "Captura simulada" : "Captura del"}{" "}
-                  {fecha(results.ejecucion.fecha)}
-                  <span>·</span>Solo se copian enlaces con comprobación vigente
-                </div>
-              )}
-              {!loadingResults && !errorResultados && shown.length > 0 && (
-                <ListaVacantes vacantes={shown} />
-              )}
-              {loadingResults && (
-                <p role="status" className="helper">
-                  Consultando vacantes…
-                </p>
-              )}
-              {/* Auditoría H1: un fallo no se confunde con «no hay vacantes». */}
-              {!loadingResults && errorResultados && (
-                <Empty
-                  icon={BriefcaseBusiness}
-                  title="No se pudieron cargar las vacantes"
-                  texto="El panel no recibió respuesta del servidor. Revisa tu conexión y vuelve a intentarlo; tu configuración no cambió."
-                  action={cargarResultados}
-                  actionIcon={RefreshCw}
-                  label="Reintentar"
-                />
-              )}
-              {!loadingResults && !errorResultados && !shown.length && (
-                <Empty
-                  icon={BriefcaseBusiness}
-                  {...vacioVacantes(estado, results)}
-                />
-              )}
-            </>
+            <SeccionVacantes
+              sesion={sesion}
+              estado={estado}
+              clientes={clientes}
+              selectedClient={selectedClient}
+              setSelectedClient={setSelectedClient}
+              resultDate={resultDate}
+              setResultDate={setResultDate}
+              diaResultados={diaResultados}
+              results={results}
+              shown={shown}
+              loadingResults={loadingResults}
+              errorResultados={errorResultados}
+              cargarResultados={cargarResultados}
+              search={search}
+              setSearch={setSearch}
+              busy={busy}
+              paraCopiar={paraCopiar}
+              diaAnterior={diaAnterior}
+              cuantasWhats={cuantasWhats}
+              setCuantasWhats={setCuantasWhats}
+              botonWhatsApp={botonWhatsApp}
+              abriendoWhatsApp={abriendoWhatsApp}
+              abrirWhatsApp={abrirWhatsApp}
+              csvFecha={csvFecha}
+              setCsvFecha={setCsvFecha}
+              csvTodo={csvTodo}
+              setCsvTodo={setCsvTodo}
+              csvCliente={csvCliente}
+              setCsvCliente={setCsvCliente}
+              descargandoBase={descargandoBase}
+              descargarBase={descargarBase}
+            />
           )}
           {tab === "Por confirmar" && (
             <PorConfirmar
