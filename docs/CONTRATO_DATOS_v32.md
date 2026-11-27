@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v32: más vacantes y menos «por confirmar»
 
 **Fecha:** 16 de noviembre de 2026 (después de la búsqueda de las 7:38: 37 de 120, con el país como el mayor corte y

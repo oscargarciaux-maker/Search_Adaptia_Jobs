@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Rescate por persona hasta 5 vacantes — v11
 
 Revisión del 12 de noviembre de 2026 (decisiones de Oscar). Amplía v9. Sin SQL nuevo.

@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v27: solo la ubicación y el idioma descartan
 
 **Fecha:** 16 de noviembre de 2026. **Reemplaza:** las reglas de descarte por perfil de

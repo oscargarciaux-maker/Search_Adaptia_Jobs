@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v34: «Por confirmar» rápido y con los datos del aviso
 
 **Fecha:** 16 de noviembre de 2026. **SQL:** 018, aditiva (una columna). **Sin IA.**

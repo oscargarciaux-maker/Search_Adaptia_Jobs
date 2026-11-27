@@ -37,6 +37,7 @@ Instalación privada, Docker, configuración y guía detallada: [Panel de contro
 
 | Para quién / tarea | Documento vigente |
 |---|---|
+| **Reglas vigentes del proyecto, por tema (fuente principal)** | [Contrato vigente](docs/CONTRATO_VIGENTE.md) |
 | Guardar y consultar accesos, distinguir claves y compartirlos con el propietario | [Credenciales y accesos](docs/CREDENCIALES_Y_ACCESOS.md) |
 | Operador: clientes, filtros, cupos y vacantes | [Manual del cliente](docs/GUIA_CLIENTE.md) |
 | Administrador: instalar o actualizar sin perder datos | [Instalación](docs/INSTALACION.md) |

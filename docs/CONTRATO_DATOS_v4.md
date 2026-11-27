@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Consulta operativa v4: selección e información vigente
 
 Extensión aditiva. No cambia columnas, estados ni snapshots de `ofertas` v1 o `entregas_diarias`.

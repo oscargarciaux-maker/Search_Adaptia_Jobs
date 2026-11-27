@@ -24,7 +24,7 @@ código y probadas.
 | 10:15 a. m. | Se preparan los mensajes de WhatsApp de cada cliente. | En «Mensajes», «Abrir en WhatsApp», revisar y enviar. |
 | Cuando quieras | | Mirar el Resumen, decidir «Por confirmar» (un par de minutos) y descargar los CSV. |
 | Domingos 5:41 a. m. | Copia de seguridad cifrada de la base. | Nada. |
-| Una vez al mes | | Actualizar las tasas de cambio de los salarios: `python -m buscador.tasas --actualizar` y subir el cambio (o pedírselo a la IA). Con tasas de más de 120 días, los salarios en otra moneda dejan de descartar. |
+| Una vez al mes | | Actualizar las tasas de cambio de los salarios: `python -m buscador.tasas --actualizar` y subir el cambio (o pedírselo a la IA). Con tasas de más de 120 días, los salarios en otra moneda dejan de compararse (el salario solo deja etiqueta). |
 
 ## 3. El panel, pantalla por pantalla
 
@@ -47,7 +47,8 @@ derecha, el botón con el sol o la luna cambia entre modo claro y oscuro (por de
   - prioridades: sectores y palabras que solo ordenan;
   - «Este perfil NO acepta…»: salario menor (comparado en cualquier moneda), palabras o tipo de contrato.
 
-  Un cliente marcado **«Comunidad»** (el grupo de WhatsApp) recibe después de los reales, con lo que sobre del techo.
+  Un cliente marcado **«Comunidad»** (el grupo de WhatsApp) recibe después de los reales, con lo que sobre del techo
+  y hasta su meta.
 - **Cargos y metas.** Aquí se define el **techo del día** (120 por defecto), que protege los consumos. Cada cargo
   tiene una lista de «Nombres del cargo». En «Opciones avanzadas» están las funciones del cargo (con «Proponer
   funciones»), los cargos cercanos y los términos excluidos.
@@ -68,43 +69,17 @@ derecha, el botón con el sol o la luna cambia entre modo claro y oscuro (por de
 
 ## 4. Cómo se decide qué vacante llega a quién
 
-1. **El cargo.** El título coincide con los nombres del cargo, o es genérico («Especialista», «Consultor») y la
-   descripción nombra el cargo. Si solo coinciden las funciones, va a «Por confirmar»; nunca entra sola.
-   - Desde el 26 nov (contrato v49) también se leen las funciones del aviso. Si el título coincide pero la
-     descripción no trae ninguna función del cargo, llega al final con la etiqueta «Funciones por confirmar». Si
-     además parece otro oficio («QA Manufacturing Analyst»), va a «Por confirmar».
-   - Los nombres hermanos en español del cargo (el mismo oficio con otro nombre: «Jefe de producto» para Product
-     Manager, «Ingeniero de pruebas» para QA) se buscan y se reconocen solos (contrato v50), con ese mismo control
-     de funciones. Los oficios vecinos siguen como sugerencias. En el diálogo del cargo
-     están en «En español, se usan solos»; tocar uno lo deja de usar.
-2. **La ubicación.**
-   - Remota: abierta a su país, al mundo o a un país donde puede trabajar legalmente. Si el aviso nombra un país,
-     manda ese país (contrato v49). Una remota que solo dice un horario, sin país, llega solo a quien marcó ese
-     horario.
-   - Presencial o híbrida: en una de sus ciudades (o a 50 km). Sin ciudad escrita en el perfil no llegan (contrato
-     v49).
-   - Si no se sabe, puede ir a «Por confirmar» (hasta 10 al día, primero las de quien va corto): un país desconocido
-     nunca completa la meta.
-3. **Idioma y fecha (descartan):**
-   - el idioma del aviso, solo español o inglés según el perfil;
-   - la publicación, de hasta 30 días.
-   - **Desde el 16 nov (contrato v27) solo esto y la ubicación descartan.**
-4. **Lo demás del perfil solo ordena y deja una etiqueta.** Las que encajan en todo van primero, y las demás llegan
-   después con lo que no cumplen («Pide 7 años», «Pide inglés C1», «Salario menor al que pide»…):
-   - años y nivel;
-   - inglés exigido;
-   - restricciones;
-   - la antigüedad que pidió el perfil.
-5. **Enlace comprobado.** Solo se entregan enlaces donde de verdad se postula y que siguen abiertos.
-6. **Cuántas.** Primero se cubren las metas de los clientes reales, sin pasar el techo. Después Comunidad recibe con lo
-   que sobre. Entre varias candidatas ganan las que coinciden con las prioridades, con variedad de empresas, países y
-   fuentes.
-7. **Si alguien no llega a su meta.** Se le completa hasta su meta diaria (contrato v49; antes hasta 5) con vacantes
-   de días anteriores y de toda la bodega que esa persona nunca recibió, sin pasar el techo del día. Los cargos
-   cercanos ya entran directo. Como último recurso: remotas abiertas a su
-   país, más de la misma empresa, vacantes de días
-   anteriores que esa persona nunca recibió y, como último recurso, posts de LinkedIn etiquetados «Post». Nunca se
-   repite una vacante a la misma persona.
+Resumen corto; la regla exacta de cada punto está en [CONTRATO_VIGENTE.md](CONTRATO_VIGENTE.md), que es la fuente.
+
+1. **El cargo:** el título (o un título genérico cuya descripción nombra el cargo) y, desde v49, las funciones del
+   aviso. Sin funciones del cargo llega al final con «Funciones por confirmar»; si parece otro oficio, o solo coinciden
+   las funciones, va a «Por confirmar».
+2. **Solo descartan la ubicación, el idioma y las reglas del sistema** (abierta, enlace comprobado, sin repetir, fecha
+   confirmada, 30 días). Si el aviso nombra un país, manda ese país; presencial e híbrida exigen ciudad en el perfil.
+3. **Lo demás solo ordena y deja etiqueta:** años, nivel, inglés exigido, salario, restricciones y antigüedad.
+4. **Cuántas:** primero las metas de los clientes reales sin pasar el techo; después Comunidad, hasta su meta.
+5. **Si alguien no llega a su meta:** se le completa hasta ella con vacantes que nunca recibió (otros días y toda la
+   bodega) y, como último recurso, posts etiquetados «Post». Nunca se repite una vacante a la misma persona.
 
 ## 5. Lo que el sistema no hace (a propósito)
 
@@ -133,8 +108,7 @@ El repositorio está preparado para que una IA lo lea y lo cambie con cuidado.
 **Qué leer primero:**
 - **`CLAUDE.md`**, en la raíz: las reglas vigentes. La IA lo lee sola.
 - **Este documento**, para el panorama.
-- El **contrato de datos** más reciente (`docs/CONTRATO_DATOS_v25.md` y los anteriores que cite): qué significa cada
-  campo y cada regla.
+- **`docs/CONTRATO_VIGENTE.md`**: la regla vigente de cada tema (los `CONTRATO_DATOS_vNN.md` son históricos).
 
 **Cómo pedirlo bien:**
 - Una cosa por vez y en lenguaje normal. Ejemplos: «que los perfiles puedan excluir empresas concretas», «añade el
@@ -152,7 +126,8 @@ El repositorio está preparado para que una IA lo lea y lo cambie con cuidado.
 **Reglas que la IA debe respetar** (están en `CLAUDE.md`; recuérdaselas si duda):
 - Nunca poner claves, correos, IDs ni datos de clientes en el repositorio. Las claves van en los secretos de GitHub o
   del alojamiento.
-- Un campo nuevo se escribe primero en un contrato nuevo y después en el código.
+- Una regla o un campo nuevo se escribe primero en `docs/CONTRATO_VIGENTE.md` (y una línea en el historial) y
+  después en el código. Ya no se crean contratos `CONTRATO_DATOS_vNN.md`.
 - No modificar SQL ya instalado: se añade una migración nueva.
 - Antes de subir: `python -m pytest -q`. Si cambia el panel, también el formato, la compilación y las pruebas de
   navegador (Playwright), incluida la de contraste en claro y oscuro.
@@ -174,12 +149,7 @@ El repositorio está preparado para que una IA lo lea y lo cambie con cuidado.
 
 - Uso diario: [GUIA_CLIENTE.md](GUIA_CLIENTE.md) y [PANEL_CONTROL.md](PANEL_CONTROL.md).
 - Qué cambió y cuándo: [HISTORIAL_CAMBIOS.md](HISTORIAL_CAMBIOS.md).
-- Reglas de los datos: [CONTRATO_DATOS_v50.md](CONTRATO_DATOS_v50.md) (más vacantes en español: fichas de LinkedIn
-  al cargo, repaso de Indeed, nombres hermanos), [CONTRATO_DATOS_v49.md](CONTRATO_DATOS_v49.md) (ubicación sin fugas,
-  funciones, completar hasta la meta y panel de un botón), [CONTRATO_DATOS_v27.md](CONTRATO_DATOS_v27.md) (qué descarta y qué solo ordena; «Aplicar
-  hoy»), [v25](CONTRATO_DATOS_v25.md) (funciones), [v24](CONTRATO_DATOS_v24.md)
-  (búsqueda por perfil), [v23](CONTRATO_DATOS_v23.md) (ubicaciones del mundo), [v22](CONTRATO_DATOS_v22.md) (filtros
-  del perfil) y [v21](CONTRATO_DATOS_v21.md) (metas y techo).
+- Reglas vigentes: [CONTRATO_VIGENTE.md](CONTRATO_VIGENTE.md). Los `CONTRATO_DATOS_vNN.md` quedan como historia.
 - Entrega y traspaso al Supabase del cliente: [ENTREGA_AL_CLIENTE.md](ENTREGA_AL_CLIENTE.md) e
   [INSTALACION_AUTOMATICA.md](INSTALACION_AUTOMATICA.md).
 - Si algo falla: [OPERACION_Y_RECUPERACION.md](OPERACION_Y_RECUPERACION.md).

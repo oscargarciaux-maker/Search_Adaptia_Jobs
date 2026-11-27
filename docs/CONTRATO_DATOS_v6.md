@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Control por cargo y cliente — v6
 
 El operador administra clientes, cargos, filtros y cupos desde una interfaz privada. El presupuesto diario se asigna

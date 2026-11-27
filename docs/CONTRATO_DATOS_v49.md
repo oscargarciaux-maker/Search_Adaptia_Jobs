@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v49 — ubicación sin fugas, afinidad por funciones, más vacantes para quien va corto y panel simple (26 nov 2026)
 
 Pedido de Oscar tras el reporte del cliente: hay personas que piden vacantes en español y no reciben ninguna; llegan

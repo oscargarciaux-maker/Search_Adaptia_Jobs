@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos de ofertas — Adaptia Jobs (v1)
 
 **Para:** quien construye el scraper y cualquier agente futuro · **De:** Adaptia Jobs · **Fecha:** 28 de octubre de 2026

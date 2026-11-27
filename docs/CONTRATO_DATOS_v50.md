@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v50 — más vacantes en español, para cualquier país de LATAM y España (26 nov 2026)
 
 Pedido de Oscar: las vacantes en español llegan muy pocas. Sin IA y sin SQL nuevo. Amplía v49; donde v44 y v49 decían

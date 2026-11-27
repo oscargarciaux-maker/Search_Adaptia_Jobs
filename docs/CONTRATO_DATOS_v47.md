@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v47 — «Buscar ahora» para quien falta: corta y sin repetir (18 nov 2026)
 
 Decisión de Oscar: «Me gustaría que sea corta. Sin embargo, lo más prioritario es que lleguen las vacantes necesarias

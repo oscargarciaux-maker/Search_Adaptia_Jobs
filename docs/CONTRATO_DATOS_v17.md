@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Aprendizaje autónomo de ubicaciones, solo con código — v17
 
 Revisión del 13 de noviembre de 2026 (decisión de Oscar: el sistema debe aprender y mantenerse **sin IA ni Claude**).

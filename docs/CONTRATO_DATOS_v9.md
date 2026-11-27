@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Mínimo por perfil, ampliación marcada y vigencia para seleccionar — v9
 
 Revisión del 12 de noviembre de 2026. Amplía v8 (perfil) y v3 (comprobación de enlaces). No requiere SQL nuevo.

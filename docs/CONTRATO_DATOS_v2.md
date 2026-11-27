@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de catálogo y frescura v2
 
 Extensión compatible del contrato v1. La entrega histórica `ofertas` conserva sus columnas v1. El catálogo persistente

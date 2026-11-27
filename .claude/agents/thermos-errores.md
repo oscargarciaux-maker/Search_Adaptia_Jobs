@@ -37,7 +37,8 @@ y vulnerabilidades. Nada debe escaparse.
   - no se borra lo entregado, el historial, las reservas ni las colas para «arreglar» un error;
   - la credencial de servicio nunca llega al navegador;
   - solo enlaces donde se postula de verdad (nunca agregadores);
-  - un campo nuevo de la entrega va primero a un contrato (`docs/CONTRATO_DATOS_vNN.md`).
+  - un campo o una regla nueva va primero a `docs/CONTRATO_VIGENTE.md` (más una línea en
+    `docs/HISTORIAL_CAMBIOS.md`); ya no se crean `docs/CONTRATO_DATOS_vNN.md`.
 - **Cambios que rompen a propósito:** si el riesgo es justo lo que la rama busca (por ejemplo quitar una guarda) y
   el alcance está acotado, no lo informes; sí hazlo si parece que el autor no vio todas las consecuencias.
 

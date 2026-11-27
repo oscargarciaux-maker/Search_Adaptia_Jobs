@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v36: nadie se queda bajo el mínimo si la bodega tiene vacantes para esa persona
 
 **Fecha:** 17 de noviembre de 2026. **Sin SQL ni IA.** Caso que lo motivó: Danna (vive en Chicago, EE. UU.) recibió

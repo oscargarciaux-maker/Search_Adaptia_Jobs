@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v43: «Confirmar y aplicar», búsquedas que no se caen, Comunidad hasta su meta y vacantes compartidas
 
 **Fecha:** 18 de noviembre de 2026. **SQL 019.** Sin IA. Decisiones de Oscar del 18 nov.

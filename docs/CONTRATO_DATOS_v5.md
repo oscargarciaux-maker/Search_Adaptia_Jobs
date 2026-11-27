@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Identidad y entrega única por vacante v5
 
 Por decisión del propietario, una oportunidad en varios portales cuenta una sola vez y `ofertas` pasa a contener

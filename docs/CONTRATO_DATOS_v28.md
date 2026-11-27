@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v28: posts con más fuerza
 
 **Fecha:** 16 de noviembre de 2026. **Amplía:** [v11](CONTRATO_DATOS_v11.md) (posts para perfiles bajo 5) y

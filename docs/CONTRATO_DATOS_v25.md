@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v25 — que no se pierdan vacantes por el título (huella de funciones)
 
 Vigente desde el 15 nov 2026 (paso 6b de los ajustes de la reunión con el cliente). Amplía v24. Sin columnas nuevas en

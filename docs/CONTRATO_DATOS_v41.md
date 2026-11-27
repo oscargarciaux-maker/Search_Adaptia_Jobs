@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v41: Indeed comprobado por su búsqueda y comprobación repartida entre fuentes
 
 **Fecha:** 17 de noviembre de 2026. **Sin SQL ni IA.** Aprobado por Oscar tras la auditoría de los 21 perfiles.

@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v24 — búsqueda guiada por cada perfil y ciudades con mudanza
 
 Vigente desde el 15 nov 2026 (paso 6a de los ajustes de la reunión con el cliente). Amplía v23. Sin columnas nuevas en

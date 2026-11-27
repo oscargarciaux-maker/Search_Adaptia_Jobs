@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Idioma por evidencia y todos los países del mundo — v15
 
 Revisión del 13 de noviembre de 2026 (pedido de Oscar). Amplía v12–v14. Sin SQL nuevo. Primera de tres etapas: después

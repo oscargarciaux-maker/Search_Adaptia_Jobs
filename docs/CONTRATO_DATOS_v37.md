@@ -1,3 +1,5 @@
+> Histórico. Vigente: docs/CONTRATO_VIGENTE.md
+
 # Contrato de datos v37: más vacantes para quien va corto y cobertura por persona
 
 **Fecha:** 17 de noviembre de 2026. **Sin SQL ni IA.** Viene del documento «Ampliación: cobertura de cargos actuales y
