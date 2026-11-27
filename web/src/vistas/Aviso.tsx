@@ -1,4 +1,4 @@
-// El aviso que aparece abajo tras una acción (dividido de main.tsx), con su acción opcional.
+// El aviso que aparece abajo tras una acción, con su acción opcional.
 import { Check, ShieldCheck, X } from "lucide-react";
 
 export function Aviso({

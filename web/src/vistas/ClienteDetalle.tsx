@@ -1,4 +1,4 @@
-// Detalle de un cliente desde el Resumen (dividido de main.tsx).
+// Detalle de un cliente desde el Resumen.
 import React, { useEffect, useState } from "react";
 import {
   BriefcaseBusiness,
@@ -17,7 +17,7 @@ import type {
 } from "../types";
 import { Dialog, REGIONES, diaCorto, fecha, nombrePais } from "../comunes";
 import { TarjetaPorConfirmar } from "./TarjetaPorConfirmar";
-import type { ResumenCliente } from "./Resumen";
+import type { ResumenCliente } from "./TarjetasResumen";
 
 // Paso 8 (variante B): el detalle de un cliente desde el Resumen, con sus 7 días, lo que más le corta, su CSV y sus
 // «por confirmar» para decidir ahí mismo.

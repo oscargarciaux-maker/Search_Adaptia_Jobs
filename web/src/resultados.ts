@@ -1,4 +1,4 @@
-// Las vacantes de un cliente y un día en «Vacantes» (dividido de main.tsx): se piden solo en esa sección, la
+// Las vacantes de un cliente y un día en «Vacantes»: se piden solo en esa sección, la
 // respuesta vieja no pisa a la nueva y, al llegar desde «Tomar vacantes», el foco va a «Copiar WhatsApp».
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api";

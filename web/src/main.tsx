@@ -24,12 +24,13 @@ import { CargosYMetas } from "./vistas/CargosYMetas";
 import { Clientes } from "./vistas/Clientes";
 import { SeccionVacantes } from "./vistas/SeccionVacantes";
 import { useDescargaCsv } from "./descargaCsv";
-import { useWhatsApp, DialogoWhatsApp } from "./vistas/DialogoWhatsApp";
+import { DialogoWhatsApp } from "./vistas/DialogoWhatsApp";
+import { useWhatsApp } from "./whatsapp";
 import { EliminarCargoDialog, ArchivarDialog } from "./vistas/DialogosArchivo";
 import { InicioSesion } from "./vistas/InicioSesion";
 import { Cabecera } from "./vistas/Cabecera";
 import { useConfiguracion } from "./configuracion";
-import { SeccionResumen } from "./vistas/SeccionResumen";
+import { Resumen } from "./vistas/Resumen";
 import { useResultados } from "./resultados";
 import { useContactos } from "./contactos";
 import { Protector } from "./vistas/Protector";
@@ -335,7 +336,7 @@ function App() {
             recargarResumen={recargarResumen}
           />
           {tab === "Resumen" && (
-            <SeccionResumen
+            <Resumen
               sesion={sesion}
               estado={estado}
               draft={draft}

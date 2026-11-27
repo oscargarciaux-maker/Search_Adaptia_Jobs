@@ -1,4 +1,4 @@
-// Historial del panel (dividido de main.tsx): la última búsqueda, las anteriores, la cobertura y las reglas
+// Historial del panel: la última búsqueda, las anteriores, la cobertura y las reglas
 // aprendidas, y el aviso de una búsqueda que falló o quedó corta.
 import { Clock3, RefreshCw } from "lucide-react";
 import { api } from "../api";

@@ -95,6 +95,8 @@ export function conMetas(cfg: Configuracion) {
 // Contrato v30: las filas de ubicación. Un perfil anterior se muestra en filas con el mismo resultado (como
 // `Perfil.filas` en panel/modelos.py). El servidor manda las filas y recalcula los demás campos al guardar.
 const MODOS = ["remoto", "hibrido", "presencial"];
+export type Metas = ReturnType<typeof conMetas>;
+
 export function filasDe(p: Perfil): Ubicacion[] {
   if (p.ubicaciones?.length) return p.ubicaciones;
   const filas: Ubicacion[] = [

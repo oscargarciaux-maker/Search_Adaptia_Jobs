@@ -1,4 +1,4 @@
-// Descarga del CSV (dividido de main.tsx): general o de un cliente, del día elegido o de toda la base.
+// Descarga del CSV: general o de un cliente, del día elegido o de toda la base.
 import { useState } from "react";
 import type { Cliente } from "./types";
 import { hoyBogota } from "./comunes";

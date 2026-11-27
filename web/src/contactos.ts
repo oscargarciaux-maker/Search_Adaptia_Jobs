@@ -1,10 +1,9 @@
-// Los WhatsApp de los clientes (dividido de main.tsx).
+// Los WhatsApp de los clientes.
 import { useState } from "react";
 import { api } from "./api";
 import type { Contacto } from "./types";
 
 export function useContactos(notify: (s: string, error?: boolean) => void) {
-  // Sesión de prueba (17 nov): quién inició sesión, visible arriba.
   // Contrato v30: los WhatsApp se cargan con el panel para que el formulario del cliente abra sin esperar.
   const [contactos, setContactos] = useState<Record<string, Contacto>>({});
   function cargarContactos() {

@@ -1,4 +1,4 @@
-// «Cargos y metas» (dividido de main.tsx): el cupo diario, una tarjeta por cargo con sus cifras y los archivados.
+// «Cargos y metas»: el cupo diario, una tarjeta por cargo con sus cifras y los archivados.
 import { useState } from "react";
 import {
   Archive,
@@ -19,8 +19,9 @@ import type {
   EstimacionCargo,
 } from "../types";
 import { Ayuda, colores, hoyBogota } from "../comunes";
-import type { conMetas } from "../perfiles";
+import type { Metas } from "../perfiles";
 import type { EstadoPrevia, useVistaPrevia } from "../vistaPrevia";
+import { type Archivo } from "./DialogosArchivo";
 
 export function CargosYMetas({
   draft,
@@ -38,19 +39,15 @@ export function CargosYMetas({
 }: {
   draft: Configuracion;
   cambiar: (v: Configuracion) => void;
-  metas: ReturnType<typeof conMetas>;
+  metas: Metas;
   excede: boolean;
-  cargos: ReturnType<typeof conMetas>["cargos"];
+  cargos: Metas["cargos"];
   clientCount: (id: string) => number;
   previaCargos: ReturnType<typeof useVistaPrevia>;
   runs: Ejecucion[];
   setEditCargo: (c: Cargo | null) => void;
   setBorrarCargo: (c: Cargo) => void;
-  setArchive: (a: {
-    tipo: "cliente" | "cargo";
-    id: string;
-    nombre: string;
-  }) => void;
+  setArchive: (a: Archivo) => void;
   setModal: (m: "cargo" | "archivo") => void;
 }) {
   return (

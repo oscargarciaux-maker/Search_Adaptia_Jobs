@@ -1,8 +1,8 @@
-// Importar clientes desde un CSV y eliminar del todo un cliente archivado (dividido de main.tsx).
+// Importar clientes desde un CSV y eliminar del todo un cliente archivado.
 import { useEffect, useState } from "react";
 import { Upload } from "lucide-react";
 import { api } from "../api";
-import type { Cliente, EstadoConfig, PreviaImportacion } from "../types";
+import type { EstadoConfig, PreviaImportacion } from "../types";
 import { Dialog, nombrePais } from "../comunes";
 
 // Importar clientes desde un CSV (15 nov): vista previa sin guardar y luego importación todo o nada. Los clientes
@@ -292,79 +292,6 @@ export function ImportarClientes({
             : previa
               ? `Importar ${previa.clientes} ${previa.clientes === 1 ? "cliente" : "clientes"}`
               : "Importar"}
-        </button>
-      </div>
-    </Dialog>
-  );
-}
-
-// «Eliminar definitivamente» un cliente archivado (15 nov): pide escribir BORRAR.
-export function BorrarClienteDialog({
-  cliente,
-  revision,
-  dirty,
-  notify,
-  onListo,
-  onClose,
-}: {
-  cliente: Cliente;
-  revision: number;
-  dirty: boolean;
-  notify: (s: string, error?: boolean) => void;
-  onListo: (estado: EstadoConfig) => void;
-  onClose: () => void;
-}) {
-  const [texto, setTexto] = useState("");
-  const [ocupado, setOcupado] = useState(false);
-  return (
-    <Dialog titulo={`Eliminar «${cliente.nombre}»`} onClose={onClose}>
-      <p className="dialog-copy">
-        Se quita de la configuración junto con sus perfiles, su WhatsApp y sus
-        mensajes preparados. No se puede deshacer. Las vacantes que ya recibió y
-        las configuraciones anteriores se conservan en el historial.
-      </p>
-      {dirty && (
-        <p className="importar-error" role="alert">
-          Tienes cambios sin aplicar. Pulsa «Aplicar cambios» antes de eliminar.
-        </p>
-      )}
-      <div className="field">
-        <label htmlFor="borrar-confirmar">Escribe BORRAR para confirmar</label>
-        <input
-          id="borrar-confirmar"
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          autoComplete="off"
-        />
-      </div>
-      <div className="dialog-actions">
-        <button type="button" className="button secondary" onClick={onClose}>
-          Cancelar
-        </button>
-        <button
-          type="button"
-          className="button danger-button"
-          disabled={dirty || ocupado || texto.trim().toUpperCase() !== "BORRAR"}
-          onClick={async () => {
-            setOcupado(true);
-            try {
-              const r = await api<{ estado: EstadoConfig }>(
-                `/clientes/${cliente.id}/borrar`,
-                {
-                  method: "POST",
-                  body: JSON.stringify({ revision, confirmacion: texto }),
-                },
-              );
-              onListo(r.estado);
-              notify(`«${cliente.nombre}» se eliminó definitivamente.`);
-            } catch (e) {
-              notify((e as Error).message, true);
-            } finally {
-              setOcupado(false);
-            }
-          }}
-        >
-          Eliminar definitivamente
         </button>
       </div>
     </Dialog>

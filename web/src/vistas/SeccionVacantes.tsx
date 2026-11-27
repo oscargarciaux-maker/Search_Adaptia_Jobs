@@ -1,4 +1,4 @@
-// «Vacantes» (dividido de main.tsx): elegir el cliente, copiar su WhatsApp, descargar el CSV y ver la lista del día.
+// «Vacantes»: elegir el cliente, copiar su WhatsApp, descargar el CSV y ver la lista del día.
 import React from "react";
 import {
   ArrowDownToLine,

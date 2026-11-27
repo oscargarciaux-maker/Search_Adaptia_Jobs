@@ -1,4 +1,4 @@
-// Cabecera de cada sección (dividido de main.tsx): aviso de demostración, volver, título y su explicación,
+// Cabecera de cada sección: aviso de demostración, volver, título y su explicación,
 // «Aplicar cambios», «Buscar ahora», tema claro u oscuro, cerrar sesión y por qué no se aplicó lo guardado.
 import { useEffect, useState } from "react";
 import {
@@ -39,7 +39,7 @@ export function Cabecera({
   busy: boolean;
   noAplica: string;
   pendienteDeAplicar: boolean;
-  aplicar: () => void;
+  aplicar: () => Promise<unknown>;
   aplicarPendientes: () => Promise<boolean>;
   notify: (s: string, error?: boolean) => void;
   recargarResumen: () => void;

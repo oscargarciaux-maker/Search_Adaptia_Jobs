@@ -1,4 +1,4 @@
-// «Clientes» (dividido de main.tsx): buscador, importar, una tarjeta por cliente y los archivados.
+// «Clientes»: buscador, importar, una tarjeta por cliente y los archivados.
 import {
   Archive,
   ArrowUpRight,
@@ -20,10 +20,17 @@ import type {
   Perfil,
   Sesion,
 } from "../types";
-import { Empty, Plegable, modos, nombrePais } from "../comunes";
+import {
+  Empty,
+  Plegable,
+  modos,
+  nombrePais,
+  DistintivoComunidad,
+} from "../comunes";
 import { perfilSinCiudad } from "../perfiles";
-import { DistintivoComunidad } from "./Resumen";
-import { BorrarClienteDialog, ImportarClientes } from "./ImportarClientes";
+
+import { ImportarClientes } from "./ImportarClientes";
+import { BorrarClienteDialog, type Archivo } from "./DialogosArchivo";
 
 export function Clientes({
   draft,
@@ -64,11 +71,7 @@ export function Clientes({
   notify: (s: string, error?: boolean) => void;
   setEditCliente: (c: Cliente | null) => void;
   setSelectedClient: (id: string) => void;
-  setArchive: (a: {
-    tipo: "cliente" | "cargo";
-    id: string;
-    nombre: string;
-  }) => void;
+  setArchive: (a: Archivo) => void;
   setModal: (m: "cliente" | "archivo") => void;
   go: (t: string) => void;
 }) {

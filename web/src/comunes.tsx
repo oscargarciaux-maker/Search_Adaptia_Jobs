@@ -1,6 +1,6 @@
 // Piezas compartidas del panel (lista grande, PR 3): ayudas, diálogos, vacíos, países y formatos.
 import React, { useEffect, useId, useRef, useState } from "react";
-import { ChevronDown, Info, Plus, X } from "lucide-react";
+import { ChevronDown, Info, Plus, X, Users } from "lucide-react";
 
 export const fecha = (v: string) =>
   new Date(v + "T12:00:00").toLocaleDateString("es-CO", {
@@ -468,4 +468,17 @@ export function origenMensaje(b: { de_hoy: number; anteriores: number }) {
   return b.de_hoy
     ? `${b.de_hoy} de hoy y ${b.anteriores} de días anteriores`
     : "de días anteriores";
+}
+
+// Contrato v27: el cliente «Comunidad» lleva un distintivo discreto para reconocerlo sin que llame toda la atención.
+export function DistintivoComunidad() {
+  return (
+    <span
+      className="distintivo-comunidad"
+      title="Grupo de WhatsApp: recibe solo lo que sobra del cupo diario, después de los clientes"
+    >
+      <Users size={11} aria-hidden="true" />
+      Comunidad
+    </span>
+  );
 }

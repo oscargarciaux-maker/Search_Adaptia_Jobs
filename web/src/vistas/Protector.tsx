@@ -1,7 +1,7 @@
-import React from "react";
-
 // Reunión del 14 nov: un fallo al pintar dejaba la pantalla en blanco y se perdía lo escrito. Ahora se muestra qué
 // pasó; el borrador del cliente sigue en este navegador y se ofrece al volver a abrir el formulario.
+import React from "react";
+
 export class Protector extends React.Component<
   { children: React.ReactNode },
   { error: Error | null }

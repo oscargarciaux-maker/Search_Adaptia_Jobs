@@ -1,4 +1,4 @@
-// Inicio de sesión del panel (dividido de main.tsx).
+// Inicio de sesión del panel.
 import { ArrowRight, Loader2, ShieldCheck } from "lucide-react";
 import { api } from "../api";
 

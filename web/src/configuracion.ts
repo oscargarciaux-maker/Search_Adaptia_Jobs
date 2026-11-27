@@ -1,4 +1,4 @@
-// La configuración del panel (dividido de main.tsx): lo guardado, el borrador que se edita, si hay cambios sin
+// La configuración del panel: lo guardado, el borrador que se edita, si hay cambios sin
 // aplicar y «Aplicar cambios», que guarda y deja en uso.
 import { useMemo, useState } from "react";
 import { api } from "./api";

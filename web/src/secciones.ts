@@ -1,5 +1,4 @@
-// Las secciones del panel y su dirección (#clientes…) (dividido de main.tsx).
-// Contrato v22: prioridades que solo ordenan y restricciones que descartan con evidencia clara.
+// Las secciones del panel y su dirección (#clientes…).
 // Sección 5 (13 nov): sin menú propio; cada sección tiene su dirección y se abre desde las tarjetas del resumen.
 export const secciones: Record<string, string> = {
   Resumen: "",
