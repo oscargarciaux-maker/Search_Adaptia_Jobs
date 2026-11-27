@@ -233,7 +233,8 @@ para evaluar: copia diaria y antes de cambios, con recuperación probada; el adm
 ## 8. Respaldo completo y restauración comprobable
 
 El instalador produce antes de cambios un corte cifrado de las tablas del proyecto, secuencias y `trabajo/`; la acción
-debe subirlo correctamente antes de aplicar SQL. Esos artefactos duran 14 días. Descargar cortes a almacenamiento privado
+debe subirlo correctamente antes de aplicar SQL. Esos artefactos duran 14 días (todavía no van a Storage; los
+semanales sí, ver abajo). Descargar cortes a almacenamiento privado
 duradero según la política acordada, guardando la clave de cifrado fuera de GitHub. No incluye Auth, Storage ni otros
 esquemas de Supabase. No sustituye una copia periódica ni la supervisión independiente del servicio.
 
@@ -246,6 +247,27 @@ Un respaldo de `trabajo/` no contiene la base. Una exportación de `ofertas` no 
 Necesita **ambas piezas del mismo corte** y, si se usa, KV/historial del operador. Consultar también las opciones vigentes
 [de respaldo de Supabase](https://supabase.com/docs/guides/platform/backups); no asumir que el plan gratis conserva una
 copia recuperable para el cliente.
+
+### Respaldos guardados en Supabase Storage (desde el 27 nov)
+
+Los respaldos semanales (`respaldo.yml`, domingos) y los de «antes de limpiar» están en el bucket **privado**
+`respaldos` de Supabase Storage del mismo proyecto: carpetas `semanal/AAAA-MM-DD_<ejecución>/` y
+`antes-de-limpiar/…`, cada una con trozos `parte-000`, `parte-001`… y un `manifiesto.json`. Una carpeta sin manifiesto
+es una subida a medias: no sirve. Quedan las últimas 4 semanales; las de «antes de limpiar» no se borran solas.
+También se ven en el panel de Supabase: Storage > Buckets > `respaldos` (no hacer público nunca ese bucket).
+
+Para recuperar, en un equipo de confianza (no en Actions) con `SUPABASE_URL` y `SUPABASE_SECRET_KEY` del proyecto en el
+entorno, sin escribirlos en la línea de órdenes ni en archivos del repositorio:
+
+```bash
+python -m buscador.almacen_respaldos listar --tipo semanal          # fecha, tamaño y sha256 de cada uno
+python -m buscador.almacen_respaldos bajar --respaldo semanal/2026-11-30_123456789 --salida /ruta/privada/copia.enc
+```
+
+`bajar` reúne los trozos y comprueba el sha256 de cada uno y del total. El `.enc` resultante es el mismo que crea
+`buscador.respaldo.crear`: se restaura con `buscador.respaldo.restaurar` (o con `traspaso.yml`) en un destino aislado
+vacío, con `SUPABASE_BACKUP_KEY`, siguiendo el ensayo de abajo. Si el resumen de la copia semanal avisa de que el
+bucket pasa de 800 MB, decidir entre pasar a Pro o guardar menos semanas antes de llegar al 1 GB del plan gratuito.
 
 ### Corte y respaldo
 

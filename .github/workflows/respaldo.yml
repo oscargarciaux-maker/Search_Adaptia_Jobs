@@ -1,6 +1,7 @@
 name: Copia de seguridad semanal
 
-# Copia cifrada de las tablas del sistema, sus secuencias y la carpeta de trabajo. Se conserva 90 días en Actions.
+# Copia cifrada de las tablas del sistema, sus secuencias y la carpeta de trabajo. Se guarda en el bucket PRIVADO
+# `respaldos` de Supabase Storage (buscador/almacen_respaldos.py): quedan las últimas 4 semanas (27 nov).
 # Complementa (no sustituye) las copias diarias que Supabase incluye en sus planes de pago.
 # Usa SUPABASE_DB_URL y SUPABASE_BACKUP_KEY; sin la clave de cifrado la copia no se puede leer: guardarla aparte.
 # Domingos 5:41 a. m. de Bogotá (10:41 UTC). A mano: Actions > Copia de seguridad semanal > Run workflow.
@@ -42,13 +43,21 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           SUPABASE_BACKUP_KEY: ${{ secrets.SUPABASE_BACKUP_KEY }}
         run: python -m buscador.traspaso --fase respaldo --salida salida --privado privado
-      - name: Conservar la copia 90 días
+      - name: Guardar la copia en Storage privado
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python -m buscador.almacen_respaldos subir --tipo semanal --carpeta privado/respaldos
+      # Red de seguridad TEMPORAL (27 nov): hasta confirmar en real la primera subida a Storage. El repo es público:
+      # 1 día y no 90. Oscar decide quitarla tras una corrida real correcta.
+      - name: Red de seguridad temporal (1 día)
+        if: always()
         uses: actions/upload-artifact@v6
         with:
           name: respaldo-semanal-${{ github.run_id }}
           path: privado/respaldos/*.enc
-          if-no-files-found: error
-          retention-days: 90
+          if-no-files-found: ignore
+          retention-days: 1
       - name: Avisar
         if: always()
         env:
