@@ -142,3 +142,43 @@ def test_reutilizar_no_pasa_de_5_con_remotas_para_un_perfil_presencial(meta_diez
     ejecutor.registrar(repo, {"revision": 1, "configuracion": meta_diez}, hoy())
     filas = _recibidas(repo, meta_diez)
     assert len(filas) == MINIMO_POR_PERFIL and _ampliadas(filas) == MINIMO_POR_PERFIL
+
+
+def test_de_5_a_la_meta_sigue_entrando_lo_que_cumple_el_perfil(meta_diez):
+    from datetime import date, timedelta
+    ayer = (date.fromisoformat(hoy()) - timedelta(days=1)).isoformat()
+    previas = [{"delivery_date": ayer, "role_id": "otro", "vacante_id": v["id"], "match_grade": "exact", "snapshot": v}
+               for v in [_comprobada(10 + n, "Remote - Colombia", True) for n in range(8)]]
+    en_su_ciudad = [_comprobada(n, "Bogotá, Colombia", None) for n in range(3)]
+    repo = _Supabase(previas)  # reutilizar da primero 5 remotas; el rescate, después, las 3 de su ciudad
+    ejecutor.registrar(repo, {"revision": 1, "configuracion": meta_diez}, hoy(), vacantes=en_su_ciudad,
+                       cache_enlaces={})
+    filas = _recibidas(repo, meta_diez)
+    assert _ampliadas(filas) == MINIMO_POR_PERFIL and len(filas) == MINIMO_POR_PERFIL + 3
+
+
+class _ConPasadaAnterior(_Supabase):
+    """Lote de hoy con una ampliada nueva y 5 vacantes que la persona ya recibió en una pasada anterior de hoy."""
+    def __init__(self, lote, perfil_id, ya):
+        super().__init__()
+        self.lote, self.ya = lote, {perfil_id: set(ya)}
+
+    def asignadas_de(self, ejecucion_id):
+        return self.ya
+
+    def pedir(self, metodo, ruta, **op):
+        if ruta == "entregas_diarias" and (op.get("params") or {}).get("delivery_date") == "eq." + hoy():
+            return self.lote
+        return super().pedir(metodo, ruta, **op)
+
+
+def test_lo_de_una_pasada_anterior_de_hoy_cuenta_para_el_tope_de_5(meta_diez):
+    rid = "cargo:" + meta_diez["cargos"][0]["id"]
+    nueva = dict(_comprobada(10, "Remote - Colombia", True), _ampliacion="remota_cercana")
+    lote = [{"role_id": rid, "vacante_id": nueva["id"], "match_grade": "exact", "snapshot": nueva}]
+    repo = _ConPasadaAnterior(lote, meta_diez["perfiles"][0]["id"], [f"antes-{n}" for n in range(5)])
+    ejecutor.registrar(repo, {"revision": 1, "configuracion": meta_diez}, hoy())
+    assert _recibidas(repo, meta_diez) == []  # ya tenía 5 hoy: la ampliada no entra
+    repo = _ConPasadaAnterior(lote, meta_diez["perfiles"][0]["id"], [f"antes-{n}" for n in range(4)])
+    ejecutor.registrar(repo, {"revision": 1, "configuracion": meta_diez}, hoy())
+    assert len(_recibidas(repo, meta_diez)) == 1  # con 4, sí completa la quinta
