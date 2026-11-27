@@ -235,7 +235,8 @@ def main():
             assert 'fastupdate=off' in c.execute("select reloptions from pg_class where relname='catalogo_ids_agrupados'").fetchone()[0]
             plan = c.execute("""explain (format json) select id from public.catalogo_vacantes
                 where nullif(datos->>'duplicada_de','') is not null""").fetchone()[0]
-            assert 'catalogo_duplicada_de' in json.dumps(plan)
+            # 021 añade un índice parcial por id para recorrer estas referencias en orden; cualquiera de los dos evita leer el catálogo.
+            assert 'catalogo_duplicada_de' in json.dumps(plan) or 'catalogo_referencias_explicitas' in json.dumps(plan)
             assert c.execute("""select id from public.catalogo_vacantes
                 where public.adaptia_urls_identidad(datos) @> array[public.adaptia_url_identidad('https://www.linkedin.com/jobs/view/9000000123?trk=otra')]""").fetchall() == [(c.execute("select substr(md5('volumen-123'),1,16)").fetchone()[0],)]
             with c.transaction():
@@ -266,7 +267,7 @@ def main():
             # exactamente el mismo estado que hacerlo todo de una vez.
             de_una_vez = ensayar_estado(c, lambda: c.execute("select public.reconciliar_ofertas()"))
             for limite in (1, 2, 7):
-                assert ensayar_estado(c, lambda: por_lotes(c, limite)) == de_una_vez
+                assert ensayar_estado(c, lambda limite=limite: por_lotes(c, limite)) == de_una_vez
             with c.transaction():
                 c.execute("set local statement_timeout='3s'")
                 c.execute("set local role service_role")
