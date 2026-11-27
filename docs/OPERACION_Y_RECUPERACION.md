@@ -314,6 +314,26 @@ credenciales/red. Si hay otras tablas de negocio, extensiones o un esquema modif
     una captura real con memoria conservada, verificar pendientes y desplegar. No ejecutar dos instancias simultáneas.
 11. Reabrir el servicio cuando se haya completado la aceptación mínima. Conservar evidencia del incidente y el corte.
 
+### Estado privado en Supabase (`estado_trabajo`, 27 nov)
+
+- **Una corrida se detiene con «el estado privado está en Supabase, pero no se puede leer» o «incompleto o mezclado».**
+  No se busca ni se elige nada, a propósito: seguir sin el lote ni lo ya entregado repetiría vacantes. Revisar que
+  `SUPABASE_URL` y `SUPABASE_SECRET_KEY` sean del mismo proyecto que guardó el estado y que exista la tabla
+  `estado_trabajo` (la instala «Preparar Supabase», SQL 022). Si el proyecto se restauró de un respaldo cifrado, la
+  tabla viene en él. Si el estado se perdió de verdad, un técnico reconstruye `trabajo/` desde el último artefacto o
+  respaldo y quita `trabajo/estado_privado.json` de la rama `publicado` en la ventana acordada (entonces la corrida usa
+  lo que trae la rama); el lote del día se recupera además desde `entregas_diarias`.
+- **«Aviso: el estado privado es de una corrida posterior a la rama publicado».** Falló la publicación después de
+  guardar el estado: se usa el de Supabase, que es el más reciente. No requiere acción si la siguiente publica.
+- **Una corrida que falló** guarda su estado aparte (grupo `fallida`), solo para diagnóstico; la siguiente sigue con
+  el estado vigente anterior, como antes de este cambio.
+- **Revertir este cambio (volver a publicar todo en la rama).** El código anterior no sabe leer Supabase: antes de
+  revertir, en una copia de la rama `publicado`, ejecutar `python -m buscador.estado_privado traer --salida <copia>`
+  con los secretos del proyecto, borrar `trabajo/estado_privado.json` y publicar esa carpeta completa. Sin ese paso,
+  la primera corrida arrancaría sin lote ni entregadas y elegiría otra entrega del día.
+- **Instalaciones en modo manual** (sin `SUPABASE_DB_URL`): hay que aplicar `supabase/migraciones/022_estado_trabajo.sql`
+  a mano antes de la primera corrida con este cambio; sin la tabla, `guardar` falla y la rama no se publica.
+
 La recuperación puede necesitar decisión humana si Supabase confirmó filas y se perdió una cola antes de publicarla.
 V2 ayuda a reconstruir selección/no repetición, pero no restaura saldo ni reservas del proveedor. No garantizar que todo
 se recupera automáticamente ni borrar filas para forzar otro resultado.

@@ -396,10 +396,14 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
   cargo, ni metas, ni países por cargo, ni la lista de vacantes elegidas o entregadas. Ese detalle vive en la tabla
   privada `estado_trabajo` (SQL 022, solo `service_role`), que escribe y lee `buscador/estado_privado.py`: `guardar`
   antes de publicar y de subir el artefacto (también si la corrida falló, en el grupo `fallida`, que nadie lee) y
-  `traer` justo después de clonar `publicado`. La marca `trabajo/estado_privado.json` lista lo guardado; si existe y
-  Supabase no lo devuelve, la corrida se detiene antes de buscar (nunca sigue con el estado vacío). Los pasos del
-  mismo trabajo que necesitan el detalle (validación y resumen) leen la copia completa de `privado/estado_trabajo/`,
-  que no se publica. La bodega publicada sigue trayendo todas las vacantes, sin decir a qué cargo va cada una.
+  `traer` después de clonar `publicado` y solo si la pasada trabaja (lo que lee el arranque para decidir está en la
+  rama). La marca `trabajo/estado_privado.json` dice que el estado está en Supabase; si existe y Supabase no lo
+  devuelve completo, la corrida se detiene antes de buscar (nunca sigue con el estado vacío). Los pasos del
+  mismo trabajo que necesitan el detalle (la validación) leen la copia completa de `privado/estado_trabajo/`, que no
+  se publica. El resumen y los avisos de cada corrida de Actions, también públicos, solo muestran totales; el detalle
+  por cargo está en el panel. El reporte público es una lista blanca (`CAMPOS_REPORTE`): un campo nuevo no se publica
+  hasta clasificarlo. La bodega publicada sigue trayendo todas las vacantes, sin decir a qué cargo va cada una.
+  Todo se guarda en una sola escritura con su manifiesto; un estado incompleto o de dos corridas no se usa.
 - Despliegue del panel: Docker y guía sin proveedor obligatorio (`docs/PANEL_CONTROL.md`).
 
 ## 18. Seguridad y lo prohibido

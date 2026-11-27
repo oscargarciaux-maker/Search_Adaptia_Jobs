@@ -445,3 +445,17 @@ def test_el_resumen_de_la_corrida_cuenta_lo_comprobado_de_verdad_por_sitio():
     indeed.VISTAS.clear()
     assert all(m.startswith(ve.VISTA_HOY) for m in motivos)
     assert f"{ve.VISTA_HOY} en la búsqueda de InfoJobs" in inspect.getsource(infojobs)
+
+
+def test_los_mensajes_publicos_no_nombran_cargos():
+    """Auditoría de exposición (27 nov): el registro de Actions es público; el panel (privado) sigue con el nombre."""
+    from buscador import validacion
+    roles = {"qa": {"nombre": "QA", "vacantes": [{"afinidad_vigente": False, "catalog_status": "active"}]},
+             "ux": {"nombre": "UX", "vacantes": [{"afinidad_vigente": False, "catalog_status": "closed"}]}}
+    r = {"seleccion_actual": {"roles": roles}}
+    assert validacion.errores(r, detalle=False)[-1] == ("1 vacantes de la selección de hoy ya no encajan en ningún "
+                                                       "perfil del cargo. (1 cargo)")
+    assert validacion.avisos(r, detalle=False) == [
+        "1 vacantes elegidas hoy cerraron o salieron del inventario después; no se comparten. (1 cargo)"]
+    assert validacion.avisos(r) == ["UX: 1 vacantes elegidas hoy cerraron o salieron del inventario después; "
+                                    "no se comparten."]

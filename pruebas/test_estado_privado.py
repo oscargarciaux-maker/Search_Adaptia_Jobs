@@ -1,5 +1,6 @@
 """Auditoría de exposición (#2, #4): la rama publicado y los artefactos quedan solo con cifras agregadas; el detalle por
 cargo vive en Supabase (`estado_trabajo`) y la siguiente corrida arranca igual que antes. Todo con datos ficticios."""
+import ast
 import gzip
 import json
 from pathlib import Path
@@ -28,7 +29,9 @@ def _reporte():
            "fuentes": {"LinkedIn": 2}, "paises": {"CO": 2}}
     return {
         "fecha": HOY, "modo": "diario", "consulta": "", "vacantes_en_bodega": 3, "nuevas_hoy": 1,
-        "fuentes": {"LinkedIn (Apify)": {"busquedas": 1, "por_familia": {CARGO: 1, "qa": 2}}},
+        "fuentes": {"LinkedIn (Apify)": {"busquedas": 1, "por_familia": {CARGO: 1, "qa": 2}},
+                    "Indeed": {"error": f"HTTPError: 403 para https://indeed.example/?q={NOMBRE}"}},
+        "campo_nuevo_sin_clasificar": {"nombre": NOMBRE},
         "por_familia": {CARGO: 1, "qa": 2},
         "entrega": {"roles": {CARGO: rol}, "metas_por_rol": {CARGO: 3}, "meta_por_rol": None, "vacantes": 2,
                     "filas": 2, "meta_cumplida": False, "fecha": HOY,
@@ -79,9 +82,10 @@ def _texto_publico(salida, con_bodega=False):
 class SesionFalsa:
     """Imita la API REST de Supabase para la tabla estado_trabajo."""
     def __init__(self, estado=200):
-        self.filas, self.estado = {}, estado
+        self.filas, self.estado, self.escrituras = {}, estado, 0
 
     def post(self, url, json, headers, timeout):
+        self.escrituras += 1
         for fila in json:
             self.filas[(fila["grupo"], fila["archivo"])] = fila
         return type("R", (), {"status_code": 201})()
@@ -173,8 +177,68 @@ def test_con_marca_no_sigue_sin_el_estado_privado(tmp_path, credenciales):
     with pytest.raises(RuntimeError, match="no se puede leer"):
         ep.traer(salida, sesion=SesionFalsa(estado=404))
     del sesion.filas[("vigente", "trabajo/lote_entrega.json")]
-    with pytest.raises(RuntimeError, match="Faltan 1 archivos"):
+    with pytest.raises(RuntimeError, match=r"incompleto o mezclado \(1 archivos\)"):
         ep.traer(salida, sesion=sesion)
+
+
+def test_un_estado_mezclado_de_dos_corridas_no_se_usa(tmp_path, credenciales):
+    salida = _salida(tmp_path)
+    sesion = SesionFalsa()
+    ep.guardar(salida, None, ejecucion="42", sesion=sesion)
+    sesion.filas[("vigente", "trabajo/entregadas.json")]["ejecucion"] = "41"
+    with pytest.raises(RuntimeError, match="mezclado"):
+        ep.traer(salida, sesion=sesion)
+
+
+def test_se_guarda_en_una_sola_escritura_con_su_manifiesto(tmp_path, credenciales):
+    sesion = SesionFalsa()
+    ep.guardar(_salida(tmp_path), None, ejecucion="42", sesion=sesion)
+    assert sesion.escrituras == 1 and ("vigente", ep.MARCA) in sesion.filas
+
+
+def test_si_supabase_va_por_delante_de_la_rama_se_usa_supabase_con_aviso(tmp_path, credenciales):
+    """La publicación falló después de guardar: la rama tiene la marca de la corrida 42 y Supabase la 43."""
+    salida = _salida(tmp_path)
+    sesion = SesionFalsa()
+    ep.guardar(salida, None, ejecucion="42", sesion=sesion)
+    marca_vieja = (salida / ep.MARCA).read_bytes()
+    ep.traer(salida, sesion=sesion)
+    ep.guardar(salida, None, ejecucion="43", sesion=sesion)
+    (salida / ep.MARCA).write_bytes(marca_vieja)
+    assert ep.traer(salida, sesion=sesion).startswith("Aviso")
+    assert json.loads((salida / "trabajo/entregadas.json").read_text(encoding="utf-8")) == {HUELLA: HOY}
+
+
+def test_si_algo_no_se_puede_leer_la_carpeta_queda_como_estaba(tmp_path):
+    salida = _salida(tmp_path)
+    (salida / "trabajo/metricas_entrega.json").write_text("{roto", encoding="utf-8")
+    with pytest.raises(ValueError):
+        ep.separar(salida)
+    assert (salida / "trabajo/lote_entrega.json").exists()
+
+
+def test_las_escrituras_cortadas_no_quedan_a_la_vista(tmp_path):
+    salida = _salida(tmp_path)
+    (salida / "trabajo/lote_entrega.json.tmp").write_text(NOMBRE, encoding="utf-8")
+    ep.separar(salida)
+    assert not list(salida.rglob("*.tmp"))
+
+
+def test_el_reporte_publico_es_lista_blanca(tmp_path):
+    salida = _salida(tmp_path)
+    ep.separar(salida)
+    s = json.loads((salida / "datos/salud.json").read_text(encoding="utf-8"))
+    assert "campo_nuevo_sin_clasificar" not in s and s["campos_no_publicados"] == ["campo_nuevo_sin_clasificar"]
+    assert s["fuentes"]["Indeed"]["error"] == "HTTPError"   # el texto del error puede traer el nombre del cargo
+
+
+def test_cada_campo_del_reporte_real_esta_clasificado():
+    """Si `bodega.correr` empieza a emitir un campo nuevo, hay que decidir cómo se publica (o que no se publique)."""
+    arbol = ast.parse((RAIZ / "buscador/bodega.py").read_text(encoding="utf-8"))
+    reportes = [n.value for n in ast.walk(arbol) if isinstance(n, ast.Assign) and isinstance(n.value, ast.Dict)
+                and any(isinstance(d, ast.Name) and d.id == "reporte" for d in n.targets)]
+    claves = {k.value for d in reportes for k in d.keys if isinstance(k, ast.Constant)}
+    assert claves and claves <= set(ep.CAMPOS_REPORTE)
 
 
 def test_una_corrida_fallida_no_pisa_el_estado_vigente(tmp_path, credenciales):
@@ -205,14 +269,28 @@ def test_los_flujos_separan_antes_de_publicar_y_de_subir_el_artefacto(flujo):
     assert guardar < texto.index("uses: actions/upload-artifact") and guardar < texto.index("git push -q --force")
     assert "hashFiles('salida/trabajo/estado.json')" not in texto   # estado.json ya no queda en la carpeta publicada
     paso = texto[texto.rindex("- name:", 0, guardar):guardar]
-    assert "always()" in paso and "--fallida" in texto[guardar:texto.index("\n", guardar)]
+    assert "always()" in paso and "id: separar" in paso and "--fallida" in texto[guardar:texto.index("\n", guardar)]
     assert "validacion --salida privado/estado_trabajo" in texto
+    artefacto = texto[texto.rindex("- name:", 0, texto.index("uses: actions/upload-artifact")):]
+    assert "steps.separar.outcome == 'success'" in artefacto.split("uses:", 1)[0]
 
 
-def test_bodega_repone_antes_de_decidir_y_de_borrar_el_reporte_viejo():
+def test_bodega_decide_con_lo_publico_y_repone_solo_si_trabaja():
     texto = (RAIZ / ".github/workflows/bodega.yml").read_text(encoding="utf-8")
     traer = texto.index("python -m buscador.estado_privado traer")
-    assert traer < texto.index("rm -f salida/datos/salud.json") < texto.index("python -m buscador.arranque --trabajo")
+    paso = texto[texto.rindex("- name:", 0, traer):traer]
+    assert texto.index("python -m buscador.arranque --trabajo") < traer < texto.index("uses: ./.github/actions/preparar")
+    assert "steps.decidir.outputs.ejecutar == 'true'" in paso
+    assert "rm -f salida/datos/salud.json" in texto[traer:texto.index("- name:", traer)]
+    resumen = texto[texto.index("- name: Resumen"):texto.index("- name: Avisar")]
+    assert "estado_privado resumen --salida salida" in resumen and "nombre" not in resumen
+
+
+def test_el_resumen_publico_no_nombra_cargos(tmp_path):
+    salida = _salida(tmp_path)
+    ep.separar(salida)
+    texto = ep.resumen(json.loads((salida / "datos/salud.json").read_text(encoding="utf-8")))
+    assert "meta total 3, faltan 1" in texto and NOMBRE not in texto and UUID not in texto
 
 
 def test_migracion_022_es_privada():

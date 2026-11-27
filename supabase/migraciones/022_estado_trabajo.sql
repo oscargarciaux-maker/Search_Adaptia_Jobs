@@ -17,4 +17,6 @@ create table if not exists public.estado_trabajo (
 alter table public.estado_trabajo enable row level security;
 revoke all on public.estado_trabajo from public, anon, authenticated, service_role;
 grant select, insert, update on public.estado_trabajo to service_role;
+-- La API REST ve la tabla nueva sin esperar a que Supabase recargue el esquema por su cuenta.
+notify pgrst,'reload schema';
 commit;

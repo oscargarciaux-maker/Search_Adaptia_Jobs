@@ -39,7 +39,7 @@ def test_completa_termina_bien(tmp_path, monkeypatch, capsys):
     codigo, resumen = _correr(tmp_path, monkeypatch, _reporte())
     salida = capsys.readouterr().out
     assert codigo == 0 and "::warning::" not in salida and "::error::" not in salida and "COMPLETA" in salida
-    assert "Resultado del día: COMPLETA" in resumen and "| QA | 20 | 20 | 0 |" in resumen
+    assert "Resultado del día: COMPLETA" in resumen and "| 1 | 20 | 20 | 0 |" in resumen
 
 
 def test_meta_corta_termina_bien_con_aviso_y_resumen(tmp_path, monkeypatch, capsys):
@@ -52,7 +52,8 @@ def test_meta_corta_termina_bien_con_aviso_y_resumen(tmp_path, monkeypatch, caps
     assert codigo == 0 and "::error::" not in salida
     assert "::warning::La meta de selección diaria está incompleta." in salida
     assert "::warning::2 vacantes de la selección de hoy tienen el enlace sin comprobar" in salida
-    assert "Resultado del día: CORTA" in resumen and "| QA | 20 | 12 | 8 | 2 |" in resumen
+    assert "Resultado del día: CORTA" in resumen and "| 1 | 20 | 12 | 8 | 2 |" in resumen
+    assert "QA" not in resumen and "QA" not in salida   # público: sin nombres de cargo (auditoría de exposición)
     assert "segunda pasada" in resumen and "no se comparten hasta comprobarlo" in resumen
     assert resumen.endswith("\n\n")  # el paso «Resumen» escribe después: no debe pegarse a la tabla
     assert "La meta de selección diaria está incompleta." in resumen and "2 sin comprobar" in resumen

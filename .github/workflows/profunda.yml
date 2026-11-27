@@ -67,6 +67,7 @@ jobs:
           PAIS: ${{ inputs.pais }}
         run: python -m buscador.bodega --salida salida --consulta "$CONSULTA" --pais "$PAIS"
       - name: Separar el detalle por cargo (privado, en Supabase) antes de publicar
+        id: separar
         # Auditoría de exposición (#2, #4): la rama publicado y el artefacto quedan solo con cifras agregadas.
         # Si la corrida falló, se guarda aparte («fallida») y la siguiente sigue con el estado anterior.
         if: ${{ always() && hashFiles('salida/trabajo/bodega.json.gz') != '' }}
@@ -75,7 +76,8 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: python -m buscador.estado_privado guardar --salida salida ${{ job.status != 'success' && '--fallida' || '' }}
       - name: Conservar estado de recuperación
-        if: ${{ always() && hashFiles('salida/trabajo/bodega.json.gz') != '' }}
+        # Solo si la separación terminó bien: si falló a medias, la carpeta podría traer el detalle (es público).
+        if: ${{ always() && steps.separar.outcome == 'success' }}
         uses: actions/upload-artifact@v6
         with:
           name: estado-profunda-${{ github.run_id }}

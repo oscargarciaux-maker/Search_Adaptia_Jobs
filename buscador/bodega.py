@@ -827,8 +827,9 @@ def main():
     print("Verificación de enlaces:", json.dumps(reporte["verificacion_enlaces"], ensure_ascii=False))
     e = reporte.get("entrega") or {}
     if not a.prueba and a.modo != "incremental" and e.get("meta_cumplida") is False:
-        faltantes = ", ".join(f"{r['nombre']}: faltan {r['faltan']}" for r in e["roles"].values() if r["faltan"])
-        print(f"::warning::Meta diaria incompleta tras los refuerzos. {faltantes}")
+        # Registro público de Actions: solo el total (auditoría de exposición, 27 nov); el detalle está en el panel.
+        cortos = [r["faltan"] for r in e["roles"].values() if r["faltan"]]
+        print(f"::warning::Meta diaria incompleta tras los refuerzos: faltan {sum(cortos)} en {len(cortos)} cargos.")
 
 
 if __name__ == "__main__":
