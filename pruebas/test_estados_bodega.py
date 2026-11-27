@@ -53,6 +53,8 @@ def test_meta_corta_termina_bien_con_aviso_y_resumen(tmp_path, monkeypatch, caps
     assert "::warning::La meta de selección diaria está incompleta." in salida
     assert "::warning::2 vacantes de la selección de hoy tienen el enlace sin comprobar" in salida
     assert "Resultado del día: CORTA" in resumen and "| QA | 20 | 12 | 8 | 2 |" in resumen
+    assert "segunda pasada" in resumen and "no se comparten hasta comprobarlo" in resumen
+    assert resumen.endswith("\n\n")  # el paso «Resumen» escribe después: no debe pegarse a la tabla
     assert "La meta de selección diaria está incompleta." in resumen and "2 sin comprobar" in resumen
 
 

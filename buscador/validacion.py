@@ -61,10 +61,11 @@ def problemas(reporte):
     return errores(reporte) + cortos(reporte)
 
 
-def estado(reporte):
-    if errores(reporte):
-        return AVERIA
-    return CORTA if cortos(reporte) else COMPLETA
+def estado(reporte, fallos=None, faltas=None):
+    """La única regla de los tres estados: manda la avería. `fallos`/`faltas` evitan calcular dos veces."""
+    fallos = errores(reporte) if fallos is None else fallos
+    faltas = cortos(reporte) if faltas is None else faltas
+    return AVERIA if fallos else CORTA if faltas else COMPLETA
 
 
 def _cerro_despues(v):
@@ -101,11 +102,9 @@ def errores_catalogo(reporte):
     return fallos
 
 
-def resumen(reporte, fallos=None, faltas=None):
+def resumen(reporte, fallos, faltas):
     """Markdown para $GITHUB_STEP_SUMMARY, solo con cifras que ya trae salud.json (sin datos de clientes)."""
-    fallos = errores(reporte) if fallos is None else fallos
-    faltas = cortos(reporte) if faltas is None else faltas
-    actual = AVERIA if fallos else CORTA if faltas else COMPLETA
+    actual = estado(reporte, fallos, faltas)
     e = reporte.get("entrega") or {}
     lineas = [f"## Resultado del día: {NOMBRE_ESTADO[actual]}", ""]
     if fallos or faltas:
@@ -130,8 +129,14 @@ def resumen(reporte, fallos=None, faltas=None):
         lineas += [f"Enlaces de la selección: {n.get('verificada', 0)} comprobados, {n.get('pendiente', 0)} sin "
                    f"comprobar, {n.get('rechazada', 0)} cerrados.", ""]
     if actual == CORTA:
-        lineas += ["La corrida no falla: la segunda pasada (8:30) o «Buscar ahora» completan lo que faltó.", ""]
-    return "\n".join(lineas)
+        lineas.append("La corrida no falla (no es una avería).")
+        if not e.get("meta_cumplida"):
+            lineas.append("La segunda pasada (8:30) o «Buscar ahora» completan la meta.")
+        if revision.get("vacantes") and (revision.get("estados") or {}).get("pendiente"):
+            lineas.append("Las vacantes con el enlace sin comprobar no se comparten hasta comprobarlo.")
+        lineas.append("")
+    # Termina en línea en blanco: el paso «Resumen» escribe después en el mismo archivo y no debe pegarse a la tabla.
+    return "\n".join(lineas) + "\n"
 
 
 def main():
@@ -156,13 +161,13 @@ def main():
     if destino := os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(destino, "a", encoding="utf-8") as f:
             f.write(resumen(reporte, fallos, faltas))
-    if fallos:
-        print("Resultado: AVERÍA.")
+    actual = estado(reporte, fallos, faltas)
+    print(f"Resultado: {NOMBRE_ESTADO[actual]}. " + {
+        AVERIA: "Ver los errores de arriba.",
+        CORTA: "Sincronización confirmada; el día quedó corto (ver avisos). No es una avería.",
+        COMPLETA: CONFIRMADO}[actual])
+    if actual == AVERIA:
         raise SystemExit(1)
-    if faltas:
-        print("Resultado: CORTA. Sincronización confirmada; el día quedó corto (ver avisos). No es una avería.")
-        return
-    print("Resultado: COMPLETA. " + CONFIRMADO)
 
 
 if __name__ == "__main__":

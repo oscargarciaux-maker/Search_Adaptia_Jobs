@@ -31,7 +31,9 @@ Si hay a la vez una avería y una falta, manda la avería. Los mensajes son los 
 - Los reintentos: la segunda pasada (8:30) y su respaldo (9:30) deciden con `trabajo/metricas_entrega.json`
   (`arranque.falta_completar`: meta, registro y pendientes de Supabase), no con el color de la corrida. Los respaldos
   de las 7:15/7:50 miran si hoy terminó alguna búsqueda (`pasadas`), y el Reloj y el vigía (`toca_diaria`) tratan igual
-  una corrida en verde o en rojo: ya corrió. Un día CORTO sigue pidiendo la segunda pasada.
+  una corrida en verde o en rojo: ya corrió. Un día con la meta incompleta sigue pidiendo la segunda pasada. Un día
+  CORTO solo por enlaces sin comprobar (meta cumplida) no la pedía antes ni la pide ahora: esas vacantes no se
+  comparten hasta comprobarlas.
 - El panel: `panel/ejecutor.py` usa `problemas()`, así que un día corto sigue quedando como «parcial» («Con
   faltantes») en `panel_ejecuciones` y «Buscar ahora» sigue ofreciendo completar a quien va corto.
 - Las otras partes de la corrida que fallan (búsqueda, publicación) siguen poniendo la corrida en rojo y el aviso en
