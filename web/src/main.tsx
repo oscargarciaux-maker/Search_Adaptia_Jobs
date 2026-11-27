@@ -16,15 +16,12 @@ import type {
 } from "./types";
 import { fijarLugares, fijarMundo } from "./comunes";
 import { PorConfirmar } from "./vistas/PorConfirmar";
-import { BuscarAhora } from "./vistas/BuscarAhora";
 import { Mensajes } from "./vistas/Mensajes";
 import { CargoDialog } from "./vistas/CargoDialog";
-import { ClienteDetalle } from "./vistas/ClienteDetalle";
 import { ClienteDialog } from "./vistas/ClienteFormulario";
 import { conMetas } from "./perfiles";
 import { useVistaPrevia } from "./vistaPrevia";
-import { TarjetasResumen, resumenDeClientes } from "./vistas/Resumen";
-import { Historial, AvisoUltimaBusqueda } from "./vistas/Historial";
+import { Historial } from "./vistas/Historial";
 import { CargosYMetas } from "./vistas/CargosYMetas";
 import { Clientes } from "./vistas/Clientes";
 import { SeccionVacantes } from "./vistas/SeccionVacantes";
@@ -34,6 +31,7 @@ import { EliminarCargoDialog, ArchivarDialog } from "./vistas/DialogosArchivo";
 import { InicioSesion } from "./vistas/InicioSesion";
 import { Cabecera } from "./vistas/Cabecera";
 import { useConfiguracion } from "./configuracion";
+import { SeccionResumen } from "./vistas/SeccionResumen";
 import "./style.css";
 
 // Contrato v22: prioridades que solo ordenan y restricciones que descartan con evidencia clara.
@@ -424,89 +422,34 @@ function App() {
             recargarResumen={recargarResumen}
           />
           {tab === "Resumen" && (
-            <>
-              <AvisoUltimaBusqueda ultima={runs?.[0]} soloFallo />
-              <TarjetasResumen
-                clientes={resumenDeClientes(
-                  draft,
-                  porCliente,
-                  pendientesPorCliente,
-                )}
-                diaConteo={porCliente?.dias.at(-1)?.fecha}
-                onCliente={setDetalle}
-                perfiles={
-                  draft.perfiles.filter(
-                    (p) =>
-                      p.activo && clientes.some((c) => c.id === p.cliente_id),
-                  ).length
-                }
-                cargos={cargos}
-                total={total}
-                techo={metas.techo}
-                reales={metas.reales}
-                comunidad={metas.comunidad}
-                ultima={runs?.[0]}
-                porConfirmar={porConfirmar}
-                borradores={borradoresHoy}
-                go={go}
-                onNuevoCliente={() => {
-                  setEditCliente(null);
-                  setModal("cliente");
-                }}
-              />
-              {detalle &&
-                (() => {
-                  const c = resumenDeClientes(
-                    draft,
-                    porCliente,
-                    pendientesPorCliente,
-                  ).find((x) => x.id === detalle);
-                  return c ? (
-                    <ClienteDetalle
-                      cliente={c}
-                      cfg={draft}
-                      dias={porCliente?.dias || []}
-                      ultima={runs?.[0]}
-                      notify={notify}
-                      onCerrar={() => setDetalle("")}
-                      onCambio={recargarResumen}
-                      onVacantes={(dia) => {
-                        setDetalle("");
-                        setSelectedClient(c.id);
-                        if (dia) {
-                          setResultDate(dia);
-                          enfocarWhatsApp.current = true;
-                        }
-                        go("Vacantes");
-                      }}
-                      onRevisar={() => {
-                        setDetalle("");
-                        go("Por confirmar");
-                      }}
-                      onCsv={() => descargarBase(c.id)}
-                      buscarAhora={
-                        <BuscarAhora
-                          cliente={{ id: c.id, nombre: c.nombre }}
-                          sinAplicar={pendienteDeAplicar}
-                          onAplicar={aplicarPendientes}
-                          revision={estado?.publicada?.revision}
-                          demo={Boolean(sesion.demo)}
-                          onAviso={notify}
-                          onTermino={recargarResumen}
-                        />
-                      }
-                      onEditar={() => {
-                        setDetalle("");
-                        setEditCliente(
-                          draft.clientes.find((x) => x.id === c.id) || null,
-                        );
-                        setModal("cliente");
-                      }}
-                      descargando={descargandoBase}
-                    />
-                  ) : null;
-                })()}
-            </>
+            <SeccionResumen
+              sesion={sesion}
+              estado={estado}
+              draft={draft}
+              clientes={clientes}
+              cargos={cargos}
+              metas={metas}
+              total={total}
+              runs={runs}
+              porCliente={porCliente}
+              pendientesPorCliente={pendientesPorCliente}
+              porConfirmar={porConfirmar}
+              borradoresHoy={borradoresHoy}
+              detalle={detalle}
+              setDetalle={setDetalle}
+              go={go}
+              notify={notify}
+              recargarResumen={recargarResumen}
+              setEditCliente={setEditCliente}
+              setModal={setModal}
+              setSelectedClient={setSelectedClient}
+              setResultDate={setResultDate}
+              enfocarWhatsApp={enfocarWhatsApp}
+              descargarBase={descargarBase}
+              descargandoBase={descargandoBase}
+              pendienteDeAplicar={pendienteDeAplicar}
+              aplicarPendientes={aplicarPendientes}
+            />
           )}
           {tab === "Clientes" && (
             <Clientes
