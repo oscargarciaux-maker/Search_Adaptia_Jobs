@@ -65,6 +65,8 @@ jobs:
           python-version: '3.12'
           cache: pip
       - run: pip install --require-hashes -r requirements.txt
+      - name: Medir reconciliación (temporal)
+        run: python -m pruebas.medir_reconciliacion
       - name: Probar migración, repetición e integridad sin Supabase
         run: |
           psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -c 'create role anon; create role authenticated; create role service_role bypassrls;'
