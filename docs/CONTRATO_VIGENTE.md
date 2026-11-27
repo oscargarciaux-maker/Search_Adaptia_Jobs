@@ -160,6 +160,10 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
   vacante que hoy aún no usa nadie solo entra mientras lote + añadidas no pasen del techo del día. Orden: lote → reutilización de vacantes de otros días que esa persona nunca recibió → rescate con toda
   la bodega (cargo, ubicación e idioma; 2 por empresa; enlace de 24 h) → ampliación como último recurso (`remota_cercana`,
   `empresa_4`) → posts. Comunidad y los posts se quedan en el mínimo de 5 (v11, v27, v36, v49).
+- **Las ampliadas van marcadas:** `remota_cercana` da a un perfil sin «remoto» (presencial o híbrido) remotas abiertas
+  al país donde vive, solo para llegar al mínimo de 5 y nunca de otro país. El panel las marca «Ampliada: …» en la lista
+  de Vacantes y en la ficha; el WhatsApp las incluye al final, con su modalidad («Remoto») y sin la marca (v9, v27;
+  medido en la línea base: las 32 vacantes «fuera de lo pedido» de los escenarios b y e eran estas, 27 nov).
 - Lo asignado en pasadas anteriores del mismo día cuenta para la meta y el techo; si no se puede leer, se completa
   solo hasta el mínimo (v49).
 - Las rescatadas no cuentan en el cupo ni van a `ofertas` (marca `rescatada`) (v36).

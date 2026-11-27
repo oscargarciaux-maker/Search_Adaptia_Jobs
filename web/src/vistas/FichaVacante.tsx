@@ -270,7 +270,7 @@ export function FichaVacante({
         {v.ampliacion && (
           <span
             className="amplified"
-            title="Entró para completar el mínimo de 5 vacantes de este perfil. No aparece en el mensaje de WhatsApp."
+            title="Entró para completar el mínimo de 5 vacantes de este perfil, aunque no es lo que pidió. Va en el mensaje de WhatsApp, al final y sin esta marca."
           >
             Ampliada: {v.ampliacion}
           </span>
