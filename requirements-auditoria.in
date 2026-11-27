@@ -1,5 +1,5 @@
 # Herramientas de auditoría (solo CI y la skill auditoria-codigo; no las usa la búsqueda ni el panel).
-ruff==0.16.9
+ruff==0.17.6
 vulture==2.16
 bandit==1.9.4
 pip-audit==2.10.1
