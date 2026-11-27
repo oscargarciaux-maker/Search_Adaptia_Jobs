@@ -237,7 +237,7 @@ def test_horaria_recupera_colas_y_seleccion_sin_gastar_ni_crear_entrega(monkeypa
     assert r["estado_operativo"]["reintentos"]["ofertas"]["enviadas"] == 1
     assert not any(r["estado_operativo"]["pendientes"].values())
     assert r["verificacion_enlaces"]["seleccion_del_dia"]["vacantes"] == 1
-    assert json.loads((tmp_path / "trabajo/lote_entrega.json").read_text())["elegidas"]
+    assert json.loads((tmp_path / "trabajo/lote_entrega.json").read_text(encoding="utf-8"))["elegidas"]
 
 
 def test_operacion_pendiente_no_se_declara_sincronizada():
@@ -258,7 +258,7 @@ def test_diaria_recupera_canonico_antes_de_importar_archivo_atrasado(monkeypatch
     trabajo = tmp_path / "trabajo"
     trabajo.mkdir()
     (trabajo / "lote_entrega.json").write_text(json.dumps({"fecha": HOY,
-        "elegidas": {"ux-ui-designer": [[vs[0], "exacto"]]}}))
+        "elegidas": {"ux-ui-designer": [[vs[0], "exacto"]]}}), encoding="utf-8")
     monkeypatch.setattr(supabase, "leer_lote", lambda hoy: deepcopy(completo))
     def comprobar(self, hoy, local):
         assert local == completo

@@ -61,6 +61,7 @@ def test_pasada_de_la_manana_solo_si_falta(tmp_path, dia, esperado):
     from buscador import arranque
     import json
     if dia is not None:
-        (tmp_path / "metricas_entrega.json").write_text(json.dumps({"2026-11-10": dia, "2026-11-09": {"meta_cumplida": True}}))
+        (tmp_path / "metricas_entrega.json").write_text(json.dumps({"2026-11-10": dia, "2026-11-09": {"meta_cumplida": True}}),
+                                                       encoding="utf-8")
     assert arranque.falta_completar(arranque.leer_dia(tmp_path, "2026-11-10")) is esperado
     assert arranque.falta_completar(arranque.leer_dia(tmp_path / "no-existe", "2026-11-10")) is True

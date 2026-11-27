@@ -52,7 +52,8 @@ def descubrir(raiz=RAIZ):
     versiones = [v for v, _ in archivos]
     if versiones != sorted(set(versiones)):
         raise RuntimeError("Las versiones de migración deben ser únicas y crecientes.")
-    return [Migracion(v, p.name, sha256(p.read_bytes()).hexdigest(), sin_transaccion_externa(p.read_text())) for v, p in archivos]
+    return [Migracion(v, p.name, sha256(p.read_bytes()).hexdigest(),
+                      sin_transaccion_externa(p.read_text(encoding="utf-8"))) for v, p in archivos]
 
 
 def error_conexion(error, directa=False):
@@ -265,7 +266,7 @@ def preparar(conn, trabajo, plan, versiones=None, instancia_nueva=False):
             aplicar(conn, faltantes)
             validar(conn)
             archivo = Path(trabajo) / "apify_presupuesto.json"
-            presupuesto = json.loads(archivo.read_text()) if archivo.exists() else {}
+            presupuesto = json.loads(archivo.read_text(encoding="utf-8")) if archivo.exists() else {}
             inicializada = conn.execute("select exists(select 1 from public.estado_operativo where cola='control' and identificador='inicializado')").fetchone()[0]
             if not presupuesto and not inicializada and instancia_nueva:
                 for tabla in ("ofertas", "catalogo_vacantes", "entregas_diarias", "apify_reservas"):

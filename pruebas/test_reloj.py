@@ -136,7 +136,7 @@ def _salidas(texto):
 
 def _archivos(carpeta, relojes, diarias=(), capturas=()):
     for nombre, lista in (("relojes", relojes), ("diarias", diarias), ("capturas", capturas)):
-        (carpeta / f"{nombre}.json").write_text(json.dumps(list(lista)))
+        (carpeta / f"{nombre}.json").write_text(json.dumps(list(lista)), encoding="utf-8")
     return ["--trabajo", str(carpeta), "--reloj", str(carpeta), "--yo", "50", "--rama", "main"]
 
 
@@ -155,7 +155,7 @@ def test_linea_de_comandos_del_reloj(tmp_path, capsys):
                                                  "captura_sin_diaria": "false", "falta_temporizador": "false"}
 
     # Con la búsqueda de hoy ya terminada (el registro del día lo dice), toca la captura de la hora.
-    (tmp_path / "metricas_entrega.json").write_text(json.dumps({arranque.hoy_bogota(AHORA): HECHA}))
+    (tmp_path / "metricas_entrega.json").write_text(json.dumps({arranque.hoy_bogota(AHORA): HECHA}), encoding="utf-8")
     arranque.main(_archivos(tmp_path, [_yo()], diarias=[_corrida(100)], capturas=[_corrida(70)]), ahora=AHORA)
     assert _salidas(capsys.readouterr().out) == {"actuar": "true", "seguir": "true", "captura": "true", "diaria": "false",
                                                  "captura_sin_diaria": "true", "falta_temporizador": "false"}
@@ -169,10 +169,10 @@ def test_linea_de_comandos_del_reloj(tmp_path, capsys):
 
 
 def test_linea_de_comandos_para_reanudar_no_necesita_la_carpeta_de_trabajo(tmp_path, capsys):
-    (tmp_path / "relojes.json").write_text("[]")
+    (tmp_path / "relojes.json").write_text("[]", encoding="utf-8")
     arranque.main(["--reloj-vivo", str(tmp_path / "relojes.json"), "--rama", "main"])
     assert capsys.readouterr().out == "revivir=true\n"
-    (tmp_path / "relojes.json").write_text(json.dumps([_corrida(10, "waiting")]))
+    (tmp_path / "relojes.json").write_text(json.dumps([_corrida(10, "waiting")]), encoding="utf-8")
     arranque.main(["--reloj-vivo", str(tmp_path / "relojes.json"), "--rama", "main"])
     assert capsys.readouterr().out == "revivir=false\n"
     arranque.main(["--reloj-vivo", str(tmp_path / "no-existe.json"), "--rama", "main"])

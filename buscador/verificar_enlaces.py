@@ -547,11 +547,12 @@ def main():
     p.add_argument("--salida", required=True)
     p.add_argument("--maximo", type=int, default=120)
     a = p.parse_args()
-    lote = json.loads(Path(a.lote).read_text())
+    lote = json.loads(Path(a.lote).read_text(encoding="utf-8"))
     vs = list({v["id"]: v for lista in lote["elegidas"].values() for v, _ in lista}.values())
     cache = {}
     auditar(vs, cache, maximo=a.maximo, segundos=240)
-    Path(a.salida).write_text(json.dumps({"resumen": resumen(vs), "resultados": cache}, ensure_ascii=False, indent=2))
+    Path(a.salida).write_text(json.dumps({"resumen": resumen(vs), "resultados": cache}, ensure_ascii=False, indent=2),
+                              encoding="utf-8")
     print(json.dumps(resumen(vs), ensure_ascii=False, indent=2))
 
 

@@ -70,15 +70,15 @@ def comprobar_rest(huellas):
 
 def salidas(ejecutar, central, catalogo, copia="", resumen=""):
     if os.environ.get("GITHUB_OUTPUT"):
-        with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
             f.write(f"ejecutar={str(ejecutar).lower()}\nrespaldo={copia}\n")
     if os.environ.get("GITHUB_ENV"):
-        with open(os.environ["GITHUB_ENV"], "a") as f:
+        with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
             f.write(f"ESTADO_SUPABASE_ACTIVO={str(central).lower()}\nCATALOGO_ACTIVO={str(catalogo).lower()}\n")
     if resumen:
         print(resumen)
         if os.environ.get("GITHUB_STEP_SUMMARY"):
-            with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f: f.write(resumen + "\n")
+            with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f: f.write(resumen + "\n")
 
 
 def correr(args):
@@ -113,12 +113,13 @@ def correr(args):
         if args.fase == "respaldo":
             copia = privado / "respaldos" / ("corte-" + uuid4().hex + ".enc")
             plan = migraciones.planificar(conn, Path(args.salida) / "trabajo", copia, llave)
-            plan_archivo.write_text(json.dumps(plan))
+            plan_archivo.write_text(json.dumps(plan), encoding="utf-8")
             salidas(False, False, False, copia=str(copia) if plan["necesaria"] else "",
                     resumen="Respaldo cifrado preparado; debe subirse antes de aplicar." if plan["necesaria"] else "Esquema automático ya vigente; no requiere otro respaldo de migración.")
             return
         if not plan_archivo.exists(): raise RuntimeError("Falta el plan y su respaldo previo; ejecutar primero la fase de respaldo.")
-        resultado = migraciones.preparar(conn, Path(args.salida) / "trabajo", json.loads(plan_archivo.read_text()),
+        plan = json.loads(plan_archivo.read_text(encoding="utf-8"))
+        resultado = migraciones.preparar(conn, Path(args.salida) / "trabajo", plan,
                                          instancia_nueva=args.instancia_nueva)
     comprobar_rest({m.version: m.digest for m in migraciones.descubrir()})
     from buscador.bodega import _guardar_json

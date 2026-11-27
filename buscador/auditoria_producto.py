@@ -116,7 +116,7 @@ def main():
     texto = json.dumps(resultado, ensure_ascii=False, indent=2, default=str)
     print(texto)
     if os.environ.get("GITHUB_STEP_SUMMARY"):
-        with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+        with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
             f.write("## Auditoría de producto (solo lectura)\n```json\n" + texto.replace("```", "") + "\n```\n")
 
 

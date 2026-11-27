@@ -12,7 +12,7 @@ def _directas(archivo="requirements.in"):
     for linea in (RAIZ / archivo).read_text(encoding="utf-8").splitlines():
         linea = linea.split("#")[0].strip()
         if linea:
-            m = re.fullmatch(r"([A-Za-z0-9_.-]+)(\[[^\]]+\])?==([^\s;]+)", linea)
+            m = re.fullmatch(r"([A-Za-z0-9_.-]+)(\[[^\]]+\])?==([^\s;]+)(\s*;.+)?", linea)
             assert m, f"«{linea}» debe fijar una versión exacta con =="
             salida[m.group(1).lower().replace("_", "-")] = m.group(3)
     return salida
@@ -39,6 +39,13 @@ def test_lock_coincide_con_requirements_y_todo_lleva_huella(base):
         assert nombre in bloqueadas, f"{nombre} falta en el .txt compilado; regenera con: {COMANDO}"
         assert bloqueadas[nombre][0] == version, f"{nombre} difiere del .txt compilado; regenera con: {COMANDO}"
     assert all(con_huella for _, con_huella in bloqueadas.values()), "toda pieza del lock lleva su sha256"
+
+
+def test_el_lock_tambien_instala_en_windows():
+    """pytest y click piden colorama solo en Windows; sin ella fijada, `--require-hashes` falla allí (27 nov)."""
+    texto = (RAIZ / "requirements.txt").read_text(encoding="utf-8")
+    assert re.search(r'^colorama==\S+ ; sys_platform == "win32" \\$', texto, re.M), \
+        "falta colorama con su marcador de Windows en requirements.txt; cópiala de requirements.in con sus huellas"
 
 
 def test_flujos_y_docker_instalan_desde_el_lock_con_huellas():
