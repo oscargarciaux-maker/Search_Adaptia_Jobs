@@ -15,6 +15,26 @@ from buscador import migraciones
 
 
 
+def por_lotes(c, limite):
+    """Lo que hace buscador.supabase.reconciliar_ofertas por la API: un lote tras otro hasta que no queda cursor."""
+    for funcion, desde in (("reconciliar_referencias_lote", ""), ("reconciliar_ofertas_lote", 0)):
+        while desde is not None:
+            consulta = sql.SQL("select public.{}(%s,%s)").format(sql.Identifier(funcion))
+            desde = c.execute(consulta, (desde, limite)).fetchone()[0].get("siguiente")
+
+
+def ensayar_estado(c, reconciliar):
+    """Reconciliar como service_role con el límite de 3 s y devolver ofertas y archivo; siempre se revierte."""
+    with c.transaction(force_rollback=True):
+        c.execute("set local role service_role")
+        c.execute("set local statement_timeout='3s'")
+        reconciliar()
+        c.execute("reset role")
+        return (c.execute("select jsonb_agg(to_jsonb(o) order by id) from public.ofertas o").fetchone()[0],
+                c.execute("""select jsonb_agg(to_jsonb(h)-'archivada_en' order by oferta_id)
+                    from public.ofertas_enlaces_historicos h""").fetchone()[0])
+
+
 def probar_aliases(conectar, nombre):
     from buscador.diagnostico_migraciones import ensayar
     with conectar() as admin:
@@ -33,7 +53,7 @@ def probar_aliases(conectar, nombre):
                 insert into public.entregas_diarias(vacante_id,delivery_date,role_id,match_grade,selected_at,snapshot)
                 values('2222222222222222',current_date,'qa','exact',now(),'{"conservar":"histórico"}');""")
             antes = c.execute("select jsonb_agg(to_jsonb(c) order by id) from public.catalogo_vacantes c").fetchone()[0]
-            assert ensayar(c) == ['006','007','008','009','010','011','012','013','014','015','016','017','018','019','020']
+            assert ensayar(c) == ['006','007','008','009','010','011','012','013','014','015','016','017','018','019','020','021']
             assert c.execute("select jsonb_agg(to_jsonb(c) order by id) from public.catalogo_vacantes c").fetchone()[0] == antes
             assert c.execute("select count(*) from public.ofertas").fetchone()[0] == 2
             assert '006' not in migraciones.aplicadas(c)
@@ -242,6 +262,11 @@ def main():
              insert into public.entregas_diarias(vacante_id,delivery_date,role_id,match_grade,selected_at,snapshot)
               values('1111111111111111',current_date,'qa','exact',now(),'{"conservar":"grafo-histórico"}');
              analyze public.catalogo_vacantes;""")
+            # SQL 021: recorrer los lotes (aun de a una oferta, con copias repartidas en lotes distintos) deja
+            # exactamente el mismo estado que hacerlo todo de una vez.
+            de_una_vez = ensayar_estado(c, lambda: c.execute("select public.reconciliar_ofertas()"))
+            for limite in (1, 2, 7):
+                assert ensayar_estado(c, lambda: por_lotes(c, limite)) == de_una_vez
             with c.transaction():
                 c.execute("set local statement_timeout='3s'")
                 c.execute("set local role service_role")
@@ -258,6 +283,17 @@ def main():
                     c.execute("set local role service_role")
                     assert c.execute("select public.reconciliar_ofertas()->>'archivadas'").fetchone()[0] == '0'
                 assert c.execute("select id,xmin::text from public.ofertas order by id").fetchall() == antes
+            # SQL 021: un lote solo toca sus ofertas (las 50 primeras), no las demás, y dice dónde seguir.
+            with c.transaction(force_rollback=True):
+                c.execute("update public.ofertas set enlaces_alternativos=null")
+                primeras = c.execute("select id,vacante_id from public.ofertas order by id limit 50").fetchall()
+                c.execute("set local role service_role")
+                c.execute("set local statement_timeout='3s'")
+                r = c.execute("select public.reconciliar_ofertas_lote(0,50)").fetchone()[0]
+                c.execute("reset role")
+                tocadas = {i for (i,) in c.execute("select id from public.ofertas where enlaces_alternativos is not null")}
+                assert tocadas == {i for i, vacante in primeras if vacante} and r['siguiente'] == primeras[-1][0]
+                assert r['archivadas'] == 0
             # Un prefijo explícito puede llevar a una equivalencia implícita válida; un ciclo explícito no.
             for datos, motivo in [
                 ("""insert into public.catalogo_vacantes(id,datos,status,observed_at) values

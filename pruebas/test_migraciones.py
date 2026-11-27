@@ -26,6 +26,7 @@ def test_perfil_revierte_y_no_imprime_contexto_privado(capsys):
             if sql == 'select public.reconciliar_ofertas()': raise Fallo('DATO-PRIVADO')
             return self
         def fetchall(self): return [('catalogo', 24000)]
+        def fetchone(self): return (None,)  # sin SQL 021: se mide la función de una llamada
     c = Conexion()
     assert diagnostico_migraciones.perfilar(c) is False
     salida = capsys.readouterr().out
@@ -55,7 +56,7 @@ def sin_archivos_reales_de_actions(monkeypatch):
 
 def test_migraciones_en_orden_y_hash_del_sql_original():
     versiones = migraciones.descubrir()
-    assert [m.version for m in versiones] == ["001", "002", "003", "004", "005", "006", "007", "008", "009", "010", "011", "012", "013", "014", "015", "016", "017", "018", "019", "020"]
+    assert [m.version for m in versiones] == ["001", "002", "003", "004", "005", "006", "007", "008", "009", "010", "011", "012", "013", "014", "015", "016", "017", "018", "019", "020", "021"]
     assert all(len(m.digest) == 64 for m in versiones)
     assert "begin;\n" not in versiones[1].cuerpo.lower()
     assert "begin\n" in versiones[1].cuerpo.lower()  # conserva el cuerpo PL/pgSQL

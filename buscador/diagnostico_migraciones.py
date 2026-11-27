@@ -4,8 +4,24 @@ import re
 import time
 
 import psycopg
+from psycopg import sql
 
 from buscador import migraciones, supabase
+
+
+def medir_lotes(conn):
+    """Recorrer los lotes de SQL 021 como la API: cada uno es una sentencia con su propio límite de tiempo."""
+    from buscador.supabase import LOTES_RECONCILIACION
+    lotes, mas_lento, archivadas, r = 0, 0, 0, {}
+    for funcion, desde, limite in LOTES_RECONCILIACION:
+        while desde is not None:
+            t0 = time.perf_counter()
+            consulta = sql.SQL("select public.{}(%s,%s)").format(sql.Identifier(funcion))
+            r = conn.execute(consulta, (desde, limite)).fetchone()[0]
+            mas_lento = max(mas_lento, round((time.perf_counter() - t0) * 1000))
+            lotes, archivadas, desde = lotes + 1, archivadas + int(r.get("archivadas") or 0), r.get("siguiente")
+    return {"lotes": lotes, "lote_mas_lento_ms": mas_lento, "archivadas": archivadas,
+            "filas_unicas": r.get("filas_unicas"), "sin_identificar": r.get("sin_identificar")}
 
 
 def perfilar(conn):
@@ -25,7 +41,10 @@ def perfilar(conn):
             conn.execute("set local role service_role")
             conn.execute("set local lock_timeout='1s'")
             conn.execute("set local statement_timeout='3s'")
-            resultado = conn.execute("select public.reconciliar_ofertas()").fetchone()[0]
+            if conn.execute("select to_regprocedure('public.reconciliar_ofertas_lote(bigint,integer)')").fetchone()[0]:
+                resultado = medir_lotes(conn)
+            else:
+                resultado = conn.execute("select public.reconciliar_ofertas()").fetchone()[0]
         print({"perfil_revertido_ms":round((time.perf_counter()-t0)*1000),"resultado":resultado}, flush=True)
         return True
     except psycopg.Error as e:
@@ -56,7 +75,9 @@ def identidades(conn):
 # se pueden ensayar igual. 018 solo añade la columna `panel_revisiones.resumen` (contrato v34). 019 solo reemplaza
 # las funciones `panel_publicar` y `panel_publicar_hoy` («Confirmar y aplicar», contrato v43), sin tablas ni datos.
 # 020 solo añade el número corto de cada vacante (`catalogo_vacantes.numero`, su secuencia y disparadores; contrato v48).
-ENSAYABLES = {"006", "007", "008", "009", "010", "011", "012", "013", "014", "015", "016", "017", "018", "019", "020"}
+# 021 solo reemplaza la reconciliación por lotes cortos y añade un índice parcial; sin tablas ni datos nuevos.
+ENSAYABLES = {"006", "007", "008", "009", "010", "011", "012", "013", "014", "015", "016", "017", "018", "019", "020",
+              "021"}
 
 
 def ensayar(conn):
@@ -70,11 +91,12 @@ def ensayar(conn):
             raise RuntimeError("Este ensayo admite únicamente las migraciones " + "/".join(sorted(ENSAYABLES)) +
                                " de esta revisión; usar el instalador respaldado para otras versiones.")
         migraciones.aplicar(conn, pendientes)
-        if any(m.version in {"008", "010", "011"} for m in pendientes):
+        if any(m.version in {"008", "010", "011", "021"} for m in pendientes):
             conn.execute("set local statement_timeout='3s'")
             conn.execute("set local role service_role")
             t0 = time.perf_counter()
-            resultado = conn.execute("select public.reconciliar_ofertas()").fetchone()[0]
+            resultado = (medir_lotes(conn) if any(m.version == "021" for m in pendientes)
+                         else conn.execute("select public.reconciliar_ofertas()").fetchone()[0])
             print({"reconciliacion_indexada_ms":round((time.perf_counter()-t0)*1000), "resultado":resultado},flush=True)
         return [m.version for m in pendientes]
 

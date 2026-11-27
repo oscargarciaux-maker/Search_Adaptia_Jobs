@@ -38,15 +38,20 @@ def poblar(c, catalogo, explicitas, ofertas):
     c.execute("analyze")
 
 
-def medir(c, consulta="select public.reconciliar_ofertas()"):
-    tiempos = []
+def medir(c, lotes=False):
+    """Mejor de tres, siempre revertido. Con `lotes`, también el lote más lento (lo que ve el límite de la API)."""
+    from buscador.diagnostico_migraciones import medir_lotes
+    tiempos, mas_lento = [], []
     for _ in range(3):
-        with c.transaction():
+        with c.transaction(force_rollback=True):
             c.execute("set local role service_role")
             t0 = time.perf_counter()
-            c.execute(consulta)
+            if lotes:
+                mas_lento.append(medir_lotes(c)["lote_mas_lento_ms"])
+            else:
+                c.execute("select public.reconciliar_ofertas()")
             tiempos.append(round((time.perf_counter() - t0) * 1000))
-    return min(tiempos)
+    return {"total_ms": min(tiempos), **({"lote_mas_lento_ms": min(mas_lento)} if lotes else {})}
 
 
 def main():
@@ -57,7 +62,7 @@ def main():
         return psycopg.connect(host="127.0.0.1", port=os.environ.get("PGPORT", "5432"), user="postgres",
                                password=os.environ.get("PGPASSWORD", "prueba-migraciones"), dbname=db, autocommit=True)
     escenarios = [(int(x) for x in e.split(":")) for e in
-                  os.environ.get("ESCENARIOS", "60000:0:1000,60000:10000:1000,60000:0:5000,150000:15000:5000").split(",")]
+                  os.environ.get("ESCENARIOS", "20000:4000:1000,20000:4000:6000").split(",")]
     for catalogo, explicitas, ofertas in escenarios:
         nombre = "adaptia_medir_" + uuid4().hex
         with conectar() as admin:
@@ -67,13 +72,17 @@ def main():
                     admin.execute(sql.SQL("create role {} {}").format(sql.Identifier(rol), sql.SQL("bypassrls") if rol == "service_role" else sql.SQL("")))
         try:
             with conectar(nombre) as c:
+                ms = migraciones.descubrir()
                 with c.transaction():
-                    migraciones.aplicar(c, migraciones.descubrir())
+                    migraciones.aplicar(c, [m for m in ms if m.version < "021"])
                 t0 = time.perf_counter()
                 poblar(c, catalogo, explicitas, ofertas)
                 poblado = round(time.perf_counter() - t0)
-                print(json.dumps({"catalogo": catalogo, "explicitas": explicitas, "ofertas": ofertas,
-                                  "poblado_s": poblado, "reconciliar_ms": medir(c)}), flush=True)
+                antes = medir(c)  # SQL 011: todas las ofertas en una sola llamada
+                with c.transaction():
+                    migraciones.aplicar(c, [m for m in ms if m.version >= "021"])
+                print(json.dumps({"catalogo": catalogo, "explicitas": explicitas, "ofertas": ofertas, "poblado_s": poblado,
+                                  "sql_011": antes, "sql_021": medir(c, lotes=True)}), flush=True)
         finally:
             with conectar() as admin:
                 admin.execute(sql.SQL("drop database {}").format(sql.Identifier(nombre)))
