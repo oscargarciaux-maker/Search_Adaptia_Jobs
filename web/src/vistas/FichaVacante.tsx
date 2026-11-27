@@ -208,6 +208,20 @@ export function Descripcion({ id, enlace }: { id: string; enlace?: string }) {
   );
 }
 
+// Contrato v9: la vacante entró por ampliación (p. ej. una remota para un perfil presencial). Se marca en la lista y
+// en la ficha; el mensaje de WhatsApp la incluye después de las demás formales, sin la marca.
+export function EtiquetaAmpliada({ v }: { v: Vacante }) {
+  if (!v.ampliacion) return null;
+  return (
+    <span
+      className="amplified"
+      title="Entró por ampliación para completar a un perfil que va corto. En el mensaje de WhatsApp va después de las demás vacantes, sin esta marca."
+    >
+      Ampliada: {v.ampliacion}
+    </span>
+  );
+}
+
 export function FichaVacante({
   v,
   volver,
@@ -267,14 +281,7 @@ export function FichaVacante({
             {a}
           </span>
         ))}
-        {v.ampliacion && (
-          <span
-            className="amplified"
-            title="Entró para completar el mínimo de 5 vacantes de este perfil. No aparece en el mensaje de WhatsApp."
-          >
-            Ampliada: {v.ampliacion}
-          </span>
-        )}
+        <EtiquetaAmpliada v={v} />
       </div>
       <div className="ficha-acciones">
         <span className="ficha-comprobacion">
