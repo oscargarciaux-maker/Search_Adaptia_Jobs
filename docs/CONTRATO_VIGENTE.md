@@ -70,6 +70,11 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
   postales, provincias de Canadá y Australia, «US-Remote» y apodos de `datos/alias_lugares.yaml` (v38). Áreas
   metropolitanas de `datos/areas_metropolitanas.yaml` (v32). Una región como ubicación vale solo si el aviso no es
   presencial ni híbrido; vale la región del título si la ubicación no dice ningún lugar (v19).
+- **El país escrito al final manda** en una ubicación de un solo lugar («ciudad, región, país», un único país con su
+  nombre): el nombre de un estado o región de otro país en los tramos de antes no suma ese país («Califórnia, Paraná,
+  Brasil» es solo Brasil; «Birmingham, Alabama, United States», solo EE. UU.). Los errores conocidos de un portal se
+  corrigen por texto exacto en `datos/ubicaciones_corregidas.yaml`, con evidencia del aviso («California, Pará,
+  Brasil» de LinkedIn es EE. UU.) (7.E, 27 nov).
 - «Autorizado para trabajar en el país» se refiere al país del propio aviso (v14). `puede_trabajar_en` admite hasta 60
   países y el importador acepta regiones (v26).
 - **Get on Board:** `fully_remote` = cualquier país; `remote_local` = los países de `location_tenants`; sin país,

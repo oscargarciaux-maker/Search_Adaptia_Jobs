@@ -21,6 +21,7 @@ RUTA_MUNDO = RUTA.parent / "paises_mundo.yaml"
 RUTA_LUGARES = RUTA.parent / "lugares_mundo.json.gz"  # contrato v19: GeoNames (CC BY 4.0), generado
 RUTA_AREAS = RUTA.parent / "areas_metropolitanas.yaml"  # contrato v32
 RUTA_ALIAS = RUTA.parent / "alias_lugares.yaml"  # contrato v38
+RUTA_CORREGIDAS = RUTA.parent / "ubicaciones_corregidas.yaml"  # 7.E: errores conocidos de un portal
 _METRO = re.compile(r"^(?:area metropolitana de |region metropolitana de |greater )(.+?)(?: area| metropolitan area)?$|"
                     r"^(.+?) (?:y alrededores|and surrounding areas|metropolitan area|area metropolitana|area)$")
 
@@ -70,6 +71,21 @@ def alias_lugares():
 def alias_ciudad(nombre):
     """Contrato v38: la ciudad a la que equivale un apodo («nyc» → «new york city»), o el mismo nombre."""
     return _alias().get(nombre, ("", ""))[1] or nombre
+
+
+@lru_cache(maxsize=1)
+def ubicaciones_corregidas():
+    """7.E (27 nov): ubicación entera que un portal escribe mal → la que dice el aviso (`datos/ubicaciones_corregidas.yaml`)."""
+    try:
+        crudo = yaml.safe_load(RUTA_CORREGIDAS.read_text(encoding="utf-8")) or {}
+    except OSError:
+        return {}
+    return {clave(k): str(v) for k, v in crudo.items()}
+
+
+def corregir_ubicacion(ubicacion):
+    """La ubicación corregida si el texto entero está en `datos/ubicaciones_corregidas.yaml`; si no, la misma."""
+    return ubicaciones_corregidas().get(clave(ubicacion), ubicacion or "")
 
 _REMOTO = re.compile(r"\b(remote|remoto|remota|remotely|teletrabajo|home ?office|work from home|wfh|trabajo a distancia|"
                      r"100% remoto|distributed|fully distributed|anywhere|desde casa|trabajo desde casa|remote work)\b")
@@ -414,8 +430,9 @@ NOTA_INCIERTA = "confirmar países: fuentes con ubicación incierta"
 
 def lugar_del_portal(localizacion, pais, nombre_pais, remoto=False):
     """Contrato v50: la ubicación de un aviso de un portal de un solo país: «Localidad, Provincia» más el país del
-    portal. En una remota, si la localidad se llama como un lugar de otro país («Palermo», «Florida», «Concepción del
-    Uruguay»), se quita: el aviso es del país de su portal y no debe abrir otro. En una presencial o híbrida la
+    portal. En una remota, si la localidad abre otro país aun con el del portal al final («Concepción del Uruguay»), se
+    quita: el aviso es del país de su portal y no debe abrir otro (desde 7.E, «Palermo» o «Florida» seguidas del país ya
+    no abren Italia ni EE. UU. y se conservan). En una presencial o híbrida la
     localidad se conserva siempre: sin ciudad no le llega a nadie (v49), y ahí el país lo decide la ciudad del perfil
     («Granada, España» se quedaba en «España» por la isla de Granada)."""
     tramos = [t.strip() for t in localizacion.split(",") if t.strip()] if isinstance(localizacion, str) else []
@@ -717,6 +734,7 @@ def cargar_reglas(reglas=()):
 def elegibles(titulo, ubicacion, descripcion="", remoto=None):
     """Países desde los que se puede aplicar, con modalidad, confianza y una nota corta (y, desde v23, `paises_mundo`,
     `alcance_mundial` y `zona_utc`)."""
+    ubicacion = corregir_ubicacion(ubicacion)
     r = {**_elegibles(titulo, ubicacion, descripcion, remoto), **alcance(titulo, ubicacion, descripcion)}
     restriccion = r.pop("_restriccion")
     if restriccion and r["modalidad"] == "remoto":
@@ -833,6 +851,20 @@ def _paises_por_sigla(ubicacion, nombrados=()):
     return hallados
 
 
+def _estados_de_otro_pais(ubicacion):
+    """7.E (27 nov): en «Califórnia, Paraná, Brasil» el país escrito al final manda: los países que solo suman los
+    nombres de estados o regiones de otro país en los tramos de antes («California» → EE. UU.) se quitan.
+    «Birmingham, Alabama, United States» no es Reino Unido. Solo si la ubicación es un lugar: un único país escrito con
+    su nombre y sin «;», «|» ni «/», que separan varios. La modalidad al final («(Remoto)») no cuenta como tramo."""
+    if re.search(r"[;|/]", ubicacion or ""):
+        return set()
+    lugares = [c[0] for t in _tramos(ubicacion) if (c := _candidatos_tramo(t))]
+    pais_final = mundo()["pais_de"].get(lugares[-1]) if len(lugares) > 1 else None
+    if not pais_final or paises_por_nombre_entero(" , ".join(lugares)) != {pais_final}:
+        return set()
+    return {c for t in lugares[:-1] for c in paises_en_texto(t) - paises_por_nombre_entero(t)} - {pais_final}
+
+
 def alcance(titulo, ubicacion, descripcion=""):
     """Contrato v23: países que el aviso nombra como lugar o como alcance permitido (cubiertos o no), si es remoto para
     cualquier lugar y la franja horaria que pide. Sin IA: tabla ISO y las mismas frases de residencia del motor."""
@@ -859,6 +891,7 @@ def alcance(titulo, ubicacion, descripcion=""):
     for t in tramos[1:]:  # «Atlanta, Georgia»: la ciudad es de EE. UU., así que Georgia es el estado
         if ciudad and ciudad in mundo()["homonimos"].get(t, ()):
             hallados = (hallados - {mundo()["pais_de"][t]}) | {ciudad}
+    hallados -= _estados_de_otro_pais(ubicacion)
     # Contrato v32: LinkedIn muestra muchas de EE. UU. como «Chicago, IL», «Austin, TX» o «Remote, US». Sin esto no
     # tenían país y se descartaban al entrar, aunque un perfil viva en EE. UU. AR, CO y PA también son países cubiertos:
     # esos tres siguen por la regla de v15.
