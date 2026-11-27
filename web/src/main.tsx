@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Check, Loader2, ShieldCheck, X } from "lucide-react";
 import { api } from "./api";
@@ -6,11 +6,9 @@ import type {
   Cargo,
   Cliente,
   EstadoConfig,
-  Resultados,
   Sesion,
   Ejecucion,
   Borrador,
-  Contacto,
   Revisiones,
   ResumenClientes,
 } from "./types";
@@ -32,6 +30,8 @@ import { InicioSesion } from "./vistas/InicioSesion";
 import { Cabecera } from "./vistas/Cabecera";
 import { useConfiguracion } from "./configuracion";
 import { SeccionResumen } from "./vistas/SeccionResumen";
+import { useResultados } from "./resultados";
+import { useContactos } from "./contactos";
 import "./style.css";
 
 // Contrato v22: prioridades que solo ordenan y restricciones que descartan con evidencia clara.
@@ -83,7 +83,6 @@ function App() {
       id: string;
       nombre: string;
     } | null>(null),
-    [results, setResults] = useState<Resultados | null>(null),
     [selectedClient, setSelectedClient] = useState(""),
     [resultDate, setResultDate] = useState(""),
     [search, setSearch] = useState(""),
@@ -105,42 +104,19 @@ function App() {
     cambiar,
     aplicar,
   } = useConfiguracion(notify);
-  const peticionResultados = useRef(0);
-  // Contrato v48: al llegar desde «Tomar vacantes» del detalle, el foco queda en «Copiar WhatsApp».
-  const enfocarWhatsApp = useRef(false);
-  const botonWhatsApp = useRef<HTMLButtonElement>(null);
-  const [focoWhatsApp, setFocoWhatsApp] = useState(0);
-  const [loadingResults, setLoadingResults] = useState(false);
-  const [errorResultados, setErrorResultados] = useState(false);
+  const {
+    results,
+    enfocarWhatsApp,
+    botonWhatsApp,
+    loadingResults,
+    errorResultados,
+    cargarResultados,
+    diaResultados,
+    diaAnterior,
+    paraCopiar,
+  } = useResultados(sesion, selectedClient, resultDate, tab, notify);
+  const { contactos, cargarContactos, guardarContacto } = useContactos(notify);
   const [porConfirmar, setPorConfirmar] = useState(0);
-  // Sesión de prueba (17 nov): quién inició sesión, visible arriba.
-  // Contrato v30: los WhatsApp se cargan con el panel para que el formulario del cliente abra sin esperar.
-  const [contactos, setContactos] = useState<Record<string, Contacto>>({});
-  function cargarContactos() {
-    api<Record<string, Contacto>>("/contactos")
-      .then(setContactos)
-      .catch(() => undefined);
-  }
-  // Se guarda sin hacer esperar al formulario: se ve al momento y, si falla, se avisa y se vuelve a leer.
-  function guardarContacto(id: string, ct: Contacto, tenia: boolean) {
-    const borrar = !ct.telefono.trim();
-    setContactos((actuales) => {
-      const copia = { ...actuales };
-      if (borrar) delete copia[id];
-      else copia[id] = ct;
-      return copia;
-    });
-    if (borrar && !tenia) return;
-    api(
-      "/contactos/" + id,
-      borrar
-        ? { method: "DELETE" }
-        : { method: "PUT", body: JSON.stringify(ct) },
-    ).catch((e) => {
-      notify("No se guardó el WhatsApp: " + (e as Error).message, true);
-      cargarContactos();
-    });
-  }
   const [pendientesPorCliente, setPendientesPorCliente] = useState<
     Record<string, number>
   >({});
@@ -276,49 +252,6 @@ function App() {
     window.addEventListener("beforeunload", alerta);
     return () => window.removeEventListener("beforeunload", alerta);
   }, [dirty]);
-  async function cargarResultados() {
-    const turno = ++peticionResultados.current;
-    if (!sesion?.sesion) return;
-    setLoadingResults(true);
-    setResults(null);
-    setErrorResultados(false);
-    try {
-      const r = await api<Resultados>(
-        "/resultados?" +
-          new URLSearchParams({
-            ...(selectedClient ? { cliente_id: selectedClient } : {}),
-            ...(resultDate ? { fecha: resultDate } : {}),
-          }),
-      );
-      if (turno === peticionResultados.current) {
-        setResults(r);
-        // Contrato v48: al llegar desde «Tomar vacantes», el foco va a «Copiar WhatsApp» con los datos de ese día.
-        if (enfocarWhatsApp.current) setFocoWhatsApp((n) => n + 1);
-      }
-    } catch (e) {
-      if (turno === peticionResultados.current) {
-        setErrorResultados(true);
-        notify((e as Error).message, true);
-      }
-    } finally {
-      if (turno === peticionResultados.current) {
-        setLoadingResults(false);
-        enfocarWhatsApp.current = false;
-      }
-    }
-  }
-  // Contrato v46 (velocidad): las vacantes solo se piden en su pestaña; antes, entrar por #mensajes también las pedía.
-  const enVacantes = tab === "Vacantes";
-  useEffect(() => {
-    if (enVacantes) cargarResultados();
-  }, [selectedClient, resultDate, sesion?.sesion, enVacantes]);
-  useEffect(() => {
-    if (focoWhatsApp) botonWhatsApp.current?.focus();
-  }, [focoWhatsApp]);
-  // Contrato v48: el servidor dice si es de un día anterior y cuántas se pueden copiar.
-  const diaResultados = (results?.ejecucion?.fecha || "").slice(0, 10);
-  const diaAnterior = Boolean(results?.dia_anterior);
-  const paraCopiar = results?.para_copiar ?? results?.listas ?? 0;
   const {
     descargandoBase,
     csvFecha,
