@@ -6,11 +6,16 @@ solo acepta español y solo remoto, y cuántas tienen el enlace comprobado?; 3) 
 sin que las funciones lo respalden? Solo imprime conteos y títulos públicos de avisos.
 
     python -m buscador.medicion --bodega trabajo/bodega.json.gz
+
+Sección 7 (objetivo mundial): `--mundial` mide 8 escenarios ficticios del modo panel por etapa y `--comparar
+pruebas/datos/linea_base_mundial.json` compara con la línea base y falla si cambia el control (docs/LINEA_BASE_MUNDIAL.md).
 """
 import argparse
 import gzip
+import hashlib
 import json
 from collections import Counter
+from time import perf_counter
 from uuid import NAMESPACE_DNS, uuid5
 
 from buscador import paises
@@ -24,17 +29,27 @@ def _id(nombre):
     return str(uuid5(NAMESPACE_DNS, "adaptia.medicion." + nombre))
 
 
+def cargo_crudo(nombre):
+    """Un cargo como lo guardaría el panel con «Buscar denominaciones afines» (lo que acepta `panel.modelos.Cargo`)."""
+    from panel.terminos import sugerir
+    s = sugerir(nombre, consultar_esco=False)
+    return {"id": _id(nombre), "nombre": nombre, "cupo": 20, "activo": True,
+            "terminos_exactos": s["terminos_exactos"], "terminos_similares": s["terminos_similares"],
+            "terminos_excluidos": [], "terminos_cercanos": [], "funciones": []}
+
+
+def huella_ficticia(cargo, vacantes):
+    """La huella de funciones que se calcularía esa noche para `cargo` con estas vacantes (contrato v49)."""
+    from panel.contenido import huellas_automaticas
+    return huellas_automaticas(vacantes, [cargo]).get(cargo["id"]) if vacantes else ()
+
+
 def cargo_ficticio(nombre, vacantes=()):
     """Un cargo como lo dejaría el panel con «Buscar denominaciones afines», sin tocar nada guardado. Con `vacantes`,
     también con la huella de funciones que se calcularía esa noche (contrato v49)."""
-    from panel.contenido import cargo_operativo, huellas_automaticas
-    from panel.terminos import sugerir
-    s = sugerir(nombre, consultar_esco=False)
-    cargo = {"id": _id(nombre), "nombre": nombre, "cupo": 20, "activo": True, "terminos_exactos": s["terminos_exactos"],
-             "terminos_similares": s["terminos_similares"], "terminos_excluidos": [], "terminos_cercanos": [],
-             "funciones": []}
-    huella = huellas_automaticas(vacantes, [cargo]).get(cargo["id"]) if vacantes else ()
-    return cargo_operativo(cargo, huella_auto=huella)
+    from panel.contenido import cargo_operativo
+    cargo = cargo_crudo(nombre)
+    return cargo_operativo(cargo, huella_auto=huella_ficticia(cargo, vacantes))
 
 
 def perfil(pais, idiomas=("es", "en"), modalidades=("remoto",), ciudades=()):
@@ -174,20 +189,225 @@ def medir(vacantes, hoy=None):
             "solo_espanol_remoto": embudo_espanol(vacantes, hoy, cargos), "funciones": evidencias(vacantes, cargos)}
 
 
-def main():
+# ── Línea base del objetivo mundial (sección 7) ───────────────────────────────────────────────────────────────────
+# Antes de quitar las restricciones LATAM/España/Brasil del código, se mide el comportamiento ACTUAL del modo panel con
+# perfiles ficticios, para comparar después de cada sub-tarea (7.1–7.4). Solo conteos y tiempos: nunca títulos.
+# Cada escenario es un cliente ficticio con un perfil por cada cargo de `CARGOS`, todos con el mismo lugar e idioma.
+
+# LATAM tal como lo expande hoy el panel (`panel.revision.expandir(["LATAM"])`), escrito a mano para que el control no
+# cambie si 7.x añade Brasil a la región.
+LATAM_HOY = ["AR", "BO", "CL", "CO", "CR", "CU", "DO", "EC", "GT", "HN", "MX", "NI", "PA", "PE", "PR", "PY", "SV", "UY",
+             "VE"]
+ESCENARIOS = {
+    "a": {"nombre": "Brasil, inglés, remoto mundial", "idiomas": ["en"],
+          "filas": [{"paises": ["BR"], "modalidades": ["remoto"]}]},
+    "b": {"nombre": "Brasil, inglés, presencial en São Paulo", "idiomas": ["en"],
+          "filas": [{"paises": ["BR"], "ciudades": ["São Paulo"], "modalidades": ["presencial"]}]},
+    "c": {"nombre": "EE. UU., solo español, remoto mundial", "idiomas": ["es"],
+          "filas": [{"paises": ["US"], "modalidades": ["remoto"]}]},
+    "d": {"nombre": "Colombia, solo inglés, remoto mundial", "idiomas": ["en"],
+          "filas": [{"paises": ["CO"], "modalidades": ["remoto"]}]},
+    "e": {"nombre": "Alemania, inglés, híbrido en Berlín", "idiomas": ["en"],
+          "filas": [{"paises": ["DE"], "ciudades": ["Berlin"], "modalidades": ["hibrido"]}]},
+    "f": {"nombre": "Kenia, inglés, remoto mundial (sin fuentes locales)", "idiomas": ["en"],
+          "filas": [{"paises": ["KE"], "modalidades": ["remoto"]}]},
+    "g": {"nombre": "India, inglés, remoto en su país", "idiomas": ["en"],
+          "filas": [{"paises": ["IN"], "modalidades": ["remoto"]}]},
+    "h": {"nombre": "Control: Colombia, español, remoto LATAM", "idiomas": ["es"],
+          "filas": [{"paises": ["CO"], "modalidades": ["remoto"]}, {"paises": LATAM_HOY, "modalidades": ["remoto"]}]},
+}
+CONTROL = "h"
+ETAPAS = ("objetivo", "limpiar", "entregable", "afinidad", "panel")
+QUE_MIDE = {"objetivo": "del cargo, en un idioma del perfil y con un lugar que el objetivo mundial acepta",
+            "limpiar": "de esas, siguen tras `bodega.limpiar`", "entregable": "y pasan `contrato.entregable`",
+            "afinidad": "y `panel.afinidad.evaluar` las da por compatibles", "panel": "y `entrega.elegir` las ofrece"}
+META_ESCENARIO = 100  # alta a propósito: que la meta del día no esconda dónde se pierden (5 perfiles × 100 = 500)
+META_CONJUNTO = 15   # todos los escenarios juntos: 8 × 5 perfiles × 15 = 600, el techo máximo del panel
+
+
+def _nombrados(v):
+    return set(v.get("paises") or []) | set(v.get("paises_mundo") or [])
+
+
+def lugar_objetivo(v, fila):
+    """¿El objetivo mundial aceptaría esta vacante para esta fila? Regla propia y simple sobre las etiquetas ya
+    guardadas en la bodega (no usa el código que la sección 7 va a cambiar, para que esta etapa quede fija):
+    - remota: nombra un país de la fila, o es de alcance mundial sin nombrar países;
+    - presencial o híbrida: la ubicación nombra una ciudad de la fila y no nombra solo otros países."""
+    from buscador import normalizar
+    modo = v.get("modalidad")
+    if modo not in fila["modalidades"]:
+        return False
+    nombrados = _nombrados(v)
+    if modo == "remoto":
+        return bool(nombrados & set(fila["paises"])) or (bool(v.get("alcance_mundial")) and not v.get("paises_mundo"))
+    if nombrados and not nombrados & set(fila["paises"]):
+        return False
+    texto = normalizar.texto(v.get("ubicacion") or "")
+    return any(normalizar.contiene_frase(texto, normalizar.texto(c)) for c in fila.get("ciudades", []))
+
+
+def encaja_objetivo(v, escenario, cargos):
+    from panel.terminos import grado
+    if v.get("tipo") == "post" or v.get("idioma") not in escenario["idiomas"]:
+        return False
+    if not any(lugar_objetivo(v, f) for f in escenario["filas"]):
+        return False
+    return any(grado(v.get("titulo") or "", c)[0] in ("exacto", "similar") for c in cargos)
+
+
+def configuracion_ficticia(claves, crudos, meta):
+    """Una versión del panel con un cliente ficticio y, por cada escenario, un perfil en cada cargo."""
+    cliente = _id("cliente.mundial")
+    campos = ("id", "nombre", "cupo", "activo", "terminos_exactos", "terminos_similares", "terminos_excluidos",
+              "terminos_cercanos", "funciones")
+    cargos = [{k: (c[k][:30] if isinstance(c[k], list) else c[k]) for k in campos} for c in crudos]
+    perfiles = [{"id": _id(f"perfil.{clave}.{c['nombre']}"), "cliente_id": cliente, "cargo_id": c["id"],
+                 "idiomas": ESCENARIOS[clave]["idiomas"], "antiguedad_dias": 30, "meta_diaria": meta,
+                 "ubicaciones": ESCENARIOS[clave]["filas"]} for clave in claves for c in crudos]
+    return {"revision": 0, "configuracion": {"clientes": [{"id": cliente, "nombre": "Cliente ficticio"}],
+                                             "cargos": cargos, "perfiles": perfiles,
+                                             "techo_diario": meta * len(perfiles)}}
+
+
+def _correr_panel(texto, claves, crudos, huellas, hoy, meta):
+    """Pasa la bodega (copia nueva desde `texto`) por el flujo real del modo panel con estos escenarios. Devuelve
+    (vacantes tras limpiar, ids ofrecidos por `entrega.elegir`, segundos de limpiar y de la selección, perfiles)."""
+    from buscador import bodega, entrega
+    from panel import ejecutor
+    from panel.modelos import Perfil
+    version = configuracion_ficticia(claves, crudos, meta)
+    with ejecutor.activar(version, hoy, huellas=huellas) as cfg:
+        previas = json.loads(texto)
+        t0 = perf_counter()
+        limpias, _, _ = bodega.limpiar(previas, [], hoy, bodega.config()["dias_maximos"], set(), set())
+        t1 = perf_counter()
+        # La comprobación de enlaces depende de qué pidió cada noche cada cliente real: no se usa aquí (sería ruido).
+        salida, _ = entrega.elegir(limpias, set(), hoy, cfg, omitir_verificacion=True)
+        t2 = perf_counter()
+        perfiles = [Perfil.model_validate(p) for p in version["configuracion"]["perfiles"]]
+        return limpias, {v["id"] for lista in salida.values() for v, _ in lista}, (t1 - t0, t2 - t1), perfiles
+
+
+def medir_mundial(texto, hoy=None):
+    """Línea base del objetivo mundial sobre una bodega (`texto` = su JSON). Solo conteos y segundos."""
+    from buscador import contrato
+    from panel.afinidad import evaluar
+    from panel.contenido import cargo_operativo
+    vacantes = json.loads(texto)
+    hoy = hoy or max((v.get("visto_ultima_vez") or "")[:10] for v in vacantes)
+    crudos = [cargo_crudo(n) for n in CARGOS]
+    huellas = {c["id"]: huella_ficticia(c, vacantes) for c in crudos}
+    cargos = [cargo_operativo(c, huella_auto=huellas[c["id"]]) for c in crudos]
+    salida = {"hoy": hoy, "vacantes": len(vacantes), "meta_por_perfil": META_ESCENARIO, "escenarios": {}}
+    for clave, esc in ESCENARIOS.items():
+        objetivo = {v["id"] for v in vacantes if encaja_objetivo(v, esc, cargos)}
+        limpias, ofrecidas, (s_limpiar, s_elegir), perfiles = _correr_panel(texto, [clave], crudos, huellas, hoy,
+                                                                             META_ESCENARIO)
+        # Una vacante puede unirse a otra al limpiar: se sigue por su id o por los ids que absorbió.
+        por_id = {i: v for v in limpias for i in (v["id"], *v.get("_ids_fusionados", []))}
+        sigue = {por_id[i]["id"]: por_id[i] for i in objetivo if i in por_id}
+        entregables = {i for i, v in sigue.items() if not contrato.entregable(v, ("es", "en"), panel=True)}
+        compatibles = {i for i in entregables if evaluar(sigue[i], perfiles[0], hoy)["compatible"]}
+        salida["escenarios"][clave] = {
+            "nombre": esc["nombre"],
+            "etapas": {"objetivo": len(objetivo), "limpiar": len(sigue), "entregable": len(entregables),
+                       "afinidad": len(compatibles), "panel": len(ofrecidas & set(sigue))},
+            # Lo que el panel ofrece fuera de la regla del objetivo (ampliaciones, lugares que la regla no reconoce).
+            "panel_fuera_del_objetivo": len(ofrecidas - set(sigue)),
+            "admitidas": len(limpias),
+            "segundos": {"limpiar": round(s_limpiar, 2), "seleccion": round(s_elegir, 2)}}
+    limpias, ofrecidas, (s_limpiar, s_elegir), _ = _correr_panel(texto, list(ESCENARIOS), crudos, huellas, hoy,
+                                                                  META_CONJUNTO)
+    salida["conjunto"] = {"meta_por_perfil": META_CONJUNTO, "admitidas": len(limpias), "ofrecidas": len(ofrecidas),
+                          "segundos": {"limpiar": round(s_limpiar, 2), "seleccion": round(s_elegir, 2)}}
+    return salida
+
+
+def _cifras(r):
+    """Los conteos que se comparan (los segundos se muestran pero no deciden nada: cambian con la máquina)."""
+    return {**r["etapas"], "panel_fuera_del_objetivo": r["panel_fuera_del_objetivo"], "admitidas": r["admitidas"]}
+
+
+def comparar(base, ahora):
+    """(líneas de la tabla antes → después, el control cambió)."""
+    def celda(a, d):
+        return f"{a}" if a == d else f"{a}→{d} ({d - a:+d})"
+    columnas = (*ETAPAS, "panel_fuera_del_objetivo", "admitidas")
+    lineas = ["| escenario | " + " | ".join(columnas) + " | s limpiar | s selección |",
+              "|---" * (len(columnas) + 3) + "|"]
+    for clave, b in base["escenarios"].items():
+        a = ahora["escenarios"].get(clave)
+        if a is None:
+            lineas.append(f"| {clave} | (falta en la medición nueva) |")
+            continue
+        cb, ca = _cifras(b), _cifras(a)
+        tiempos = [f"{b['segundos'][k]}→{a['segundos'][k]}" for k in ("limpiar", "seleccion")]
+        lineas.append(f"| {clave} {b['nombre']} | " + " | ".join(celda(cb[k], ca[k]) for k in columnas) + " | "
+                      + " | ".join(tiempos) + " |")
+    cb, ca = base.get("conjunto"), ahora.get("conjunto")
+    if cb and ca:
+        lineas.append(f"\nTodos juntos: admitidas {celda(cb['admitidas'], ca['admitidas'])}, ofrecidas "
+                      f"{celda(cb['ofrecidas'], ca['ofrecidas'])}, s limpiar {cb['segundos']['limpiar']}→"
+                      f"{ca['segundos']['limpiar']}, s selección {cb['segundos']['seleccion']}→"
+                      f"{ca['segundos']['seleccion']}")
+    control = ahora["escenarios"].get(CONTROL)
+    cambio = control is None or _cifras(base["escenarios"][CONTROL]) != _cifras(control)
+    return lineas, cambio
+
+
+def _sha256(ruta):
+    h = hashlib.sha256()
+    with open(ruta, "rb") as f:
+        for bloque in iter(lambda: f.read(1 << 20), b""):
+            h.update(bloque)
+    return h.hexdigest()
+
+
+def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--bodega", required=True, help="trabajo/bodega.json.gz de una búsqueda")
     p.add_argument("--hoy", help="fecha de la medición (por defecto, la última en que se vio una vacante)")
     p.add_argument("--reetiquetar", action="store_true",
                    help="vuelve a leer país, modalidad e idioma con el código actual (como hará la próxima búsqueda)")
-    a = p.parse_args()
+    p.add_argument("--mundial", action="store_true", help="línea base del objetivo mundial (escenarios a–h)")
+    p.add_argument("--guardar", help="con --mundial: escribe la línea base en este archivo")
+    p.add_argument("--commit", default="", help="con --guardar: SHA del commit de `publicado` de donde salió la bodega")
+    p.add_argument("--comparar", help="línea base guardada: imprime antes → después y falla si cambia el control (h)")
+    a = p.parse_args(argv)
+    if a.mundial or a.comparar:
+        with gzip.open(a.bodega, "rt", encoding="utf-8") as f:
+            texto = f.read()
+        sha = _sha256(a.bodega)
+        if a.comparar:
+            with open(a.comparar, encoding="utf-8") as f:
+                base = json.load(f)
+            if base["bodega"]["sha256"] != sha:
+                print("La bodega no es la fijada en la línea base (sha256 distinto): la comparación no vale.")
+                return 2
+            lineas, cambio = comparar(base, medir_mundial(texto, a.hoy or base["hoy"]))
+            print("\n".join(lineas))
+            if cambio:
+                print(f"\nFALLA: el escenario de control ({CONTROL}) cambió y debía quedar igual.")
+                return 1
+            print(f"\nEl escenario de control ({CONTROL}) no cambió.")
+            return 0
+        r = medir_mundial(texto, a.hoy)
+        r = {"bodega": {"commit": a.commit, "sha256": sha, "vacantes": r["vacantes"]}, **r}
+        salida = json.dumps(r, ensure_ascii=False, indent=1)
+        if a.guardar:
+            with open(a.guardar, "w", encoding="utf-8", newline="\n") as f:
+                f.write(salida + "\n")
+        print(salida)
+        return 0
     with gzip.open(a.bodega, "rt", encoding="utf-8") as f:
         vacantes = json.load(f)
     if a.reetiquetar:
         from buscador import vacante
         vacantes = [vacante.reetiquetar(dict(v)) for v in vacantes]
     print(json.dumps(medir(vacantes, a.hoy), ensure_ascii=False, indent=1))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
