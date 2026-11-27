@@ -29,6 +29,14 @@ def credenciales():
     return (url, clave) if url and clave else (None, None)
 
 
+def cabeceras(clave):
+    """`apikey` siempre; `Authorization` solo con la clave antigua (JWT `eyJ…`): la nueva `sb_secret_` va solo en apikey."""
+    salida = {"apikey": clave}
+    if clave.startswith("eyJ"):
+        salida["Authorization"] = f"Bearer {clave}"
+    return salida
+
+
 def _lista(texto):
     partes = [p.strip() for p in str(texto or "").split("|") if p.strip()]
     return partes or None
