@@ -223,7 +223,8 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
   ronda. Los demás sitios van en paralelo. Primero lo de quien va corto (`cola_por_necesidad`) (v39, v41, v49, v50).
 - Presupuestos: 800 enlaces en 10 min por búsqueda diaria; rescate hasta 200 enlaces en 5 min (30 en 60 s en las
   horarias); en «Buscar ahora» para quien falta, 240 s con el tiempo de ordenar incluido y 60 s reservados al refuerzo
-  (v36, v39, v48, v49).
+  (v36, v39, v48, v49). El rescate comprueba hasta 3 candidatas por plaza que falta; una ampliada solo si todavía
+  puede entrar, y hasta 3 por plaza que queda bajo el mínimo de 5 (7.E, 27 nov).
 - Un enlace rechazado no invalida otro comprobado de la misma oferta; nunca se borra del histórico. Las vistas de SQL
   004 son del modo heredado y conservan su criterio de 6 h (v3, v4).
 

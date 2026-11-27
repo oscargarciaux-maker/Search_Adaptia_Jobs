@@ -87,3 +87,37 @@ def test_penetration_tester_sigue_siendo_ciberseguridad():
     pentester = cargo_operativo(cargo_crudo("Pentester"))
     assert grado("Penetration Tester", pentester)[0] == "exacto"
     assert grado("Analista de Pentesting", pentester)[0] == "similar"
+
+
+# ── 3. Eficiencia del rescate ────────────────────────────────────────────────────────────────────────────────────────
+def _sin_comprobar(n, ubicacion, remoto):
+    v = _comprobada(n, ubicacion, remoto)
+    v["verificacion"]["enlaces"] = []
+    return v
+
+
+def test_el_rescate_no_comprueba_ampliadas_para_quien_ya_tiene_5(meta_diez, monkeypatch):  # noqa: F811
+    from buscador import verificar_enlaces
+    pedidas = []
+    monkeypatch.setattr(verificar_enlaces, "auditar", lambda vacantes, cache, **_: pedidas.extend(vacantes) or 0)
+    ayer = (date.fromisoformat(hoy()) - timedelta(days=1)).isoformat()
+    previas = [{"delivery_date": ayer, "role_id": "otro", "vacante_id": v["id"], "match_grade": "exact", "snapshot": v}
+               for v in [_comprobada(n, "Bogotá, Colombia", None) for n in range(MINIMO_POR_PERFIL)]]
+    remotas = [_sin_comprobar(10 + n, "Remote - Colombia", True) for n in range(8)]
+    en_su_ciudad = [_sin_comprobar(30 + n, "Bogotá, Colombia", None) for n in range(2)]
+    repo = _Supabase(previas)  # reutilizar le da 5 de su ciudad: las remotas ya no pueden entrar
+    ejecutor.registrar(repo, {"revision": 1, "configuracion": meta_diez}, hoy(), vacantes=remotas + en_su_ciudad,
+                       cache_enlaces={})
+    assert len(_recibidas(repo, meta_diez)) == MINIMO_POR_PERFIL
+    # Antes se pedían las 10 (3 por plaza que falta hasta la meta); ahora solo las 2 que pueden entrar.
+    assert {v["id"] for v in pedidas} == {v["id"] for v in en_su_ciudad}
+
+
+def test_el_rescate_si_comprueba_ampliadas_mientras_caben(meta_diez, monkeypatch):  # noqa: F811
+    from buscador import verificar_enlaces
+    pedidas = []
+    monkeypatch.setattr(verificar_enlaces, "auditar", lambda vacantes, cache, **_: pedidas.extend(vacantes) or 0)
+    remotas = [_sin_comprobar(10 + n, "Remote - Colombia", True) for n in range(20)]
+    ejecutor.registrar(_Supabase(), {"revision": 1, "configuracion": meta_diez}, hoy(), vacantes=remotas,
+                       cache_enlaces={})
+    assert len(pedidas) == MINIMO_POR_PERFIL * 3  # 3 por plaza de ampliada (antes 20: 3 por plaza hasta la meta)

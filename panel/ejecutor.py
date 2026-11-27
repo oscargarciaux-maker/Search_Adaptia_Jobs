@@ -619,11 +619,24 @@ def _rescatar(repo, cfg, fecha, completar, filas, fila, vacantes, operativos, ca
     # 2) Comprobar al momento los enlaces de las que podrían entrar (las 3 mejores por plaza que falta).
     # Contrato v49: por turnos y primero quien tiene menos candidatas (con pocas en español, cada enlace cuenta); antes
     # el presupuesto se iba en los primeros perfiles de la lista.
+    # 7.E: una ampliada solo se comprueba si todavía puede entrar (7.A: completan hasta el mínimo de 5), y como mucho 3
+    # por plaza de ampliada que queda. Antes se gastaba la comprobación en remotas para quien ya tenía 5.
+    def comprobables(p, lista):
+        cupo = max(0, MINIMO_POR_PERFIL - completar.estrictas.get(p.id, 0)) * 3
+        salida = []
+        for item in lista:
+            if item[5]:  # `extra`: es una ampliación
+                if not cupo:
+                    continue
+                cupo -= 1
+            salida.append(item)
+        return salida
+    a_mirar = {(cargo.id, p.id): comprobables(p, candidatas[(cargo.id, p.id)]) for cargo, p in bajos}
     por_comprobar, ya = [], set()
     turnos = sorted(bajos, key=lambda cp: len(candidatas[(cp[0].id, cp[1].id)]))
     for i in range(max((completar.falta(p) * 3 for _, p in bajos), default=0)):
         for cargo, p in turnos:
-            lista = candidatas[(cargo.id, p.id)]
+            lista = a_mirar[(cargo.id, p.id)]
             if i >= completar.falta(p) * 3 or i >= len(lista):
                 continue
             v = lista[i][2]
