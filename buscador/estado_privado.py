@@ -269,10 +269,7 @@ def _conexion():
     url, clave = supabase.credenciales()
     if not url or not clave:
         return None, None
-    cabeceras = {"apikey": clave}
-    if clave.startswith("eyJ"):
-        cabeceras["Authorization"] = f"Bearer {clave}"
-    return url, cabeceras
+    return url, supabase.cabeceras(clave)
 
 
 def _empacar(datos):

@@ -265,9 +265,12 @@ python -m buscador.almacen_respaldos bajar --respaldo semanal/2026-11-30_1234567
 ```
 
 `bajar` reúne los trozos y comprueba el sha256 de cada uno y del total. El `.enc` resultante es el mismo que crea
-`buscador.respaldo.crear`: se restaura con `buscador.respaldo.restaurar` (o con `traspaso.yml`) en un destino aislado
-vacío, con `SUPABASE_BACKUP_KEY`, siguiendo el ensayo de abajo. Si el resumen de la copia semanal avisa de que el
-bucket pasa de 800 MB, decidir entre pasar a Pro o guardar menos semanas antes de llegar al 1 GB del plan gratuito.
+`buscador.respaldo.crear`: se restaura con la función `buscador.respaldo.restaurar` (no tiene línea de órdenes;
+`traspaso.yml` NO sirve: hace un corte nuevo de la base actual) en un destino aislado vacío con el esquema ya preparado
+y `SUPABASE_BACKUP_KEY`, siguiendo el ensayo de abajo. Si el resumen de la copia semanal avisa de que la
+próxima copia podría no caber (el bucket más una copia nueva pasa de 800 MB), decidir esa misma semana entre pasar a
+Pro o guardar menos semanas (`CONSERVAR` en `buscador/almacen_respaldos.py`). Si se llega al 1 GB, la subida falla y
+la poda no corre: borrar a mano en Storage la carpeta semanal más vieja con manifiesto (nunca la más nueva) y relanzar.
 
 ### Corte y respaldo
 

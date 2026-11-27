@@ -239,3 +239,75 @@ def test_workflows_suben_a_storage_y_el_artefacto_dura_un_dia(flujo, tipo):
     assert texto.index("--fase respaldo") < texto.index("almacen_respaldos subir") < texto.index("upload-artifact")
     red = _paso(texto, "Red de seguridad temporal")
     assert "retention-days: 1\n" in red + "\n" and "retention-days: 90" not in texto
+
+
+def test_reintento_tras_un_5xx_repite_las_cabeceras_y_acepta_el_trozo_ya_guardado(tmp_path):
+    storage = StorageFalso(publico=False)
+    original, cortes = storage.request, {"n": 0}
+    def corta_la_respuesta(metodo, url, **k):
+        r = original(metodo, url, **k)
+        if url.endswith("/parte-000") and metodo == "POST" and cortes["n"] == 0:
+            cortes["n"] += 1
+            return StorageFalso._r(502)  # el trozo quedó guardado pero la respuesta se perdió
+        return r
+    storage.request = corta_la_respuesta
+    _cifrado_ficticio(tmp_path / "a.enc", filas=5)
+    m = ar.subir(_almacen(storage), tmp_path / "a.enc", "semanal", "1")
+    subidas = [h for metodo, ruta, h in storage.llamadas if metodo == "POST" and ruta.endswith("/parte-000")]
+    assert len(subidas) == 2 and all(h["Content-Type"] == "application/octet-stream" for h in subidas)
+    assert ar.leer_manifiesto(_almacen(storage), m["carpeta"]) == m
+
+
+def test_un_400_que_no_es_ausencia_no_se_toma_como_respaldo_incompleto(tmp_path):
+    storage = StorageFalso()
+    almacen = _almacen(storage)
+    _cifrado_ficticio(tmp_path / "a.enc", filas=5)
+    m = ar.subir(almacen, tmp_path / "a.enc", "semanal", "1")
+    original = storage.request
+    storage.request = lambda metodo, url, **k: (StorageFalso._r(400, {"error": "InvalidJWT"})
+                                                if url.endswith("manifiesto.json") else original(metodo, url, **k))
+    with pytest.raises(RuntimeError, match="HTTP 400"):
+        ar.leer_manifiesto(almacen, m["carpeta"])
+
+
+def test_reintentar_el_job_usa_otra_carpeta(tmp_path, monkeypatch):
+    storage = StorageFalso()
+    almacen = _almacen(storage)
+    carpeta = tmp_path / "respaldos"
+    carpeta.mkdir()
+    _cifrado_ficticio(carpeta / "semanal.enc", filas=5)
+    monkeypatch.setattr(ar, "Almacen", lambda: almacen)
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    monkeypatch.setenv("GITHUB_RUN_ID", "555")
+    storage.objetos[f"semanal/{datetime.now(timezone.utc):%Y-%m-%d}_555-1/parte-000"] = b"a medias"
+    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "2")
+    ar.main(["subir", "--tipo", "semanal", "--carpeta", str(carpeta)])
+    assert [c.rsplit("_", 1)[1] for c, _ in ar.validos(almacen, "semanal")] == ["555-2"]
+
+
+def test_bajar_no_sobrescribe_ni_deja_restos_si_un_trozo_no_cuadra(tmp_path, monkeypatch):
+    monkeypatch.setattr(ar, "TROZO", 1024)
+    storage = StorageFalso()
+    almacen = _almacen(storage)
+    _cifrado_ficticio(tmp_path / "a.enc")
+    m = ar.subir(almacen, tmp_path / "a.enc", "semanal", "1")
+    (tmp_path / "existe.enc").write_bytes(b"no tocar")
+    with pytest.raises(RuntimeError, match="ya existe"):
+        ar.bajar(almacen, m["carpeta"], tmp_path / "existe.enc")
+    assert (tmp_path / "existe.enc").read_bytes() == b"no tocar"
+    storage.corromper.add(f"{m['carpeta']}/parte-001")
+    with pytest.raises(RuntimeError, match="no coincide"):
+        ar.bajar(almacen, m["carpeta"], tmp_path / "nuevo.enc")
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["a.enc", "existe.enc"]
+
+
+def test_listar_marca_los_incompletos(tmp_path, monkeypatch, capsys):
+    storage = StorageFalso()
+    almacen = _almacen(storage)
+    _cifrado_ficticio(tmp_path / "a.enc", filas=5)
+    ar.subir(almacen, tmp_path / "a.enc", "semanal", "1", datetime(2026, 11, 30, tzinfo=timezone.utc))
+    storage.objetos["semanal/2026-11-23_0/parte-000"] = b"a medias"
+    monkeypatch.setattr(ar, "Almacen", lambda: almacen)
+    ar.main(["listar", "--tipo", "semanal"])
+    lineas = capsys.readouterr().out.splitlines()
+    assert lineas[0] == "semanal/2026-11-23_0  INCOMPLETO (no sirve)" and lineas[1].startswith("semanal/2026-11-30_1  ")

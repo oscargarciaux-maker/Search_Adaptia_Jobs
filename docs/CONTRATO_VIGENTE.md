@@ -396,7 +396,8 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
   gratuito admite 50 MB por archivo y 1 GB en total, cada copia se parte en trozos de 40 MiB con un `manifiesto.json`
   (tamaño y sha256); se comprueba bajando cada trozo y, si la subida falla, el job falla. Se conservan las **últimas 4
   semanales** válidas (nunca se borra la última válida); las de «antes de limpiar» no se borran solas. Si el bucket
-  existe y es público, no se sube nada. Pasar más de 800 MB deja aviso: decidir entonces Pro o menos semanas. Mientras
+  existe y es público, no se sube nada. Si el bucket más una copia nueva pasaría de 800 MB, el resumen avisa:
+  decidir esa semana Pro o menos semanas. Mientras
   no se confirme en real la primera subida, el artefacto sigue como red de seguridad de **1 día**. `traspaso.yml` y
   «Preparar Supabase» todavía suben su copia como artefacto (90 y 14 días): pendiente.
 - El arranque importa un corte coherente; un respaldo previo a cambios no equivale a copias periódicas (domingos,

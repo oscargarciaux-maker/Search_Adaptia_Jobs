@@ -22,6 +22,7 @@ import re
 import sys
 import time
 from urllib.parse import quote
+from uuid import uuid4
 
 import requests
 
@@ -31,11 +32,35 @@ BUCKET = "respaldos"
 TROZO = 40 * 1024 * 1024        # bajo el máximo de 50 MB por archivo del plan gratuito
 LIMITE_BUCKET = 50 * 1000 * 1000  # el bucket rechaza cualquier archivo mayor
 CONSERVAR = 4                    # semanales válidos que se guardan (decisión de Oscar, 27 nov)
-AVISO_TOTAL = 800 * 1000 * 1000  # aviso antes de llegar al 1 GB del plan gratuito
+CUOTA_GRATUITA = 1000 * 1000 * 1000  # 1 GB de Storage en el plan gratuito
+AVISO = 0.8                      # aviso si la próxima copia (mientras convive con las demás) pasaría del 80 %
 TIPOS = ("semanal", "antes-de-limpiar")
 PODABLES = ("semanal",)
 MANIFIESTO = "manifiesto.json"
-_CARPETA = re.compile(r"^\d{4}-\d{2}-\d{2}_[A-Za-z0-9-]+$")
+_ID = "A-Za-z0-9-"
+_CARPETA = re.compile(rf"^\d{{4}}-\d{{2}}-\d{{2}}_[{_ID}]+$")
+
+
+def _no_existe(r):
+    """Storage responde «no encontrado» con 404 o con 400 y `statusCode: 404`/`not_found` en el cuerpo. Otro 400 no se
+    toma como ausencia: así un error raro nunca hace que un respaldo bueno parezca incompleto."""
+    if r.status_code == 404:
+        return True
+    if r.status_code != 400:
+        return False
+    try:
+        cuerpo = json.dumps(r.json()).lower()
+    except ValueError:
+        return False
+    return "not found" in cuerpo or "not_found" in cuerpo or '"404"' in cuerpo
+
+
+def _duplicado(r):
+    try:
+        cuerpo = json.dumps(r.json()).lower()
+    except ValueError:
+        return False
+    return r.status_code == 409 or (r.status_code == 400 and ("duplicate" in cuerpo or "already exists" in cuerpo))
 
 
 class Almacen:
@@ -45,20 +70,17 @@ class Almacen:
         if not url or not clave:
             raise RuntimeError("Faltan SUPABASE_URL o SUPABASE_SECRET_KEY: no se puede guardar el respaldo.")
         self.url = url.rstrip("/") + "/storage/v1"
-        self.cabeceras = {"apikey": clave}
-        if clave.startswith("eyJ"):  # clave antigua service_role; la nueva (sb_secret_) va solo en apikey
-            self.cabeceras["Authorization"] = f"Bearer {clave}"
+        self.cabeceras = supabase.cabeceras(clave)
         self.sesion = sesion or requests.Session()
         self.pausa = pausa
 
     # ------------------------------------------------------------ HTTP
     def _pedir(self, metodo, ruta, que, aceptar=(), **k):
         """Tres intentos ante red o 5xx; un 4xx no se repite. Los estados de `aceptar` se devuelven sin error."""
-        causa = ""
+        causa, cabeceras = "", {**self.cabeceras, **k.pop("headers", {})}
         for intento in range(3):
             try:
-                r = self.sesion.request(metodo, self.url + ruta, headers={**self.cabeceras, **k.pop("headers", {})},
-                                        timeout=600, **k)
+                r = self.sesion.request(metodo, self.url + ruta, headers=cabeceras, timeout=600, **k)
             except requests.RequestException as e:
                 causa = type(e).__name__
             else:
@@ -80,6 +102,8 @@ class Almacen:
         """Crea el bucket privado si no existe. Si existe y es público, falla: nunca se sube a un bucket público."""
         r = self._pedir("GET", f"/bucket/{BUCKET}", "consultar el bucket", aceptar=(400, 404))
         if r.status_code in (400, 404):
+            if not _no_existe(r):
+                raise RuntimeError(f"Supabase Storage rechazó la consulta del bucket (HTTP {r.status_code}).")
             self._pedir("POST", "/bucket", "crear el bucket privado", aceptar=(409,),
                         json={"id": BUCKET, "name": BUCKET, "public": False, "file_size_limit": LIMITE_BUCKET})
             r = self._pedir("GET", f"/bucket/{BUCKET}", "consultar el bucket")
@@ -105,14 +129,22 @@ class Almacen:
             desde += 1000
 
     def subir_objeto(self, nombre, datos):
-        self._pedir("POST", f"/object/{BUCKET}/{self._ruta(nombre)}", f"subir {nombre}", data=datos,
-                    headers={"Content-Type": "application/octet-stream", "x-upsert": "false"})
+        """Si un reintento encuentra el trozo ya guardado (la respuesta anterior se perdió), lo da por subido:
+        `comprobar` lo baja después y compara su sha256, así que un trozo distinto nunca pasa."""
+        r = self._pedir("POST", f"/object/{BUCKET}/{self._ruta(nombre)}", f"subir {nombre}", aceptar=(400, 409),
+                        data=datos, headers={"Content-Type": "application/octet-stream", "x-upsert": "false"})
+        if r.status_code in (400, 409) and not _duplicado(r):
+            raise RuntimeError(f"No se pudo subir {nombre} en Supabase Storage (HTTP {r.status_code}).")
 
     def bajar_objeto(self, nombre, faltante=False):
-        """Bytes del objeto. Con `faltante=True` devuelve None si no existe (400/404); otro error siempre lanza."""
+        """Bytes del objeto. Con `faltante=True` devuelve None si no existe; cualquier otro error lanza."""
         r = self._pedir("GET", f"/object/authenticated/{BUCKET}/{self._ruta(nombre)}", f"bajar {nombre}",
                         aceptar=(400, 404) if faltante else ())
-        return None if r.status_code in (400, 404) else r.content
+        if r.status_code in (400, 404):
+            if _no_existe(r):
+                return None
+            raise RuntimeError(f"No se pudo bajar {nombre} de Supabase Storage (HTTP {r.status_code}).")
+        return r.content
 
     def borrar(self, nombres):
         if nombres:
@@ -133,11 +165,19 @@ def _trozos(archivo):
             yield datos
 
 
+def _bajar_trozo(almacen, carpeta, parte):
+    datos = almacen.bajar_objeto(f"{carpeta}/{parte['nombre']}")
+    if len(datos) != parte["tamano"] or _sha(datos) != parte["sha256"]:
+        raise RuntimeError(f"El trozo {parte['nombre']} de {carpeta} no coincide con el manifiesto (tamaño o sha256).")
+    return datos
+
+
 def subir(almacen, archivo, tipo, ejecucion, ahora=None):
-    """Sube, comprueba (vuelve a bajar cada trozo) y deja el manifiesto. Devuelve el manifiesto. Cualquier fallo lanza."""
+    """Sube, comprueba (vuelve a bajar cada trozo) y deja el manifiesto. Devuelve el manifiesto. Cualquier fallo lanza.
+    `ejecucion` distingue cada intento (en Actions: ejecución-intento), para que «Re-run» no choque con el anterior."""
     if tipo not in TIPOS:
         raise RuntimeError(f"Tipo de respaldo desconocido: {tipo}.")
-    ejecucion = re.sub(r"[^A-Za-z0-9-]", "", str(ejecucion or "")) or "local"
+    ejecucion = re.sub(f"[^{_ID}]", "", str(ejecucion or "")) or "local"
     ahora = ahora or datetime.now(timezone.utc)
     carpeta = f"{tipo}/{ahora:%Y-%m-%d}_{ejecucion}"
     almacen.asegurar_bucket()
@@ -169,21 +209,29 @@ def comprobar(almacen, manifiesto):
     for p in manifiesto["partes"]:
         if tamanos.get(p["nombre"]) != p["tamano"]:
             raise RuntimeError(f"El trozo {p['nombre']} de {carpeta} no está en Storage con su tamaño.")
-        datos = almacen.bajar_objeto(f"{carpeta}/{p['nombre']}")
-        if len(datos) != p["tamano"] or _sha(datos) != p["sha256"]:
-            raise RuntimeError(f"El trozo {p['nombre']} de {carpeta} no coincide al bajarlo (tamaño o sha256).")
+        _bajar_trozo(almacen, carpeta, p)
+
+
+def _manifiesto_valido(m, carpeta):
+    if not isinstance(m, dict) or m.get("carpeta") != carpeta or not isinstance(m.get("sha256"), str):
+        return False
+    partes = m.get("partes")
+    if not partes or not all(isinstance(p, dict) and {"nombre", "tamano", "sha256"} <= set(p) for p in partes):
+        return False
+    return m.get("tamano") == sum(p["tamano"] for p in partes)
 
 
 def leer_manifiesto(almacen, carpeta):
-    """None si la carpeta no tiene manifiesto (respaldo incompleto). Un fallo de red lanza: así nunca se confunde un
-    respaldo bueno con uno incompleto al podar."""
+    """El manifiesto si la carpeta tiene uno válido para ella; None si es un respaldo incompleto. Es la única regla de
+    «respaldo válido». Un fallo de red lanza: así nunca se confunde un respaldo bueno con uno incompleto al podar."""
     datos = almacen.bajar_objeto(f"{carpeta}/{MANIFIESTO}", faltante=True)
     if datos is None:
         return None
     try:
-        return json.loads(datos)
+        m = json.loads(datos)
     except ValueError:
         return None
+    return m if _manifiesto_valido(m, carpeta) else None
 
 
 def carpetas(almacen, tipo):
@@ -192,12 +240,12 @@ def carpetas(almacen, tipo):
                   if not e.get("id") and _CARPETA.match(e["name"]))
 
 
-def validos(almacen, tipo):
+def validos(almacen, tipo, todas=None):
     """[(carpeta, manifiesto)] de los respaldos completos, del más viejo al más nuevo."""
     salida = []
-    for carpeta in carpetas(almacen, tipo):
+    for carpeta in carpetas(almacen, tipo) if todas is None else todas:
         m = leer_manifiesto(almacen, carpeta)
-        if isinstance(m, dict) and m.get("carpeta") == carpeta and m.get("partes"):
+        if m:
             salida.append((carpeta, m))
     return salida
 
@@ -208,54 +256,49 @@ def podar(almacen, tipo, conservar=CONSERVAR):
     if tipo not in PODABLES:
         return []
     conservar = max(1, conservar)
-    buenos = validos(almacen, tipo)
+    todas = carpetas(almacen, tipo)
+    buenos = validos(almacen, tipo, todas)
     if not buenos:
         return []
     quedan = {c for c, _ in buenos[-conservar:]}
     ultimo = buenos[-1][0]
-    viejas = [c for c in carpetas(almacen, tipo) if c not in quedan and c < ultimo]
     borradas = []
-    for carpeta in viejas:
-        nombres = [f"{carpeta}/{e['name']}" for e in almacen.listar(carpeta + "/")]
-        almacen.borrar(nombres)
+    for carpeta in todas:
+        if carpeta in quedan or carpeta >= ultimo:
+            continue
+        almacen.borrar([f"{carpeta}/{e['name']}" for e in almacen.listar(carpeta + "/")])
         borradas.append(carpeta)
     return borradas
 
 
 def ocupado(almacen):
-    """Bytes que ocupan todos los respaldos del bucket."""
-    total = 0
-    for tipo in TIPOS:
-        for carpeta in carpetas(almacen, tipo):
-            total += sum((e.get("metadata") or {}).get("size") or 0 for e in almacen.listar(carpeta + "/"))
-    return total
+    """Bytes que ocupan todos los respaldos del bucket (también los incompletos)."""
+    return sum((e.get("metadata") or {}).get("size") or 0
+               for tipo in TIPOS for carpeta in carpetas(almacen, tipo) for e in almacen.listar(carpeta + "/"))
 
 
 def bajar(almacen, carpeta, destino):
     """Reúne los trozos en `destino` (archivo nuevo), comprobando cada sha256 y el total. Devuelve el manifiesto."""
-    m = leer_manifiesto(almacen, carpeta)
-    if not isinstance(m, dict) or m.get("carpeta") != carpeta:
-        raise RuntimeError(f"{carpeta} no tiene manifiesto válido: el respaldo está incompleto.")
     destino = Path(destino)
+    if destino.exists():
+        raise RuntimeError(f"{destino} ya existe: no se sobrescribe.")
+    m = leer_manifiesto(almacen, carpeta)
+    if not m:
+        raise RuntimeError(f"{carpeta} no tiene manifiesto válido: el respaldo está incompleto.")
+    temporal = destino.with_name(f"{destino.name}.{uuid4().hex}.partial")
     total = hashlib.sha256()
-    temporal = destino.with_name(destino.name + ".partial")
     try:
         with os.fdopen(os.open(temporal, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as salida:
             for p in m["partes"]:
-                datos = almacen.bajar_objeto(f"{carpeta}/{p['nombre']}")
-                if len(datos) != p["tamano"] or _sha(datos) != p["sha256"]:
-                    raise RuntimeError(f"El trozo {p['nombre']} no coincide con el manifiesto.")
+                datos = _bajar_trozo(almacen, carpeta, p)
                 salida.write(datos)
                 total.update(datos)
         if total.hexdigest() != m["sha256"]:
             raise RuntimeError("El respaldo reunido no coincide con el sha256 del manifiesto.")
-        if destino.exists():
-            raise RuntimeError(f"{destino} ya existe: no se sobrescribe.")
-        temporal.replace(destino)
+        os.link(temporal, destino)  # falla si alguien creó el destino mientras tanto: nunca se sobrescribe
         return m
-    except BaseException:
+    finally:
         temporal.unlink(missing_ok=True)
-        raise
 
 
 # ---------------------------------------------------------------- línea de órdenes
@@ -279,7 +322,8 @@ def _archivo_unico(carpeta):
 
 
 def _subir_cli(args, almacen):
-    m = subir(almacen, _archivo_unico(args.carpeta), args.tipo, os.environ.get("GITHUB_RUN_ID", "local"))
+    ejecucion = "-".join(filter(None, (os.environ.get("GITHUB_RUN_ID"), os.environ.get("GITHUB_RUN_ATTEMPT"))))
+    m = subir(almacen, _archivo_unico(args.carpeta), args.tipo, ejecucion or "local")
     lineas = [f"Respaldo guardado en Storage (bucket privado `{BUCKET}`): `{m['carpeta']}`",
               f"- {_mb(m['tamano'])} en {len(m['partes'])} trozos, comprobados al bajarlos de nuevo",
               f"- sha256 `{m['sha256']}`"]
@@ -288,9 +332,11 @@ def _subir_cli(args, almacen):
         if borradas:
             lineas.append(f"- Se borraron {len(borradas)} respaldos semanales viejos (quedan los últimos {CONSERVAR})")
         usado = ocupado(almacen)
-        lineas.append(f"- El bucket ocupa {_mb(usado)} de 1.000 MB del plan gratuito")
-        if usado > AVISO_TOTAL:
-            lineas.append("- ⚠️ Queda poco espacio: decidir si pasar a Pro o guardar menos semanas")
+        lineas.append(f"- El bucket ocupa {_mb(usado)} de {_mb(CUOTA_GRATUITA)} del plan gratuito")
+        # La próxima copia se sube antes de podar: durante la subida convive con todas las de ahora.
+        if usado + m["tamano"] > AVISO * CUOTA_GRATUITA:
+            lineas.append("- ⚠️ La próxima copia podría no caber: decidir ya si pasar a Pro o guardar menos semanas "
+                          "(docs/OPERACION_Y_RECUPERACION.md §8)")
             registro.aviso("almacen_respaldos.espacio", RuntimeError(f"el bucket ocupa {_mb(usado)}"))
     except (RuntimeError, ValueError, KeyError) as e:
         registro.aviso("almacen_respaldos.podar", e)
@@ -316,7 +362,7 @@ def main(argv=None):
     elif args.orden == "listar":
         for carpeta in carpetas(almacen, args.tipo):
             m = leer_manifiesto(almacen, carpeta)
-            estado = f"{_mb(m['tamano'])}  sha256 {m['sha256'][:12]}…" if isinstance(m, dict) else "INCOMPLETO"
+            estado = f"{_mb(m['tamano'])}  sha256 {m['sha256'][:12]}…" if m else "INCOMPLETO (no sirve)"
             print(f"{carpeta}  {estado}")
     else:
         m = bajar(almacen, args.respaldo, args.salida)
