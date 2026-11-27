@@ -12,8 +12,8 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Read|Edit|Write|MultiEdit|NotebookEdit|Bash",
-        "hooks": [{ "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/bloquear_secretos.py\"" }]
+        "matcher": "Read|Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell|Grep|Glob",
+        "hooks": [{ "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/lanzar_python.sh\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/bloquear_secretos.py\"" }]
       }
     ],
     "Stop": [

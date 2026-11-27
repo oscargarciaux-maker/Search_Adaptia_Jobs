@@ -19,7 +19,7 @@ Cada auditoría (skill `auditoria-codigo`, cada mes) se mide contra esta lista.
 | Tamaño máximo de petición: 1 MB (API4) | ✅ | middleware `proteccion` |
 | Cabeceras: CSP estricta, `nosniff`, `X-Frame-Options DENY`, `Referrer-Policy`, HSTS (ASVS 14.4) | ✅ | HSTS desde el PR 1.5; prueba de cabeceras |
 | La credencial de servicio nunca va al navegador (ASVS 2.10) | ✅ | `test_api…`: `service_role` no aparece en `/api/session` |
-| Ninguna clave, ID ni dato de clientes en el repositorio | ✅ | `pruebas/test_repositorio.py`; hook `bloquear_secretos.py` |
+| Ninguna clave, ID ni dato de clientes en el repositorio | ✅ | `pruebas/test_repositorio.py`; hook `bloquear_secretos.py` (vía `lanzar_python.sh`; `test_hook_secretos.py`) |
 | Validación estricta de entradas (`extra="forbid"`, longitudes) (API3, API6) | ✅ | `panel/modelos.py` (pydantic) |
 | Dependencias sin vulnerabilidades conocidas (A06) | ✅ | `pip-audit` y `npm audit` en CI (job `auditoria`) |
 | Dependencias fijadas con huella (integridad, A08) | ✅ | `requirements.txt` con `--require-hashes`; `test_dependencias.py` |
