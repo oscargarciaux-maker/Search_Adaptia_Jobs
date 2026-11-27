@@ -39,8 +39,12 @@ python -m buscador.medicion --bodega ../adaptia-bodegas/bodega-774a1e3.json.gz -
 python -m buscador.medicion --bodega <ruta> --mundial --commit <sha del commit> --guardar pruebas/datos/linea_base_mundial.json
 ```
 
-El modo comparar imprime una tabla antes → después por escenario y etapa. **Falla (código 1) si cambia el escenario de
-control (h)**. Los segundos se muestran pero no deciden nada, porque dependen de la máquina.
+El modo comparar imprime una tabla antes → después por escenario y etapa. **Falla (código 1) si cambia lo que recibe
+el escenario de control (h)**: sus cinco etapas y `panel_fuera_del_objetivo`. `admitidas` (volumen de toda la bodega)
+y los segundos se muestran pero no deciden nada: 7.2 puede subirlos a propósito, y los segundos dependen de la máquina.
+Se niega a comparar (código 2) con otra bodega o con otro `--hoy`. Si cambiaron los términos de los cargos ficticios
+(por ejemplo, porque se amplió el mapa de cargos), avisa antes de la tabla: entonces una diferencia puede no venir de
+la sección 7.
 
 ## Escenarios (perfiles ficticios, modo panel)
 
@@ -79,3 +83,7 @@ que se descartó al capturar («no se puede aplicar desde LATAM»: 1.168 avisos 
 `datos/salud.json` de `publicado`) no está en la bodega, y lo que nunca se buscó (por ejemplo en Kenia o India) tampoco.
 Esta medición ve las pérdidas **dentro** de lo guardado; las de antes se verán como más vacantes en la etapa
 «objetivo» cuando 7.x cambie la búsqueda y se use una bodega nueva.
+
+Además, la regla «objetivo» lee las etiquetas de país que puso el código de hoy, que tiene sesgo LATAM: por ejemplo,
+una remota «Americas» queda con países de LATAM y sin EE. UU., así que no cuenta como objetivo para el escenario c.
+Así la etapa queda fija (es lo que se busca), pero el objetivo mundial se ve más chico de lo que es.

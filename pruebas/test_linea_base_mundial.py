@@ -48,8 +48,9 @@ def test_corren_todos_los_escenarios_y_solo_hay_conteos(medida):
         etapas = r["etapas"]
         assert list(etapas) == list(medicion.ETAPAS)
         assert all(isinstance(n, int) and n >= 0 for n in etapas.values())
-        # cada etapa recorta a la anterior: el embudo nunca crece
-        assert [etapas[k] for k in medicion.ETAPAS] == sorted(etapas.values(), reverse=True)
+        # hasta «afinidad» cada etapa recorta a la anterior («panel» puede sumar ampliaciones)
+        hasta_afinidad = [etapas[k] for k in medicion.ETAPAS[:4]]
+        assert hasta_afinidad == sorted(hasta_afinidad, reverse=True)
     texto = json.dumps(medida, ensure_ascii=False)
     assert "Ficticia" not in texto and "greenhouse" not in texto  # ni empresas ni enlaces
 
@@ -63,7 +64,8 @@ def test_el_objetivo_reconoce_lo_que_pide_cada_escenario(medida):
 
 def test_comparar_contra_si_misma_no_falla(medida):
     lineas, cambio = medicion.comparar(medida, medida)
-    assert not cambio and len(lineas) == 3 + len(medicion.ESCENARIOS)  # cabecera + escenarios + «Todos juntos»
+    assert not cambio
+    assert all(any(linea.startswith(f"| {clave} ") for linea in lineas) for clave in medicion.ESCENARIOS)
 
 
 def test_comparar_falla_si_cambia_el_control(medida):
@@ -72,6 +74,8 @@ def test_comparar_falla_si_cambia_el_control(medida):
     assert medicion.comparar(medida, otra)[1]
     otra = json.loads(json.dumps(medida))
     otra["escenarios"]["a"]["etapas"]["panel"] += 1  # un escenario a–g sí puede cambiar
+    otra["escenarios"]["h"]["admitidas"] += 50  # y el volumen total (7.2 puede subirlo a propósito)
+    otra["escenarios"]["h"]["segundos"]["limpiar"] += 9.5
     assert not medicion.comparar(medida, otra)[1]
 
 
@@ -83,8 +87,9 @@ def test_linea_comandos_guarda_y_compara(tmp_path, texto, capsys):
     assert medicion.main(["--bodega", str(ruta), "--mundial", "--guardar", str(base), "--hoy", HOY]) == 0
     assert json.loads(base.read_text(encoding="utf-8"))["bodega"]["sha256"] == medicion._sha256(ruta)
     assert medicion.main(["--bodega", str(ruta), "--comparar", str(base)]) == 0
+    assert medicion.main(["--bodega", str(ruta), "--comparar", str(base), "--hoy", "2026-11-01"]) == 2
     datos = json.loads(base.read_text(encoding="utf-8"))
-    datos["escenarios"]["h"]["admitidas"] += 1
+    datos["escenarios"]["h"]["etapas"]["afinidad"] += 1
     base.write_text(json.dumps(datos), encoding="utf-8")
     assert medicion.main(["--bodega", str(ruta), "--comparar", str(base)]) == 1
     datos["bodega"]["sha256"] = "0" * 64
@@ -100,6 +105,8 @@ def test_la_linea_base_guardada_tiene_solo_conteos():
         pytest.skip("aún no hay línea base guardada")
     datos = json.loads(ruta.read_text(encoding="utf-8"))
     assert len(datos["bodega"]["sha256"]) == 64 and len(datos["bodega"]["commit"]) == 40
+    # si falla, cambió el mapa de cargos: las comparaciones mezclarían ese cambio con los de la sección 7
+    assert datos["huella_cargos"] == medicion.huella_de_cargos(medicion.cargos_del_panel())
     assert set(datos["escenarios"]) == set(medicion.ESCENARIOS)
     permitidas = {"nombre"}  # el nombre del escenario ficticio; todo lo demás son números
     def numeros(x, clave=""):
