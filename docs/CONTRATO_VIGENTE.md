@@ -6,7 +6,7 @@ no el país donde vive: si pide español, solo en español aunque viva en un pa�
 le llegan en inglés aunque viva en un país hispanohablante, en Brasil o en cualquier otro. El origen LATAM/España es
 histórico. Los idiomas de aviso aceptados siguen siendo solo español e inglés.
 
-Fuente principal de las reglas del proyecto (estado al 27 nov 2026, hasta v51 y la decisión del 27 nov). Cada regla dice cómo es **hoy**; entre
+Fuente principal de las reglas del proyecto (estado al 27 nov 2026, hasta v52 y la decisión del 27 nov). Cada regla dice cómo es **hoy**; entre
 paréntesis va el contrato de donde sale, por si hace falta el detalle. Si una versión posterior corrigió a otra, aquí
 solo queda la posterior. Los `docs/CONTRATO_DATOS_vNN.md` son históricos: se conservan porque el código y las pruebas
 los citan, pero no se editan ni se crean nuevos.
@@ -169,9 +169,22 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
   dejara nada útil: entonces pide los 30 días; una combinación con 3 búsquedas seguidas sin nada útil pasa al final de
   los turnos de su persona hasta que vuelva a traer algo (`estado["rendimiento"]`) (v40). Los lugares salen de todas las filas del perfil y de las regiones de
   `datos/regiones_busqueda.yaml`; «remoto LATAM» solo para quien vive en LATAM (v40).
-- La entrega diaria comprueba Supabase antes de recoger; la validación final falla si queda un enlace de la selección
-  sin comprobar, una vacante que ya no encaja o sincronización pendiente; una elegida que después cerró es un aviso
-  (v40; reglas de integridad).
+- La entrega diaria comprueba Supabase antes de recoger (reglas de integridad). Una elegida que después cerró es un
+  aviso y no se comparte (v40).
+- **Cómo termina la búsqueda diaria: tres estados** (`buscador/validacion.py`, paso «Comprobar meta y
+  sincronización» de `bodega.yml`) (v52):
+  - **COMPLETA:** todo bien → corrida en verde y ping de éxito a Healthchecks.
+  - **CORTA:** meta del día incompleta o vacantes de la selección con el enlace sin comprobar (siguen sin compartirse
+    hasta comprobarlas) → corrida en verde con `::warning::` y resumen de qué faltó por cargo (sin datos de clientes);
+    ping de éxito. El déficit **no** hace fallar la corrida.
+  - **AVERÍA:** sincronización con Supabase o catálogo sin confirmar, reconciliación sin confirmar (incluido el 57014),
+    selección no registrada, operaciones centrales pendientes, sin catálogo válido o vacantes de hoy que ya no encajan
+    en el perfil → corrida en rojo y aviso `/fail`. **Solo una avería hace fallar la corrida**; si hay avería y falta a
+    la vez, manda la avería.
+  - La segunda pasada (8:30) y su respaldo completan la meta según `trabajo/metricas_entrega.json`
+    (`arranque.falta_completar`), no según el color de la corrida; un día CORTO solo por enlaces sin comprobar (meta
+    cumplida) no la pide. En el panel un día corto sigue como «parcial» y «Buscar ahora» ofrece completar (v52).
+  - Las demás partes que fallan (búsqueda, publicación) siguen poniendo la corrida en rojo (v52).
 - Repetir el día solo completa o reintenta el mismo lote; nunca añade otro lote (v2). Un lote ya elegido no se reescribe
   para ocultar cierres o déficit; el déficit se informa (v3, v4).
 - No se borran archivos históricos ni snapshots para ocultar déficit (v5).
