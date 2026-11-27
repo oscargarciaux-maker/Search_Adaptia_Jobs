@@ -14,6 +14,7 @@ import argparse
 import gzip
 import hashlib
 import json
+import sys
 from collections import Counter
 from time import perf_counter
 from uuid import NAMESPACE_DNS, uuid5
@@ -425,6 +426,8 @@ def main(argv=None):
     a = p.parse_args(argv)
     if (a.guardar and not a.mundial) or (a.commit and not a.guardar) or (a.comparar and a.mundial):
         p.error("--guardar va con --mundial, --commit va con --guardar y --comparar va sin --mundial")
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")  # la tabla lleva «→» y tildes: en Windows la salida redirigida es cp1252
     if a.mundial or a.comparar:
         return _main_mundial(a)
     with gzip.open(a.bodega, "rt", encoding="utf-8") as f:
