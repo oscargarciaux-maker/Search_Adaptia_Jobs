@@ -1,0 +1,9 @@
+# 7.E (27 nov): ubicaciones enteras que un portal escribe mal, con la ubicación que dice el propio aviso.
+# Clave: la ubicación tal como llega (sin importar tildes ni mayúsculas); valor: la ubicación correcta.
+# Solo cuenta cuando la ubicación entera es exactamente ese texto. Para añadir una, que haya evidencia en el aviso
+# (salario, leyes o ciudad de otro país) y que se haya visto más de una vez; nunca por suponerlo.
+#
+# LinkedIn geolocaliza «California» como un lugar de Pará (Brasil). Visto el 17 nov en 4 avisos de Adobe cuya
+# descripción da el rango salarial de EE. UU. y los avisos legales de California. El caso real de Brasil
+# («Califórnia, Paraná, Brasil») no está aquí y sigue siendo Brasil.
+"California, Pará, Brasil": California, United States

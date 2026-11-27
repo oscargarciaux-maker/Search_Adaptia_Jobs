@@ -70,6 +70,11 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
   postales, provincias de Canadá y Australia, «US-Remote» y apodos de `datos/alias_lugares.yaml` (v38). Áreas
   metropolitanas de `datos/areas_metropolitanas.yaml` (v32). Una región como ubicación vale solo si el aviso no es
   presencial ni híbrido; vale la región del título si la ubicación no dice ningún lugar (v19).
+- **El país escrito al final manda** en una ubicación de un solo lugar («ciudad, región, país», un único país con su
+  nombre): el nombre de un estado o región de otro país en los tramos de antes no suma ese país («Califórnia, Paraná,
+  Brasil» es solo Brasil; «Birmingham, Alabama, United States», solo EE. UU.). Los errores conocidos de un portal se
+  corrigen por texto exacto en `datos/ubicaciones_corregidas.yaml`, con evidencia del aviso («California, Pará,
+  Brasil» de LinkedIn es EE. UU.) (7.E, 27 nov).
 - «Autorizado para trabajar en el país» se refiere al país del propio aviso (v14). `puede_trabajar_en` admite hasta 60
   países y el importador acepta regiones (v26).
 - **Get on Board:** `fully_remote` = cualquier país; `remote_local` = los países de `location_tenants`; sin país,
@@ -116,6 +121,10 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
   del cargo que la recibe (v49).
 - El importador añade nombres y funciones a cargos existentes; nunca quita (v27).
 - Desarrollo genérico no cuenta como QA ni como IA (v4).
+- **El nombre más largo dice el oficio:** un término de una sola palabra del cargo («tester», «qa») no basta si es parte
+  del nombre de varias palabras de otro oficio del mapa que trae el título («Penetration Tester» es Ciberseguridad, no
+  QA; «QA Tester» o «Software Tester» siguen siendo QA). La similitud textual no cuenta si el título trae un `excluir`
+  de la familia del cargo en el mapa («Analista de Pentesting» no es «analista de testing») (7.E, 27 nov).
 
 ## 5. Qué descarta y qué solo ordena
 
@@ -214,7 +223,8 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
   ronda. Los demás sitios van en paralelo. Primero lo de quien va corto (`cola_por_necesidad`) (v39, v41, v49, v50).
 - Presupuestos: 800 enlaces en 10 min por búsqueda diaria; rescate hasta 200 enlaces en 5 min (30 en 60 s en las
   horarias); en «Buscar ahora» para quien falta, 240 s con el tiempo de ordenar incluido y 60 s reservados al refuerzo
-  (v36, v39, v48, v49).
+  (v36, v39, v48, v49). El rescate comprueba hasta 3 candidatas por plaza que falta; una ampliada solo si todavía
+  puede entrar, y hasta 3 por plaza que queda bajo el mínimo de 5 (7.E, 27 nov).
 - Un enlace rechazado no invalida otro comprobado de la misma oferta; nunca se borra del histórico. Las vistas de SQL
   004 son del modo heredado y conservan su criterio de 6 h (v3, v4).
 

@@ -71,8 +71,9 @@ def test_la_vacante_lleva_pais_modalidad_fecha_descripcion_y_la_direccion_del_po
 
 def test_una_localidad_con_nombre_de_otro_pais_no_abre_ese_pais():
     from buscador import paises
-    for localizacion, esperado in (("Palermo, Capital Federal", "Capital Federal, Argentina"),
-                                   ("Florida, Buenos Aires", "Buenos Aires, Argentina"),
+    # 7.E: con el país del portal al final, «Palermo» y «Florida» ya no abren Italia ni EE. UU.: la localidad se queda.
+    for localizacion, esperado in (("Palermo, Capital Federal", "Palermo, Capital Federal, Argentina"),
+                                   ("Florida, Buenos Aires", "Florida, Buenos Aires, Argentina"),
                                    ("Concepción del Uruguay, Entre Ríos", "Entre Ríos, Argentina"),
                                    ("Capital Federal, Buenos Aires", "Capital Federal, Buenos Aires, Argentina")):
         cruda = jobint.vacante(dict(_aviso(8, modalidad="Remoto"), localizacion=localizacion), "AR", dict(PAISES))
