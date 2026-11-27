@@ -1,0 +1,223 @@
+"""Auditoría de exposición (#2, #4): la rama publicado y los artefactos quedan solo con cifras agregadas; el detalle por
+cargo vive en Supabase (`estado_trabajo`) y la siguiente corrida arranca igual que antes. Todo con datos ficticios."""
+import gzip
+import json
+from pathlib import Path
+
+import pytest
+
+from buscador import arranque, estado_privado as ep
+
+RAIZ = Path(__file__).resolve().parents[1]
+CARGO = "cargo:11111111-2222-3333-4444-555555555555"
+UUID = "11111111-2222-3333-4444-555555555555"
+NOMBRE = "Cargo Ficticio Zeta"
+VACANTE = "vacficticia00001"
+HUELLA = "huellaficticia01"
+HOY = "2026-11-27"
+SECRETOS = (NOMBRE, UUID, VACANTE, HUELLA)
+
+
+def _json(ruta, datos):
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    ruta.write_text(json.dumps(datos, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def _reporte():
+    rol = {"nombre": NOMBRE, "candidatas": 4, "entregadas": 2, "unicas": 2, "faltan": 1, "idiomas": {"es": 2},
+           "fuentes": {"LinkedIn": 2}, "paises": {"CO": 2}}
+    return {
+        "fecha": HOY, "modo": "diario", "consulta": "", "vacantes_en_bodega": 3, "nuevas_hoy": 1,
+        "fuentes": {"LinkedIn (Apify)": {"busquedas": 1, "por_familia": {CARGO: 1, "qa": 2}}},
+        "por_familia": {CARGO: 1, "qa": 2},
+        "entrega": {"roles": {CARGO: rol}, "metas_por_rol": {CARGO: 3}, "meta_por_rol": None, "vacantes": 2,
+                    "filas": 2, "meta_cumplida": False, "fecha": HOY,
+                    "supabase": {"filas": 2, "enviadas": 2, "errores": [], "pendientes": 0},
+                    "embudo": {CARGO: {"nuevas": 4}}},
+        "seleccion_actual": {"fecha": HOY, "roles": {CARGO: {"nombre": NOMBRE, "meta": 3, "vacantes": [
+            {"id": VACANTE, "catalog_status": "active", "afinidad_vigente": True, "verificacion": {"estado": "verificada"}}]}}},
+        "refuerzos": [{"ronda": 1, "faltantes_antes": {CARGO: 1}, "crudas": 5, "fuentes": {}}],
+        "historico_entregas": [{"fecha": HOY, "meta_cumplida": False, "roles": {CARGO: {"entregadas": 2}}}],
+        "catalogo": {"filas": 3, "enviadas": 3, "errores": [], "pendientes": 0},
+        "verificacion_enlaces": {"seleccion_del_dia": {"vacantes": 1, "estados": {"verificada": 1}}},
+    }
+
+
+def _salida(tmp_path):
+    salida = tmp_path / "salida"
+    t = salida / "trabajo"
+    _json(t / "lote_entrega.json", {"fecha": HOY, "elegidas": {CARGO: [[{"id": VACANTE, "titulo": "Diseño"}, "exacto"]]}})
+    _json(t / "entregadas.json", {HUELLA: HOY})
+    _json(t / "estado.json", {"rendimiento": {CARGO + "@CO": {"utiles": 1, "ceros": 0}}, "linkedin": {"qa@CO": HOY}})
+    for cola in ("catalogo", "supabase", "registro"):
+        _json(t / f"pendientes_{cola}.json", {})
+    _json(t / "metricas_entrega.json", {HOY: {"pasadas": 1, "fecha": HOY, "meta_cumplida": True,
+                                              "pendientes_supabase": 0, "registro_confirmado": True,
+                                              "roles": {CARGO: {"entregadas": 2, "faltan": 0}}}})
+    _json(t / "verificacion_enlaces.json", {"https://empresa.example/1": {"estado": "verificada"}})
+    vacantes = [{"id": VACANTE, "titulo": "Diseño", "rol_entrega_actual": CARGO,
+                 "familias": [{"familia": "ux", "grado": "exacto"}, {"familia": CARGO, "grado": "exacto"}]},
+                {"id": "otraficticia0001", "titulo": "QA", "rol_entrega_actual": ""},
+                {"id": "terceraficticia1", "titulo": "Datos"}]
+    with gzip.open(t / "bodega.json.gz", "wt", encoding="utf-8") as f:
+        json.dump(vacantes, f)
+    _json(salida / "datos" / "salud.json", _reporte())
+    _json(salida / "datos" / "salud_bodega.json", _reporte())
+    return salida
+
+
+def _texto_publico(salida, con_bodega=False):
+    """La bodega trae todas las vacantes (también la elegida): lo que no debe haber es qué se eligió ni para quién."""
+    partes = []
+    for ruta in sorted(Path(salida).rglob("*")):
+        if ruta.is_file() and (con_bodega or ruta.name != "bodega.json.gz"):
+            datos = ruta.read_bytes()
+            partes.append(gzip.decompress(datos).decode() if ruta.suffix == ".gz" else datos.decode())
+    return "\n".join(partes)
+
+
+class SesionFalsa:
+    """Imita la API REST de Supabase para la tabla estado_trabajo."""
+    def __init__(self, estado=200):
+        self.filas, self.estado = {}, estado
+
+    def post(self, url, json, headers, timeout):
+        for fila in json:
+            self.filas[(fila["grupo"], fila["archivo"])] = fila
+        return type("R", (), {"status_code": 201})()
+
+    def get(self, url, headers, timeout, params):
+        grupo = params["grupo"].removeprefix("eq.")
+        filas = [f for (g, _), f in self.filas.items() if g == grupo]
+        return type("R", (), {"status_code": self.estado, "json": lambda self: filas})()
+
+
+@pytest.fixture
+def credenciales(monkeypatch):
+    monkeypatch.setenv("SUPABASE_URL", "https://ficticio.supabase.co")
+    monkeypatch.setenv("SUPABASE_SECRET_KEY", "clave-ficticia")
+
+
+def test_lo_publicado_no_trae_cargos_metas_ni_vacantes_elegidas(tmp_path):
+    salida = _salida(tmp_path)
+    privados = ep.separar(salida, tmp_path / "copia")
+    texto = _texto_publico(salida)
+    for secreto in SECRETOS:
+        assert secreto not in texto
+    for secreto in (NOMBRE, UUID, HUELLA):
+        assert secreto not in _texto_publico(salida, con_bodega=True)
+    for clave in ('"metas_por_rol"', '"meta_por_rol"', '"roles"', '"faltantes_antes": {', '"rol_entrega_actual"'):
+        assert clave not in texto
+    for rel in ep.PRIVADOS:
+        assert not (salida / rel).exists() and rel in privados
+    assert ep.CARGOS_BODEGA in privados
+    # La copia local (fuera de lo publicado) conserva el reporte completo para validar en el mismo trabajo.
+    assert json.loads((tmp_path / "copia/datos/salud.json").read_text(encoding="utf-8")) == _reporte()
+
+
+def test_lo_publicado_conserva_cifras_agregadas(tmp_path):
+    salida = _salida(tmp_path)
+    ep.separar(salida)
+    s = json.loads((salida / "datos/salud.json").read_text(encoding="utf-8"))
+    e = s["entrega"]
+    assert e["cargos"] == 1 and e["totales"]["meta"] == 3 and e["totales"]["entregadas"] == 2
+    assert e["totales"]["faltan"] == 1 and e["por_idioma"] == {"es": 2} and e["por_fuente"] == {"LinkedIn": 2}
+    assert e["filas"] == 2 and e["meta_cumplida"] is False and e["supabase"]["enviadas"] == 2
+    assert s["seleccion_actual"] == {"fecha": HOY, "cargos": 1, "vacantes": 1}
+    assert s["refuerzos"][0]["faltantes_antes"] == 1
+    assert s["por_familia"] == {"qa": 2} and s["vacantes_en_bodega"] == 3
+    assert s["resultado"] == "CORTA"   # meta incompleta: COMPLETA/CORTA/AVERÍA (contrato v52)
+    assert s["fuentes"]["LinkedIn (Apify)"]["por_familia"] == {"qa": 2}
+
+
+def test_el_arranque_decide_igual_con_las_metricas_publicadas(tmp_path):
+    salida = _salida(tmp_path)
+    completo = arranque.leer_dia(salida / "trabajo", HOY)
+    ep.separar(salida)
+    publico = arranque.leer_dia(salida / "trabajo", HOY)
+    assert "roles" not in publico
+    assert arranque.falta_completar(publico) == arranque.falta_completar(completo)
+    assert arranque.busquedas_diarias(publico) == arranque.busquedas_diarias(completo)
+
+
+def test_la_siguiente_corrida_arranca_con_el_mismo_estado(tmp_path, credenciales):
+    salida = _salida(tmp_path)
+    antes = {rel: (salida / rel).read_bytes() for rel in ep.PRIVADOS + ep.DIVIDIDOS}
+    with gzip.open(salida / ep.BODEGA, "rt", encoding="utf-8") as f:
+        bodega_antes = json.load(f)
+    sesion = SesionFalsa()
+    guardados = ep.guardar(salida, tmp_path / "copia", ejecucion="42", sesion=sesion)
+    assert set(guardados) == set(ep.PRIVADOS + ep.DIVIDIDOS) | {ep.CARGOS_BODEGA}
+    marca = json.loads((salida / ep.MARCA).read_text(encoding="utf-8"))
+    assert marca["ejecucion"] == "42" and set(marca["archivos"]) == set(guardados)
+    assert all(g == "vigente" for g, _ in sesion.filas)
+    mensaje = ep.traer(salida, sesion=sesion)
+    assert "recuperado" in mensaje
+    for rel, datos in antes.items():
+        assert (salida / rel).read_bytes() == datos
+    with gzip.open(salida / ep.BODEGA, "rt", encoding="utf-8") as f:
+        assert json.load(f) == bodega_antes   # "" y campo ausente se distinguen como antes
+
+
+def test_sin_marca_se_usa_lo_que_trae_la_rama(tmp_path, credenciales):
+    salida = _salida(tmp_path)
+    antes = (salida / "trabajo/lote_entrega.json").read_bytes()
+    assert "aún no separa" in ep.traer(salida, sesion=SesionFalsa(estado=404))
+    assert (salida / "trabajo/lote_entrega.json").read_bytes() == antes
+
+
+def test_con_marca_no_sigue_sin_el_estado_privado(tmp_path, credenciales):
+    salida = _salida(tmp_path)
+    sesion = SesionFalsa()
+    ep.guardar(salida, None, ejecucion="42", sesion=sesion)
+    with pytest.raises(RuntimeError, match="no se puede leer"):
+        ep.traer(salida, sesion=SesionFalsa(estado=404))
+    del sesion.filas[("vigente", "trabajo/lote_entrega.json")]
+    with pytest.raises(RuntimeError, match="Faltan 1 archivos"):
+        ep.traer(salida, sesion=sesion)
+
+
+def test_una_corrida_fallida_no_pisa_el_estado_vigente(tmp_path, credenciales):
+    salida = _salida(tmp_path)
+    sesion = SesionFalsa()
+    ep.guardar(salida, None, grupo="fallida", ejecucion="43", sesion=sesion)
+    assert sesion.filas and all(g == "fallida" for g, _ in sesion.filas)
+    assert not (salida / ep.MARCA).exists()
+    for secreto in SECRETOS:
+        assert secreto not in _texto_publico(salida)   # el artefacto de una corrida fallida también queda limpio
+
+
+def test_huella_alterada_no_se_usa(tmp_path, credenciales):
+    salida = _salida(tmp_path)
+    sesion = SesionFalsa()
+    ep.guardar(salida, None, ejecucion="42", sesion=sesion)
+    sesion.filas[("vigente", "trabajo/entregadas.json")]["sha256"] = "0" * 64
+    with pytest.raises(RuntimeError, match="huella"):
+        ep.traer(salida, sesion=sesion)
+
+
+@pytest.mark.parametrize("flujo", ["bodega.yml", "incremental.yml", "profunda.yml"])
+def test_los_flujos_separan_antes_de_publicar_y_de_subir_el_artefacto(flujo):
+    texto = (RAIZ / ".github/workflows" / flujo).read_text(encoding="utf-8")
+    traer = texto.index("python -m buscador.estado_privado traer --salida salida")
+    guardar = texto.index("python -m buscador.estado_privado guardar --salida salida")
+    assert texto.index("git clone --depth 1 --branch publicado") < traer
+    assert guardar < texto.index("uses: actions/upload-artifact") and guardar < texto.index("git push -q --force")
+    assert "hashFiles('salida/trabajo/estado.json')" not in texto   # estado.json ya no queda en la carpeta publicada
+    paso = texto[texto.rindex("- name:", 0, guardar):guardar]
+    assert "always()" in paso and "--fallida" in texto[guardar:texto.index("\n", guardar)]
+    assert "validacion --salida privado/estado_trabajo" in texto
+
+
+def test_bodega_repone_antes_de_decidir_y_de_borrar_el_reporte_viejo():
+    texto = (RAIZ / ".github/workflows/bodega.yml").read_text(encoding="utf-8")
+    traer = texto.index("python -m buscador.estado_privado traer")
+    assert traer < texto.index("rm -f salida/datos/salud.json") < texto.index("python -m buscador.arranque --trabajo")
+
+
+def test_migracion_022_es_privada():
+    sql = (RAIZ / "supabase/migraciones/022_estado_trabajo.sql").read_text(encoding="utf-8")
+    assert "enable row level security" in sql
+    assert "revoke all on public.estado_trabajo from public, anon, authenticated, service_role;" in sql
+    assert "grant select, insert, update on public.estado_trabajo to service_role;" in sql
+    assert "anon" not in sql.split("revoke all", 1)[1].split("\n", 1)[1]

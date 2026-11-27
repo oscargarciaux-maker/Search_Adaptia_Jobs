@@ -209,7 +209,7 @@ def validar(conn):
     conn.execute("select id,external_id,description_full from public.ofertas limit 0")
     conn.execute("select id,datos,observed_at from public.catalogo_vacantes limit 0")
     conn.execute("select vacante_id,snapshot,delivery_date from public.entregas_diarias limit 0")
-    for tabla in ("estado_operativo", "apify_reservas", "adaptia_migraciones"):
+    for tabla in ("estado_operativo", "apify_reservas", "estado_trabajo", "adaptia_migraciones"):
         if conn.execute("select has_table_privilege('anon',%s,'SELECT') or has_table_privilege('authenticated',%s,'SELECT')", ("public."+tabla, "public."+tabla)).fetchone()[0]:
             raise RuntimeError("Hay permisos públicos indebidos en el estado privado.")
 

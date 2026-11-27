@@ -358,7 +358,7 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
 ## 17. Supabase y migraciones
 
 - **No se modifica SQL ya registrado:** se añade una migración nueva (también a `ENSAYABLES` y a
-  `pruebas/test_migraciones.py`). Migraciones actuales: 002 a 021 (v2–v48).
+  `pruebas/test_migraciones.py`). Migraciones actuales: 002 a 022 (v2–v48; 022 = tabla privada `estado_trabajo`, 27 nov).
 - «Preparar Supabase» sube respaldo cifrado antes de aplicar SQL, registra hashes en `adaptia_migraciones` y activa por
   marca privada; no pedir copiar SQL a mano ni variables manuales. `SUPABASE_DB_URL` y `SUPABASE_BACKUP_KEY` se configuran
   una vez como Secrets; la clave administrativa solo prepara, nunca va a fuentes, navegador ni logs.
@@ -390,6 +390,16 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
   (no solo cambiar secretos) y el origen trasladado deja de capturar (`docs/ENTREGA_AL_CLIENTE.md`).
 - `publicar.py` conserva `datos/salud.json` y `trabajo/` en la rama `publicado` para la siguiente captura, sin borrar
   inventario, colas ni reservas. Las notas antiguas de instalación pendiente no prueban el estado actual.
+- **Qué se publica (27 nov, auditoría de exposición; decisión de Oscar: Supabase).** La rama `publicado` y los
+  artefactos `estado-*` son públicos: solo llevan cifras agregadas (totales del día, por fuente, por idioma, por
+  familia del mapa y país, y `resultado` COMPLETA/CORTA/AVERÍA). Nada por cargo ni por perfil: ni nombres ni IDs de
+  cargo, ni metas, ni países por cargo, ni la lista de vacantes elegidas o entregadas. Ese detalle vive en la tabla
+  privada `estado_trabajo` (SQL 022, solo `service_role`), que escribe y lee `buscador/estado_privado.py`: `guardar`
+  antes de publicar y de subir el artefacto (también si la corrida falló, en el grupo `fallida`, que nadie lee) y
+  `traer` justo después de clonar `publicado`. La marca `trabajo/estado_privado.json` lista lo guardado; si existe y
+  Supabase no lo devuelve, la corrida se detiene antes de buscar (nunca sigue con el estado vacío). Los pasos del
+  mismo trabajo que necesitan el detalle (validación y resumen) leen la copia completa de `privado/estado_trabajo/`,
+  que no se publica. La bodega publicada sigue trayendo todas las vacantes, sin decir a qué cargo va cada una.
 - Despliegue del panel: Docker y guía sin proveedor obligatorio (`docs/PANEL_CONTROL.md`).
 
 ## 18. Seguridad y lo prohibido
@@ -402,7 +412,8 @@ Las «Reglas innegociables» de `CLAUDE.md` son el resumen de esta sección: si 
 - **LinkedIn sin sesión ni cookie de nadie** (`li_at` incluida), ni actores de Apify que la pidan.
 - Ninguna clave, ID, correo, teléfono ni dato de clientes en el repositorio, registros de Actions, reportes públicos,
   `trabajo/` ni la rama `publicado`; las claves van en los secretos (v10, v11, v40). La credencial de servicio nunca
-  llega al navegador (v6).
+  llega al navegador (v6). Tampoco el detalle por cargo (nombre, ID, meta, países, vacantes elegidas): solo cifras
+  agregadas (§17, 27 nov).
 - Las alertas por correo (Resend) solo llevan cifras por cargo, nunca datos de clientes (v10).
 - No se reintroducen la web de Pages/Cloudflare, Excel, el envío automático de WhatsApp ni el seguimiento de
   postulaciones. No se depende del repositorio `ux_job_agent`.

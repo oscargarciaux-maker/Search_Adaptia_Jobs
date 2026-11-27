@@ -119,4 +119,4 @@ def test_el_aviso_solo_marca_fallo_cuando_la_corrida_falla():
     flujo = (RAIZ / ".github/workflows/bodega.yml").read_text(encoding="utf-8")
     avisar = flujo.split("- name: Avisar", 1)[1].split("\n  reloj:", 1)[0]
     assert 'job.status }}" = "success"' in avisar and '"$AVISO/fail"' in avisar
-    assert "python -m buscador.validacion --salida salida\n" in flujo
+    assert "python -m buscador.validacion --salida privado/estado_trabajo\n" in flujo

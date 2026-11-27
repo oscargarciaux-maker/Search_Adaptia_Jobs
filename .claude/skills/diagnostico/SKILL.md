@@ -7,7 +7,9 @@ description: Explica en lenguaje sencillo qué pasó en la última búsqueda noc
 
 1. Lee solo `datos/salud.json` de la rama `publicado`
    (`https://raw.githubusercontent.com/<repo>/publicado/datos/salud.json`). Trae: fecha, minutos, vacantes en la bodega,
-   nuevas, cada fuente (avisos, errores, tiempo), descartes y conteos por cargo, país y fuente.
+   nuevas, cada fuente (avisos, errores, tiempo), descartes y conteos por familia del mapa, país, fuente e idioma, y el
+   `resultado` del día. Desde el 27 nov no trae nada por cargo del panel (es público): para un cargo concreto, mira el
+   panel.
 2. Si la fecha no es de anoche: la bodega no corrió o falló. Revisa *Actions → Bodega nocturna* (el último registro) y di
    el error exacto.
 3. Si una fuente dice `error`, explica cuál y si las demás compensan. Bloqueos de LinkedIn (429) son normales a ratos:
