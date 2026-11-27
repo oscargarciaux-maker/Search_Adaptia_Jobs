@@ -77,8 +77,9 @@ def identidades(conn):
 # las funciones `panel_publicar` y `panel_publicar_hoy` («Confirmar y aplicar», contrato v43), sin tablas ni datos.
 # 020 solo añade el número corto de cada vacante (`catalogo_vacantes.numero`, su secuencia y disparadores; contrato v48).
 # 021 solo reemplaza la reconciliación por lotes cortos y añade un índice parcial; sin tablas ni datos nuevos.
+# 022 solo crea la tabla privada `estado_trabajo` (detalle por cargo fuera de la rama pública); sin tocar otras.
 ENSAYABLES = {"006", "007", "008", "009", "010", "011", "012", "013", "014", "015", "016", "017", "018", "019", "020",
-              "021"}
+              "021", "022"}
 
 
 def ensayar(conn):

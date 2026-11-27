@@ -74,6 +74,16 @@ jobs:
           # Cada horario dice qué pasada es en buscador/arranque.py (HORARIOS); vacío = a mano, que siempre trabaja.
           python -m buscador.arranque --trabajo salida/trabajo --horario "${{ github.event.schedule }}" >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"
+      - name: Reponer el detalle por cargo (privado, en Supabase)
+        # Auditoría de exposición: la rama publicado solo trae cifras agregadas (lo que lee «Decidir» está ahí).
+        # Solo si esta pasada trabaja: un horario de respaldo que no hace nada no consulta Supabase.
+        if: ${{ steps.decidir.outputs.ejecutar == 'true' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          python -m buscador.estado_privado traer --salida salida
+          rm -f salida/datos/salud.json  # el reporte viejo completo tampoco se muestra
       - name: Preparar base y estado automáticamente
         if: ${{ steps.decidir.outputs.ejecutar == 'true' }}
         uses: ./.github/actions/preparar-supabase
@@ -96,6 +106,15 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python -m panel.ejecutor --salida salida --modo "${{ inputs.modo || 'diario' }}" --enfoque "${{ inputs.enfoque || 'completo' }}" ${{ inputs.prueba && '--prueba' || '' }}
+      - name: Separar el detalle por cargo (privado, en Supabase) antes de publicar
+        id: separar
+        # Auditoría de exposición (#2, #4): la rama publicado y el artefacto quedan solo con cifras agregadas.
+        # Si la corrida falló, se guarda aparte («fallida») y la siguiente sigue con el estado anterior.
+        if: ${{ steps.decidir.outputs.ejecutar == 'true' && always() && !inputs.prueba && hashFiles('salida/trabajo/bodega.json.gz') != '' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python -m buscador.estado_privado guardar --salida salida ${{ job.status != 'success' && '--fallida' || '' }}
       - name: Publicar en la rama publicado
         if: ${{ steps.decidir.outputs.ejecutar == 'true' && !inputs.prueba }}
         working-directory: salida
@@ -108,7 +127,8 @@ jobs:
           git commit -qm "Bodega $(date -u +%Y-%m-%dT%H:%MZ)"
           git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" publicado
       - name: Conservar estado para diagnóstico y recuperación
-        if: ${{ steps.decidir.outputs.ejecutar == 'true' && always() && !inputs.prueba && hashFiles('salida/trabajo/estado.json') != '' }}
+        # Solo si la separación terminó bien: si falló a medias, la carpeta podría traer el detalle (es público).
+        if: ${{ steps.decidir.outputs.ejecutar == 'true' && always() && !inputs.prueba && steps.separar.outcome == 'success' }}
         uses: actions/upload-artifact@v6
         with:
           name: estado-bodega-${{ github.run_id }}
@@ -119,23 +139,13 @@ jobs:
         # solo una AVERÍA (Supabase, catálogo, reconciliación/57014, registro, operaciones centrales…) pone la corrida
         # en rojo. La segunda pasada decide con trabajo/metricas_entrega.json, no con este resultado.
         if: ${{ steps.decidir.outputs.ejecutar == 'true' && !inputs.prueba }}
-        run: python -m buscador.validacion --salida salida
+        # Lee el reporte completo, que no se publica (buscador/estado_privado.py).
+        run: python -m buscador.validacion --salida privado/estado_trabajo
       - name: Resumen
         if: ${{ always() && steps.decidir.outputs.ejecutar == 'true' }}
         run: |
-          test -f salida/datos/salud.json && python -c "
-          import json; s=json.load(open('salida/datos/salud.json'))
-          print(f\"Vacantes en la bodega: {s['vacantes_en_bodega']} · nuevas hoy: {s['nuevas_hoy']} · {s['minutos']} min\")
-          [print(f'  {k}: {v}') for k, v in s['fuentes'].items()]
-          e = s.get('entrega') or {}
-          print(f\"Verificación de enlaces: {s.get('verificacion_enlaces', {})}\")
-          print(f\"Selección histórica del día: {e.get('vacantes', 0)} vacantes, {e.get('filas', 0)} filas · Supabase: {e.get('supabase')}\")
-          [print(f\"  {r['nombre']}: {r['entregadas']} (faltaron {r['faltan']})\") for r in (e.get('roles') or {}).values()]
-          print('Disponibilidad observada en esta captura:')
-          for r in ((s.get('seleccion_actual') or {}).get('roles') or {}).values():
-              listas=sum(v.get('catalog_status')=='active' and v.get('afinidad_vigente') is True and (v.get('verificacion') or {}).get('estado')=='verificada' for v in r.get('vacantes',[]))
-              print('{}: {} listas; {} faltantes vigentes frente a la meta'.format(r['nombre'],listas,max(0,r.get('meta',20)-listas)))
-          " >> "$GITHUB_STEP_SUMMARY" || true
+          # El resumen de la corrida es público: solo el reporte recortado (cifras agregadas). Detalle: el panel.
+          python -m buscador.estado_privado resumen --salida salida >> "$GITHUB_STEP_SUMMARY" || true
       - name: Avisar
         # Solo la pasada que trabajó avisa: un respaldo que no hizo nada no debe poner en verde un fallo anterior.
         # Contrato v52: COMPLETA y CORTA hacen ping de éxito; solo una AVERÍA (o un paso roto) llama a /fail.

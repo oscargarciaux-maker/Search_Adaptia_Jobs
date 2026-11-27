@@ -19,7 +19,18 @@ NOMBRE_ESTADO = {COMPLETA: "COMPLETA", CORTA: "CORTA", AVERIA: "AVERÍA"}
 CONFIRMADO = "Meta de selección y sincronización confirmadas. Esto no certifica autenticidad de cada empresa."
 
 
-def errores(reporte):
+def _por_cargo(roles, mensaje, detalle):
+    """`roles`: [(nombre, n)]. Con `detalle` (el panel, privado) un mensaje por cargo; sin él (registros de Actions,
+    públicos: auditoría de exposición, 27 nov) uno solo con el total y cuántos cargos, sin nombres."""
+    roles = [(nombre, n) for nombre, n in roles if n]
+    if detalle:
+        return [f"{nombre}: {n} {mensaje}" for nombre, n in roles]
+    if not roles:
+        return []
+    return [f"{sum(n for _, n in roles)} {mensaje} ({len(roles)} {'cargo' if len(roles) == 1 else 'cargos'})"]
+
+
+def errores(reporte, detalle=True):
     """Averías: lo que de verdad está roto o sin confirmar. La corrida falla (contrato v52)."""
     e = reporte.get("entrega") or {}
     sb = e.get("supabase") or {}
@@ -34,11 +45,11 @@ def errores(reporte):
         fallos.append("La selección no quedó registrada en Supabase; conservar pendientes y reintentar.")
     if reporte.get("catalogo") is not None:
         fallos.extend(errores_catalogo(reporte))
-    for rol in (reporte.get("seleccion_actual") or {}).get("roles", {}).values():
-        fuera = [v for v in rol.get("vacantes", []) if not v.get("afinidad_vigente") and not _cerro_despues(v)]
-        if fuera:
-            fallos.append(f"{rol['nombre']}: {len(fuera)} vacantes de la selección de hoy ya no encajan en ningún perfil "
-                          "del cargo.")
+    fallos.extend(_por_cargo(
+        [(rol.get("nombre", ""), sum(1 for v in rol.get("vacantes", [])
+                                     if not v.get("afinidad_vigente") and not _cerro_despues(v)))
+         for rol in (reporte.get("seleccion_actual") or {}).get("roles", {}).values()],
+        "vacantes de la selección de hoy ya no encajan en ningún perfil del cargo.", detalle))
     return fallos
 
 
@@ -74,15 +85,13 @@ def _cerro_despues(v):
     return v.get("catalog_status") != "active" or (v.get("verificacion") or {}).get("estado") == "rechazada"
 
 
-def avisos(reporte):
+def avisos(reporte, detalle=True):
     """Lo que conviene saber sin que la búsqueda falle."""
-    salida = []
-    for rol in (reporte.get("seleccion_actual") or {}).get("roles", {}).values():
-        cerradas = [v for v in rol.get("vacantes", []) if not v.get("afinidad_vigente") and _cerro_despues(v)]
-        if cerradas:
-            salida.append(f"{rol['nombre']}: {len(cerradas)} vacantes elegidas hoy cerraron o salieron del inventario "
-                          "después; no se comparten.")
-    return salida
+    return _por_cargo(
+        [(rol.get("nombre", ""), sum(1 for v in rol.get("vacantes", [])
+                                     if not v.get("afinidad_vigente") and _cerro_despues(v)))
+         for rol in (reporte.get("seleccion_actual") or {}).get("roles", {}).values()],
+        "vacantes elegidas hoy cerraron o salieron del inventario después; no se comparten.", detalle)
 
 
 def errores_catalogo(reporte):
@@ -103,7 +112,7 @@ def errores_catalogo(reporte):
 
 
 def resumen(reporte, fallos, faltas):
-    """Markdown para $GITHUB_STEP_SUMMARY, solo con cifras que ya trae salud.json (sin datos de clientes)."""
+    """Markdown para $GITHUB_STEP_SUMMARY (público): solo totales, sin nombre ni meta de cada cargo (27 nov)."""
     actual = estado(reporte, fallos, faltas)
     e = reporte.get("entrega") or {}
     lineas = [f"## Resultado del día: {NOMBRE_ESTADO[actual]}", ""]
@@ -113,16 +122,15 @@ def resumen(reporte, fallos, faltas):
         lineas += [CONFIRMADO, ""]
     roles = e.get("roles") or {}
     if roles:
-        metas = e.get("metas_por_rol") or {}
+        metas = [m for m in (e.get("metas_por_rol") or {}).values() if m is not None]
         perfiles = any("perfiles_bajo_minimo" in r for r in roles.values())
-        lineas += ["| Cargo | Meta | Logradas | Faltan |" + (" Perfiles bajo el mínimo |" if perfiles else ""),
+        lineas += ["| Cargos | Meta total | Logradas | Faltan |" + (" Perfiles bajo el mínimo |" if perfiles else ""),
                    "|---|---|---|---|" + ("---|" if perfiles else "")]
-        for rid, r in roles.items():
-            meta = metas.get(rid)
-            fila = (f"| {r.get('nombre', rid)} | {'—' if meta is None else meta} | "
-                    f"{r.get('unicas', r.get('entregadas', 0))} | {r.get('faltan', 0)} |")
-            lineas.append(fila + (f" {r.get('perfiles_bajo_minimo', 0)} |" if perfiles else ""))
-        lineas.append("")
+        fila = (f"| {len(roles)} | {sum(metas) if metas else '—'} | "
+                f"{sum(r.get('unicas', r.get('entregadas', 0)) for r in roles.values())} | "
+                f"{sum(r.get('faltan', 0) for r in roles.values())} |")
+        lineas.append(fila + (f" {sum(r.get('perfiles_bajo_minimo', 0) for r in roles.values())} |" if perfiles else ""))
+        lineas += ["", "El detalle por cargo está en el panel (este resumen es público).", ""]
     revision = (reporte.get("verificacion_enlaces") or {}).get("seleccion_del_dia") or {}
     if revision.get("vacantes"):
         n = revision.get("estados") or {}
@@ -153,8 +161,9 @@ def main():
             raise SystemExit(1)
         print(CONFIRMADO)
         return
-    fallos, faltas = errores(reporte), cortos(reporte)
-    for mensaje in avisos(reporte) + faltas:
+    # Lo que se imprime y el resumen son públicos: sin nombres de cargo (detalle=False). El estado no cambia.
+    fallos, faltas = errores(reporte, detalle=False), cortos(reporte)
+    for mensaje in avisos(reporte, detalle=False) + faltas:
         print("::warning::" + mensaje)
     for mensaje in fallos:
         print("::error::" + mensaje)

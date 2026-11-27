@@ -56,6 +56,13 @@ jobs:
           manual: ${{ github.event_name == 'workflow_dispatch' && !inputs.reloj }}
           captura: ${{ vars.CAPTURA_HORARIA_ACTIVA }}
           central: ${{ vars.ESTADO_SUPABASE_ACTIVO }}
+      - name: Reponer el detalle por cargo (privado, en Supabase)
+        # Solo si la captura trabaja: una hora sin captura no consulta Supabase.
+        if: steps.preparar.outputs.ejecutar == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python -m buscador.estado_privado traer --salida salida
       - name: Capturar sin crear entrega diaria ni consumir Apify
         if: steps.preparar.outputs.ejecutar == 'true'
         env:
@@ -63,8 +70,18 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python -m panel.ejecutor --salida salida --modo incremental ${{ inputs.prueba && '--prueba' || '' }}
+      - name: Separar el detalle por cargo (privado, en Supabase) antes de publicar
+        id: separar
+        # Auditoría de exposición (#2, #4): la rama publicado y el artefacto quedan solo con cifras agregadas.
+        # Si la corrida falló, se guarda aparte («fallida») y la siguiente sigue con el estado anterior.
+        if: ${{ always() && !inputs.prueba && steps.preparar.outputs.ejecutar == 'true' && hashFiles('salida/trabajo/bodega.json.gz') != '' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python -m buscador.estado_privado guardar --salida salida ${{ job.status != 'success' && '--fallida' || '' }}
       - name: Conservar estado de recuperación
-        if: ${{ always() && !inputs.prueba && steps.preparar.outputs.ejecutar == 'true' && hashFiles('salida/trabajo/estado.json') != '' }}
+        # Solo si la separación terminó bien: si falló a medias, la carpeta podría traer el detalle (es público).
+        if: ${{ always() && !inputs.prueba && steps.separar.outcome == 'success' }}
         uses: actions/upload-artifact@v6
         with:
           name: estado-captura-${{ github.run_id }}
@@ -83,7 +100,7 @@ jobs:
           git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" publicado
       - name: Comprobar sincronización del catálogo
         if: ${{ !inputs.prueba && steps.preparar.outputs.ejecutar == 'true' }}
-        run: python -m buscador.validacion --salida salida --catalogo
+        run: python -m buscador.validacion --salida privado/estado_trabajo --catalogo
       - name: Avisar
         if: always()
         env:

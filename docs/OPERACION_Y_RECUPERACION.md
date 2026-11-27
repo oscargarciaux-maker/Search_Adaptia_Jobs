@@ -42,10 +42,11 @@ no una garantía contractual del proveedor. Abrir una incidencia si hay retrasos
 | `entrega_de_hoy` | Vista de la fecha máxima existente en `ofertas` | Puede mostrar un día anterior; no tiene almacenamiento propio |
 | `seleccion_estado_actual` | Vista privada que cruza selección con catálogo, rol vigente y enlaces | `estado_actual=lista` exige enlace de la ficha con menos de seis horas; no usar `ofertas.active` para enviar |
 | `resumen_entregas_actual` | Vista privada por fecha/rol | Distingue seleccionadas, listas ahora, pendientes, retiradas y afinidad por revisar; no cuenta filas v1 como ofertas |
-| `publicado/trabajo/` | Estado de búsqueda, memoria, colas, presupuesto y caché | Continuar ejecuciones y recuperar pendientes |
+| `publicado/trabajo/` | Bodega, caché de enlaces, presupuesto y métricas del día **sin detalle por cargo** (27 nov) | Continuar ejecuciones; `estado_privado.json` dice qué parte está en Supabase |
+| `estado_trabajo` (SQL 022) | Privada: lote del día, vacantes ya entregadas, rotación con claves cargo@país, colas, métricas por cargo, reporte completo y a qué cargo va cada vacante de la bodega (`buscador/estado_privado.py`) | La siguiente corrida la repone tras clonar `publicado`; si la marca existe y falta, no arranca. Grupo `fallida`: copia de la última corrida que falló, solo para diagnóstico |
 | Supabase con SQL 003 | `estado_operativo` y `apify_reservas` privados | Autoridad de pendientes/reservas en modo central; archivos de trabajo auxiliares |
 | `adaptia_migraciones` | Versión, nombre, hash y fecha; acceso administrativo | Evita repetir o modificar migraciones ya aplicadas; incluir en respaldos automáticos |
-| `publicado/datos/` | Reporte técnico de salud | Foto de la captura; no sustituye a Supabase |
+| `publicado/datos/` | Reporte técnico de salud, solo cifras agregadas (totales, por fuente, por idioma, COMPLETA/CORTA/AVERÍA) | Foto de la captura; el reporte completo está en `estado_trabajo` |
 
 Cerrar significa evidencia de cierre; archivar puede deberse a antigüedad, fusión o enlace rechazado. Retirar del
 buscador no elimina registros en Supabase. Los 30 días son ventana activa, no retención máxima de la base.
@@ -251,7 +252,8 @@ copia recuperable para el cliente.
 1. Deshabilitar los tres flujos que escriben y esperar los que estén en curso. Guardar los commits del corte.
 2. Descargar/guardar completa la rama `publicado`, en especial `trabajo/` y `datos/salud.json`, fuera del repositorio.
    La rama se reescribe y no es por sí misma un histórico de recuperación. Actions guarda artefactos de estado 14 días,
-   no una copia permanente ni el contenido de Supabase.
+   no una copia permanente ni el contenido de Supabase. Desde el 27 nov el detalle por cargo de `trabajo/` está en la
+   tabla `estado_trabajo` (va en los respaldos cifrados): la rama sola ya no basta para recuperar el estado.
 3. Si se aplicó 003, exportar cinco tablas y dos secuencias, aunque la variable aún no esté activa. Sin 003 hay tres
    tablas y una secuencia: omitir los argumentos de `estado_operativo`, `apify_reservas` y su secuencia en esta receta.
    Un técnico puede usar la receta siguiente, con cliente
@@ -312,12 +314,32 @@ credenciales/red. Si hay otras tablas de negocio, extensiones o un esquema modif
     una captura real con memoria conservada, verificar pendientes y desplegar. No ejecutar dos instancias simultáneas.
 11. Reabrir el servicio cuando se haya completado la aceptación mínima. Conservar evidencia del incidente y el corte.
 
+### Estado privado en Supabase (`estado_trabajo`, 27 nov)
+
+- **Una corrida se detiene con «el estado privado está en Supabase, pero no se puede leer» o «incompleto o mezclado».**
+  No se busca ni se elige nada, a propósito: seguir sin el lote ni lo ya entregado repetiría vacantes. Revisar que
+  `SUPABASE_URL` y `SUPABASE_SECRET_KEY` sean del mismo proyecto que guardó el estado y que exista la tabla
+  `estado_trabajo` (la instala «Preparar Supabase», SQL 022). Si el proyecto se restauró de un respaldo cifrado, la
+  tabla viene en él. Si el estado se perdió de verdad, un técnico reconstruye `trabajo/` desde el último artefacto o
+  respaldo y quita `trabajo/estado_privado.json` de la rama `publicado` en la ventana acordada (entonces la corrida usa
+  lo que trae la rama); el lote del día se recupera además desde `entregas_diarias`.
+- **«Aviso: el estado privado es de una corrida posterior a la rama publicado».** Falló la publicación después de
+  guardar el estado: se usa el de Supabase, que es el más reciente. No requiere acción si la siguiente publica.
+- **Una corrida que falló** guarda su estado aparte (grupo `fallida`), solo para diagnóstico; la siguiente sigue con
+  el estado vigente anterior, como antes de este cambio.
+- **Revertir este cambio (volver a publicar todo en la rama).** El código anterior no sabe leer Supabase: antes de
+  revertir, en una copia de la rama `publicado`, ejecutar `python -m buscador.estado_privado traer --salida <copia>`
+  con los secretos del proyecto, borrar `trabajo/estado_privado.json` y publicar esa carpeta completa. Sin ese paso,
+  la primera corrida arrancaría sin lote ni entregadas y elegiría otra entrega del día.
+- **Instalaciones en modo manual** (sin `SUPABASE_DB_URL`): hay que aplicar `supabase/migraciones/022_estado_trabajo.sql`
+  a mano antes de la primera corrida con este cambio; sin la tabla, `guardar` falla y la rama no se publica.
+
 La recuperación puede necesitar decisión humana si Supabase confirmó filas y se perdió una cola antes de publicarla.
 V2 ayuda a reconstruir selección/no repetición, pero no restaura saldo ni reservas del proveedor. No garantizar que todo
 se recupera automáticamente ni borrar filas para forzar otro resultado.
 Con modo central activo, SQL 003 conserva las reservas y los pendientes confirmados en esa base y permite reconstruir
-colas desde los lotes interrumpidos, también de días anteriores. Todavía se necesita el respaldo de `trabajo/` para
-rotación, inventario, caché de enlaces y métricas. Una restauración vieja puede omitir consumo posterior al corte:
+colas desde los lotes interrumpidos, también de días anteriores. Todavía se necesita el respaldo de `trabajo/` (la
+rama) y de `estado_trabajo` (la base) para rotación, inventario, caché de enlaces y métricas: deben ser del mismo corte. Una restauración vieja puede omitir consumo posterior al corte:
 contrastar Apify antes de reanudar; un backup viejo no repone crédito real. No apagar la variable como recuperación rápida.
 
 ## 9. Actualizaciones y regreso de versión

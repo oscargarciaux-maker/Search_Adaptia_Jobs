@@ -34,6 +34,9 @@ jobs:
           cache: pip
       - run: pip install --require-hashes -r requirements.txt
       - name: Traer la bodega publicada
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: |
           if git ls-remote --exit-code --heads origin publicado; then
             git clone --depth 1 --branch publicado "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" salida
@@ -41,6 +44,8 @@ jobs:
           else
             mkdir -p salida
           fi
+          # El detalle por cargo vive en Supabase (tabla estado_trabajo): se repone antes de seguir.
+          python -m buscador.estado_privado traer --salida salida
       - name: Preparar base y presupuesto automáticamente
         uses: ./.github/actions/preparar-supabase
         with:
@@ -61,8 +66,18 @@ jobs:
           CONSULTA: ${{ inputs.consulta }}
           PAIS: ${{ inputs.pais }}
         run: python -m buscador.bodega --salida salida --consulta "$CONSULTA" --pais "$PAIS"
+      - name: Separar el detalle por cargo (privado, en Supabase) antes de publicar
+        id: separar
+        # Auditoría de exposición (#2, #4): la rama publicado y el artefacto quedan solo con cifras agregadas.
+        # Si la corrida falló, se guarda aparte («fallida») y la siguiente sigue con el estado anterior.
+        if: ${{ always() && hashFiles('salida/trabajo/bodega.json.gz') != '' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python -m buscador.estado_privado guardar --salida salida ${{ job.status != 'success' && '--fallida' || '' }}
       - name: Conservar estado de recuperación
-        if: ${{ always() && hashFiles('salida/trabajo/estado.json') != '' }}
+        # Solo si la separación terminó bien: si falló a medias, la carpeta podría traer el detalle (es público).
+        if: ${{ always() && steps.separar.outcome == 'success' }}
         uses: actions/upload-artifact@v6
         with:
           name: estado-profunda-${{ github.run_id }}
@@ -80,4 +95,4 @@ jobs:
           git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" publicado
       - name: Comprobar estado central y catálogo
         if: ${{ env.ESTADO_SUPABASE_ACTIVO == 'true' }}
-        run: python -m buscador.validacion --salida salida --catalogo
+        run: python -m buscador.validacion --salida privado/estado_trabajo --catalogo
