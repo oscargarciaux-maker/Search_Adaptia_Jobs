@@ -837,8 +837,9 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
         except Exception:  # noqa: BLE001 — la bandeja es una ayuda; nunca impide registrar lo del día
             por_confirmar = {}
     faltantes = {c.nombre: max(0, c.cupo - conteos.get(str(c.id), 0)) for c in cfg.cargos if c.activo}
-    from buscador.validacion import errores_catalogo, errores
-    confirmado = reporte is None or not (errores_catalogo(reporte) if reporte.get("modo") == "incremental" else errores(reporte))
+    from buscador.validacion import errores_catalogo, problemas
+    # Contrato v52: una corrida CORTA ya no falla en GitHub, pero aquí sigue siendo «parcial» (averías + cortes).
+    confirmado = reporte is None or not (errores_catalogo(reporte) if reporte.get("modo") == "incremental" else problemas(reporte))
     repo.pedir("PATCH", "panel_ejecuciones", params={"id": "eq." + ejecucion["id"]},
         json={"estado": "parcial" if any(faltantes.values()) or not confirmado else "completa",
               "resumen": {"vacantes": sum(conteos.values()), "meta": cfg.total, "techo": cfg.techo_diario,

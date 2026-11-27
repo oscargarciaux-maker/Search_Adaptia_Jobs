@@ -323,7 +323,10 @@ def test_validacion_no_aprueba_historial_si_sus_enlaces_actuales_fallaron():
          "supabase": {"filas": 120, "enviadas": 120}},
          "verificacion_enlaces": {"seleccion_del_dia": {"vacantes": 120,
                                   "estados": {"verificada": 108, "pendiente": 5, "rechazada": 7}}}}
-    assert any("enlace sin comprobar" in error for error in validacion.errores(r))
+    # Contrato v52: sin comprobar no se comparte y el día queda CORTO; no es una avería.
+    assert not validacion.errores(r)
+    assert any("enlace sin comprobar" in aviso for aviso in validacion.cortos(r))
+    assert validacion.estado(r) == validacion.CORTA
     # 17 nov: un enlace rechazado es una vacante que cerró y ya no se comparte: aviso, no falla.
     r["verificacion_enlaces"]["seleccion_del_dia"]["estados"] = {"verificada": 113, "rechazada": 7}
     assert not validacion.errores(r)

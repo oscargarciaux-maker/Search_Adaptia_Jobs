@@ -115,6 +115,9 @@ jobs:
           path: salida/trabajo/
           retention-days: 14
       - name: Comprobar meta y sincronización
+        # Contrato v52: COMPLETA y CORTA (meta incompleta o enlaces sin comprobar) terminan bien, con avisos y resumen;
+        # solo una AVERÍA (Supabase, catálogo, reconciliación/57014, registro, operaciones centrales…) pone la corrida
+        # en rojo. La segunda pasada decide con trabajo/metricas_entrega.json, no con este resultado.
         if: ${{ steps.decidir.outputs.ejecutar == 'true' && !inputs.prueba }}
         run: python -m buscador.validacion --salida salida
       - name: Resumen
@@ -135,6 +138,7 @@ jobs:
           " >> "$GITHUB_STEP_SUMMARY" || true
       - name: Avisar
         # Solo la pasada que trabajó avisa: un respaldo que no hizo nada no debe poner en verde un fallo anterior.
+        # Contrato v52: COMPLETA y CORTA hacen ping de éxito; solo una AVERÍA (o un paso roto) llama a /fail.
         if: ${{ always() && steps.decidir.outputs.ejecutar != 'false' }}
         env:
           AVISO: ${{ secrets.AVISO_NOCTURNA_URL }}

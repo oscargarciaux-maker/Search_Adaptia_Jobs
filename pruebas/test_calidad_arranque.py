@@ -146,12 +146,15 @@ def test_prueba_de_integracion_no_exige_claves_ni_genera_excel(tmp_path, monkeyp
 def test_validacion_no_confunde_workflow_exitoso_con_entrega_completa():
     reporte = {"vacantes_en_bodega": 120, "entrega": {"meta_cumplida": True,
                "supabase": {"filas": 120, "enviadas": 120, "pendientes": 0, "errores": []}}}
-    assert validacion.errores(reporte) == []
+    assert validacion.errores(reporte) == [] and validacion.estado(reporte) == validacion.COMPLETA
     reporte["entrega"]["supabase"]["pendientes"] = 1
-    assert validacion.errores(reporte)
+    assert validacion.errores(reporte) and validacion.estado(reporte) == validacion.AVERIA
     reporte["entrega"]["supabase"]["pendientes"] = 0
     reporte["entrega"]["meta_cumplida"] = False
-    assert validacion.errores(reporte)
+    # Contrato v52: una meta incompleta no es una avería (CORTA), pero nunca pasa por día completo.
+    assert validacion.errores(reporte) == []
+    assert validacion.cortos(reporte) == ["La meta de selección diaria está incompleta."]
+    assert validacion.problemas(reporte) and validacion.estado(reporte) == validacion.CORTA
 
 
 def test_escritura_interrumpida_de_json_preserva_estado_anterior(tmp_path, monkeypatch):
