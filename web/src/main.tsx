@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Check, Loader2, ShieldCheck, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { api } from "./api";
 import type {
   Cargo,
@@ -32,30 +32,10 @@ import { useConfiguracion } from "./configuracion";
 import { SeccionResumen } from "./vistas/SeccionResumen";
 import { useResultados } from "./resultados";
 import { useContactos } from "./contactos";
+import { Protector } from "./vistas/Protector";
+import { Aviso } from "./vistas/Aviso";
+import { secciones, seccionDeHash } from "./secciones";
 import "./style.css";
-
-// Contrato v22: prioridades que solo ordenan y restricciones que descartan con evidencia clara.
-// Sección 5 (13 nov): sin menú propio; cada sección tiene su dirección y se abre desde las tarjetas del resumen.
-const secciones: Record<string, string> = {
-  Resumen: "",
-  Clientes: "clientes",
-  "Cargos y metas": "cargos",
-  Vacantes: "vacantes",
-  "Por confirmar": "por-confirmar",
-  Mensajes: "mensajes",
-  Historial: "historial",
-};
-function seccionDeHash() {
-  // Contrato v29: «#vacantes/<id>» recuerda la vacante abierta; la sección es lo que va antes de la barra.
-  const h = decodeURIComponent(location.hash.replace(/^#\/?/, "")).split(
-    "/",
-  )[0];
-  // «#actividad» (nombre anterior de Historial) sigue abriendo la misma sección.
-  const clave = h === "actividad" ? "historial" : h;
-  return (
-    Object.keys(secciones).find((t) => secciones[t] === clave) || "Resumen"
-  );
-}
 
 // Contrato v29: el Resumen pide una página corta; el total y el conteo por cliente cubren todas las pendientes.
 const PENDIENTES_RESUMEN = "/revisiones?pagina=1&por_pagina=1";
@@ -586,68 +566,9 @@ function App() {
           setModal={setModal}
         />
       )}
-      {toast && (
-        <div
-          className={"toast " + (toast.error ? "error" : "")}
-          role={toast.error ? "alert" : "status"}
-        >
-          {toast.error ? <ShieldCheck size={18} /> : <Check size={18} />}
-          <span>{toast.texto}</span>
-          {toast.accion && (
-            <button
-              type="button"
-              className="toast-accion"
-              onClick={() => {
-                const a = toast.accion;
-                setToast(null);
-                a?.hacer();
-              }}
-            >
-              {toast.accion.texto}
-            </button>
-          )}
-          <button aria-label="Cerrar aviso" onClick={() => setToast(null)}>
-            <X size={15} />
-          </button>
-        </div>
-      )}
+      {toast && <Aviso toast={toast} setToast={setToast} />}
     </div>
   );
-}
-
-// Reunión del 14 nov: un fallo al pintar dejaba la pantalla en blanco y se perdía lo escrito. Ahora se muestra qué
-// pasó; el borrador del cliente sigue en este navegador y se ofrece al volver a abrir el formulario.
-class Protector extends React.Component<
-  { children: React.ReactNode },
-  { error: Error | null }
-> {
-  state = { error: null as Error | null };
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-  componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error("Fallo del panel:", error, info.componentStack);
-  }
-  render() {
-    if (!this.state.error) return this.props.children;
-    return (
-      <main className="fallo" role="alert">
-        <h1>Algo falló al mostrar esta pantalla</h1>
-        <p>
-          Lo que estabas escribiendo de un cliente quedó guardado en este
-          navegador: al abrir otra vez su formulario podrás recuperarlo.
-        </p>
-        <p className="fallo-detalle">Detalle: {this.state.error.message}</p>
-        <button
-          type="button"
-          className="button primary"
-          onClick={() => window.location.reload()}
-        >
-          Volver a cargar el panel
-        </button>
-      </main>
-    );
-  }
 }
 
 createRoot(document.getElementById("root")!).render(
