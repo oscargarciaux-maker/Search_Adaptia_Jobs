@@ -1,9 +1,7 @@
 """Hook PreToolUse (PR 1.5): no leer ni escribir archivos de secretos (.env, claves, certificados privados).
 Recibe el evento por stdin; con código 2 Claude Code bloquea la acción y muestra el motivo.
-
-Portabilidad (27 nov): el evento se lee como bytes UTF-8, no con la codificación del sistema (cp1252 en Windows, que
-fallaba con «Á» o «Í» y dejaba pasar todo sin avisar). Si el evento no se puede entender, bloquea: falla cerrado.
-Las rutas de Windows (con «\\») se revisan igual que las de Linux."""
+Lee el evento como UTF-8 (no con la codificación del sistema), revisa las rutas de Windows igual que las de Linux
+(«\\» se trata como «/») y, si el evento no se entiende, sale con 2: falla cerrado."""
 import json
 import re
 import sys
@@ -22,15 +20,22 @@ def rutas_del_evento(crudo):
     datos = evento.get("tool_input") or {}
     rutas = [datos.get("file_path") or "", datos.get("path") or "", datos.get("notebook_path") or ""]
     comando = datos.get("command") or ""
-    if not all(isinstance(x, str) for x in [*rutas, comando]):
+    if not all(isinstance(x, str) for x in [*rutas, comando]):  # forma inesperada: main() lo bloquea
         raise TypeError("campos que no son texto")
     rutas += re.findall(r"[\w./\\-]*\.env(?:\.[\w-]+)?\b", comando)
-    return [r.replace("\\", "/") for r in rutas if r]
+    return [_como_abre_windows(r) for r in rutas if r]
+
+
+def _como_abre_windows(ruta):
+    """Barras de Windows a «/», sin flujo NTFS («.env::$DATA») ni espacios o puntos finales («.env. »), que Windows
+    ignora al abrir el archivo."""
+    ruta = re.sub(r":[^/]*$", "", ruta.replace("\\", "/"))
+    return ruta.rstrip(" .") or ruta
 
 
 def main():
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
         rutas = rutas_del_evento(sys.stdin.buffer.read())
     except Exception as error:  # cualquier fallo al leer el evento bloquea
         bloquear(f"Bloqueado: el control de secretos no pudo leer la acción ({type(error).__name__}). "

@@ -18,7 +18,8 @@ def _correr(crudo):
 
 
 def _evento(**datos):
-    return json.dumps({"tool_name": "Bash", "tool_input": datos}, ensure_ascii=False).encode("utf-8")
+    herramienta = "Bash" if "command" in datos else "Read"
+    return json.dumps({"tool_name": herramienta, "tool_input": datos}, ensure_ascii=False).encode("utf-8")
 
 
 @pytest.mark.parametrize("datos", [
@@ -34,6 +35,7 @@ def test_deja_pasar_texto_con_tildes_sin_secretos(datos):
 @pytest.mark.parametrize("datos", [
     {"file_path": "config/.env"},
     {"file_path": r"C:\Users\ejemplo\proyecto\.env.produccion"},
+    {"file_path": r"C:\p\.env::$DATA"}, {"file_path": "C:\\p\\.env "}, {"file_path": "C:\\p\\.env."},
     {"file_path": "llaves/servidor_falso.pem"},
     {"command": "cat .env.local  # Ánimo, Índice"},
     {"path": "credentials_ejemplo_falso.json"},

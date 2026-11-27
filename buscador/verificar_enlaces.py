@@ -8,8 +8,8 @@ import json
 from pathlib import Path
 import re
 import socket
-from threading import BoundedSemaphore, Lock
 import sys
+from threading import BoundedSemaphore, Lock
 import time
 from urllib.parse import urldefrag, urljoin, urlparse
 
