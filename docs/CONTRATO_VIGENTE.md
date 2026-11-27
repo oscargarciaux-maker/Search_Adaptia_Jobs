@@ -6,7 +6,7 @@ no el país donde vive: si pide español, solo en español aunque viva en un pa�
 le llegan en inglés aunque viva en un país hispanohablante, en Brasil o en cualquier otro. El origen LATAM/España es
 histórico. Los idiomas de aviso aceptados siguen siendo solo español e inglés.
 
-Fuente principal de las reglas del proyecto (estado al 27 nov 2026, hasta v52 y la decisión del 27 nov). Cada regla dice cómo es **hoy**; entre
+Fuente principal de las reglas del proyecto (estado al 27 nov 2026, hasta v52 y las decisiones del 27 nov). Cada regla dice cómo es **hoy**; entre
 paréntesis va el contrato de donde sale, por si hace falta el detalle. Si una versión posterior corrigió a otra, aquí
 solo queda la posterior. Los `docs/CONTRATO_DATOS_vNN.md` son históricos: se conservan porque el código y las pruebas
 los citan, pero no se editan ni se crean nuevos.
@@ -158,8 +158,13 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
   (v11, v27). Nunca dos veces la misma vacante a la misma persona (v11).
 - **Completar a quien va corto:** hasta su **meta diaria**. Hasta 5 vacantes siempre cabe; del mínimo a la meta, una
   vacante que hoy aún no usa nadie solo entra mientras lote + añadidas no pasen del techo del día. Orden: lote → reutilización de vacantes de otros días que esa persona nunca recibió → rescate con toda
-  la bodega (cargo, ubicación e idioma; 2 por empresa; enlace de 24 h) → ampliación como último recurso (`remota_cercana`,
-  `empresa_4`) → posts. Comunidad y los posts se quedan en el mínimo de 5 (v11, v27, v36, v49).
+  la bodega (cargo, ubicación e idioma; 2 por empresa; enlace de 24 h) → ampliación como último recurso y **solo hasta 5**
+  (`remota_cercana`, `empresa_4`; también al reutilizar y al rescatar: de 5 a la meta solo entra lo que cumple el
+  perfil, decisión de Oscar 27 nov) → posts. Comunidad y los posts se quedan en el mínimo de 5 (v11, v27, v36, v49).
+- **Las ampliadas van marcadas:** `remota_cercana` da a un perfil sin «remoto» (presencial o híbrido) las remotas que
+  su primera fila (donde vive) aceptaría: abiertas a uno de sus países, mundiales o por su franja horaria; nunca una
+  cerrada a otros países. El panel las marca «Ampliada: …» en la lista de Vacantes y en la ficha; el WhatsApp las
+  incluye después de las demás vacantes formales (si caben en las 10), con su modalidad y sin la marca (v9, v27, v49).
 - Lo asignado en pasadas anteriores del mismo día cuenta para la meta y el techo; si no se puede leer, se completa
   solo hasta el mínimo (v49).
 - Las rescatadas no cuentan en el cupo ni van a `ofertas` (marca `rescatada`) (v36).

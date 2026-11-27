@@ -58,7 +58,7 @@ claro/oscuro (por defecto sigue al computador; `?tema=oscuro|claro` en la direcc
    «Cargar todas las dudosas de la base» (contrato v17) llena la bandeja al momento con todas las del catálogo, para
    depurar la base: cada decisión cambia el catálogo en el acto, vale en todas las búsquedas y la limpieza de `ofertas`
    borra lo descartado.
-   **Mínimo por perfil (contrato v9):** si un cliente no llega a 5 vacantes en el día, se completa dentro del cupo con avisos que no dicen años o inglés y luego con los «Cargos cercanos» del cargo (o remotas abiertas a su país si solo pidió presencial). En «Vacantes» se marcan «Ampliada»; el mensaje de WhatsApp no cambia. Dos cargos con los mismos términos se reparten las vacantes: la estimación lo avisa.
+   **Mínimo por perfil (contrato v9):** si un cliente no llega a 5 vacantes en el día, se completa dentro del cupo con avisos que no dicen años o inglés y luego con los «Cargos cercanos» del cargo (o remotas abiertas a su país si solo pidió presencial). En «Vacantes» se marcan «Ampliada» (lista y ficha); el mensaje de WhatsApp las incluye después de las demás vacantes, sin la marca. Dos cargos con los mismos términos se reparten las vacantes: la estimación lo avisa.
    **Estimar con búsqueda en vivo** hace, solo al pulsarlo, una búsqueda corta (hasta 30 s) en LinkedIn público y
    Get on Board, sin Apify ni cookies, aplica los mismos filtros y descuenta las ya entregadas. Es una muestra: la
    búsqueda nocturna revisa más páginas y portales. Para no exponer la IP del servidor a bloqueos de LinkedIn, solo

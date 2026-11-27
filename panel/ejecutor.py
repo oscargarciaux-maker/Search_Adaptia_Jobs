@@ -440,6 +440,12 @@ class Completar:
     def cabe(self, p, vacante_id):
         return self.estrictas.get(p.id, 0) < MINIMO_POR_PERFIL or vacante_id in self.usadas or self.libre > 0
 
+    def cabe_ampliada(self, p):
+        """Decisión de Oscar (27 nov, sección 7.A): una vacante por ampliación (p. ej. una remota para quien pidió
+        presencial) solo completa hasta el mínimo de 5, también al reutilizar y al rescatar; de 5 a la meta, solo entra
+        lo que cumple el perfil tal cual."""
+        return self.estrictas.get(p.id, 0) < MINIMO_POR_PERFIL
+
     def anotar(self, p, vacante_id):
         if vacante_id not in self.usadas:
             self.usadas.add(vacante_id)
@@ -530,7 +536,7 @@ def _reutilizar(repo, cfg, fecha, completar, filas, fila, operativos):
             match, extra = evaluar(row["snapshot"], p, fecha), [{"reutilizada": row["delivery_date"]}]
             if not match["compatible"]:
                 nivel = next((n for n in AMPLIACIONES if evaluar_ampliada(row["snapshot"], p, fecha, n)["compatible"]), None)
-                if not nivel:
+                if not nivel or not completar.cabe_ampliada(p):
                     continue
                 match, extra = evaluar_ampliada(row["snapshot"], p, fecha, nivel), [*extra, {"ampliacion": nivel}]
             vistas.add(row["vacante_id"])
@@ -650,7 +656,7 @@ def _rescatar(repo, cfg, fecha, completar, filas, fila, vacantes, operativos, ca
             empresa = normalizar.texto(v.get("empresa") or "")
             if v["id"] in vistas.setdefault(str(p.id), set()) or empresas[empresa] >= 2 or not _vigente_24h(v, ahora):
                 continue
-            if not completar.cabe(p, v["id"]):
+            if not completar.cabe(p, v["id"]) or (extra and not completar.cabe_ampliada(p)):
                 continue
             row = {"vacante_id": v["id"], "snapshot": v, "match_grade": entrega.GRADO_CONTRATO.get(afinidad, "close")}
             vistas[str(p.id)].add(v["id"])
@@ -789,16 +795,6 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
             continue
         estrictas[p.id] = estrictas.get(p.id, 0) + 1
         filas.append(fila(row, p, cid, pruebas))
-    # Contrato v9: lo ampliado solo se asigna a perfiles que no llegaron al mínimo con vacantes que cumplen todo.
-    for row, p, cargo_id in ampliables:
-        nivel = row["snapshot"]["_ampliacion"]
-        if estrictas.get(p.id, 0) >= MINIMO_POR_PERFIL or (de_comunidad(p) and estrictas.get(p.id, 0) >= (p.meta_diaria or 0)):
-            continue
-        match = evaluar_ampliada(row["snapshot"], p, fecha, nivel)
-        if match["compatible"]:
-            estrictas[p.id] = estrictas.get(p.id, 0) + 1
-            filas.append(fila(row, p, cargo_id, match["pruebas"], [{"ampliacion": nivel}]))
-    reutilizadas = posts = rescatadas = 0
     ya_hoy = {}
     if hasattr(repo, "asignadas_de"):
         try:  # contrato v49: lo de las pasadas anteriores de hoy cuenta para la meta y el techo
@@ -806,6 +802,24 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
         except Exception as e:  # noqa: BLE001 — sin el dato no se completa de más: solo hasta el mínimo de siempre
             registro.aviso("ejecutor:ya-hoy", e)
             ya_hoy = None
+
+    def con_hoy(p):
+        """Lo que la persona ya tiene hoy: esta pasada más las anteriores (sin contar dos veces una vacante)."""
+        return len(set((ya_hoy or {}).get(str(p.id), ())) | {f["vacante_id"] for f in filas if f["perfil_id"] == str(p.id)})
+    # Contrato v9: lo ampliado solo se asigna a perfiles que no llegaron al mínimo con vacantes que cumplen todo.
+    # 7.A (27 nov): contando también lo que recibió en las pasadas anteriores de hoy; antes la pasada de las 8:30 o
+    # «Buscar ahora» podía darle una ampliada más a quien ya tenía 5. Una que ya recibió hoy se vuelve a registrar.
+    for row, p, cargo_id in ampliables:
+        nivel = row["snapshot"]["_ampliacion"]
+        if estrictas.get(p.id, 0) >= MINIMO_POR_PERFIL or (de_comunidad(p) and estrictas.get(p.id, 0) >= (p.meta_diaria or 0)):
+            continue
+        if row["vacante_id"] not in set((ya_hoy or {}).get(str(p.id), ())) and con_hoy(p) >= MINIMO_POR_PERFIL:
+            continue
+        match = evaluar_ampliada(row["snapshot"], p, fecha, nivel)
+        if match["compatible"]:
+            estrictas[p.id] = estrictas.get(p.id, 0) + 1
+            filas.append(fila(row, p, cargo_id, match["pruebas"], [{"ampliacion": nivel}]))
+    reutilizadas = posts = rescatadas = 0
     completar = Completar(cfg, estrictas, filas, [r["vacante_id"] for r in seleccionadas], ya_hoy)
     if ya_hoy is None:
         completar.metas = dict.fromkeys(completar.metas, MINIMO_POR_PERFIL)
