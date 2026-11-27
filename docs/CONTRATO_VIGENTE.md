@@ -358,7 +358,7 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
 ## 17. Supabase y migraciones
 
 - **No se modifica SQL ya registrado:** se añade una migración nueva (también a `ENSAYABLES` y a
-  `pruebas/test_migraciones.py`). Migraciones actuales: 002 a 020 (v2–v48).
+  `pruebas/test_migraciones.py`). Migraciones actuales: 002 a 021 (v2–v48).
 - «Preparar Supabase» sube respaldo cifrado antes de aplicar SQL, registra hashes en `adaptia_migraciones` y activa por
   marca privada; no pedir copiar SQL a mano ni variables manuales. `SUPABASE_DB_URL` y `SUPABASE_BACKUP_KEY` se configuran
   una vez como Secrets; la clave administrativa solo prepara, nunca va a fuentes, navegador ni logs.
@@ -380,6 +380,11 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
   Supabase; `--prueba` no marca entregadas ni sube (v1; reglas de integridad).
 - SQL 010 y 011 recorren el grafo de identidades solo desde `ofertas` y referencias explícitas; comprobar instalación
   y la captura posterior antes de afirmar una recuperación (v5).
+- **La reconciliación va por lotes (SQL 021, 27 nov):** la API llama de a 5.000 referencias explícitas y luego de a 500
+  ofertas; cada lote es una transacción corta e idempotente, con un solo reintento si Supabase lo corta (57014). Así
+  ninguna llamada crece con el catálogo ni con las ofertas. Mismas reglas de identidad, rechazos y archivo que 011,
+  pero un rechazo en un lote deja confirmados los lotes anteriores (la corrida sigue en AVERÍA y repetir es seguro);
+  `reconciliar_ofertas()` sigue existiendo para el instalador y el diagnóstico (todo en una transacción).
 - El arranque importa un corte coherente; un respaldo previo a cambios no equivale a copias periódicas (domingos,
   `respaldo.yml`). El traspaso (`traspaso.yml`) va a un destino vacío y propio, exige tablas, memoria, colas y reservas
   (no solo cambiar secretos) y el origen trasladado deja de capturar (`docs/ENTREGA_AL_CLIENTE.md`).
