@@ -415,6 +415,8 @@ Las «Reglas innegociables» de `CLAUDE.md` son el resumen de esta sección: si 
 - Reportes públicos solo con conteos, sin datos de clientes: `embudo_idioma` (v50), `embudo[cargo].por_idioma` y
   `verificacion_enlaces.en_la_corrida` (v51). Cifras por persona solo en el resumen privado (v40).
 - `python -m buscador.medicion --bodega …` mide sobre una bodega guardada (v49).
+- Línea base del objetivo mundial: `--comparar pruebas/datos/linea_base_mundial.json` repite 8 escenarios ficticios del
+  modo panel sobre la bodega fijada y falla si cambia el de control (`docs/LINEA_BASE_MUNDIAL.md`, 27 nov).
 
 ## Decisiones recientes
 

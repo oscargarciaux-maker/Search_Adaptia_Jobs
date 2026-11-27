@@ -1,0 +1,150 @@
+{
+ "bodega": {
+  "commit": "774a1e39208bad12fe52879c6e0d36b0648b98a3",
+  "sha256": "96b57d8a745fd40faa9cacc8289609e1946b8bb2fb971cfbc39810c735378fd2",
+  "vacantes": 12606
+ },
+ "hoy": "2026-11-27",
+ "vacantes": 12606,
+ "huella_cargos": "a37ef17ef49ea560a52e259ca5ac2659e48d58cb695b0b20e39fe1b89298a95f",
+ "meta_por_perfil": 100,
+ "escenarios": {
+  "a": {
+   "nombre": "Brasil, inglés, remoto mundial",
+   "etapas": {
+    "objetivo": 34,
+    "limpiar": 34,
+    "entregable": 34,
+    "afinidad": 34,
+    "panel": 32
+   },
+   "panel_fuera_del_objetivo": 1,
+   "admitidas": 7267,
+   "segundos": {
+    "limpiar": 203.07,
+    "seleccion": 17.38
+   }
+  },
+  "b": {
+   "nombre": "Brasil, inglés, presencial en São Paulo",
+   "etapas": {
+    "objetivo": 1,
+    "limpiar": 1,
+    "entregable": 1,
+    "afinidad": 1,
+    "panel": 1
+   },
+   "panel_fuera_del_objetivo": 20,
+   "admitidas": 7267,
+   "segundos": {
+    "limpiar": 201.5,
+    "seleccion": 21.95
+   }
+  },
+  "c": {
+   "nombre": "EE. UU., solo español, remoto mundial",
+   "etapas": {
+    "objetivo": 2,
+    "limpiar": 2,
+    "entregable": 2,
+    "afinidad": 2,
+    "panel": 2
+   },
+   "panel_fuera_del_objetivo": 0,
+   "admitidas": 10051,
+   "segundos": {
+    "limpiar": 199.35,
+    "seleccion": 31.85
+   }
+  },
+  "d": {
+   "nombre": "Colombia, solo inglés, remoto mundial",
+   "etapas": {
+    "objetivo": 383,
+    "limpiar": 383,
+    "entregable": 358,
+    "afinidad": 358,
+    "panel": 228
+   },
+   "panel_fuera_del_objetivo": 0,
+   "admitidas": 7262,
+   "segundos": {
+    "limpiar": 194.44,
+    "seleccion": 18.34
+   }
+  },
+  "e": {
+   "nombre": "Alemania, inglés, híbrido en Berlín",
+   "etapas": {
+    "objetivo": 38,
+    "limpiar": 38,
+    "entregable": 38,
+    "afinidad": 38,
+    "panel": 38
+   },
+   "panel_fuera_del_objetivo": 12,
+   "admitidas": 7760,
+   "segundos": {
+    "limpiar": 194.92,
+    "seleccion": 20.84
+   }
+  },
+  "f": {
+   "nombre": "Kenia, inglés, remoto mundial (sin fuentes locales)",
+   "etapas": {
+    "objetivo": 6,
+    "limpiar": 6,
+    "entregable": 6,
+    "afinidad": 6,
+    "panel": 6
+   },
+   "panel_fuera_del_objetivo": 1,
+   "admitidas": 7259,
+   "segundos": {
+    "limpiar": 195.09,
+    "seleccion": 17.41
+   }
+  },
+  "g": {
+   "nombre": "India, inglés, remoto en su país",
+   "etapas": {
+    "objetivo": 8,
+    "limpiar": 8,
+    "entregable": 8,
+    "afinidad": 8,
+    "panel": 8
+   },
+   "panel_fuera_del_objetivo": 1,
+   "admitidas": 7262,
+   "segundos": {
+    "limpiar": 194.51,
+    "seleccion": 17.03
+   }
+  },
+  "h": {
+   "nombre": "Control: Colombia, español, remoto LATAM",
+   "etapas": {
+    "objetivo": 307,
+    "limpiar": 307,
+    "entregable": 301,
+    "afinidad": 300,
+    "panel": 267
+   },
+   "panel_fuera_del_objetivo": 0,
+   "admitidas": 7269,
+   "segundos": {
+    "limpiar": 195.3,
+    "seleccion": 18.12
+   }
+  }
+ },
+ "conjunto": {
+  "meta_por_perfil": 15,
+  "admitidas": 10560,
+  "ofrecidas": 415,
+  "segundos": {
+   "limpiar": 196.46,
+   "seleccion": 62.69
+  }
+ }
+}
