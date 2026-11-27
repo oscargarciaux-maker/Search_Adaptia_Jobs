@@ -261,7 +261,7 @@ def podar(almacen, tipo, conservar=None, ahora=None):
     if tipo not in CONSERVAR:
         return []
     conservar = max(1, CONSERVAR[tipo] if conservar is None else conservar)
-    reciente = f"{tipo}/{(ahora or datetime.now(timezone.utc)) - timedelta(days=1):%Y-%m-%d}"
+    desde_ayer = f"{(ahora or datetime.now(timezone.utc)) - timedelta(days=1):%Y-%m-%d}"
     todas = carpetas(almacen, tipo)
     buenos = validos(almacen, tipo, todas)
     if not buenos:
@@ -271,8 +271,11 @@ def podar(almacen, tipo, conservar=None, ahora=None):
     ultimo = buenos[-1][0]
     borradas = []
     for carpeta in todas:
-        if carpeta in conservados or carpeta >= ultimo or (carpeta not in completas and carpeta >= reciente):
+        if carpeta in conservados or carpeta >= ultimo:
             continue
+        fecha = carpeta.split("/", 1)[1][:10]  # AAAA-MM-DD (lo garantiza _CARPETA)
+        if carpeta not in completas and fecha >= desde_ayer:
+            continue  # puede estar subiéndose ahora
         almacen.borrar([f"{carpeta}/{e['name']}" for e in almacen.listar(carpeta + "/")])
         borradas.append(carpeta)
     return borradas
@@ -309,7 +312,7 @@ def bajar(almacen, carpeta, destino):
 
 
 # ---------------------------------------------------------------- línea de órdenes
-def _mb(n):
+def mb(n):
     return f"{n / 1_000_000:.1f} MB"
 
 
@@ -339,7 +342,7 @@ def _subir_cli(args, almacen):
     archivo = Path(args.archivo) if args.archivo else _archivo_unico(args.carpeta)
     m = subir(almacen, archivo, args.tipo, ejecucion_actual())
     lineas = [f"Respaldo guardado en Storage (bucket privado `{BUCKET}`): `{m['carpeta']}`",
-              f"- {_mb(m['tamano'])} en {len(m['partes'])} trozos, comprobados al bajarlos de nuevo",
+              f"- {mb(m['tamano'])} en {len(m['partes'])} trozos, comprobados al bajarlos de nuevo",
               f"- sha256 `{m['sha256']}`"]
     try:
         borradas = podar(almacen, args.tipo)
@@ -347,12 +350,12 @@ def _subir_cli(args, almacen):
             lineas.append(f"- Se borraron {len(borradas)} respaldos «{args.tipo}» viejos "
                           f"(quedan los últimos {CONSERVAR[args.tipo]})")
         usado = ocupado(almacen)
-        lineas.append(f"- El bucket ocupa {_mb(usado)} de {_mb(CUOTA_GRATUITA)} del plan gratuito")
+        lineas.append(f"- El bucket ocupa {mb(usado)} de {mb(CUOTA_GRATUITA)} del plan gratuito")
         # La próxima copia se sube antes de podar: durante la subida convive con todas las de ahora.
         if usado + m["tamano"] > AVISO * CUOTA_GRATUITA:
             lineas.append("- ⚠️ La próxima copia podría no caber: decidir ya si pasar a Pro o guardar menos semanas "
                           "(docs/OPERACION_Y_RECUPERACION.md §8)")
-            registro.aviso("almacen_respaldos.espacio", RuntimeError(f"el bucket ocupa {_mb(usado)}"))
+            registro.aviso("almacen_respaldos.espacio", RuntimeError(f"el bucket ocupa {mb(usado)}"))
     except (RuntimeError, ValueError, KeyError) as e:
         registro.aviso("almacen_respaldos.podar", e)
         lineas.append("- No se pudo revisar ni podar los respaldos viejos (ver aviso en el registro); el nuevo sí quedó")
@@ -364,8 +367,9 @@ def main(argv=None):
     sub = p.add_subparsers(dest="orden", required=True)
     s = sub.add_parser("subir", help="Sube el único .enc de la carpeta y lo comprueba")
     s.add_argument("--tipo", choices=TIPOS, required=True)
-    s.add_argument("--carpeta", default="privado/respaldos")
-    s.add_argument("--archivo", help="El .enc exacto a subir (en vez del único de --carpeta)")
+    origen = s.add_mutually_exclusive_group()
+    origen.add_argument("--carpeta", default="privado/respaldos", help="Sube el único .enc de esta carpeta")
+    origen.add_argument("--archivo", help="El .enc exacto a subir")
     lst = sub.add_parser("listar", help="Respaldos guardados, del más viejo al más nuevo")
     lst.add_argument("--tipo", choices=TIPOS, default="semanal")
     b = sub.add_parser("bajar", help="Reúne un respaldo en un archivo .enc")
@@ -378,11 +382,11 @@ def main(argv=None):
     elif args.orden == "listar":
         for carpeta in carpetas(almacen, args.tipo):
             m = leer_manifiesto(almacen, carpeta)
-            estado = f"{_mb(m['tamano'])}  sha256 {m['sha256'][:12]}…" if m else "INCOMPLETO (no sirve)"
+            estado = f"{mb(m['tamano'])}  sha256 {m['sha256'][:12]}…" if m else "INCOMPLETO (no sirve)"
             print(f"{carpeta}  {estado}")
     else:
         m = bajar(almacen, args.respaldo, args.salida)
-        print(f"Respaldo reunido en {args.salida} ({_mb(m['tamano'])}, sha256 comprobado).")
+        print(f"Respaldo reunido en {args.salida} ({mb(m['tamano'])}, sha256 comprobado).")
 
 
 if __name__ == "__main__":

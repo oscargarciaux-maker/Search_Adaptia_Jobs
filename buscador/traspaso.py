@@ -137,17 +137,20 @@ def main():
             raise RuntimeError("Falta el secreto SUPABASE_SECRET_KEY_DESTINO (Secret key del destino): sin él la "
                                "copia del traspaso no se puede guardar en el destino. No se copió nada.")
         almacen = almacen_respaldos.Almacen(url_destino, clave_destino)
-        almacen.asegurar_bucket()  # antes de copiar nada: una clave mala o un bucket público paran aquí
         guardado = {}
 
         def guardar(archivo):
             guardado.update(almacen_respaldos.subir(almacen, archivo, "traspaso", almacen_respaldos.ejecucion_actual()))
 
         with migraciones.conexion(os.environ.get("SUPABASE_DB_URL_DESTINO", ""), url_destino) as destino:
+            # Primero que el destino sea de verdad un proyecto libre (no la web por error); después, antes de copiar
+            # nada, que la clave sirva y el bucket sea privado.
+            exigir_destino_libre(destino)
+            almacen.asegurar_bucket()
             copia = Path(args.privado) / "respaldos" / f"traspaso-{fecha}.enc"
             inv = trasladar(origen, destino, trabajo, llave, copia, url_destino, ensayo=args.ensayo, guardar=guardar)
         _escribir_resumen(f"Copia cifrada del traspaso guardada en el bucket privado `{almacen_respaldos.BUCKET}` "
-                          f"del DESTINO: `{guardado['carpeta']}` ({guardado['tamano'] / 1_000_000:.1f} MB, "
+                          f"del DESTINO: `{guardado['carpeta']}` ({almacen_respaldos.mb(guardado['tamano'])}, "
                           "comprobada al bajarla de nuevo).\n")
     if args.ensayo:
         _escribir_resumen(resumen("Ensayo comprobado: el destino coincide con el origen", inv) +

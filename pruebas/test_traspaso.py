@@ -141,9 +141,27 @@ def test_el_traspaso_guarda_la_copia_en_el_storage_del_destino(monkeypatch, tmp_
         guardar(copia)
         return {"tablas": {"ofertas": 5}, "secuencias": {}}
     monkeypatch.setattr(traspaso, "trasladar", trasladar)
+    monkeypatch.setattr(traspaso, "exigir_destino_libre", lambda c: None)
     traspaso.main()
     assert usados == ["https://destino.supabase.co"]
     assert [n.split("/")[0] for n in storage.objetos] and all(n.startswith("traspaso/") for n in storage.objetos)
     assert any(n.endswith("/manifiesto.json") for n in storage.objetos)
     salida = capsys.readouterr().out
     assert "bucket privado `respaldos` del DESTINO" in salida and "sb_secret" not in salida
+
+
+def test_un_destino_ocupado_no_recibe_ni_el_bucket(monkeypatch, tmp_path):
+    """Si por error se apunta al proyecto de la web, se rechaza antes de crear nada en su Storage."""
+    from pruebas.test_almacen_respaldos import StorageFalso
+    abiertas, storage = [], StorageFalso()
+    _entorno_traspaso(monkeypatch, tmp_path, abiertas)
+    monkeypatch.setenv("SUPABASE_SECRET_KEY_DESTINO", "sb_secret_ficticia")
+    original = traspaso.almacen_respaldos.Almacen
+    monkeypatch.setattr(traspaso.almacen_respaldos, "Almacen",
+                        lambda url, clave: original(url, clave, sesion=storage, pausa=0))
+    def ocupado(c):
+        raise RuntimeError("El destino ya tiene tablas de este sistema (ofertas).")
+    monkeypatch.setattr(traspaso, "exigir_destino_libre", ocupado)
+    with pytest.raises(RuntimeError, match="ya tiene tablas"):
+        traspaso.main()
+    assert storage.bucket is None and storage.llamadas == []
