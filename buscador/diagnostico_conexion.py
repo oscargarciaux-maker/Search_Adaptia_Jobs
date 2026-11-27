@@ -32,7 +32,7 @@ def main():
         raise SystemExit(1) from None
     print(mensaje)
     if os.environ.get("GITHUB_STEP_SUMMARY"):
-        with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+        with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
             f.write(mensaje + "\n")
 
 

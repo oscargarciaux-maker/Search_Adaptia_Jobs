@@ -35,7 +35,7 @@ def main():
         raiz = Path(carpeta)
         trabajo = raiz / "trabajo"
         trabajo.mkdir()
-        (trabajo / "estado.json").write_text('{"rotacion": 7}')
+        (trabajo / "estado.json").write_text('{"rotacion": 7}', encoding="utf-8")
         with nueva() as origen:
             plan = migraciones.planificar(origen, trabajo, raiz / "inicial.enc", llave)
             migraciones.preparar(origen, trabajo, plan, instancia_nueva=True)

@@ -252,10 +252,10 @@ def test_captura_incremental_no_crea_lotes_ni_usa_apify(monkeypatch, tmp_path):
     trabajo = tmp_path / "trabajo"
     trabajo.mkdir()
     archivo = trabajo / "entregadas.json"
-    archivo.write_text('{"anterior":"2026-11-03"}')
+    archivo.write_text('{"anterior":"2026-11-03"}', encoding="utf-8")
     r = bodega.correr(tmp_path, modo="incremental", hoy=HOY)
     assert r["modo"] == "incremental" and r["catalogo"]["activas_elegibles"] == 1
-    assert archivo.read_text() == '{"anterior":"2026-11-03"}'
+    assert archivo.read_text(encoding="utf-8") == '{"anterior":"2026-11-03"}'
     assert not (trabajo / "lote_entrega.json").exists()
     memoria = bodega._leer_json(trabajo / "catalogo_sincronizado.json.gz", {})
     assert memoria and r["catalogo"]["enviadas"] >= 1 and set(memoria) <= {v["id"] for v in bodega._leer_json(trabajo / "bodega.json.gz", [])}
@@ -308,7 +308,7 @@ def test_perder_registro_y_estado_no_crea_otro_lote_ni_gasta_apify(monkeypatch, 
         trabajo = tmp_path / "trabajo"
         trabajo.mkdir()
         (trabajo / "lote_entrega.json").write_text(json.dumps({"fecha": HOY,
-            "elegidas": {"ux-ui-designer": [[v, "exacto"]]}}))
+            "elegidas": {"ux-ui-designer": [[v, "exacto"]]}}), encoding="utf-8")
     def recoger(*a, **k):
         raise RuntimeError("captura alcanzada con lote recuperable")
     monkeypatch.setattr(bodega, "recoger", recoger)

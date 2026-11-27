@@ -49,18 +49,18 @@ def test_un_horario_sin_pasada_es_un_error():
 
 
 def test_registro_roto_cuenta_como_sin_registro(tmp_path):
-    (tmp_path / "metricas_entrega.json").write_text("{roto")
+    (tmp_path / "metricas_entrega.json").write_text("{roto", encoding="utf-8")
     assert arranque.leer_dia(tmp_path, HOY) is None
     assert arranque.leer_dia(tmp_path / "no-existe", HOY) is None
 
 
 def test_linea_de_comandos_imprime_lo_que_lee_el_flujo(tmp_path, capsys):
-    (tmp_path / "metricas_entrega.json").write_text(json.dumps({arranque.hoy_bogota(): INCOMPLETA_1}))
+    (tmp_path / "metricas_entrega.json").write_text(json.dumps({arranque.hoy_bogota(): INCOMPLETA_1}), encoding="utf-8")
     arranque.main(["--trabajo", str(tmp_path), "--horario", RESPALDO])
     arranque.main(["--trabajo", str(tmp_path), "--horario", SEGUNDA])
     arranque.main(["--trabajo", str(tmp_path), "--horario", ""])
     assert capsys.readouterr().out.splitlines() == ["ejecutar=false", "ejecutar=true", "ejecutar=true"]
-    (tmp_path / "corridas.json").write_text("[]")
+    (tmp_path / "corridas.json").write_text("[]", encoding="utf-8")
     arranque.main(["--trabajo", str(tmp_path), "--vigia", str(tmp_path / "corridas.json"), "--rama", "main"])
     salida = capsys.readouterr()
     assert salida.out == "lanzar=false\n" and "::notice::" in salida.err  # el motivo no va a GITHUB_OUTPUT

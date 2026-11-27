@@ -23,7 +23,7 @@ DOMINIOS_DE_EJEMPLO = ("@example.org", "@example.com", "@example.net")
 
 def archivos_del_repositorio():
     salida = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard"], cwd=RAIZ,
-                            capture_output=True, text=True, check=True).stdout
+                            capture_output=True, text=True, check=True, encoding="utf-8").stdout
     return [RAIZ / linea for linea in salida.splitlines() if linea and (RAIZ / linea).is_file()]
 
 

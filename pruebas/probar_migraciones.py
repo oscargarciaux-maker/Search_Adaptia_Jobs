@@ -72,8 +72,8 @@ def main():
             for m in ms[:2]: conn.execute(m.cuerpo)
             fecha = conn.execute("select (now() at time zone 'America/Bogota')::date::text").fetchone()[0]
             presupuesto = {"mes": fecha[:7], "reservas": {fecha: 0.035}}
-            (trabajo / "apify_presupuesto.json").write_text(json.dumps(presupuesto))
-            (trabajo / "estado.json").write_text('{"fuente":"corte de ensayo"}')
+            (trabajo / "apify_presupuesto.json").write_text(json.dumps(presupuesto), encoding="utf-8")
+            (trabajo / "estado.json").write_text('{"fuente":"corte de ensayo"}', encoding="utf-8")
             conn.execute("""insert into public.catalogo_vacantes(id,datos,observed_at,status)
                 values('aaaaaaaaaaaaaaaa','{"titulo":"QA"}',now(),'closed');
                 insert into public.entregas_diarias(vacante_id,delivery_date,role_id,match_grade,selected_at,snapshot)

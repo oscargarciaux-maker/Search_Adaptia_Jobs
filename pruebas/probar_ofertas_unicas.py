@@ -84,7 +84,7 @@ def main():
             with c.transaction(): migraciones.aplicar(c, [m for m in ms if m.version<"005"])
             if args.lote:
                 from buscador import catalogo, contrato, entrega, supabase, vacante
-                lote = json.loads(Path(args.lote).read_text())
+                lote = json.loads(Path(args.lote).read_text(encoding="utf-8"))
                 vacantes = {v["id"]: v for lista in lote["elegidas"].values() for v,_ in lista}
                 agrupadas = vacante.juntar(list(vacantes.values()))
                 principales = {identificador:v["id"] for v in agrupadas for identificador in [v["id"],*v.get("_ids_fusionados",[])]}

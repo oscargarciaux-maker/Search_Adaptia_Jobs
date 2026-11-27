@@ -618,7 +618,7 @@ class RepositorioDemo:
         self.lock = RLock()
         self.estado = {"revision": 1, "borrador": configuracion_demo(), "publicada": None}
         if self.archivo and self.archivo.exists():
-            self.estado = json.loads(self.archivo.read_text())
+            self.estado = json.loads(self.archivo.read_text(encoding="utf-8"))
             Configuracion.model_validate(self.estado["borrador"])
         self.creada = datetime.now(timezone.utc)
 
@@ -959,7 +959,7 @@ class RepositorioDemo:
         if self.archivo:
             self.archivo.parent.mkdir(parents=True, exist_ok=True)
             tmp = self.archivo.with_suffix(".partial")
-            tmp.write_text(json.dumps(self.estado, ensure_ascii=False))
+            tmp.write_text(json.dumps(self.estado, ensure_ascii=False), encoding="utf-8")
             os.chmod(tmp, 0o600)
             tmp.replace(self.archivo)
 

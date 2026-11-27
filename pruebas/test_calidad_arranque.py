@@ -74,7 +74,7 @@ def test_preflight_impide_recoger_y_modificar_estado_si_no_hay_supabase(tmp_path
     trabajo = tmp_path / "trabajo"
     trabajo.mkdir()
     archivo = trabajo / "estado.json"
-    archivo.write_text('{"anterior": true}')
+    archivo.write_text('{"anterior": true}', encoding="utf-8")
     monkeypatch.delenv("SUPABASE_URL", raising=False)
     monkeypatch.delenv("SUPABASE_SECRET_KEY", raising=False)
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
@@ -83,7 +83,7 @@ def test_preflight_impide_recoger_y_modificar_estado_si_no_hay_supabase(tmp_path
     monkeypatch.setattr(bodega, "recoger", prohibido)
     with pytest.raises(RuntimeError, match="Supabase es obligatorio"):
         bodega.correr(tmp_path, hoy=HOY)
-    assert archivo.read_text() == '{"anterior": true}'
+    assert archivo.read_text(encoding="utf-8") == '{"anterior": true}'
 
 
 @pytest.mark.parametrize("clave", ["sb_publishable_ficticia", "clave-desconocida"])
@@ -118,10 +118,10 @@ def test_corrida_vacia_no_reescribe_estado_previo(tmp_path, monkeypatch):
     monkeypatch.setattr(bodega, "recoger", lambda *a, **k: ([], set(), set(), {}))
     trabajo = tmp_path / "trabajo"
     trabajo.mkdir()
-    (trabajo / "estado.json").write_text('{"anterior": true}')
+    (trabajo / "estado.json").write_text('{"anterior": true}', encoding="utf-8")
     with pytest.raises(RuntimeError, match="catálogo válido"):
         bodega.correr(tmp_path, hoy=HOY)
-    assert json.loads((trabajo / "estado.json").read_text()) == {"anterior": True}
+    assert json.loads((trabajo / "estado.json").read_text(encoding="utf-8")) == {"anterior": True}
 
 
 def test_prueba_de_integracion_no_exige_claves_ni_genera_excel(tmp_path, monkeypatch):
@@ -159,11 +159,11 @@ def test_validacion_no_confunde_workflow_exitoso_con_entrega_completa():
 
 def test_escritura_interrumpida_de_json_preserva_estado_anterior(tmp_path, monkeypatch):
     archivo = tmp_path / "pendientes_supabase.json"
-    archivo.write_text('{"anterior": true}')
+    archivo.write_text('{"anterior": true}', encoding="utf-8")
     def interrumpir(datos, flujo, **kwargs):
         flujo.write('{"incompleto":')
         raise OSError("escritura interrumpida")
     monkeypatch.setattr(bodega.json, "dump", interrumpir)
     with pytest.raises(OSError):
         bodega._guardar_json(archivo, {"nuevo": True})
-    assert json.loads(archivo.read_text()) == {"anterior": True}
+    assert json.loads(archivo.read_text(encoding="utf-8")) == {"anterior": True}

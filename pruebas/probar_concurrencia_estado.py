@@ -26,7 +26,7 @@ def main():
         base = ["psql", "-h", "127.0.0.1", "-U", "postgres"]
     def ejecutar(sql, db="postgres", permitir_error=False):
         r = subprocess.run(base + ["-d", db, "-At", "-v", "ON_ERROR_STOP=1"], input=sql,
-                           text=True, capture_output=True, env=entorno)
+                           text=True, capture_output=True, env=entorno, encoding="utf-8")
         if r.returncode and not permitir_error:
             raise RuntimeError(r.stderr)
         return r
@@ -35,7 +35,7 @@ def main():
     try:
         raiz = Path(__file__).resolve().parent.parent
         for ruta in ("supabase/esquema.sql", "supabase/migraciones/002_catalogo.sql", "supabase/migraciones/003_estado_operativo.sql"):
-            ejecutar((raiz / ruta).read_text(), db)
+            ejecutar((raiz / ruta).read_text(encoding="utf-8"), db)
         def sql(s, permitir_error=False): return ejecutar(s, db, permitir_error)
         fecha = sql("select (now()at time zone 'America/Bogota')::date;").stdout.strip()
         mes = fecha[:7]
@@ -95,7 +95,7 @@ def main():
         ejecutar(f"create database {destino};")
         try:
             for ruta in ("supabase/esquema.sql", "supabase/migraciones/002_catalogo.sql", "supabase/migraciones/003_estado_operativo.sql"):
-                ejecutar((raiz / ruta).read_text(), destino)
+                ejecutar((raiz / ruta).read_text(encoding="utf-8"), destino)
             subprocess.run(prefijo + ["pg_restore", *conexion, "-d", destino, "--data-only", "--no-owner",
                 "--no-privileges", "--single-transaction", "--exit-on-error"], input=dump,
                 capture_output=True, env=entorno, check=True)

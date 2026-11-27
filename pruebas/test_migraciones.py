@@ -73,8 +73,8 @@ def test_transaccion_externa_se_retira_sin_tocar_funciones():
 def test_rechazar_versiones_ambiguas(tmp_path, nombre):
     carpeta = tmp_path / "supabase/migraciones"
     carpeta.mkdir(parents=True)
-    (tmp_path / "supabase/esquema.sql").write_text("select 1;")
-    (carpeta / nombre).write_text("select 2;")
+    (tmp_path / "supabase/esquema.sql").write_text("select 1;", encoding="utf-8")
+    (carpeta / nombre).write_text("select 2;", encoding="utf-8")
     with pytest.raises(RuntimeError): migraciones.descubrir(tmp_path)
 
 
@@ -162,7 +162,7 @@ def test_prueba_no_contacta_base_ni_activa(monkeypatch, tmp_path):
     a = args()
     a.prueba = True
     preparar.correr(a)
-    assert archivo.read_text() == "ESTADO_SUPABASE_ACTIVO=false\nCATALOGO_ACTIVO=false\n"
+    assert archivo.read_text(encoding="utf-8") == "ESTADO_SUPABASE_ACTIVO=false\nCATALOGO_ACTIVO=false\n"
 
 
 def test_marca_activa_sin_variables_habilita_captura(monkeypatch, tmp_path):
@@ -174,7 +174,7 @@ def test_marca_activa_sin_variables_habilita_captura(monkeypatch, tmp_path):
     salida = tmp_path / "outputs"
     monkeypatch.setenv("GITHUB_OUTPUT", str(salida))
     preparar.correr(args())
-    assert "ejecutar=true" in salida.read_text()
+    assert "ejecutar=true" in salida.read_text(encoding="utf-8")
 
 
 def test_actualizacion_pendiente_exige_acceso_administrativo(monkeypatch):
@@ -192,7 +192,7 @@ def test_desactivar_horario_manual_sigue_respetandose(monkeypatch, tmp_path):
     salida = tmp_path / "outputs"
     monkeypatch.setenv("GITHUB_OUTPUT", str(salida))
     preparar.correr(args())
-    assert "ejecutar=false" in salida.read_text()
+    assert "ejecutar=false" in salida.read_text(encoding="utf-8")
 
 
 def test_acceso_sin_clave_de_cifrado_no_contacta_base(monkeypatch):
@@ -215,7 +215,7 @@ def test_rest_sin_confirmar_no_activa_captura(monkeypatch, tmp_path):
     monkeypatch.setattr(preparar, "comprobar_rest", sin_confirmar)
     privado = tmp_path / "privado"
     privado.mkdir()
-    (privado / "plan.json").write_text(json.dumps({}))
+    (privado / "plan.json").write_text(json.dumps({}), encoding="utf-8")
     a = args()
     a.fase, a.privado, a.salida = "aplicar", str(privado), str(tmp_path / "salida")
     entorno = tmp_path / "env"
@@ -226,7 +226,7 @@ def test_rest_sin_confirmar_no_activa_captura(monkeypatch, tmp_path):
 
 
 def test_respaldo_se_sube_antes_de_aplicar_sql():
-    texto = (migraciones.RAIZ / ".github/actions/preparar-supabase/action.yml").read_text()
+    texto = (migraciones.RAIZ / ".github/actions/preparar-supabase/action.yml").read_text(encoding="utf-8")
     assert texto.index("--fase respaldo") < texto.index("uses: actions/upload-artifact@v6") < texto.index("--fase aplicar")
     assert "continue-on-error" not in texto
 

@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import re
 import socket
+import sys
 from threading import BoundedSemaphore, Lock
 import time
 from urllib.parse import urldefrag, urljoin, urlparse
@@ -542,16 +543,18 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8")  # el JSON lleva tildes: en Windows la salida redirigida es cp1252
     p = argparse.ArgumentParser(description="Auditoría de solo lectura de un lote diario, sin Supabase ni Apify")
     p.add_argument("--lote", required=True)
     p.add_argument("--salida", required=True)
     p.add_argument("--maximo", type=int, default=120)
     a = p.parse_args()
-    lote = json.loads(Path(a.lote).read_text())
+    lote = json.loads(Path(a.lote).read_text(encoding="utf-8"))
     vs = list({v["id"]: v for lista in lote["elegidas"].values() for v, _ in lista}.values())
     cache = {}
     auditar(vs, cache, maximo=a.maximo, segundos=240)
-    Path(a.salida).write_text(json.dumps({"resumen": resumen(vs), "resultados": cache}, ensure_ascii=False, indent=2))
+    Path(a.salida).write_text(json.dumps({"resumen": resumen(vs), "resultados": cache}, ensure_ascii=False, indent=2),
+                              encoding="utf-8")
     print(json.dumps(resumen(vs), ensure_ascii=False, indent=2))
 
 
