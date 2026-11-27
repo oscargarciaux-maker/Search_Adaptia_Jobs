@@ -400,16 +400,27 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
   ninguna llamada crece con el catálogo ni con las ofertas. Mismas reglas de identidad, rechazos y archivo que 011,
   pero un rechazo en un lote deja confirmados los lotes anteriores (la corrida sigue en AVERÍA y repetir es seguro);
   `reconciliar_ofertas()` sigue existiendo para el instalador y el diagnóstico (todo en una transacción).
-- **Dónde viven los respaldos (27 nov, decisión de Oscar: opción B).** Las copias cifradas de `respaldo.yml`
-  (semanal) y de `limpiar_fuera_objetivo.yml` (antes de limpiar) van al bucket **privado** `respaldos` de Supabase
-  Storage del mismo proyecto (`buscador/almacen_respaldos.py`), no como artefacto público de Actions. Como el plan
-  gratuito admite 50 MB por archivo y 1 GB en total, cada copia se parte en trozos de 40 MiB con un `manifiesto.json`
-  (tamaño y sha256); se comprueba bajando cada trozo y, si la subida falla, el job falla. Se conservan las **últimas 4
-  semanales** válidas (nunca se borra la última válida); las de «antes de limpiar» no se borran solas. Si el bucket
-  existe y es público, no se sube nada. Si el bucket más una copia nueva pasaría de 800 MB, el resumen avisa:
-  decidir esa semana Pro o menos semanas. Mientras
-  no se confirme en real la primera subida, el artefacto sigue como red de seguridad de **1 día**. `traspaso.yml` y
-  «Preparar Supabase» todavía suben su copia como artefacto (90 y 14 días): pendiente.
+- **Dónde viven los respaldos (27 nov, decisiones de Oscar: opción B y plan gratuito).** Todas las copias cifradas de
+  la base van al bucket **privado** `respaldos` de Supabase Storage (`buscador/almacen_respaldos.py`), no como
+  artefacto público de Actions. Como el plan gratuito admite 50 MB por archivo y 1 GB en total, cada copia se parte en
+  trozos de 40 MiB con un `manifiesto.json` (tamaño y sha256); se comprueba bajando cada trozo y, si la subida falla,
+  el job falla. Si el bucket existe y es público, no se sube nada. Un tipo por carpeta, con su retención:
+
+  | Tipo (carpeta) | Lo crea | Proyecto | Se conservan |
+  |---|---|---|---|
+  | `semanal/` | `respaldo.yml` (domingos) | el mismo | los **2 últimos** válidos |
+  | `instalacion/` | acción «Preparar Supabase», solo antes de aplicar una migración | el mismo | el **último** válido |
+  | `antes-de-limpiar/` | `limpiar_fuera_objetivo.yml` | el mismo | todos (no se borran solos) |
+  | `traspaso/` | `traspaso.yml` | el de **DESTINO** | todos (no se borran solos) |
+
+  Nunca se borra el último válido de ningún tipo, ni una subida a medias de hoy o de ayer (puede estar en curso).
+  **«Preparar Supabase»:** si no hay migración pendiente no hay copia y Storage ni se consulta; si la hay y su copia no
+  se puede guardar, la migración NO se aplica y la captura falla. **Traspaso:** la copia va al destino porque es el
+  proyecto que queda en uso (el antiguo se borra semanas después, `docs/ENTREGA_AL_CLIENTE.md`) y porque, tras cambiar
+  los secretos, se lista y se baja con los de siempre; exige `SUPABASE_SECRET_KEY_DESTINO` y se guarda antes de
+  restaurar: si no se puede guardar, no se toca el destino ni se marca el origen. Si el bucket más una copia nueva
+  pasaría de 800 MB, el resumen avisa: decidir entre Pro o menos copias. Mientras no se confirme en real cada subida,
+  el artefacto sigue como red de seguridad de **1 día**.
 - El arranque importa un corte coherente; un respaldo previo a cambios no equivale a copias periódicas (domingos,
   `respaldo.yml`). El traspaso (`traspaso.yml`) va a un destino vacío y propio, exige tablas, memoria, colas y reservas
   (no solo cambiar secretos) y el origen trasladado deja de capturar (`docs/ENTREGA_AL_CLIENTE.md`).

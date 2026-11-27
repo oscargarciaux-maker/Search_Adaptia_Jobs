@@ -4,7 +4,9 @@ Reutiliza el corte cifrado y la restauración probados en `respaldo` y las migra
 proyecto sin las tablas de este sistema: así nunca se mezcla con la base de otra aplicación del cliente. Todo el destino
 se prepara en una sola transacción; si algo falla, queda como estaba. El origen solo se marca como trasladado después de
 comprobar los conteos, y desde entonces las capturas se detienen hasta que los secretos apunten al destino.
-Nunca imprime credenciales ni contenido de vacantes o clientes: solo conteos.
+La copia cifrada del traspaso se guarda en el bucket privado `respaldos` del proyecto de DESTINO (el que queda en uso;
+el antiguo se borra semanas después) antes de restaurar: si no se puede guardar, no se toca el destino ni se marca el
+origen. Nunca imprime credenciales ni contenido de vacantes o clientes: solo conteos.
 """
 import argparse
 from datetime import datetime, timezone
@@ -15,7 +17,7 @@ import tempfile
 
 from psycopg import sql
 
-from buscador import migraciones, respaldo
+from buscador import almacen_respaldos, migraciones, respaldo
 
 MARCA = ("control", "trasladada")
 
@@ -76,13 +78,16 @@ def comparar(origen, destino):
         raise RuntimeError("El destino no coincide con el origen; el origen sigue operando sin cambios. " + "; ".join(diferencias))
 
 
-def trasladar(origen, destino, trabajo, llave, copia, ref_destino, ensayo=False):
+def trasladar(origen, destino, trabajo, llave, copia, ref_destino, ensayo=False, guardar=None):
     """Origen y destino son conexiones administrativas distintas. Devuelve el inventario comprobado.
-    `ensayo`: copia y comprueba igual, pero el origen sigue operando (para practicar con un proyecto de prueba)."""
+    `ensayo`: copia y comprueba igual, pero el origen sigue operando (para practicar con un proyecto de prueba).
+    `guardar(copia)` la deja a salvo antes de restaurar; si lanza, no se toca el destino ni se marca el origen."""
     exigir_vigente(origen)
     exigir_destino_libre(destino)
     with migraciones.bloqueo(origen):
         respaldo.crear(origen, trabajo, copia, llave)
+        if guardar:
+            guardar(copia)
         esperado = inventario(origen)
         obtenido = restaurar(destino, copia, llave)
         comparar(esperado, obtenido)
@@ -127,9 +132,23 @@ def main():
         url_destino = os.environ.get("SUPABASE_URL_DESTINO", "")
         if url_destino.rstrip("/") == os.environ.get("SUPABASE_URL", "").rstrip("/"):
             raise RuntimeError("El destino es el mismo proyecto que el origen.")
+        clave_destino = os.environ.get("SUPABASE_SECRET_KEY_DESTINO", "").strip()
+        if not clave_destino:
+            raise RuntimeError("Falta el secreto SUPABASE_SECRET_KEY_DESTINO (Secret key del destino): sin él la "
+                               "copia del traspaso no se puede guardar en el destino. No se copió nada.")
+        almacen = almacen_respaldos.Almacen(url_destino, clave_destino)
+        almacen.asegurar_bucket()  # antes de copiar nada: una clave mala o un bucket público paran aquí
+        guardado = {}
+
+        def guardar(archivo):
+            guardado.update(almacen_respaldos.subir(almacen, archivo, "traspaso", almacen_respaldos.ejecucion_actual()))
+
         with migraciones.conexion(os.environ.get("SUPABASE_DB_URL_DESTINO", ""), url_destino) as destino:
             copia = Path(args.privado) / "respaldos" / f"traspaso-{fecha}.enc"
-            inv = trasladar(origen, destino, trabajo, llave, copia, url_destino, ensayo=args.ensayo)
+            inv = trasladar(origen, destino, trabajo, llave, copia, url_destino, ensayo=args.ensayo, guardar=guardar)
+        _escribir_resumen(f"Copia cifrada del traspaso guardada en el bucket privado `{almacen_respaldos.BUCKET}` "
+                          f"del DESTINO: `{guardado['carpeta']}` ({guardado['tamano'] / 1_000_000:.1f} MB, "
+                          "comprobada al bajarla de nuevo).\n")
     if args.ensayo:
         _escribir_resumen(resumen("Ensayo comprobado: el destino coincide con el origen", inv) +
                           "\nEra un ensayo: tu base actual sigue operando igual. El proyecto de prueba ya no está vacío; "

@@ -279,10 +279,11 @@ def test_reintentar_el_job_usa_otra_carpeta(tmp_path, monkeypatch):
     monkeypatch.setattr(ar, "Almacen", lambda: almacen)
     monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
     monkeypatch.setenv("GITHUB_RUN_ID", "555")
-    storage.objetos[f"semanal/{datetime.now(timezone.utc):%Y-%m-%d}_555-1/parte-000"] = b"a medias"
+    monkeypatch.setenv("GITHUB_JOB", "respaldo")
+    storage.objetos[f"semanal/{datetime.now(timezone.utc):%Y-%m-%d}_555-respaldo-1/parte-000"] = b"a medias"
     monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "2")
     ar.main(["subir", "--tipo", "semanal", "--carpeta", str(carpeta)])
-    assert [c.rsplit("_", 1)[1] for c, _ in ar.validos(almacen, "semanal")] == ["555-2"]
+    assert [c.rsplit("_", 1)[1] for c, _ in ar.validos(almacen, "semanal")] == ["555-respaldo-2"]
 
 
 def test_bajar_no_sobrescribe_ni_deja_restos_si_un_trozo_no_cuadra(tmp_path, monkeypatch):
@@ -311,3 +312,67 @@ def test_listar_marca_los_incompletos(tmp_path, monkeypatch, capsys):
     ar.main(["listar", "--tipo", "semanal"])
     lineas = capsys.readouterr().out.splitlines()
     assert lineas[0] == "semanal/2026-11-23_0  INCOMPLETO (no sirve)" and lineas[1].startswith("semanal/2026-11-30_1  ")
+
+
+def test_retencion_por_tipo_dos_semanales_una_de_instalacion_y_el_resto_no_se_borra(tmp_path):
+    storage = StorageFalso()
+    almacen = _almacen(storage)
+    _cifrado_ficticio(tmp_path / "a.enc", filas=5)
+    inicio = datetime(2026, 10, 4, tzinfo=timezone.utc)
+    for tipo in ar.TIPOS:
+        for i in range(3):
+            ar.subir(almacen, tmp_path / "a.enc", tipo, str(i), inicio + timedelta(weeks=i))
+        ar.podar(almacen, tipo)
+    quedan = {tipo: [c.rsplit("_", 1)[1] for c, _ in ar.validos(almacen, tipo)] for tipo in ar.TIPOS}
+    assert quedan == {"semanal": ["1", "2"], "instalacion": ["2"], "antes-de-limpiar": ["0", "1", "2"],
+                      "traspaso": ["0", "1", "2"]}
+
+
+def test_poda_no_borra_una_subida_a_medias_reciente_de_otro_trabajo(tmp_path):
+    """Dos capturas pueden preparar la misma migración a la vez: la que termina primero no borra la otra en curso."""
+    storage = StorageFalso()
+    almacen = _almacen(storage)
+    _cifrado_ficticio(tmp_path / "a.enc", filas=5)
+    ahora = datetime(2026, 12, 10, 12, tzinfo=timezone.utc)
+    storage.objetos["instalacion/2026-12-10_100-captura-1/parte-000"] = b"subiendo"   # otro trabajo, hoy
+    storage.objetos["instalacion/2026-12-09_90-captura-1/parte-000"] = b"subiendo"    # ayer: aún puede estar en curso
+    storage.objetos["instalacion/2026-12-01_50-captura-1/parte-000"] = b"a medias"    # abandonada
+    ar.subir(almacen, tmp_path / "a.enc", "instalacion", "101-bodega-1", ahora)
+    assert ar.podar(almacen, "instalacion", ahora=ahora) == ["instalacion/2026-12-01_50-captura-1"]
+    assert "instalacion/2026-12-10_100-captura-1/parte-000" in storage.objetos
+    assert "instalacion/2026-12-09_90-captura-1/parte-000" in storage.objetos
+
+
+def test_subir_cli_con_archivo_exacto_y_trabajo_en_la_carpeta(tmp_path, monkeypatch):
+    storage = StorageFalso()
+    almacen = _almacen(storage)
+    (tmp_path / "otro.enc").write_bytes(b"no es este")
+    _cifrado_ficticio(tmp_path / "corte.enc", filas=5)
+    monkeypatch.setattr(ar, "Almacen", lambda: almacen)
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    for nombre, valor in (("GITHUB_RUN_ID", "77"), ("GITHUB_JOB", "captura"), ("GITHUB_RUN_ATTEMPT", "1")):
+        monkeypatch.setenv(nombre, valor)
+    ar.main(["subir", "--tipo", "instalacion", "--archivo", str(tmp_path / "corte.enc")])
+    [(carpeta, m)] = ar.validos(almacen, "instalacion")
+    assert carpeta.endswith("_77-captura-1") and m["tamano"] == (tmp_path / "corte.enc").stat().st_size
+
+
+def test_preparar_supabase_guarda_en_storage_antes_de_migrar_y_solo_si_hay_copia():
+    texto = (RAIZ / ".github" / "actions" / "preparar-supabase" / "action.yml").read_text(encoding="utf-8")
+    paso = texto[texto.index("- name: Guardar respaldo antes de cambiar SQL"):texto.index("- name: Red de seguridad")]
+    assert "if: ${{ steps.respaldo.outputs.respaldo != '' }}" in paso  # sin migración, Storage ni se consulta
+    assert "almacen_respaldos subir --tipo instalacion" in paso and '--archivo "$COPIA"' in paso
+    assert "SUPABASE_SECRET_KEY: ${{ inputs.clave_rest }}" in paso and "SUPABASE_URL: ${{ inputs.url }}" in paso
+    assert "SUPABASE_BACKUP_KEY" not in paso and "continue-on-error" not in texto
+    assert texto.index("--fase respaldo") < texto.index("almacen_respaldos subir") < texto.index("--fase aplicar")
+    red = texto[texto.index("- name: Red de seguridad"):texto.index("- name: Aplicar")]
+    assert "retention-days: 1\n" in red and "retention-days: 14" not in texto
+
+
+def test_traspaso_yml_pasa_la_clave_del_destino_y_el_artefacto_dura_un_dia():
+    texto = (RAIZ / ".github" / "workflows" / "traspaso.yml").read_text(encoding="utf-8")
+    paso = _paso(texto, "Copiar, restaurar y comprobar")
+    assert "SUPABASE_SECRET_KEY_DESTINO: ${{ secrets.SUPABASE_SECRET_KEY_DESTINO }}" in paso
+    assert "SUPABASE_SECRET_KEY:" not in paso  # la del origen no hace falta: la copia va al destino
+    red = _paso(texto, "Red de seguridad temporal")
+    assert "retention-days: 1\n" in red + "\n" and "retention-days: 90" not in texto

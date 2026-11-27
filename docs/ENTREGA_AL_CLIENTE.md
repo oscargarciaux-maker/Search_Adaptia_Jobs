@@ -19,7 +19,7 @@ pegan claves en el código, en el chat ni en documentos.
 | Bodega nocturna (segunda pasada) | 8:30 a. m. | Solo si a la de las 6:30 le faltaron vacantes o no corrió: completa el mismo día |
 | Mensajes de WhatsApp (respaldo) | 10:15 a. m. | Prepara los borradores que falten; nada se envía solo |
 | Captura horaria | Cada hora | Actualiza vacantes y comprueba enlaces; no elige vacantes nuevas |
-| Copia de seguridad semanal | Domingos 5:41 a. m. | Copia cifrada de todo; se guarda 90 días en Actions |
+| Copia de seguridad semanal | Domingos 5:41 a. m. | Copia cifrada de todo; quedan las 2 últimas en Storage privado de Supabase |
 | Traspaso a otro Supabase | Solo a mano | Copia todo al Supabase del cliente y comprueba que coincida |
 | Preparar Supabase | Al fusionar cambios o a mano | Instala las actualizaciones de la base con copia previa |
 | Pruebas | En cada cambio | Revisa el código; no toca datos reales |
@@ -35,7 +35,7 @@ Ninguna de estas pruebas cambia la selección de vacantes ni gasta Apify.
 |---|---|---|---|
 | 1 | Prueba corta de la búsqueda | Actions → **Bodega nocturna** → Run workflow → marcar *Corrida corta de prueba* | Termina en verde en unos 5–10 min; no escribe en Supabase |
 | 2 | Prueba de captura | Actions → **Captura horaria** → Run workflow → marcar *Solo capturar en temporal* | Verde; no escribe en Supabase |
-| 3 | Copia de seguridad | Actions → **Copia de seguridad semanal** → Run workflow | Verde. Abajo, en *Artifacts*, aparece `respaldo-semanal-…`; el resumen muestra cuántas filas tiene cada tabla |
+| 3 | Copia de seguridad | Actions → **Copia de seguridad semanal** → Run workflow | Verde. El resumen muestra cuántas filas tiene cada tabla y la carpeta `semanal/…` guardada en Storage > `respaldos` |
 | 4 | Pasada de la mañana | Revisar Actions cualquier día después de las 8:30 a. m. | Aparece una *Bodega nocturna* de la mañana. Si la noche llegó a 120, termina en ~1 min sin hacer nada; si no, completa el día |
 | 5 | Ensayo del traspaso | Ver sección 2 | El resumen dice *Ensayo comprobado* y los conteos coinciden; tu base sigue funcionando |
 | 6 | Panel en demostración | Ver sección 5 | Puedes crear clientes/cargos, ver la estimación de vacantes y copiar el mensaje de WhatsApp |
@@ -48,14 +48,17 @@ Si algo sale en rojo, abre la ejecución, pulsa el paso en rojo y copia el mensa
 Sirve para comprobar, sin riesgo, que todo se copia bien a otro Supabase. **Tu base actual sigue funcionando.**
 
 1. En Supabase, crea un proyecto **nuevo y vacío** de prueba (el plan gratuito permite dos proyectos).
-2. En ese proyecto copia dos datos:
+2. En ese proyecto copia tres datos:
    - **Project URL**: Project Settings → Data API (algo como `https://xxxx.supabase.co`).
    - **Cadena de conexión**: botón **Connect** → *Session pooler* (puerto 5432). Sustituye `[YOUR-PASSWORD]` por la
      contraseña de la base de ese proyecto.
-3. En GitHub, crea dos secretos: `SUPABASE_URL_DESTINO` (la URL) y `SUPABASE_DB_URL_DESTINO` (la cadena de conexión).
+   - **Secret key**: Project Settings → API Keys (empieza por `sb_secret_`). Sirve para guardar en ese proyecto la copia
+     cifrada del traspaso.
+3. En GitHub, crea tres secretos: `SUPABASE_URL_DESTINO` (la URL), `SUPABASE_DB_URL_DESTINO` (la cadena de conexión) y
+   `SUPABASE_SECRET_KEY_DESTINO` (la Secret key).
 4. Actions → **Traspaso a otro Supabase** → Run workflow → escribe `TRASPASAR` y **deja marcada la casilla Ensayo**.
 5. Resultado esperado: verde y un resumen *Ensayo comprobado* con las filas de cada tabla.
-6. Al terminar, borra el proyecto de prueba en Supabase (Project Settings → General → Delete project) y los dos
+6. Al terminar, borra el proyecto de prueba en Supabase (Project Settings → General → Delete project) y los tres
    secretos `…_DESTINO` en GitHub.
 
 Si sale en rojo: tu base no cambió. Los mensajes más comunes son *destino ya tiene tablas* (usar un proyecto vacío)
@@ -139,8 +142,10 @@ vacantes también tarda unos segundos mientras lee el catálogo. Detalle técnic
 
 Reservar unas 2 horas fuera del horario de la nocturna (entre las 9 a. m. y las 10 p. m. de Colombia).
 
-1. **Secretos del destino**: en GitHub crear `SUPABASE_URL_DESTINO` y `SUPABASE_DB_URL_DESTINO` con los datos del
-   proyecto nuevo del cliente.
+1. **Secretos del destino**: en GitHub crear `SUPABASE_URL_DESTINO`, `SUPABASE_DB_URL_DESTINO` y
+   `SUPABASE_SECRET_KEY_DESTINO` con los datos del proyecto nuevo del cliente (sección 3). Antes de copiar nada, el
+   traspaso guarda una copia cifrada de todo en el Storage privado de ese proyecto (carpeta `traspaso/`); si no puede,
+   se detiene sin tocar nada.
 2. **Traspaso real**: Actions → **Traspaso a otro Supabase** → escribir `TRASPASAR` y **desmarcar Ensayo**.
    Esperar el verde. El resumen muestra las filas copiadas. Desde este momento tu base antigua queda detenida: las
    capturas fallarán con el mensaje *Esta base se trasladó…* hasta el paso 3 (es intencional, para no escribir en dos
@@ -149,7 +154,7 @@ Reservar unas 2 horas fuera del horario de la nocturna (entre las 9 a. m. y las 
    `SUPABASE_DB_URL`. **No cambiar `SUPABASE_BACKUP_KEY`**: es la que permite leer las copias cifradas.
 4. **Comprobar**: Actions → **Preparar Supabase** → Run workflow (verde). Después **Captura horaria** → Run workflow
    sin marcar nada (verde).
-5. **Borrar** los secretos `SUPABASE_URL_DESTINO` y `SUPABASE_DB_URL_DESTINO`.
+5. **Borrar** los secretos `SUPABASE_URL_DESTINO`, `SUPABASE_DB_URL_DESTINO` y `SUPABASE_SECRET_KEY_DESTINO`.
 6. **Apify**: cambiar `APIFY_TOKEN` por el del cliente.
 7. **Avisos**: crear los secretos `AVISO_…` con el Healthchecks del cliente (sección 4).
 8. **Repositorio**: Settings → General → Danger Zone → *Transfer ownership* a la cuenta del cliente. Después, con la
@@ -169,7 +174,7 @@ Reservar unas 2 horas fuera del horario de la nocturna (entre las 9 a. m. y las 
 |---|---|
 | Mismo día | Varias capturas horarias en verde |
 | Día siguiente | Bodega nocturna en verde; si no, que la pasada de las 8:30 a. m. la complete |
-| Primer domingo | Copia de seguridad semanal en verde con su artefacto |
+| Primer domingo | Copia de seguridad semanal en verde y su carpeta en Storage > `respaldos` |
 | Toda la semana | Que no lleguen correos de aviso; si llegan, abrir la ejecución indicada |
 
 En Supabase del cliente: Reports → Database, que CPU y Disk IO no estén al 100 % de forma sostenida. Si lo están, subir
