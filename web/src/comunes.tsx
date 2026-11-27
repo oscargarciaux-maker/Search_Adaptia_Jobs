@@ -12,6 +12,14 @@ export const modos: Record<string, string> = {
   hibrido: "Híbrido",
   presencial: "Presencial",
 };
+// Sistema de Adaptia: un color por cargo, con su valor en claro y en oscuro (≥4,5:1 sobre su fondo tenue).
+export const colores = [1, 2, 3, 4, 5].map((n) => `var(--cargo-${n})`);
+export const estadosEjecucion: Record<string, string> = {
+  completa: "Completada",
+  parcial: "Con faltantes",
+  fallida: "Requiere revisión",
+  en_curso: "En curso",
+};
 export const grados: Record<string, string> = {
   exact: "Cargo exacto",
   similar: "Cargo afín",
