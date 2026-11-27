@@ -53,11 +53,15 @@ vistos; InfoJobs trajo 51 sin captcha; fugas de ubicación en 0. No apareció el
 2. **Qué pide** (reglas en `buscador/arranque.py`, con pruebas):
    - **Captura horaria** (`toca_captura`): si no hay una búsqueda diaria ni otra captura en marcha y la última captura
      que no se canceló empezó hace 55 minutos o más. Se pide con `prueba=false` (a mano su valor por defecto es de
-     prueba).
+     prueba) y `reloj=true`: `incremental.yml` la trata como la programada y respeta la marca de «captura horaria
+     activa» (una hecha a mano se la salta).
    - **Búsqueda diaria** (`toca_diaria`): entre las 6:30 a. m. y las 7:00 p. m. de Bogotá, si hoy no terminó ninguna y
-     en la rama principal no hay una de hoy en marcha ni terminada. Una que falló **no** se repite sola: se revisa. Una
-     que GitHub canceló en la cola no cuenta, pero no se pide más de 3 veces al día. Después de las 7:00 p. m. no se
-     empieza (terminaría de noche, cerca del cambio de día): queda «Buscar ahora». Es la búsqueda completa de siempre.
+     en la rama principal no hay una de hoy en marcha ni que haya corrido. Una que falló o que se cortó a medias (tope
+     de tiempo, o alguien la canceló) **no** se repite sola: se revisa. Una que GitHub quitó de la cola antes de
+     empezar no cuenta, pero no se pide más de 3 veces al día. GitHub marca las dos como `cancelled`: el flujo las
+     distingue mirando si su trabajo llegó a tener pasos (`empezo`); si no se puede saber, cuenta como empezada. Después
+     de las 7:00 p. m. no se empieza (terminaría de noche, cerca del cambio de día): queda «Buscar ahora». Es la
+     búsqueda completa de siempre.
    - **Una sola regla para el Reloj y el vigía.** El vigía (`hace_falta_lanzar`) es `toca_diaria` desde las 7:00 a. m.
      y sin insistir (una pedida al día); su comportamiento no cambia. Su lista de corridas ahora trae `status`.
    - Si toca la diaria no se pide a la vez la captura: en la cola del grupo `publicar` solo cabe una corrida en espera
@@ -70,7 +74,10 @@ vistos; InfoJobs trajo 51 sin captcha; fugas de ubicación en 0. No apareció el
      cadenas, en la ronda siguiente queda una.
    - Sin su propio registro, sin la lista de corridas o fuera de la rama principal, no hace nada a ciegas.
    - El relevo se pide **antes** que la captura o la búsqueda: si algo falla después, la cadena ya sigue. Las
-     consultas a GitHub se intentan hasta tres veces.
+     consultas a GitHub y el pedido del relevo se intentan hasta tres veces.
+   - Si un flujo está desactivado a propósito («Bodega nocturna» para no buscar un día, «Captura horaria» o el propio
+     «Reloj»), pedirlo falla: se deja un aviso, el relevo y la búsqueda no quedan en rojo, y la captura de la hora se
+     pide igual aunque la búsqueda diaria no se haya podido pedir.
 4. **Si la cadena se corta** la reanudan: el horario propio del Reloj (cuando GitHub lo dispare) y cualquier búsqueda
    real, incluida «Buscar ahora» (trabajo `reloj` de `bodega.yml`, aparte y con permiso solo de `actions: write`; la
    búsqueda no recibe ese permiso). `hace_falta_revivir`: solo si no queda ningún relevo vivo.
@@ -84,6 +91,8 @@ vistos; InfoJobs trajo 51 sin captcha; fugas de ubicación en 0. No apareció el
    - Un cruce exacto entre el vigía y el Reloj en el mismo minuto podría pedir dos búsquedas; la segunda esperaría a
      la primera. No se ha visto; el vigía solo corre cuando GitHub dispara su horario.
    - Deja unas 48 corridas cortas al día en Actions y en «Deployments».
+   - Una corrida **de prueba** de `bodega.yml` lanzada en la rama principal el mismo día cuenta como «ya corrió»: la
+     lista de corridas no dice si era de prueba (al vigía le pasa igual). Las pruebas se lanzan desde otra rama.
 
 ## 2. Motivo de los fallos de las fuentes
 
@@ -91,8 +100,11 @@ vistos; InfoJobs trajo 51 sin captcha; fugas de ubicación en 0. No apareció el
   («HTTP 403», «HTTP 200 (respuesta no JSON)», «ConnectTimeout»). `Cliente.get` y `Cliente.json` ahora lo anotan.
 - **Bumeran y portales hermanos** (`jobint.py`): el reporte añade `motivos_por_pais` y `reintentados`, y el registro
   nombra el portal que no respondió. Un portal en descanso (3 fallos seguidos) recibe **una** oportunidad más al final
-  de la corrida: si responde, siguen sus turnos; si vuelve a fallar, descansa hasta la siguiente. No se insiste contra
-  un bloqueo ni se cambia la forma de pedir.
+  de la corrida, para la que se guarda una búsqueda del presupuesto: si responde, siguen sus turnos mientras quede
+  presupuesto; si vuelve a fallar, descansa hasta la siguiente. `reintentados` solo nombra los que de verdad se
+  reintentaron. No se insiste contra un bloqueo ni se cambia la forma de pedir.
+- `Cliente.post_json` ya no falla si el portal responde un error con texto en vez de un objeto (antes la fuente entera
+  terminaba en error y sin motivo).
 - **Get on Board** (`getonbrd.py`): `fallidas` y `motivos` (motivo → cuántas búsquedas).
 - Con el motivo a la vista se decide. Un bloqueo a las direcciones de GitHub se respeta.
 

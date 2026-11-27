@@ -167,4 +167,10 @@ jobs:
           cat "$GITHUB_OUTPUT"
       - name: Reanudar el reloj
         if: steps.reloj.outputs.revivir == 'true'
-        run: gh workflow run reloj.yml --ref "${{ steps.reloj.outputs.rama }}" -f origen=reanudar
+        env:
+          RAMA: ${{ steps.reloj.outputs.rama }}
+        run: |
+          # Si alguien desactivó el flujo «Reloj», no se puede pedir: se avisa sin poner la búsqueda en rojo.
+          if ! gh workflow run reloj.yml --ref "$RAMA" -f origen=reanudar; then
+            echo "::warning::No se pudo reanudar el reloj (¿el flujo «Reloj» está desactivado?)."
+          fi

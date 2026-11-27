@@ -67,7 +67,8 @@ class Cliente:
             datos = r.json()
             if r.status_code < 300:
                 return datos
-            error = datos.get("error", {}) if isinstance(datos, dict) else {}
+            error = datos.get("error") if isinstance(datos, dict) else None
+            error = error if isinstance(error, dict) else {}  # algunos portales responden «error»: "texto"
             self.ultimo_error = {"http": r.status_code, "tipo": str(error.get("type", ""))[:100],
                                  "mensaje": str(error.get("message", ""))[:400]}
             return None

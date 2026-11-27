@@ -12,6 +12,10 @@ on:
         description: "Solo capturar en temporal, sin Supabase ni publicar"
         type: boolean
         default: true
+      reloj:
+        description: "La pidió el Reloj (v51): se trata como la captura programada, no como una hecha a mano"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -49,7 +53,7 @@ jobs:
           clave_rest: ${{ secrets.SUPABASE_SECRET_KEY }}
           modo: incremental
           prueba: ${{ inputs.prueba || false }}
-          manual: ${{ github.event_name == 'workflow_dispatch' }}
+          manual: ${{ github.event_name == 'workflow_dispatch' && !inputs.reloj }}
           captura: ${{ vars.CAPTURA_HORARIA_ACTIVA }}
           central: ${{ vars.ESTADO_SUPABASE_ACTIVO }}
       - name: Capturar sin crear entrega diaria ni consumir Apify

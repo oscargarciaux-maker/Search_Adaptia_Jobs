@@ -8,7 +8,8 @@ dentro de GitHub.
 Dos minutos y permiso de administrador en el repositorio. Se hace una sola vez.
 
 ## Pasos
-1. En GitHub, en el repositorio: **Settings → Environments → New environment**.
+1. En GitHub, en el repositorio: **Settings → Environments**. Si ya aparece un entorno llamado `reloj` (GitHub lo crea
+   solo, sin espera, la primera vez que el flujo corre), ábrelo y sigue en el paso 3. Si no, pulsa **New environment**.
 2. Nombre: `reloj` (en minúsculas, tal cual). Pulsa «Configure environment».
 3. Marca **Wait timer**, escribe `30` y pulsa **Save protection rules**. No hace falta nada más en esa página (ni
    revisores ni secretos).
@@ -30,7 +31,11 @@ Dos minutos y permiso de administrador en el repositorio. Se hace una sola vez.
 | Son más de las 7:00 p. m. y la búsqueda de hoy no corrió | A esa hora el Reloj ya no la empieza | Usa «Buscar ahora» si aún la quieres hoy |
 
 ## Detenerlo
-Actions → Reloj → menú «…» → **Disable workflow**. Los horarios normales de GitHub siguen como respaldo.
+Actions → Reloj → menú «…» → **Disable workflow**. Los horarios normales de GitHub siguen como respaldo. Las búsquedas
+dejarán un aviso amarillo («no se pudo reanudar el reloj») sin quedar en rojo.
+
+Para no buscar un día se sigue desactivando «Bodega nocturna», como antes: el Reloj deja un aviso en cada relevo y
+sigue pidiendo la captura de cada hora.
 
 ## Qué hace exactamente
 Cada 30 minutos: pide el siguiente relevo; si pasó una hora desde la última captura, pide la captura horaria; y desde

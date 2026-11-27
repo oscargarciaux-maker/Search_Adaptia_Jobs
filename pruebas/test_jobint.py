@@ -230,3 +230,22 @@ def test_el_registro_dice_que_portal_no_respondio_y_por_que_sin_claves(capsys):
     crudas, stats = _buscar(Cliente([{"error": "x"}] * 20))
     assert stats["motivos_por_pais"]["AR"] == "respuesta sin avisos"
 
+
+def test_se_guarda_una_busqueda_para_la_ultima_oportunidad_del_portal_en_descanso():
+    # Con el mapa real los portales que responden gastan todo el presupuesto: sin guardar una búsqueda, el portal en
+    # descanso nunca tenía su oportunidad y el reporte decía «reintentados» sin haberlo intentado.
+    class SoloArgentinaCaida(Cliente):
+        def post_json(self, url, cuerpo, headers=None, timeout=None):
+            datos = super().post_json(url, cuerpo, headers, timeout)
+            return None if headers["x-site-id"] == "BMAR" else datos
+    cliente = SoloArgentinaCaida()
+    _, stats = _buscar(cliente, presupuesto=6)
+    sitios = [s for _, _, s in cliente.pedidas]
+    assert len(sitios) == 6 and sitios.count("BMAR") == 4 and sitios[-1] == "BMAR"  # 3 fallos + la oportunidad final
+    assert stats["reintentados"] == ["AR"] and stats["portales_caidos"] == ["AR"]
+    # Si el tiempo se acaba antes, no hubo oportunidad y el reporte no dice que la hubo.
+    sin_tiempo = SoloArgentinaCaida()
+    reloj = iter([0, 0, 0, 0, 0, 0, 100, 100, 100, 100, 100])
+    _, stats = _buscar(sin_tiempo, limite_segundos=50, reloj=lambda: next(reloj))
+    assert "reintentados" not in stats
+

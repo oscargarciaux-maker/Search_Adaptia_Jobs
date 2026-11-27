@@ -152,33 +152,39 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_dia
             crudas.append(v)  # sin `_busqueda`: el rendimiento por combinación (v40) mide solo LinkedIn e Indeed
         return True
 
-    def recorrer(lista):
-        """Busca los turnos de la lista y devuelve los que saltó porque su portal está en descanso."""
+    reintentados = set()
+
+    def recorrer(lista, reserva=True):
+        """Busca los turnos de la lista y devuelve los que saltó porque su portal está en descanso. Con `reserva`, deja
+        sin gastar una búsqueda por cada portal en descanso: es la que se usa al final para darle otra oportunidad."""
         saltados = []
-        for turno in lista:
-            if hechas >= presupuesto or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
+        for i, turno in enumerate(lista):
+            guardadas = sum(n >= FALLOS_SEGUIDOS for n in seguidas.values()) if reserva else 0
+            if hechas >= presupuesto - guardadas or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
+                # Los turnos que quedan de un portal en descanso también esperan su oportunidad final.
+                saltados += [t for t in lista[i:] if seguidas.get(t[4], 0) >= FALLOS_SEGUIDOS]
                 break
             pais = turno[4]
             if seguidas.get(pais, 0) >= FALLOS_SEGUIDOS and pais not in ultima_oportunidad:
                 saltados.append(turno)
-            elif buscar_turno(*turno):
+            elif buscar_turno(*turno) and pais in ultima_oportunidad:
                 ultima_oportunidad.discard(pais)  # se gasta al pedir: si vuelve a fallar, descansa hasta mañana
+                reintentados.add(pais)
         return saltados
 
     en_descanso = recorrer(turnos)
     # Contrato v51: un fallo pasajero al empezar dejaba al portal sin buscar toda la corrida. Al final cada portal en
-    # descanso recibe UNA búsqueda más: si responde, siguen sus turnos; si vuelve a fallar, descansa hasta la corrida
-    # siguiente (no se insiste contra un bloqueo).
-    reintentados = sorted({turno[4] for turno in en_descanso})
-    ultima_oportunidad.update(reintentados)
-    recorrer(en_descanso)
+    # descanso recibe UNA búsqueda más: si responde, siguen sus turnos mientras quede presupuesto; si vuelve a fallar,
+    # descansa hasta la corrida siguiente (no se insiste contra un bloqueo).
+    ultima_oportunidad.update(turno[4] for turno in en_descanso)
+    recorrer(en_descanso, reserva=False)
     caidos = sorted(p for p, n in seguidas.items() if n >= FALLOS_SEGUIDOS)
     stats = {"busquedas": hechas, "fallidas": fallidas, "avisos": len(crudas), "por_pais": por_pais,
              "portales_caidos": caidos, "combinaciones_total": len(todas)}
     if motivos:
         stats["motivos_por_pais"] = dict(sorted(motivos.items()))
     if reintentados:
-        stats["reintentados"] = reintentados
+        stats["reintentados"] = sorted(reintentados)
     if caidos:
         registro.aviso("jobint", RuntimeError("portales sin respuesta: " + ", ".join(
             f"{p} ({SITIOS[p][0]}): {motivos.get(p, 'sin respuesta')}" for p in caidos)))

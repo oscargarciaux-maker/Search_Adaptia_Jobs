@@ -289,3 +289,14 @@ def test_getonbrd_dice_cuantas_busquedas_no_respondieron_y_por_que(capsys):
     assert motivo_del_fallo(type("C", (), {"ultimo_error": {"http": 200, "tipo": "respuesta no JSON"}})()) == \
         "HTTP 200 (respuesta no JSON)"
 
+
+def test_un_error_con_texto_en_vez_de_objeto_no_rompe_la_peticion():
+    # Algunos portales responden {"error": "texto"}: antes se leía como objeto y la fuente entera terminaba en error.
+    from types import SimpleNamespace
+
+    from buscador.http import Cliente, motivo_del_fallo
+    cliente = Cliente(pausa=(0, 0))
+    cliente.sesion = SimpleNamespace(post=lambda *a, **k: SimpleNamespace(status_code=403, json=lambda: {"error": "bloqueado"}))
+    assert cliente.post_json("https://portal.example/api", {}) is None
+    assert motivo_del_fallo(cliente) == "HTTP 403"
+

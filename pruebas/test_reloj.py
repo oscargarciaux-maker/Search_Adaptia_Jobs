@@ -106,6 +106,10 @@ def test_la_captura_se_pide_cada_hora_y_nunca_encima_de_otra(capturas, diarias, 
     (None, [_corrida(1, "queued")], AHORA, False),
     (None, [_corrida(25, conclusion="failure")], AHORA, False),               # falló: se revisa, no se repite sola
     (None, [_corrida(25, conclusion="cancelled")], AHORA, True),              # GitHub la canceló en la cola
+    (None, [dict(_corrida(25, conclusion="cancelled"), empezo=False)], AHORA, True),
+    # Cortada en marcha (tope de tiempo, o alguien la canceló): también termina «cancelled», pero sí empezó. No se
+    # repite sola: con el tope de 150 minutos habría buscado tres veces seguidas.
+    (None, [dict(_corrida(160, conclusion="cancelled"), empezo=True)], AHORA, False),
     (None, [_corrida(25, conclusion="cancelled", evento="schedule")], AHORA, True),
     (None, [_corrida(m, conclusion="cancelled") for m in (25, 20, 15)], AHORA, False),  # tres pedidas: no insiste
     (None, [_corrida(600, conclusion="failure")], AHORA, True),               # la de ayer (21:00 de Bogotá)
@@ -142,25 +146,25 @@ def test_linea_de_comandos_del_reloj(tmp_path, capsys):
     arranque.main(_archivos(tmp_path, [_yo()]), ahora=AHORA)
     salida = capsys.readouterr()
     assert _salidas(salida.out) == {"actuar": "true", "seguir": "true", "captura": "false", "diaria": "true",
-                                    "falta_temporizador": "false"}
+                                    "captura_sin_diaria": "true", "falta_temporizador": "false"}
     assert "::notice::" in salida.err and "=" not in salida.err.replace("::", "")  # los motivos no van a GITHUB_OUTPUT
 
     # Con la búsqueda diaria en marcha no se pide ni otra ni la captura; la cadena sigue.
     arranque.main(_archivos(tmp_path, [_yo()], diarias=[_corrida(5, "in_progress")]), ahora=AHORA)
-    assert _salidas(capsys.readouterr().out) == {"actuar": "true", "seguir": "true", "captura": "false",
-                                                 "diaria": "false", "falta_temporizador": "false"}
+    assert _salidas(capsys.readouterr().out) == {"actuar": "true", "seguir": "true", "captura": "false", "diaria": "false",
+                                                 "captura_sin_diaria": "false", "falta_temporizador": "false"}
 
     # Con la búsqueda de hoy ya terminada (el registro del día lo dice), toca la captura de la hora.
     (tmp_path / "metricas_entrega.json").write_text(json.dumps({arranque.hoy_bogota(AHORA): HECHA}))
     arranque.main(_archivos(tmp_path, [_yo()], diarias=[_corrida(100)], capturas=[_corrida(70)]), ahora=AHORA)
-    assert _salidas(capsys.readouterr().out) == {"actuar": "true", "seguir": "true", "captura": "true",
-                                                 "diaria": "false", "falta_temporizador": "false"}
+    assert _salidas(capsys.readouterr().out) == {"actuar": "true", "seguir": "true", "captura": "true", "diaria": "false",
+                                                 "captura_sin_diaria": "true", "falta_temporizador": "false"}
 
     # Sin temporizador: nada, y se dice como error.
     arranque.main(_archivos(tmp_path, [_yo(0)]), ahora=AHORA)
     salida = capsys.readouterr()
     assert _salidas(salida.out) == {"actuar": "false", "seguir": "false", "captura": "false", "diaria": "false",
-                                    "falta_temporizador": "true"}
+                                    "captura_sin_diaria": "false", "falta_temporizador": "true"}
     assert "::error::" in salida.err
 
 
@@ -190,16 +194,27 @@ def test_el_flujo_del_reloj_espera_en_su_entorno_y_solo_puede_pedir_flujos():
     assert '--yo "$GITHUB_RUN_ID"' in decidir and "--reloj" in decidir
     for lista in ("reloj.yml", "bodega.yml", "incremental.yml"):
         assert f"gh run list --workflow {lista}" in decidir
+    # Las búsquedas canceladas se miran una a una: solo la que no llegó a empezar se vuelve a pedir.
+    assert 'select(.conclusion == "cancelled")' in decidir and "empezo" in decidir and "|| pasos=1" in decidir
     siguiente = pasos["Pedir el siguiente relevo"]
     assert siguiente["if"] == "steps.decidir.outputs.seguir == 'true'"
+    assert "for intento in 1 2 3" in siguiente["run"] and "origen=relevo" in siguiente["run"]
     orden = [p.get("name") for p in trabajo["steps"]]
     assert orden.index("Pedir el siguiente relevo") < orden.index("Pedir la búsqueda diaria")  # primero la cadena
-    assert "bodega.yml" in pasos["Pedir la búsqueda diaria"]["run"] and "prueba=false" in pasos["Pedir la búsqueda diaria"]["run"]
-    assert "enfoque" not in pasos["Pedir la búsqueda diaria"]["run"]  # la completa de siempre
-    captura = pasos["Pedir la captura horaria"]["run"]
-    assert "incremental.yml" in captura and "prueba=false" in captura  # a mano su valor por defecto es de prueba
+    diaria = pasos["Pedir la búsqueda diaria"]["run"]
+    assert "bodega.yml" in diaria and "prueba=false" in diaria
+    assert "enfoque" not in diaria  # la completa de siempre
+    captura = pasos["Pedir la captura horaria"]
+    # A mano su valor por defecto es de prueba; `reloj=true` hace que cuente como la programada.
+    assert "incremental.yml" in captura["run"] and "prueba=false" in captura["run"] and "reloj=true" in captura["run"]
+    # Un flujo desactivado a propósito (para no buscar un día) no pone el relevo en rojo ni deja el día sin capturas.
+    assert "::warning::" in diaria and "fallo=true" in diaria and "::warning::" in captura["run"]
+    assert "steps.diaria.outputs.fallo == 'true' && steps.decidir.outputs.captura_sin_diaria == 'true'" in captura["if"]
     texto = json.dumps(flujo)
     assert "secrets." not in texto and "SUPABASE" not in texto  # no usa ninguna clave ni datos de clientes
+    # Ningún valor calculado se pega dentro de un guion: va por variables de entorno.
+    for paso in trabajo["steps"]:
+        assert "${{" not in paso.get("run", "")
 
 
 def test_una_busqueda_real_reanuda_el_reloj_con_el_permiso_minimo():
@@ -212,6 +227,7 @@ def test_una_busqueda_real_reanuda_el_reloj_con_el_permiso_minimo():
     reanudar = pasos["Reanudar el reloj"]
     assert reanudar["if"] == "steps.reloj.outputs.revivir == 'true'"
     assert "gh workflow run reloj.yml" in reanudar["run"] and "origen=reanudar" in reanudar["run"]
+    assert "::warning::" in reanudar["run"] and "${{" not in reanudar["run"]  # un Reloj desactivado no la pone en rojo
     assert "secrets." not in json.dumps(trabajo)
     assert "permissions" not in bodega["jobs"]["bodega"]  # la búsqueda sigue sin permiso de lanzar flujos
     # El vigía no reanuda: cuando GitHub dispara un horario, el del propio Reloj hace ese trabajo. Su lista de corridas
@@ -219,3 +235,6 @@ def test_una_busqueda_real_reanuda_el_reloj_con_el_permiso_minimo():
     vigia = json.dumps(_flujo("incremental.yml")["jobs"]["vigia"])
     assert "reloj.yml" not in vigia and "headBranch,status" in vigia
     assert _flujo("reloj.yml")[True]["schedule"]  # PyYAML lee «on» como True
+    # Una captura pedida por el Reloj respeta la marca de «captura horaria activa», como la programada.
+    captura = json.dumps(_flujo("incremental.yml")["jobs"]["captura"])
+    assert "github.event_name == 'workflow_dispatch' && !inputs.reloj" in captura

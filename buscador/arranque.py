@@ -160,11 +160,18 @@ def toca_captura(capturas, diarias, rama, ahora=None):
     return True, "Toca la captura de esta hora."
 
 
+def _cancelada_sin_empezar(c):
+    """GitHub la quitó de la cola antes de que empezara: se puede volver a pedir. Una que se cortó en marcha (tope de
+    tiempo, o alguien la canceló) también termina como `cancelled`: reloj.yml lo distingue mirando si su trabajo llegó
+    a tener pasos y lo anota en `empezo`. Sin ese dato (la lista del vigía) vale lo de antes: no empezó."""
+    return c.get("conclusion") == "cancelled" and c.get("empezo") is not True
+
+
 def toca_diaria(dia, diarias, rama, ahora=None, desde=DIARIA_DESDE, max_pedidas=MAX_PEDIDAS):
     """¿Se pide ahora la búsqueda diaria? Una sola regla para el Reloj y el vigía. Entre `desde` y `DIARIA_HASTA` (hora
-    de Bogotá), si hoy no terminó ninguna y en la rama principal no hay una de hoy en marcha ni terminada (bien o mal:
-    una que falló se revisa, no se repite sola). Una que GitHub canceló en la cola no cuenta, pero no se pide más de
-    `max_pedidas` veces al día. Devuelve (lanzar, motivo)."""
+    de Bogotá), si hoy no terminó ninguna y en la rama principal no hay una de hoy en marcha ni que haya corrido (bien,
+    mal o cortada a medias: esas se revisan, no se repiten solas). Una que GitHub canceló en la cola antes de empezar
+    no cuenta, pero no se pide más de `max_pedidas` veces al día. Devuelve (lanzar, motivo)."""
     ahora = ahora or datetime.now(timezone.utc)
     local = ahora.astimezone(BOGOTA)
     if (local.hour, local.minute) < desde:
@@ -180,8 +187,8 @@ def toca_diaria(dia, diarias, rama, ahora=None, desde=DIARIA_DESDE, max_pedidas=
     de_hoy = [c for c in lista if _fecha_bogota(c.get("createdAt", "")) == hoy]
     if any(_activa(c) for c in de_hoy):
         return False, "La búsqueda diaria de hoy ya está en marcha."
-    if any(c.get("conclusion") != "cancelled" for c in de_hoy):
-        return False, "La búsqueda diaria de hoy ya corrió; si falló, se revisa antes de repetirla."
+    if any(not _cancelada_sin_empezar(c) for c in de_hoy):
+        return False, "La búsqueda diaria de hoy ya corrió; si falló o se cortó, se revisa antes de repetirla."
     if sum(c.get("event") == "workflow_dispatch" for c in de_hoy) >= max_pedidas:
         return False, "Hoy ya se pidió la búsqueda diaria (a mano, por el vigía o por el Reloj): no se insiste."
     return True, "Es la hora de la búsqueda diaria y hoy no ha corrido: se pide ahora."
@@ -214,16 +221,17 @@ def _reloj(carpeta, yo, rama, dia, ahora):
     relojes, diarias, capturas = (_leer_json(Path(carpeta) / n) for n in ("relojes.json", "diarias.json", "capturas.json"))
     actuar, seguir, motivo, falta = relevo(yo, relojes, rama, ahora)
     print(f"::{'error' if falta else 'notice'}::{motivo}", file=sys.stderr)
-    captura = diaria = False
+    captura = diaria = captura_sin_diaria = False
     if actuar:
         diaria, motivo_diaria = toca_diaria(dia, diarias, rama, ahora)
-        # Si toca la diaria no se pide la captura: en la cola del grupo solo cabe una en espera.
-        captura, motivo_captura = (False, "Se pide la búsqueda diaria.") if diaria else \
-            toca_captura(capturas, diarias, rama, ahora)
+        captura_sin_diaria, motivo_captura = toca_captura(capturas, diarias, rama, ahora)
+        # Si toca la diaria no se pide la captura: en la cola del grupo solo cabe una en espera. `captura_sin_diaria`
+        # es lo que se pide si la diaria no se pudo pedir (p. ej. su flujo está desactivado ese día).
+        captura = captura_sin_diaria and not diaria
         print(f"::notice::Búsqueda diaria: {motivo_diaria}", file=sys.stderr)
-        print(f"::notice::Captura horaria: {motivo_captura}", file=sys.stderr)
+        print(f"::notice::Captura horaria: {'Se pide la búsqueda diaria.' if diaria else motivo_captura}", file=sys.stderr)
     for nombre, valor in (("actuar", actuar), ("seguir", seguir), ("captura", captura), ("diaria", diaria),
-                          ("falta_temporizador", falta)):
+                          ("captura_sin_diaria", captura_sin_diaria), ("falta_temporizador", falta)):
         print(f"{nombre}={_si(valor)}")
 
 
@@ -234,7 +242,7 @@ def main(argv=None, ahora=None):
     modo.add_argument("--horario", help="Cron que lanzó bodega.yml (vacío = a mano); imprime ejecutar=true/false")
     modo.add_argument("--vigia", metavar="CORRIDAS", help="JSON de gh run list; imprime lanzar=true/false")
     modo.add_argument("--reloj", metavar="CARPETA", help="Carpeta con relojes.json, diarias.json y capturas.json; "
-                      "imprime actuar, seguir, captura, diaria y falta_temporizador (true/false)")
+                      "imprime actuar, seguir, captura, diaria, captura_sin_diaria y falta_temporizador")
     modo.add_argument("--reloj-vivo", metavar="RELOJES", help="JSON de gh run list de reloj.yml; imprime revivir=…")
     ap.add_argument("--rama", default="", help="Rama principal (con --vigia y el reloj; vacía = no lanza)")
     ap.add_argument("--yo", default="", help="Con --reloj: el número de esta corrida (GITHUB_RUN_ID)")
