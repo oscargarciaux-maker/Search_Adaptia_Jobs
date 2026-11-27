@@ -59,3 +59,31 @@ def test_varias_ubicaciones_no_se_recortan(ubicacion, esperado):
 def test_el_archivo_de_correcciones_tiene_el_formato_esperado():
     corregidas = paises.ubicaciones_corregidas()
     assert corregidas and all(k == paises.clave(k) and v.strip() for k, v in corregidas.items())
+
+
+# ── 2. Cargo ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+@pytest.fixture(scope="module")
+def qa():
+    return cargo_operativo(cargo_crudo("QA"))
+
+
+@pytest.mark.parametrize("titulo", ["Penetration Tester", "Senior Web Application Penetration Tester",
+                                    "Penetration Testers", "AI Red Team Tester", "Analista de Pentesting",
+                                    "Senior IT-Security Consultant / Penetration Tester (m/w/d)"])
+def test_seguridad_ofensiva_no_es_qa(qa, titulo):
+    assert grado(titulo, qa)[0] is None
+
+
+@pytest.mark.parametrize("titulo,esperado", [
+    ("QA Tester", "exacto"), ("Software Tester", "exacto"), ("Test Engineer", "exacto"), ("Tester", "exacto"),
+    ("Manual Tester", "exacto"), ("Game Tester", "exacto"), ("Testers", "exacto"), ("QA Software Engineer", "exacto"),
+    ("Lider Tecnico QA", "exacto"),
+])
+def test_los_tester_de_verdad_siguen_siendo_qa(qa, titulo, esperado):
+    assert grado(titulo, qa)[0] == esperado
+
+
+def test_penetration_tester_sigue_siendo_ciberseguridad():
+    pentester = cargo_operativo(cargo_crudo("Pentester"))
+    assert grado("Penetration Tester", pentester)[0] == "exacto"
+    assert grado("Analista de Pentesting", pentester)[0] == "similar"

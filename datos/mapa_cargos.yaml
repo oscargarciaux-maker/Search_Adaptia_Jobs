@@ -450,7 +450,9 @@ familias:
   excluir: [quality assurance alimentos, food quality, calidad de alimentos, inspector de calidad, quality inspector,
             control de calidad planta, manufacturing quality, qa customer success manager,
             quality assurance customer service, quality analyst call center, pruebas no destructivas, qa/qc,
-            pruebas microbiológicas, pruebas de laboratorio, pruebas eléctricas, calidad alimentos]
+            pruebas microbiológicas, pruebas de laboratorio, pruebas eléctricas, calidad alimentos,
+            # 7.E (27 nov): seguridad ofensiva (Ciberseguridad), no pruebas de software
+            penetration tester, pentester, pentesting, red team]
 
 # ───────────── Datos e IA ─────────────
 - id: analista-datos
@@ -620,7 +622,9 @@ familias:
   similares: [appsec engineer, application security engineer, cloud security engineer, grc analyst, analista grc,
               security architect, arquitecto de seguridad, incident responder, threat analyst, threat intelligence,
               vulnerability analyst, analista de vulnerabilidades, iam engineer, iam analyst, devsecops,
-              red team, blue team, especialista en ciberseguridad, cybersecurity specialist, ciso]
+              red team, blue team, especialista en ciberseguridad, cybersecurity specialist, ciso,
+              # 7.E (27 nov): vistos en la bodega; sin esto se leían como QA («analista de testing», «tester»)
+              analista de pentesting, red team tester]
   cercanos: [administrador de redes, network engineer, devops engineer, auditor de sistemas, it auditor]
   herramientas: [siem, splunk, owasp, iso 27001, nist, firewall, burp suite, kali, edr, soc, pentesting]
   genericos: [security, seguridad, ciberseguridad, cybersecurity]

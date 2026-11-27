@@ -121,6 +121,10 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
   del cargo que la recibe (v49).
 - El importador añade nombres y funciones a cargos existentes; nunca quita (v27).
 - Desarrollo genérico no cuenta como QA ni como IA (v4).
+- **El nombre más largo dice el oficio:** un término de una sola palabra del cargo («tester», «qa») no basta si es parte
+  del nombre de varias palabras de otro oficio del mapa que trae el título («Penetration Tester» es Ciberseguridad, no
+  QA; «QA Tester» o «Software Tester» siguen siendo QA). La similitud textual no cuenta si el título trae un `excluir`
+  de la familia del cargo en el mapa («Analista de Pentesting» no es «analista de testing») (7.E, 27 nov).
 
 ## 5. Qué descarta y qué solo ordena
 
