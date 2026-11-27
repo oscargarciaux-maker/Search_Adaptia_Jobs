@@ -115,9 +115,13 @@ def test_no_guarda_avisos_viejos_ni_repite_nombres_ya_buscados_hoy_y_se_detiene_
             datos = super().post_json(url, cuerpo, headers, timeout)
             return None if headers["x-site-id"] == "BMAR" else datos
     medio = SoloArgentinaCaida()
+    medio.ultimo_error = {"http": 403}
     crudas, stats = _buscar(medio)
-    assert [s for _, _, s in medio.pedidas].count("BMAR") == 3 and stats["fallidas"] == 3
+    # Contrato v51: al final el portal en descanso recibe una sola oportunidad más (4 = 3 + 1) y el reporte dice por qué.
+    assert [s for _, _, s in medio.pedidas].count("BMAR") == 4 and stats["fallidas"] == 4
+    assert [s for _, _, s in medio.pedidas][-1] == "BMAR"  # el reintento va al final, después de los demás portales
     assert stats["portales_caidos"] == ["AR"] and stats["por_pais"]["CL"] == 3 and {c["fuente"] for c in crudas} == {"Laborum"}
+    assert stats["motivos"] == {"AR": "HTTP 403"} and stats["reintentados"] == ["AR"]
     sin_tiempo = Cliente()
     reloj = iter(range(0, 1000, 10))
     _buscar(sin_tiempo, limite_segundos=25, reloj=lambda: next(reloj))
@@ -187,3 +191,42 @@ def test_la_fuente_esta_registrada_donde_hace_falta():
         assert nombre in ejecutor.fuentes_en(pais)
         assert enlaces.sirve(jobint.enlace(dominio, "Analista QA", "1118600001"))  # se postula en el mismo portal
     assert "Bumeran" not in ejecutor.fuentes_en("CO")
+
+
+def test_un_portal_que_falla_al_empezar_y_luego_responde_recupera_sus_turnos_al_final(capsys):
+    # Contrato v51: un fallo pasajero al empezar dejaba al portal sin buscar toda la corrida.
+    class ArgentinaSeRecupera(Cliente):
+        fallos = 0
+
+        def post_json(self, url, cuerpo, headers=None, timeout=None):
+            datos = super().post_json(url, cuerpo, headers, timeout)
+            if headers["x-site-id"] == "BMAR" and self.fallos < 3:
+                self.fallos += 1
+                self.ultimo_error = {"tipo": "ConnectTimeout"}
+                return None
+            return datos
+    cliente = ArgentinaSeRecupera()
+    crudas, stats = _buscar(cliente)
+    sitios = [s for _, _, s in cliente.pedidas]
+    assert sitios.count("BMAR") > 4 and stats["fallidas"] == 3  # tras responder, siguen sus turnos pendientes
+    assert stats["portales_caidos"] == [] and "motivos" not in stats and stats["reintentados"] == ["AR"]
+    assert "Bumeran" in {c["fuente"] for c in crudas}
+    assert "[aviso] jobint" not in capsys.readouterr().err  # nada que avisar: terminó respondiendo
+
+
+def test_el_registro_dice_que_portal_no_respondio_y_por_que_sin_claves(capsys):
+    class TodoCaido(Cliente):
+        ultimo_error = {"http": 530, "tipo": "respuesta no JSON"}
+
+        def post_json(self, url, cuerpo, headers=None, timeout=None):
+            self.pedidas.append((url, cuerpo["query"], headers["x-site-id"]))
+            return None
+    crudas, stats = _buscar(TodoCaido())
+    assert crudas == [] and stats["portales_caidos"] == ["AR", "CL"]
+    assert stats["motivos"] == {"AR": "HTTP 530 (respuesta no JSON)", "CL": "HTTP 530 (respuesta no JSON)"}
+    aviso = capsys.readouterr().err
+    assert "[aviso] jobint" in aviso and "www.bumeran.com.ar" in aviso and "HTTP 530" in aviso
+    # Una respuesta que llega pero no trae avisos también se cuenta, con su propio motivo.
+    crudas, stats = _buscar(Cliente([{"error": "x"}] * 20))
+    assert stats["motivos"]["AR"] == "respuesta sin avisos"
+

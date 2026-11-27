@@ -410,3 +410,23 @@ def test_afinidad_vigente_acepta_empatados_y_ampliadas_y_no_lo_cerrado():
     assert afinidad_vigente(dict(v, _ampliacion="remota_cercana"), v, qa, roles, inventario)
     # Fuera del inventario (cerrada o vieja): nunca vale.
     assert not afinidad_vigente(dict(v, _ampliacion="remota_cercana"), v, qa, roles, {})
+
+
+def test_el_resumen_de_la_corrida_cuenta_lo_comprobado_de_verdad_por_sitio():
+    # Contrato v51: el reporte mostraba solo la última llamada («candidatas_programadas: 1») y enlaces escogidos que
+    # no llegaron a abrirse. Aquí se cuenta lo que quedó guardado desde que empezó la corrida.
+    cache = {
+        "https://co.computrabajo.com/ofertas-de-trabajo/a-1": {"estado": "verificada", "comprobada_en": "2026-11-26T21:32:00Z"},
+        "https://co.computrabajo.com/ofertas-de-trabajo/a-2": {"estado": "pendiente", "comprobada_en": "2026-11-26T21:33:00Z"},
+        "https://co.computrabajo.com/ofertas-de-trabajo/a-3": {"estado": "verificada", "comprobada_en": "2026-11-26T20:23:00Z"},
+        "https://es.indeed.com/viewjob?jk=1": {"estado": "verificada", "motivo": "vista hoy en la búsqueda de Indeed",
+                                               "comprobada_en": "2026-11-26T20:40:00Z"},
+        "https://empleo.empresa-ficticia.example/qa": {"estado": "rechazada", "comprobada_en": "2026-11-26T21:00:00Z"},
+        "https://rota.example/x": "no es un resultado", "https://sin-fecha.example/x": {"estado": "verificada"},
+    }
+    r = ve.resumen_corrida(cache, "2026-11-26T20:31:00Z")
+    assert r == {"enlaces": 4, "vistas_en_busqueda": 1,
+                 "por_sitio": {"Computrabajo": {"verificada": 1, "pendiente": 1}, "Indeed": {"verificada": 1},
+                               "Otros sitios": {"rechazada": 1}}}
+    assert ve.resumen_corrida(None, "2026-11-26T20:31:00Z") == {"enlaces": 0, "vistas_en_busqueda": 0, "por_sitio": {}}
+

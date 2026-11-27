@@ -451,6 +451,8 @@ def embudo(vacantes, entregadas, hoy, cfg=None, resumen=None):
     idiomas = tuple(cfg.get("idiomas", ["es", "en"]))
     salida = {r["id"]: {"nombre": r["nombre"], **{e: 0 for e in ETAPAS_EMBUDO}} for r in roles}
     filtros = {r["id"]: Counter() for r in roles}
+    # Contrato v51: los últimos pasos también por idioma del aviso, para ver dónde se pierde el español (solo cuentas).
+    por_idioma = {r["id"]: {i: Counter() for i in idiomas} for r in roles}
     for v in vacantes:
         grados = {f["familia"]: f["coincidencia"] for f in v.get("familias", []) if f["coincidencia"] in GRADOS}
         propios = [r for r in roles if any(grados.get(f) in ("exacto", "similar") for f in r["familias"])]
@@ -470,10 +472,17 @@ def embudo(vacantes, entregadas, hoy, cfg=None, resumen=None):
                 salida[r["id"]][e] += 1
             if "nuevas" not in pasos:
                 continue
+            idioma = por_idioma[r["id"]].get(v.get("idioma"))  # «nuevas» ya son entregables: su idioma es uno de estos
+            if idioma is not None:
+                idioma["nuevas"] += 1
             if any(x is r for x in aceptan):
                 salida[r["id"]]["cumplen_filtros"] += 1
+                if idioma is not None:
+                    idioma["cumplen_filtros"] += 1
                 if verificada:
                     salida[r["id"]]["enlace_comprobado"] += 1
+                    if idioma is not None:
+                        idioma["enlace_comprobado"] += 1
             elif "_perfiles" in r:
                 from panel.afinidad import evaluar
                 categorias = {FILTRO_DE_MOTIVO.get(m, "otros") for p in r["_perfiles"]
@@ -489,6 +498,10 @@ def embudo(vacantes, entregadas, hoy, cfg=None, resumen=None):
         mayor = max(caidas, key=caidas.get) if any(caidas.values()) else None
         e["principal_perdida"] = PERDIDA[mayor] if mayor else ""
         e["filtros_que_cortan"] = dict(filtros[rid].most_common())
+        entregadas_idioma = r.get("idiomas") or {}
+        e["por_idioma"] = {i: {"nuevas": c["nuevas"], "cumplen_filtros": c["cumplen_filtros"],
+                               "enlace_comprobado": c["enlace_comprobado"], "entregadas": entregadas_idioma.get(i, 0)}
+                           for i, c in por_idioma[rid].items()}
         if mayor == "cumplen_filtros" and filtros[rid]:
             e["principal_perdida"] += f" (sobre todo: {filtros[rid].most_common(1)[0][0]})"
     return salida

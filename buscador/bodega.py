@@ -439,6 +439,7 @@ PRUEBA = {"minutos_por_fuente": 3, "linkedin_busquedas": 6, "linkedin_fichas": 8
 
 def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=False):
     inicio = time.monotonic()
+    inicio_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     cfg = config()
     if prueba:
         cfg["presupuestos"].update(PRUEBA)
@@ -559,6 +560,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     cfg_revision.setdefault(clave_n, 40 if modo == "incremental" else 300)
     cfg_revision.setdefault(clave_s, 90 if modo == "incremental" else 240)
     resumen_revision = {}
+    revision_corrida = {"llamadas": 0, "programadas": 0}  # contrato v51: toda la corrida, no solo la última llamada
     from buscador import entrega
     config_entrega = entrega.config()
     roles_actuales = config_entrega["roles"]
@@ -573,6 +575,8 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         resumen_revision = verificar_enlaces.preparar(lista, entregadas_revision, hoy, cache_enlaces,
             lote=lote_previo, incremental=modo == "incremental", cfg=usar)
         cfg_revision[clave_n] = max(0, cfg_revision[clave_n] - resumen_revision["candidatas_programadas"])
+        revision_corrida["llamadas"] += 1
+        revision_corrida["programadas"] += resumen_revision["candidatas_programadas"]
         cfg_revision[clave_s] = max(0, cfg_revision[clave_s] - (time.monotonic() - t0))
         _guardar_json(trabajo / "verificacion_enlaces.json", cache_enlaces)
         # También sincronizar cierres de seleccionadas que ya salieron del inventario activo.
@@ -759,6 +763,9 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
     resumen_revision["vistas_indeed_incorporadas"] = indeed_incorporadas
     resumen_revision["vistas_infojobs_incorporadas"] = infojobs_incorporadas
     resumen_revision["vistas_portales_incorporadas"] = portales_incorporadas
+    # Contrato v51: `candidatas_programadas` y `por_necesidad` son de la última llamada; esto suma toda la corrida.
+    resumen_revision["en_la_corrida"] = {**revision_corrida,
+                                         **verificar_enlaces.resumen_corrida(cache_enlaces, inicio_utc)}
     seleccion_actual = {"fecha": lote_actual.get("fecha"), "roles": {}}
     por_id_vigente = {v["id"]: v for v in vacantes}
     estados_catalogo = {v["id"]: estado for v, estado, _ in retiradas}

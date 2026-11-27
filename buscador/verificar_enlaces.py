@@ -417,6 +417,26 @@ def resumen(vacantes):
     return {"vacantes": len(vacantes), "estados": dict(estados), "motivos": dict(motivos)}
 
 
+def resumen_corrida(cache, desde):
+    """Contrato v51: lo que se comprobó de verdad desde `desde` (instante ISO en UTC), por sitio y resultado. El
+    resumen de `preparar` es de su última llamada; una corrida lo llama varias veces (lote, cola por persona, refuerzos)
+    y el reporte mostraba solo el último paso. Cuenta resultados guardados, no enlaces escogidos: uno que no alcanzó a
+    abrirse no aparece. `vistas_en_busqueda`: los que valen por verse hoy en la búsqueda de su sitio (v41, v42, v50)."""
+    from buscador import contrato, enlaces
+    por_sitio, vistas, total = {}, 0, 0
+    for url, r in (cache or {}).items():
+        if not isinstance(r, dict) or str(r.get("comprobada_en") or "") < desde:
+            continue
+        total += 1
+        if str(r.get("motivo") or "").startswith("vista hoy"):
+            vistas += 1
+        nombre = contrato.portal(url)
+        sitio = por_sitio.setdefault("Otros sitios" if nombre == enlaces.host(url) else nombre, Counter())
+        sitio[r.get("estado") or "pendiente"] += 1
+    return {"enlaces": total, "vistas_en_busqueda": vistas,
+            "por_sitio": {s: dict(c) for s, c in sorted(por_sitio.items(), key=lambda par: -sum(par[1].values()))}}
+
+
 def cola_de_seleccion(vacantes, entregadas, hoy, cache, iniciales, maximo, ahora=None, limite=None):
     """Candidatas en el orden en que las elegiría la selección (con los filtros del panel si está activo), más allá del
     cupo: si las primeras fallan, ya estarán comprobadas las siguientes. Solo cuenta las que necesitan comprobación.

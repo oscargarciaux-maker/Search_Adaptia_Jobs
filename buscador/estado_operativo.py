@@ -3,11 +3,15 @@ from copy import deepcopy
 from decimal import Decimal, ROUND_DOWN
 import json
 import threading
+import time
 from uuid import uuid4
 
 import requests
 
 from buscador import supabase, tiempos
+
+
+INACTIVIDAD = 120  # segundos sin usar la conexión con Supabase tras los que se abre una nueva (contrato v51)
 
 
 def micro(valor, redondeo=ROUND_DOWN):
@@ -20,6 +24,7 @@ class Central:
         if not self.url or not clave:
             raise RuntimeError("El estado central requiere credenciales Supabase; no se usará estado local alternativo.")
         self.sesion = sesion or requests.Session()
+        self._ultimo_uso = None
         self.cabeceras = {"apikey": clave}
         if clave.startswith("eyJ"):
             self.cabeceras["Authorization"] = f"Bearer {clave}"
@@ -31,16 +36,36 @@ class Central:
         self.lote = Cola(self, "lote")
 
     @staticmethod
+    def _sin_confirmar(nombre, causa):
+        """El mensaje dice la causa (tipo de fallo o código), nunca la dirección ni la clave."""
+        return (f"Estado central sin confirmar ({nombre}: {causa}); conservar copia y releer, sin reintento "
+                "automático.")
+
+    @staticmethod
     def _validar_presupuesto(datos):
         if not isinstance(datos, dict) or not isinstance(datos.get("reservas"), dict) or not datos.get("mes"):
             raise RuntimeError("Supabase no confirmó el presupuesto central; no se autorizó gasto.")
 
     def rpc(self, nombre, cuerpo):
+        # Contrato v51: el refuerzo de Apify fallaba a diario aquí. Su reserva es la primera llamada tras más de una
+        # hora sin usar la conexión, y una conexión así de vieja puede no responder (la red intermedia la olvida sin
+        # avisar). Tras `INACTIVIDAD` segundos se abre una conexión nueva ANTES de pedir. No es un reintento: una
+        # petición que falla sigue sin repetirse sola.
+        ahora = time.monotonic()
+        if self._ultimo_uso is not None and ahora - self._ultimo_uso > INACTIVIDAD:
+            cerrar = getattr(self.sesion, "close", None)
+            if callable(cerrar):
+                cerrar()  # requests abre una conexión nueva en la siguiente petición
         try:
             r = self.sesion.post(f"{self.url}/rest/v1/rpc/{nombre}", json=cuerpo, headers=self.cabeceras, timeout=45)
+        except requests.RequestException as e:
+            raise RuntimeError(self._sin_confirmar(nombre, type(e).__name__)) from e
+        finally:
+            self._ultimo_uso = time.monotonic()
+        try:
             datos = r.json()
-        except (requests.RequestException, ValueError) as e:
-            raise RuntimeError(f"Estado central sin confirmar ({nombre}); conservar copia y releer, sin reintento automático.") from e
+        except ValueError as e:  # p. ej. un 502 de la pasarela con una página en vez de datos
+            raise RuntimeError(self._sin_confirmar(nombre, f"HTTP {r.status_code} sin datos")) from e
         if not 200 <= r.status_code < 300:
             detalle = datos.get("message", "") if isinstance(datos, dict) and datos.get("code") == "P0001" else ""
             raise RuntimeError(f"Estado central: {nombre} HTTP {r.status_code}. {detalle} Revisar migración 003/permisos.")

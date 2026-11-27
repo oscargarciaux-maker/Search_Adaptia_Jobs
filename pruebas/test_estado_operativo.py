@@ -59,6 +59,44 @@ def test_reserva_ambigua_no_autoriza_ni_reintenta(monkeypatch, presupuesto, resp
     assert espejo == [presupuesto]
 
 
+def test_tras_un_rato_sin_uso_se_abre_conexion_nueva_antes_de_pedir_y_sin_reintentar(monkeypatch, presupuesto):
+    # Contrato v51: la reserva del refuerzo de Apify fallaba a diario. Era la primera llamada tras más de una hora sin
+    # usar la conexión con Supabase.
+    from buscador import estado_operativo
+    siguiente = {"mes": HOY[:7], "reservas": {HOY: 0.035}}
+    c, sesion, _ = central(monkeypatch, presupuesto, [{"monto_micro": 25000, "estado": siguiente},
+                                                      {"monto_micro": 25000, "estado": siguiente}])
+    cierres = []
+    sesion.close = lambda: cierres.append(len(sesion.llamadas))
+    reloj = [1000.0]
+    monkeypatch.setattr(estado_operativo.time, "monotonic", lambda: reloj[0])
+    c._ultimo_uso = reloj[0]
+    reloj[0] += estado_operativo.INACTIVIDAD - 1
+    c.control_apify(HOY).reservar(0.025)
+    assert cierres == []                      # uso reciente: la misma conexión
+    reloj[0] += estado_operativo.INACTIVIDAD + 1
+    c.control_apify(HOY).reservar(0.025)
+    assert cierres == [2]                     # se cerró antes de la tercera petición…
+    assert len(sesion.llamadas) == 3          # …y cada reserva se pidió una sola vez
+
+
+def test_el_error_dice_la_causa_sin_direccion_ni_clave(monkeypatch, presupuesto):
+    c, sesion, _ = central(monkeypatch, presupuesto, [requests.ConnectionError("https://example.supabase.co clave")])
+    with pytest.raises(RuntimeError) as e:
+        c.rpc("apify_reservar", {})
+    texto = str(e.value)
+    assert "apify_reservar: ConnectionError" in texto and "sin reintento automático" in texto
+    assert "example.supabase.co" not in texto and "clave" not in texto
+
+    def pagina_de_error(url, **op):  # un 502 de la pasarela con una página en vez de datos
+        def sin_json():
+            raise ValueError("no es JSON")
+        return SimpleNamespace(status_code=502, json=sin_json)
+    sesion.post = pagina_de_error
+    with pytest.raises(RuntimeError, match="apify_reservar: HTTP 502 sin datos"):
+        c.rpc("apify_reservar", {})
+
+
 def test_fallo_copia_local_no_devuelve_autorizacion(monkeypatch, presupuesto):
     c, _, _ = central(monkeypatch, presupuesto, [{"monto_micro": 25000, "estado": presupuesto}])
     def falla(p): raise OSError("Disco lleno")

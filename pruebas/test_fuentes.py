@@ -263,3 +263,29 @@ def test_v18_get_on_board_politica_remota():
     from buscador import paises
     assert paises.elegibles("Product Designer", "Remote - Worldwide", "", True)["confianza"] == "alta"
     assert paises.elegibles("Product Designer", "Remote - United States", "", True)["paises"] == []
+
+
+def test_getonbrd_dice_cuantas_busquedas_no_respondieron_y_por_que(capsys):
+    # Contrato v51: el 26 nov ninguna búsqueda respondió desde GitHub y el reporte solo decía «0 avisos».
+    from buscador.http import motivo_del_fallo
+
+    class Caido:
+        ultimo_error = {"http": 403}
+
+        def json(self, url, params=None, **_):
+            return None
+    crudas, stats = getonbrd.buscar(Caido(), ["qa", "product designer"])
+    assert crudas == [] and stats["respondidas"] == [] and stats["fallidas"] == 2
+    assert stats["motivos"] == {"HTTP 403": 2} and "[aviso] getonbrd" in capsys.readouterr().err
+
+    class Bien:
+        def json(self, url, params=None, **_):
+            return {"data": []}
+    _, stats = getonbrd.buscar(Bien(), ["qa"])
+    assert stats["fallidas"] == 0 and "motivos" not in stats and capsys.readouterr().err == ""
+    # El motivo es corto y nunca lleva direcciones ni claves.
+    assert motivo_del_fallo(object()) == "sin respuesta"
+    assert motivo_del_fallo(type("C", (), {"ultimo_error": {"tipo": "ConnectTimeout"}})()) == "ConnectTimeout"
+    assert motivo_del_fallo(type("C", (), {"ultimo_error": {"http": 200, "tipo": "respuesta no JSON"}})()) == \
+        "HTTP 200 (respuesta no JSON)"
+

@@ -121,3 +121,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: gh workflow run bodega.yml --ref "${{ steps.vigia.outputs.rama }}" -f modo=diario -f prueba=false
+      - name: Reanudar el reloj si está parado
+        # Contrato v51: cuando GitHub dispara este horario, también reanuda la cadena del reloj si se cortó.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh run list --workflow reloj.yml --limit 40 --json databaseId,status,createdAt,headBranch > "$RUNNER_TEMP/relojes.json"
+          python3 -m buscador.arranque --trabajo "$RUNNER_TEMP/trabajo" --reloj-vivo "$RUNNER_TEMP/relojes.json" \
+            --rama "${{ steps.vigia.outputs.rama }}" > "$RUNNER_TEMP/salida"
+          cat "$RUNNER_TEMP/salida"
+          if grep -qx "revivir=true" "$RUNNER_TEMP/salida"; then
+            gh workflow run reloj.yml --ref "${{ steps.vigia.outputs.rama }}" -f origen=reanudar
+          fi

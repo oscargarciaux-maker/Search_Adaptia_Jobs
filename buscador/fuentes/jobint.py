@@ -11,7 +11,8 @@ import time
 from datetime import date, datetime, timedelta, timezone
 from html import unescape
 
-from buscador import cobertura, normalizar, paises
+from buscador import cobertura, normalizar, paises, registro
+from buscador.http import motivo_del_fallo
 
 # país → (dominio, identificador del sitio en la API, nombre de la fuente)
 SITIOS = {
@@ -117,15 +118,17 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_dia
     turnos.sort(key=lambda t: t[0])  # estable: dentro de cada vuelta, el orden del reparto
     crudas, vistos, hechas, fallidas, por_pais = [], set(), 0, 0, {}
     seguidas = {}  # país → fallos seguidos: un portal caído (son siete sitios distintos) no corta a los demás
-    for k, (familia, consultas, lugar, _) in turnos:
-        if hechas >= presupuesto or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
-            break
-        if seguidas.get(lugar.split(":")[0], 0) >= FALLOS_SEGUIDOS:
-            continue
+    motivos = {}   # país → por qué falló su última búsqueda (contrato v51: «HTTP 403», «ConnectTimeout»…)
+
+    def agotado():
+        return hechas >= presupuesto or (limite_segundos is not None and reloj() - inicio >= limite_segundos)
+
+    def buscar_turno(k, familia, consultas, lugar):
+        nonlocal hechas, fallidas
+        pais = lugar.split(":")[0]
         b = cobertura.siguiente_busqueda(consultas, hoy, 1, f"{familia}@{lugar}", estado, desfase=k, paginada=False)
         if b is None:  # contrato v47: ya se buscaron hoy todos sus nombres ahí
-            continue
-        pais = lugar.split(":")[0]
+            return
         dominio, sitio, _ = SITIOS[pais]
         hechas += 1
         por_pais[pais] = por_pais.get(pais, 0) + 1
@@ -136,8 +139,10 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_dia
         if not isinstance(datos, dict) or not isinstance(datos.get("content"), list):
             fallidas += 1
             seguidas[pais] = seguidas.get(pais, 0) + 1
-            continue
+            motivos[pais] = "respuesta sin avisos" if datos is not None else motivo_del_fallo(cliente)
+            return
         seguidas[pais] = 0
+        motivos.pop(pais, None)
         cobertura.anotar_hecha(estado, b, hoy)
         for a in datos["content"]:
             if not isinstance(a, dict) or not a.get("id") or not a.get("titulo"):
@@ -147,9 +152,37 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_dia
                 continue
             vistos.add(v["enlace"])
             crudas.append(v)  # sin `_busqueda`: el rendimiento por combinación (v40) mide solo LinkedIn e Indeed
-    return crudas, {"busquedas": hechas, "fallidas": fallidas, "avisos": len(crudas), "por_pais": por_pais,
-                    "portales_caidos": sorted(p for p, n in seguidas.items() if n >= FALLOS_SEGUIDOS),
-                    "combinaciones_total": len(todas)}
+
+    en_descanso = []  # turnos de un portal que dejó de responder: se reintentan una vez al final
+    for k, (familia, consultas, lugar, _) in turnos:
+        if agotado():
+            break
+        if seguidas.get(lugar.split(":")[0], 0) >= FALLOS_SEGUIDOS:
+            en_descanso.append((k, familia, consultas, lugar))
+            continue
+        buscar_turno(k, familia, consultas, lugar)
+    # Contrato v51: un fallo pasajero al empezar dejaba al portal sin buscar toda la corrida. Al final cada portal en
+    # descanso recibe UNA oportunidad más: si responde, siguen sus turnos; si vuelve a fallar, descansa hasta la
+    # corrida siguiente (no se insiste contra un bloqueo).
+    reintentados = sorted({lugar.split(":")[0] for _, _, _, lugar in en_descanso})
+    for pais in reintentados:
+        seguidas[pais] = FALLOS_SEGUIDOS - 1
+    for k, familia, consultas, lugar in en_descanso:
+        if agotado():
+            break
+        if seguidas.get(lugar.split(":")[0], 0) < FALLOS_SEGUIDOS:
+            buscar_turno(k, familia, consultas, lugar)
+    caidos = sorted(p for p, n in seguidas.items() if n >= FALLOS_SEGUIDOS)
+    stats = {"busquedas": hechas, "fallidas": fallidas, "avisos": len(crudas), "por_pais": por_pais,
+             "portales_caidos": caidos, "combinaciones_total": len(todas)}
+    if motivos:
+        stats["motivos"] = dict(sorted(motivos.items()))
+    if reintentados:
+        stats["reintentados"] = reintentados
+    if caidos:
+        registro.aviso("jobint", RuntimeError("portales sin respuesta: " + ", ".join(
+            f"{p} ({SITIOS[p][0]}): {motivos.get(p, 'sin respuesta')}" for p in caidos)))
+    return crudas, stats
 
 
 def estado_del_aviso(sesion, url, titulo, coincide, timeout=12, cabeceras=None):
