@@ -60,7 +60,8 @@ una continuación sin duplicados.
 - **Verde en captura real:** revisar que no se hayan omitido los pasos y leer sus métricas. No equivale a verificación
   de todas las fuentes, de cada enlace del inventario ni de autenticidad de empresas.
 - **Rojo en validación al final:** puede haberse guardado ya catálogo/colas. Averiguar qué falta antes de repetir.
-  Un fallo por déficit no significa que deban borrarse las ofertas válidas.
+  Desde el contrato v52 el déficit ya no pone la corrida en rojo (estado CORTA: verde con avisos); el rojo es una
+  avería. Un día corto tampoco significa que deban borrarse las ofertas válidas.
 - **Pendiente/queued:** espera un runner o el grupo de publicación. No lanzar copias para forzar otra cola.
 
 Los trabajos comparten un grupo de publicación para evitar escrituras simultáneas. GitHub puede reemplazar trabajos

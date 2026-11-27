@@ -37,9 +37,10 @@ cada aviso en este instante. No se promete precisión absoluta a partir de coinc
 4. Se conserva el estado y la cola en la rama publicada para reintentos. Actions guarda además un artefacto de recuperación
    durante 14 días. La recuperación desde ese artefacto es manual si falla la publicación, no automática. No sustituye
    copias de seguridad permanentes de Supabase.
-5. Después de conservar el estado, la validación final marca la corrida como fallida si la meta queda incompleta, hay
-   errores/pendientes, no se confirma la sincronización o el estado actual del lote exige revisar enlaces. Se puede
-   conservar una entrega parcial con su reporte; no se
+5. Después de conservar el estado, la validación final da uno de tres estados (contrato v52, 27 nov): COMPLETA;
+   CORTA si la meta queda incompleta o hay enlaces de la selección sin comprobar (la corrida termina bien, con avisos
+   y un resumen de lo que faltó, y la segunda pasada lo completa); y AVERÍA, que marca la corrida como fallida, si hay
+   errores/pendientes o no se confirma la sincronización. Se puede conservar una entrega parcial con su reporte; no se
    presenta como una cuota cumplida. El artefacto de estado tampoco afirma que se sincronizaron todas las ofertas.
 
 `Actions → Diagnóstico → solo_supabase: true` comprueba únicamente conexión y columnas, sin insertar nada. Las pruebas
