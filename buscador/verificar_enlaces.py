@@ -87,13 +87,18 @@ def sin_comprobacion_directa(url):
     return any(de_dominio(url, d) for d in SIN_COMPROBACION_DIRECTA)
 
 
+# Así empieza el motivo de un enlace que vale por haberse visto hoy en la búsqueda de su sitio (v41 Indeed, v42 portales
+# de empresa, v50 InfoJobs). La medición de la corrida los separa de los que se comprobaron abriendo la ficha.
+VISTA_HOY = "vista hoy"
+
+
 def vistas_en_portales(enlaces_vistos, ahora=None):
     """Contrato v42: los avisos que el portal de empleo de la propia empresa (Greenhouse, Lever, Ashby, Workable,
     SmartRecruiters, Recruitee) listó en esta corrida cuentan como abiertos 24 h. Esas API públicas solo listan avisos
     activos y son el mismo sitio donde se postula. Computrabajo y Get on Board no entran: sus listados pueden traer
     avisos viejos. Devuelve {enlace: comprobación} para `incorporar`."""
     hora = (ahora or datetime.now(timezone.utc)).isoformat(timespec="seconds").replace("+00:00", "Z")
-    return {u: {"estado": "verificada", "motivo": "vista hoy en el portal de la empresa", "comprobada_en": hora,
+    return {u: {"estado": "verificada", "motivo": f"{VISTA_HOY} en el portal de la empresa", "comprobada_en": hora,
                 "destino": u}
             for u in enlaces_vistos
             if u and enlaces.sirve(u) and not enlaces.es_linkedin(u) and not sin_comprobacion_directa(u)}

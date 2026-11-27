@@ -143,3 +143,34 @@ jobs:
             if [ "${{ job.status }}" = "success" ]; then curl -fsS -m 10 --retry 3 "$AVISO" >/dev/null || true
             else curl -fsS -m 10 --retry 3 "$AVISO/fail" >/dev/null || true; fi
           fi
+  reloj:
+    # Contrato v51: si la cadena del reloj se cortó, cualquier búsqueda real (horario o «Buscar ahora») la reanuda.
+    # Trabajo aparte para que la búsqueda no reciba el permiso de lanzar flujos.
+    if: ${{ !inputs.prueba }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write # solo para pedir reloj.yml con workflow_dispatch
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Mirar si el reloj está parado
+        id: reloj
+        run: |
+          rama=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
+          echo "rama=$rama" >> "$GITHUB_OUTPUT"
+          gh run list --workflow reloj.yml --limit 60 --json databaseId,status,createdAt,headBranch > "$RUNNER_TEMP/relojes.json"
+          python3 -m buscador.arranque --reloj-vivo "$RUNNER_TEMP/relojes.json" --rama "$rama" >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+      - name: Reanudar el reloj
+        if: steps.reloj.outputs.revivir == 'true'
+        env:
+          RAMA: ${{ steps.reloj.outputs.rama }}
+        run: |
+          # Si alguien desactivó el flujo «Reloj», no se puede pedir: se avisa sin poner la búsqueda en rojo.
+          if ! gh workflow run reloj.yml --ref "$RAMA" -f origen=reanudar; then
+            echo "::warning::No se pudo reanudar el reloj (¿el flujo «Reloj» está desactivado?)."
+          fi

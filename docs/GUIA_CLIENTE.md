@@ -222,6 +222,15 @@ La captura horaria no consume Apify. La búsqueda nocturna y la profunda pueden 
 hasta USD 5/mes para este programa. Revisar el gasto global de la cuenta, que puede incluir otros trabajos.
 Las fuentes y variantes rotan; no se recorren todos los títulos de todos los países en cada ejecución.
 
+### La búsqueda a su hora: el «Reloj» (contrato v51, 27 nov)
+
+- Desde el 17 nov GitHub lanza sus horarios con muchas horas de retraso: la búsqueda de las 6:30 a. m. arrancaba por
+  la tarde. El «Reloj» la pide a su hora desde dentro de GitHub, sin servicios externos, y también la captura de cada
+  hora. Se activa una vez: [ACTIVAR_RELOJ.md](ACTIVAR_RELOJ.md).
+- Si una búsqueda falla, el Reloj no la repite sola: se revisa y se usa «Buscar ahora».
+- El reporte de cada búsqueda dice ahora por qué no respondió un portal y cuántos enlaces se comprobaron de verdad en
+  toda la corrida, por sitio. El embudo por cargo separa español e inglés.
+
 ### Vacantes en español (contrato v50, 26 nov)
 
 - Quien acepta español (solo o junto con inglés) recibe búsquedas con los nombres en español de su cargo.

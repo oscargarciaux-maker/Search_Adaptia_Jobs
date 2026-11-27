@@ -938,6 +938,12 @@ def test_embudo_por_cargo_sin_datos_de_clientes_y_se_conserva_entre_capturas(cfg
         e = entrega.embudo(ofertas, {}, hoy(), resumen=resumen)["cargo:" + cfg_un_perfil["cargos"][0]["id"]]
     assert (e["encontradas"], e["con_descripcion"], e["cumplen_filtros"], e["enlace_comprobado"]) == (4, 3, 3, 2)
     assert e["principal_perdida"] and "Cliente" not in str(e)
+    # Contrato v51: los últimos pasos también por idioma del aviso (solo cuentas), para ver dónde se pierde el español.
+    idioma = ofertas[0]["idioma"]
+    assert e["por_idioma"][idioma] == {"nuevas": 3, "cumplen_filtros": 3, "enlace_comprobado": 2,
+                                       "entregadas": e["entregadas"]}
+    otro = "en" if idioma == "es" else "es"
+    assert e["por_idioma"][otro] == {"nuevas": 0, "cumplen_filtros": 0, "enlace_comprobado": 0, "entregadas": 0}
     # El registro guarda el embudo por nombre de cargo y una captura horaria sin embudo no lo borra.
     assert ejecutor._embudo_por_nombre({"entrega": {"embudo": {"cargo:x": dict(e, nombre="QA")}}})["QA"]["encontradas"] == 4
 

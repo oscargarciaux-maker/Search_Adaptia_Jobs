@@ -6,8 +6,12 @@ la ficha pública:
 - `remote_local` — «candidates must reside in <país>» (el país viene en `location_tenants`).
 Antes se perdía y la ubicación quedaba «Remote Remoto», que no dice nada."""
 import re
+from collections import Counter
 from datetime import datetime, timezone
 from html import unescape
+
+from buscador import registro
+from buscador.http import motivo_del_fallo
 
 NOMBRE = "Get on Board"
 URL = "https://www.getonbrd.com/api/v0/search/jobs"
@@ -56,14 +60,22 @@ def vacante(item):
 
 def buscar(cliente, consultas):
     """Vacantes crudas y estadísticas; `respondidas` (contrato v47): las consultas que sí respondieron."""
-    vistos, crudas, respondidas = set(), [], []
+    vistos, crudas, respondidas, motivos = set(), [], [], Counter()
     for q in consultas:
         datos = cliente.json(URL, params={"query": q, "per_page": 100, "expand": '["company","location_tenants"]'})
         if datos is not None:
             respondidas.append(q)
+        else:
+            motivos[motivo_del_fallo(cliente)] += 1
         for item in (datos or {}).get("data") or []:
             v = vacante(item)
             if v["enlace"] and v["enlace"] not in vistos:
                 vistos.add(v["enlace"])
                 crudas.append(v)
-    return crudas, {"busquedas": len(consultas), "avisos": len(crudas), "respondidas": respondidas}
+    # Contrato v51: el 26 nov ninguna búsqueda respondió desde GitHub y el reporte no decía por qué.
+    stats = {"busquedas": len(consultas), "avisos": len(crudas), "respondidas": respondidas,
+             "fallidas": len(consultas) - len(respondidas)}
+    if motivos:
+        stats["motivos"] = dict(motivos)
+        registro.aviso("getonbrd", RuntimeError(f"{stats['fallidas']} búsquedas sin respuesta: {dict(motivos)}"))
+    return crudas, stats

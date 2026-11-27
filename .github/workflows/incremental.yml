@@ -12,6 +12,10 @@ on:
         description: "Solo capturar en temporal, sin Supabase ni publicar"
         type: boolean
         default: true
+      reloj:
+        description: "La pidió el Reloj (v51): se trata como la captura programada, no como una hecha a mano"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -49,7 +53,7 @@ jobs:
           clave_rest: ${{ secrets.SUPABASE_SECRET_KEY }}
           modo: incremental
           prueba: ${{ inputs.prueba || false }}
-          manual: ${{ github.event_name == 'workflow_dispatch' }}
+          manual: ${{ github.event_name == 'workflow_dispatch' && !inputs.reloj }}
           captura: ${{ vars.CAPTURA_HORARIA_ACTIVA }}
           central: ${{ vars.ESTADO_SUPABASE_ACTIVO }}
       - name: Capturar sin crear entrega diaria ni consumir Apify
@@ -111,7 +115,7 @@ jobs:
           if git fetch -q --depth 1 origin publicado; then
             git show FETCH_HEAD:trabajo/metricas_entrega.json > "$RUNNER_TEMP/trabajo/metricas_entrega.json" 2>/dev/null || true
           fi
-          gh run list --workflow bodega.yml --limit 40 --json createdAt,conclusion,event,headBranch > "$RUNNER_TEMP/corridas.json"
+          gh run list --workflow bodega.yml --limit 40 --json createdAt,conclusion,event,headBranch,status > "$RUNNER_TEMP/corridas.json"
           python3 -m buscador.arranque --trabajo "$RUNNER_TEMP/trabajo" --vigia "$RUNNER_TEMP/corridas.json" \
             --rama "$rama" >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"

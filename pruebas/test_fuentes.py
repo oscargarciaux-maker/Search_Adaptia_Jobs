@@ -263,3 +263,40 @@ def test_v18_get_on_board_politica_remota():
     from buscador import paises
     assert paises.elegibles("Product Designer", "Remote - Worldwide", "", True)["confianza"] == "alta"
     assert paises.elegibles("Product Designer", "Remote - United States", "", True)["paises"] == []
+
+
+def test_getonbrd_dice_cuantas_busquedas_no_respondieron_y_por_que(capsys):
+    # Contrato v51: el 26 nov ninguna búsqueda respondió desde GitHub y el reporte solo decía «0 avisos».
+    from buscador.http import motivo_del_fallo
+
+    class Caido:
+        ultimo_error = {"http": 403}
+
+        def json(self, url, params=None, **_):
+            return None
+    crudas, stats = getonbrd.buscar(Caido(), ["qa", "product designer"])
+    assert crudas == [] and stats["respondidas"] == [] and stats["fallidas"] == 2
+    assert stats["motivos"] == {"HTTP 403": 2} and "[aviso] getonbrd" in capsys.readouterr().err
+
+    class Bien:
+        def json(self, url, params=None, **_):
+            return {"data": []}
+    _, stats = getonbrd.buscar(Bien(), ["qa"])
+    assert stats["fallidas"] == 0 and "motivos" not in stats and capsys.readouterr().err == ""
+    # El motivo se arma solo con el tipo de fallo y el código de respuesta.
+    assert motivo_del_fallo(object()) == "sin respuesta"
+    assert motivo_del_fallo(type("C", (), {"ultimo_error": {"tipo": "ConnectTimeout"}})()) == "ConnectTimeout"
+    assert motivo_del_fallo(type("C", (), {"ultimo_error": {"http": 200, "tipo": "respuesta no JSON"}})()) == \
+        "HTTP 200 (respuesta no JSON)"
+
+
+def test_un_error_con_texto_en_vez_de_objeto_no_rompe_la_peticion():
+    # Algunos portales responden {"error": "texto"}: antes se leía como objeto y la fuente entera terminaba en error.
+    from types import SimpleNamespace
+
+    from buscador.http import Cliente, motivo_del_fallo
+    cliente = Cliente(pausa=(0, 0))
+    cliente.sesion = SimpleNamespace(post=lambda *a, **k: SimpleNamespace(status_code=403, json=lambda: {"error": "bloqueado"}))
+    assert cliente.post_json("https://portal.example/api", {}) is None
+    assert motivo_del_fallo(cliente) == "HTTP 403"
+

@@ -23,11 +23,13 @@ class Cliente:
 
     def get(self, url, params=None, headers=None, reintentar_429=True, pausar=True):
         """Respuesta (requests.Response) o None si falló la conexión."""
+        self.ultimo_error = None
         for intento in range(2):
             self.peticiones += 1
             try:
                 r = self.sesion.get(url, params=params, headers=headers, timeout=self.timeout, allow_redirects=True)
-            except requests.RequestException:
+            except requests.RequestException as e:
+                self.ultimo_error = {"tipo": type(e).__name__}
                 return None
             finally:
                 if pausar:
@@ -42,11 +44,15 @@ class Cliente:
 
     def json(self, url, params=None, headers=None, **k):
         r = self.get(url, params=params, headers=headers, **k)
-        if r is None or r.status_code != 200:
+        if r is None:
+            return None
+        if r.status_code != 200:
+            self.ultimo_error = {"http": r.status_code}
             return None
         try:
             return r.json()
         except ValueError:
+            self.ultimo_error = {"http": r.status_code, "tipo": "respuesta no JSON"}
             return None
 
     def post_json(self, url, cuerpo, headers=None, timeout=None):
@@ -61,10 +67,24 @@ class Cliente:
             datos = r.json()
             if r.status_code < 300:
                 return datos
-            error = datos.get("error", {}) if isinstance(datos, dict) else {}
+            error = datos.get("error") if isinstance(datos, dict) else None
+            error = error if isinstance(error, dict) else {}  # algunos portales responden «error»: "texto"
             self.ultimo_error = {"http": r.status_code, "tipo": str(error.get("type", ""))[:100],
                                  "mensaje": str(error.get("message", ""))[:400]}
             return None
         except ValueError:
             self.ultimo_error = {"http": r.status_code, "tipo": "respuesta no JSON"}
             return None
+
+
+def motivo_del_fallo(cliente):
+    """Por qué falló la última petición de un cliente, en corto y sin direcciones ni claves: «HTTP 403», «HTTP 200
+    (respuesta no JSON)», «ConnectTimeout»… Contrato v51: las fuentes lo dejan en su reporte."""
+    error = getattr(cliente, "ultimo_error", None)
+    if not isinstance(error, dict):
+        return "sin respuesta"
+    tipo = str(error.get("tipo") or "")[:60]
+    if error.get("http"):
+        return f"HTTP {error['http']}" + (f" ({tipo})" if tipo else "")
+    return tipo or "sin respuesta"
+

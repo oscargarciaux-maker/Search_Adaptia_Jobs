@@ -15,7 +15,8 @@ código y probadas.
 
 | Hora | Qué pasa | Qué haces tú |
 |---|---|---|
-| 6:30 a. m. | Búsqueda principal: LinkedIn público, Indeed, portales de empresas, Computrabajo, Bumeran y sus portales hermanos, InfoJobs y Tecnoempleo (v50), Get on Board y tableros remotos. Cada vacante útil se asigna a los perfiles que cumple. | Nada. GitHub a veces la empieza con 30–60 minutos de retraso. |
+| 6:30 a. m. | Búsqueda principal: LinkedIn público, Indeed, portales de empresas, Computrabajo, Bumeran y sus portales hermanos, InfoJobs y Tecnoempleo (v50), Get on Board y tableros remotos. Cada vacante útil se asigna a los perfiles que cumple. | Nada. Con el «Reloj» activado (fila siguiente) arranca entre las 6:30 y las 7:00 a. m.; sin él, desde el 17 nov GitHub la empieza con 7 a 11 horas de retraso. |
+| Cada 30 minutos | «Reloj» (v51, hay que activarlo una vez: `docs/ACTIVAR_RELOJ.md`): desde el 17 nov GitHub dispara sus horarios con horas de retraso. El Reloj es una cadena de relevos dentro de GitHub que pide la captura de cada hora y, desde las 6:30 a. m., la búsqueda del día si no ha corrido. | Nada. Si un día no hay ninguna corrida del Reloj esperando, se reanuda sola con la siguiente búsqueda o con «Buscar ahora». |
 | 7:15 y 7:50 a. m. | Respaldos: solo si GitHub no lanzó la de las 6:30, la hacen ellos (si no, terminan sin hacer nada). Desde las 7:23, la captura horaria también la lanza una vez si hoy no corrió. | Nada. |
 | 8:30 a. m. | Segunda pasada: completa a quien le faltó. | Nada. |
 | 9:30 a. m. | Respaldo de la segunda pasada: solo si la de las 8:30 no corrió y aún falta. | Nada. |
