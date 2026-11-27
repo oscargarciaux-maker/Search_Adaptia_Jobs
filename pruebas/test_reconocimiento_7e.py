@@ -83,6 +83,31 @@ def test_los_tester_de_verdad_siguen_siendo_qa(qa, titulo, esperado):
     assert grado(titulo, qa)[0] == esperado
 
 
+def test_un_cargo_de_nombre_libre_conserva_sus_terminos_sueltos():
+    # Thermos: con un nombre que no está en el mapa, su familia sale de sus términos («tester» es de QA).
+    libre = {"nombre": "Especialista en Pruebas Funcionales", "terminos_exactos": ["tester", "qa"]}
+    for titulo in ("Software Tester", "QA Engineer", "Manual Tester", "QA Automation Engineer"):
+        assert grado(titulo, libre)[0] == "exacto"
+    assert grado("Penetration Tester", libre)[0] is None
+
+
+def test_la_guarda_vale_tambien_sin_cargo_operativo():
+    # Revisión y otros llaman a `grado` con el cargo guardado, sin `excluir_mapa`: la similitud tampoco basta ahí.
+    assert grado("Analista de Pentesting", cargo_crudo("QA"))[0] is None
+
+
+def test_un_archivo_de_correcciones_mal_escrito_no_tumba_la_busqueda(tmp_path, monkeypatch, capsys):
+    malo = tmp_path / "ubicaciones_corregidas.yaml"
+    malo.write_text("- California, Pará, Brasil\n", encoding="utf-8")  # una lista, no «texto: corrección»
+    monkeypatch.setattr(paises, "RUTA_CORREGIDAS", malo)
+    paises.ubicaciones_corregidas.cache_clear()
+    try:
+        assert paises.corregir_ubicacion("California, Pará, Brasil") == "California, Pará, Brasil"
+        assert "ubicaciones-corregidas" in capsys.readouterr().err
+    finally:
+        paises.ubicaciones_corregidas.cache_clear()
+
+
 def test_penetration_tester_sigue_siendo_ciberseguridad():
     pentester = cargo_operativo(cargo_crudo("Pentester"))
     assert grado("Penetration Tester", pentester)[0] == "exacto"

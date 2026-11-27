@@ -257,43 +257,56 @@ _texto = lru_cache(maxsize=32768)(normalizar.texto)
 _singular = lru_cache(maxsize=32768)(normalizar.singular)
 
 
-@lru_cache(maxsize=1)
-def _nombres_por_familia():
-    """[(id, expresión)] con los nombres de varias palabras (exactos y similares) de cada familia del mapa base."""
-    return [(f["id"], familias._regex([x for g in ("exacto", "similar") for x in f["_titulos"][g] if " " in x]))
-            for f in familias.mapa_base()]
+def _clave_cargo(cargo):
+    return (cargo.get("nombre") or "",
+            *(tuple(cargo.get(k) or ()) for k in ("terminos_exactos", "terminos_similares", "terminos_cercanos")))
 
 
 @lru_cache(maxsize=512)
-def _familias_propias(nombre):
-    """Ids de las familias del mapa del cargo: donde su nombre es exacto o similar, o la de su oficio base."""
+def _contexto_propio(clave):
+    """7.E: (familias del mapa del cargo, sus términos normalizados). Las familias son donde su nombre o alguno de sus
+    términos es título exacto o similar, más la de su oficio base: un cargo de nombre libre con «tester» es de QA."""
+    nombre, *listas = clave
+    propios = frozenset(_base(x) for lista in listas for x in lista) - {""}
     suyas = {f["id"] for _, _, f in _familias_de(_base(nombre))}
+    suyas |= {f["id"] for f in familias.mapa_base()
+              if propios & (set(f["_titulos"]["exacto"]) | set(f["_titulos"]["similar"]))}
     _, base = modificador(nombre)
-    return frozenset(suyas | ({base["id"]} if base else set()))
+    if base:
+        suyas.add(base["id"])
+    return frozenset(suyas), propios
 
 
-def _oficio_ajeno(base, cargo, palabra=""):
-    """7.E (27 nov): el nombre de varias palabras de OTRO oficio del mapa que trae el título («penetration tester» es
-    Ciberseguridad) y que no es también un término del cargo; con `palabra`, solo uno que la contenga. Si no hay, ''.
-    Así un término de una sola palabra del cargo («tester») no basta cuando es parte del nombre de otro oficio: el
-    nombre más largo dice el oficio, como «New Mexico» no es México."""
-    suyas = _familias_propias(cargo.get("nombre") or "")
-    propios = {_base(x) for k in ("terminos_exactos", "terminos_similares", "terminos_cercanos")
-               for x in cargo.get(k) or []}
-    for fid, patron in _nombres_por_familia():
-        if fid in suyas or patron is None:
+def _oficio_ajeno(texto, cargo, palabra):
+    """7.E (27 nov): el nombre de varias palabras de OTRO oficio del mapa que trae el título y que contiene `palabra`
+    («penetration tester» es Ciberseguridad y contiene «tester»), si no es también un término del cargo; si no, ''.
+    Así un término de una sola palabra del cargo no basta cuando es parte del nombre de otro oficio: el nombre más
+    largo dice el oficio, como «New Mexico» no es México. Sin familia del mapa conocida para el cargo, no se aplica."""
+    suyas, propios = _contexto_propio(_clave_cargo(cargo))
+    if not suyas:
+        return ""
+    for f in familias.mapa_base():
+        if f["id"] in suyas:
             continue
-        for m in patron.finditer(base):
-            if m.group(0) not in propios and (not palabra or normalizar.contiene_frase(m.group(0), palabra)):
-                return m.group(0)
+        for patron in (f["_re"]["exacto"], f["_re"]["similar"]):
+            for m in patron.finditer(texto) if patron else ():
+                if m.group(0) not in propios and normalizar.contiene_frase(m.group(0), palabra):
+                    return m.group(0)
     return ""
 
 
-def _cuenta(base, canon, cargo):
-    """El término del cargo está en el título y, si es de una sola palabra, no es parte del nombre de otro oficio."""
-    if not canon or not normalizar.contiene_frase(base, canon):
+def _excluido_del_mapa(completo, cargo):
+    """7.E: el título trae un `excluir` de una familia del mapa del cargo («pentesting» en QA)."""
+    suyas, _ = _contexto_propio(_clave_cargo(cargo))
+    return any(f["_excluir"] and f["_excluir"].search(completo) for f in familias.mapa_base() if f["id"] in suyas)
+
+
+def _cuenta(texto, canon, cargo, base):
+    """El término del cargo está en el título y, si es de una sola palabra, no es parte del nombre de otro oficio (en el
+    título tal cual ni en singular: «Analista de Datos» también es «analista de dato»)."""
+    if not canon or not normalizar.contiene_frase(texto, canon):
         return False
-    return " " in canon or not _oficio_ajeno(base, cargo, canon)
+    return " " in canon or not (_oficio_ajeno(base, cargo, canon) or _oficio_ajeno(texto, cargo, canon))
 
 
 def grado(titulo, cargo, cercanos=False):
@@ -308,7 +321,7 @@ def grado(titulo, cargo, cercanos=False):
     for campo, valor in (("terminos_exactos", "exacto"), ("terminos_similares", "similar")):
         terminos = [cargo["nombre"], *cargo.get(campo, [])] if campo == "terminos_exactos" else cargo.get(campo, [])
         for t in terminos:
-            if _cuenta(base, _base(t), cargo):
+            if _cuenta(base, _base(t), cargo, base):
                 return valor, {"regla": "término de cargo", "termino": t, "grado": valor}
     # Contrato v49: los plurales cuentan («Desarrolladores Full Stack», «QA Engineers»), como segunda oportunidad.
     plural = _base(_singular(base))  # y de nuevo el género: «desarrolladoras» → «desarrolladora» → «desarrollador»
@@ -316,11 +329,11 @@ def grado(titulo, cargo, cercanos=False):
         for campo, valor in (("terminos_exactos", "exacto"), ("terminos_similares", "similar")):
             terminos = [cargo["nombre"], *cargo.get(campo, [])] if campo == "terminos_exactos" else cargo.get(campo, [])
             for t in terminos:
-                if _cuenta(plural, _base(_singular(_base(t))), cargo):
+                if _cuenta(plural, _base(_singular(_base(t))), cargo, base):
                     return valor, {"regla": "término de cargo", "termino": t, "grado": valor}
     # 7.E: «Analista de Pentesting» se parece a «analista de testing», pero trae «pentesting», un excluido de la familia
-    # del cargo en el mapa (`excluir_mapa`, lo pone `cargo_operativo`). La similitud textual es lo más débil: no basta.
-    if len(base) >= 6 and not any(normalizar.contiene_frase(completo, _texto(x)) for x in cargo.get("excluir_mapa") or []):
+    # del cargo en el mapa. La similitud textual es lo más débil: no basta.
+    if len(base) >= 6 and not _excluido_del_mapa(completo, cargo):
         opciones = [cargo["nombre"], *cargo.get("terminos_exactos", []), *cargo.get("terminos_similares", [])]
         for t in opciones:
             puntaje = fuzz.token_sort_ratio(base, _base(t))

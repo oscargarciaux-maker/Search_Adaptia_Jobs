@@ -76,11 +76,15 @@ def alias_ciudad(nombre):
 @lru_cache(maxsize=1)
 def ubicaciones_corregidas():
     """7.E (27 nov): ubicación entera que un portal escribe mal → la que dice el aviso (`datos/ubicaciones_corregidas.yaml`)."""
-    try:
+    try:  # el operador edita este archivo: si está mal escrito, se avisa y la búsqueda sigue sin correcciones
         crudo = yaml.safe_load(RUTA_CORREGIDAS.read_text(encoding="utf-8")) or {}
-    except OSError:
+        if not isinstance(crudo, dict):
+            raise ValueError("debe ser «ubicación del portal: ubicación correcta»")
+    except (OSError, yaml.YAMLError, ValueError) as e:
+        from buscador import registro
+        registro.aviso("paises:ubicaciones-corregidas", e)
         return {}
-    return {clave(k): str(v) for k, v in crudo.items()}
+    return {clave(k): str(v).strip() for k, v in crudo.items() if k and v and str(v).strip()}
 
 
 def corregir_ubicacion(ubicacion):

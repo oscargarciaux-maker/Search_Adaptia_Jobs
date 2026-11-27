@@ -444,7 +444,11 @@ class Completar:
         """Decisión de Oscar (27 nov, sección 7.A): una vacante por ampliación (p. ej. una remota para quien pidió
         presencial) solo completa hasta el mínimo de 5, también al reutilizar y al rescatar; de 5 a la meta, solo entra
         lo que cumple el perfil tal cual."""
-        return self.estrictas.get(p.id, 0) < MINIMO_POR_PERFIL
+        return self.plazas_ampliadas(p) > 0
+
+    def plazas_ampliadas(self, p):
+        """Cuántas ampliadas caben todavía a esta persona hoy (7.A: solo hasta el mínimo de 5)."""
+        return max(0, MINIMO_POR_PERFIL - self.estrictas.get(p.id, 0))
 
     def anotar(self, p, vacante_id):
         if vacante_id not in self.usadas:
@@ -569,6 +573,23 @@ def _otro_oficio(v, cargo):
     return contenido.evidencia(v.get("titulo"), v.get("_descripcion"), cargo)["otro_oficio"]
 
 
+POR_PLAZA = 3  # candidatas del rescate cuyo enlace se comprueba por cada plaza que falta
+
+
+def _comprobables(lista, cupo_ampliadas):
+    """7.E: las candidatas (ya ordenadas) cuyo enlace vale la pena comprobar: todas las que cumplen el perfil y solo
+    las primeras `cupo_ampliadas` ampliadas."""
+    salida = []
+    for candidata in lista:
+        *_, extra = candidata
+        if extra:
+            if not cupo_ampliadas:
+                continue
+            cupo_ampliadas -= 1
+        salida.append(candidata)
+    return salida
+
+
 def _rescatar(repo, cfg, fecha, completar, filas, fila, vacantes, operativos, cache=None, comprobar=None, subir=None,
               maximo=MAX_COMPROBAR_RESCATE, segundos=SEGUNDOS_RESCATE):
     """Contrato v36: a cada perfil que no llega a su objetivo (v49: su meta diaria) se le dan vacantes de toda la bodega de la noche que cumplen
@@ -616,28 +637,19 @@ def _rescatar(repo, cfg, fecha, completar, filas, fila, vacantes, operativos, ca
                           v, afinidad, match, extra))
         lista.sort(key=lambda x: x[:2])
         candidatas[(cargo.id, p.id)] = lista
-    # 2) Comprobar al momento los enlaces de las que podrían entrar (las 3 mejores por plaza que falta).
+    # 2) Comprobar al momento los enlaces de las que podrían entrar (las POR_PLAZA mejores por plaza que falta).
     # Contrato v49: por turnos y primero quien tiene menos candidatas (con pocas en español, cada enlace cuenta); antes
     # el presupuesto se iba en los primeros perfiles de la lista.
-    # 7.E: una ampliada solo se comprueba si todavía puede entrar (7.A: completan hasta el mínimo de 5), y como mucho 3
-    # por plaza de ampliada que queda. Antes se gastaba la comprobación en remotas para quien ya tenía 5.
-    def comprobables(p, lista):
-        cupo = max(0, MINIMO_POR_PERFIL - completar.estrictas.get(p.id, 0)) * 3
-        salida = []
-        for item in lista:
-            if item[5]:  # `extra`: es una ampliación
-                if not cupo:
-                    continue
-                cupo -= 1
-            salida.append(item)
-        return salida
-    a_mirar = {(cargo.id, p.id): comprobables(p, candidatas[(cargo.id, p.id)]) for cargo, p in bajos}
+    # 7.E: una ampliada solo se comprueba si todavía puede entrar (7.A: completan hasta el mínimo de 5), y como mucho
+    # POR_PLAZA por plaza de ampliada que queda. Antes se gastaba la comprobación en remotas para quien ya tenía 5.
+    a_mirar = {(cargo.id, p.id): _comprobables(candidatas[(cargo.id, p.id)], completar.plazas_ampliadas(p) * POR_PLAZA)
+               for cargo, p in bajos}
     por_comprobar, ya = [], set()
-    turnos = sorted(bajos, key=lambda cp: len(candidatas[(cp[0].id, cp[1].id)]))
-    for i in range(max((completar.falta(p) * 3 for _, p in bajos), default=0)):
+    turnos = sorted(bajos, key=lambda cp: len(a_mirar[(cp[0].id, cp[1].id)]))
+    for i in range(max((completar.falta(p) * POR_PLAZA for _, p in bajos), default=0)):
         for cargo, p in turnos:
             lista = a_mirar[(cargo.id, p.id)]
-            if i >= completar.falta(p) * 3 or i >= len(lista):
+            if i >= completar.falta(p) * POR_PLAZA or i >= len(lista):
                 continue
             v = lista[i][2]
             if v["id"] not in ya and not _vigente_24h(v, ahora):
