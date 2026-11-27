@@ -80,7 +80,7 @@ meta 100 (alta a propósito, para que la meta del día no esconda dónde se pier
 
 En la línea base, las 20 de b (São Paulo) y las 12 de e (Berlín) son **todas** la ampliación prevista `remota_cercana`:
 el perfil no acepta remoto, no llega a 5 en su ciudad y se completa con remotas abiertas a su país o mundiales, solo
-hasta 5 por perfil en la selección del día (`docs/CONTRATO_VIGENTE.md` §7; la medición no pasa por el rescate). La regla «objetivo» no las cuenta porque mira solo la modalidad
+hasta 5 por perfil (`docs/CONTRATO_VIGENTE.md` §7; desde el 27 nov el rescate y la reutilización también paran en 5). La regla «objetivo» no las cuenta porque mira solo la modalidad
 pedida. No es un error de lugar; `pruebas/panel/test_ampliacion_marcada.py` fija ese comportamiento.
 
 ## Límite importante

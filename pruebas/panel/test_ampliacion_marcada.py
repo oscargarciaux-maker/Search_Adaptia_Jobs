@@ -74,3 +74,71 @@ def test_la_ampliada_se_ve_marcada_en_el_panel_y_el_whatsapp_no_lleva_la_marca(p
     texto = servicio.whatsapp(repo, None)["texto"]
     # La vacante sí va al mensaje (dice «Remoto»), pero sin la marca técnica (contrato v9).
     assert "Product Designer · Empresa 10 (Remoto)" in texto and "mpliad" not in texto
+
+
+# ── Decisión de Oscar (27 nov, 7.A): la ampliación solo completa hasta 5, también al reutilizar y al rescatar ──────
+
+def _comprobada(n, ubicacion, remoto):
+    from buscador import familias
+    v = _oferta("Product Designer", n, SIN_DATO, ubicacion=ubicacion, remoto=remoto)
+    v["verificacion"]["enlaces"] = [{"url": v["enlace"], "estado": "verificada",
+                                     "comprobada_en": datetime.now(timezone.utc).isoformat()}]
+    v["familias"] = familias.clasificar(v["titulo"], v["_descripcion"])
+    return v
+
+
+class _Supabase:
+    """Lote de hoy vacío; `previas` son las entregas de días anteriores (para reutilizar)."""
+    ejecucion = None
+
+    def __init__(self, previas=()):
+        self.previas, self.asignaciones = list(previas), []
+
+    def pedir(self, metodo, ruta, **op):
+        params = op.get("params") or {}
+        if ruta == "panel_ejecuciones":
+            if metodo == "GET":
+                return [self.ejecucion] if self.ejecucion else []
+            self.ejecucion = {"id": "e1", **(self.ejecucion or {}), **op["json"]}
+        elif ruta == "entregas_diarias" and str(params.get("delivery_date", "")).startswith("gte.") \
+                and not params.get("offset"):
+            return self.previas
+        elif ruta == "panel_asignaciones" and metodo == "POST":
+            self.asignaciones.extend(op["json"])
+        return []
+
+
+@pytest.fixture
+def meta_diez(presencial):
+    presencial["perfiles"][0]["meta_diaria"] = 10
+    return presencial
+
+
+def _recibidas(repo, configuracion):
+    p = configuracion["perfiles"][0]["id"]
+    return [a for a in repo.asignaciones if a["perfil_id"] == p]
+
+
+def _ampliadas(filas):
+    return sum(any(isinstance(e, dict) and e.get("ampliacion") for e in f["explicacion"]) for f in filas)
+
+
+def test_el_rescate_no_pasa_de_5_con_remotas_para_un_perfil_presencial(meta_diez):
+    bodega = [_comprobada(n, "Bogotá, Colombia", None) for n in range(2)] + \
+             [_comprobada(10 + n, "Remote - Colombia", True) for n in range(8)]
+    repo = _Supabase()
+    ejecutor.registrar(repo, {"revision": 1, "configuracion": meta_diez}, hoy(), vacantes=bodega, cache_enlaces={})
+    filas = _recibidas(repo, meta_diez)
+    # Las 2 presenciales de su ciudad y 3 remotas hasta llegar a 5; antes llegaba a 10 con 8 remotas.
+    assert len(filas) == MINIMO_POR_PERFIL and _ampliadas(filas) == MINIMO_POR_PERFIL - 2
+
+
+def test_reutilizar_no_pasa_de_5_con_remotas_para_un_perfil_presencial(meta_diez):
+    from datetime import date, timedelta
+    ayer = (date.fromisoformat(hoy()) - timedelta(days=1)).isoformat()
+    previas = [{"delivery_date": ayer, "role_id": "otro", "vacante_id": v["id"], "match_grade": "exact", "snapshot": v}
+               for v in [_comprobada(10 + n, "Remote - Colombia", True) for n in range(8)]]
+    repo = _Supabase(previas)
+    ejecutor.registrar(repo, {"revision": 1, "configuracion": meta_diez}, hoy())
+    filas = _recibidas(repo, meta_diez)
+    assert len(filas) == MINIMO_POR_PERFIL and _ampliadas(filas) == MINIMO_POR_PERFIL

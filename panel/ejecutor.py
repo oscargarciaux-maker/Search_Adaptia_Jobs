@@ -440,6 +440,12 @@ class Completar:
     def cabe(self, p, vacante_id):
         return self.estrictas.get(p.id, 0) < MINIMO_POR_PERFIL or vacante_id in self.usadas or self.libre > 0
 
+    def cabe_ampliada(self, p):
+        """Decisión de Oscar (27 nov, sección 7.A): una vacante por ampliación (p. ej. una remota para quien pidió
+        presencial) solo completa hasta el mínimo de 5, también al reutilizar y al rescatar; de 5 a la meta, solo entra
+        lo que cumple el perfil tal cual."""
+        return self.estrictas.get(p.id, 0) < MINIMO_POR_PERFIL
+
     def anotar(self, p, vacante_id):
         if vacante_id not in self.usadas:
             self.usadas.add(vacante_id)
@@ -530,7 +536,7 @@ def _reutilizar(repo, cfg, fecha, completar, filas, fila, operativos):
             match, extra = evaluar(row["snapshot"], p, fecha), [{"reutilizada": row["delivery_date"]}]
             if not match["compatible"]:
                 nivel = next((n for n in AMPLIACIONES if evaluar_ampliada(row["snapshot"], p, fecha, n)["compatible"]), None)
-                if not nivel:
+                if not nivel or not completar.cabe_ampliada(p):
                     continue
                 match, extra = evaluar_ampliada(row["snapshot"], p, fecha, nivel), [*extra, {"ampliacion": nivel}]
             vistas.add(row["vacante_id"])
@@ -650,7 +656,7 @@ def _rescatar(repo, cfg, fecha, completar, filas, fila, vacantes, operativos, ca
             empresa = normalizar.texto(v.get("empresa") or "")
             if v["id"] in vistas.setdefault(str(p.id), set()) or empresas[empresa] >= 2 or not _vigente_24h(v, ahora):
                 continue
-            if not completar.cabe(p, v["id"]):
+            if not completar.cabe(p, v["id"]) or (extra and not completar.cabe_ampliada(p)):
                 continue
             row = {"vacante_id": v["id"], "snapshot": v, "match_grade": entrega.GRADO_CONTRATO.get(afinidad, "close")}
             vistas[str(p.id)].add(v["id"])
