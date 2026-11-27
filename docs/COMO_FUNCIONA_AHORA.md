@@ -106,7 +106,7 @@ Resumen corto; la regla exacta de cada punto está en [CONTRATO_VIGENTE.md](CONT
 El repositorio está preparado para que una IA lo lea y lo cambie con cuidado.
 
 **Qué leer primero:**
-- **`CLAUDE.md`**, en la raíz: las reglas vigentes. La IA lo lee sola.
+- **`CLAUDE.md`**, en la raíz: las reglas innegociables y cómo trabajar. La IA lo lee sola.
 - **Este documento**, para el panorama.
 - **`docs/CONTRATO_VIGENTE.md`**: la regla vigente de cada tema (los `CONTRATO_DATOS_vNN.md` son históricos).
 

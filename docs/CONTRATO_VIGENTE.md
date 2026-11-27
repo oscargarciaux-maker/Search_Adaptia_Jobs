@@ -6,13 +6,19 @@ solo queda la posterior. Los `docs/CONTRATO_DATOS_vNN.md` son históricos: se co
 los citan, pero no se editan ni se crean nuevos.
 
 **Cómo se cambia una regla:** se edita este documento y se añade una línea en `docs/HISTORIAL_CAMBIOS.md`, en el mismo
-PR que el código. Un campo nuevo se escribe aquí primero y después en el código.
+PR que el código, y se actualiza la fecha de arriba. Un campo nuevo se escribe aquí primero y después en el código.
+
+**Palabras que se usan aquí:** *perfil* = un cliente + un cargo con sus condiciones · *meta* = vacantes al día de un
+perfil · *techo* = máximo de vacantes nuevas del día · *lote* = las vacantes elegidas del día · *bodega* = todo lo
+guardado de los últimos 30 días · *va corto* = está bajo su meta (o bajo 5) · *rescate* = completar con vacantes de
+la bodega · *ampliación* = último recurso que relaja algo · *exacto / similar / cercano* = qué tan parecido es el
+título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
 
 ## 1. Modos de trabajo
 
 - **Modo panel** (hay una versión de configuración vigente en Supabase): clientes con perfiles, cargos y metas; la
   captura busca solo los cargos y lugares de esa versión y asigna por perfil (v6, v21).
-- **Modo heredado** (sin versión vigente): seis cargos fijos por veinte. Solo filtran el cargo (mapa de cargos), 30
+- **Modo heredado** (sin versión vigente): seis cargos fijos, veinte vacantes por cargo. Solo filtran el cargo (mapa de cargos), 30
   días, que siga abierta, sin repetir, enlace comprobado y que se pueda postular desde LATAM o España. Inglés, nivel y
   años solo se muestran como columnas. Nada de lo que sigue cambia este modo salvo que se diga (v6, v24).
 - La captura no guarda perfiles ni datos de clientes en su estado público, reportes ni cachés (v6).
@@ -46,17 +52,20 @@ PR que el código. Un campo nuevo se escribe aquí primero y después en el cód
   menos. Motivos: «falta la ciudad en el perfil» y «oficina sin ciudad confirmada». Una región no sirve para
   presenciales. La ciudad implica su país (v24, v38, v49).
 - **La ciudad no anula el país:** el nombre de una ciudad solo cuenta si el país del aviso es uno de la fila
-  («Santiago» de Chile no acepta «Santiago de Cali») (v49).
+  (o el de la ciudad, en una fila sin países): «Santiago» de Chile no acepta «Santiago de Cali». Una fila solo con
+  ciudades toma el país de esas ciudades si todas apuntan al mismo (v49).
 - **Vacante sin modalidad declarada:** solo si el perfil acepta las tres modalidades y su país está entre los de la
   vacante; nunca se inventa la modalidad (v8).
 - **Lectura de lugares** (`buscador/paises.py`, sin IA): tabla ISO completa de 249 países (`datos/paises_mundo.yaml`)
   con siglas, nombres y subdivisiones; los nombres ambiguos nunca deciden solos; AR, CO y PA tras una ciudad solo
   cuentan si la ciudad es de ese país; PA es Panamá y PY Paraguay (v13, v14, v15). GeoNames (CC BY 4.0) da el país de
   una ciudad de fuera solo si tiene 5× más habitantes que otro país (20× frente a uno cubierto); si no llega, no se
-  adivina. La lista curada de `datos/paises.yaml` siempre manda (v19, v38). Siglas de estado de EE. UU., códigos
+  adivina. La lista curada de `datos/paises.yaml` siempre manda (v19, v38). La sigla de un estado de EE. UU. manda sobre la ciudad homónima («Panama City, FL» es EE. UU.); códigos
   postales, provincias de Canadá y Australia, «US-Remote» y apodos de `datos/alias_lugares.yaml` (v38). Áreas
   metropolitanas de `datos/areas_metropolitanas.yaml` (v32). Una región como ubicación vale solo si el aviso no es
   presencial ni híbrido; vale la región del título si la ubicación no dice ningún lugar (v19).
+- «Autorizado para trabajar en el país» se refiere al país del propio aviso (v14). `puede_trabajar_en` admite hasta 60
+  países y el importador acepta regiones (v26).
 - **Get on Board:** `fully_remote` = cualquier país; `remote_local` = los países de `location_tenants`; sin país,
   «por confirmar» (v18).
 - **Admisión y limpieza:** en modo panel se conserva una vacante de fuera si sirve a algún perfil (`_sirve_a_perfiles`;
@@ -139,8 +148,8 @@ PR que el código. Un campo nuevo se escribe aquí primero y después en el cód
   fila por vacante reconocida y no se rellenan cupos con copias (v5, v6).
 - Variedad en el lote: idioma, nivel, país, modalidad y fuente; **máximo 2 por empresa** (4 solo como último recurso)
   (v11, v27). Nunca dos veces la misma vacante a la misma persona (v11).
-- **Completar a quien va corto:** hasta su **meta diaria** (mínimo 5), sin pasar el techo del día; hasta el mínimo
-  siempre cabe. Orden: lote → reutilización de vacantes de otros días que esa persona nunca recibió → rescate con toda
+- **Completar a quien va corto:** hasta su **meta diaria**. Hasta 5 vacantes siempre cabe; del mínimo a la meta, una
+  vacante que hoy aún no usa nadie solo entra mientras lote + añadidas no pasen del techo del día. Orden: lote → reutilización de vacantes de otros días que esa persona nunca recibió → rescate con toda
   la bodega (cargo, ubicación e idioma; 2 por empresa; enlace de 24 h) → ampliación como último recurso (`remota_cercana`,
   `empresa_4`) → posts. Comunidad y los posts se quedan en el mínimo de 5 (v11, v27, v36, v49).
 - Lo asignado en pasadas anteriores del mismo día cuenta para la meta y el techo; si no se puede leer, se completa
@@ -148,7 +157,9 @@ PR que el código. Un campo nuevo se escribe aquí primero y después en el cód
 - Las rescatadas no cuentan en el cupo ni van a `ofertas` (marca `rescatada`) (v36).
 - Turnos de búsqueda por persona: peso = meta, ×2 si va corta o es nueva, ×2 si su país no tiene fuentes propias, ×2
   si solo acepta español; una búsqueda compartida cuenta para todas; sus lugares principales y los de quien va corto
-  van primero (v37, v40, v49). Los lugares salen de todas las filas del perfil y de las regiones de
+  van primero (v37, v40, v49). Una búsqueda repetida pide solo lo nuevo desde la vez anterior, salvo que esa vez no
+  dejara nada útil: entonces pide los 30 días; una combinación con 3 búsquedas seguidas sin nada útil pasa al final de
+  los turnos de su persona hasta que vuelva a traer algo (`estado["rendimiento"]`) (v40). Los lugares salen de todas las filas del perfil y de las regiones de
   `datos/regiones_busqueda.yaml`; «remoto LATAM» solo para quien vive en LATAM (v40).
 - La entrega diaria comprueba Supabase antes de recoger; la validación final falla si queda un enlace de la selección
   sin comprobar, una vacante que ya no encaja o sincronización pendiente; una elegida que después cerró es un aviso
@@ -163,7 +174,8 @@ PR que el código. Un campo nuevo se escribe aquí primero y después en el cód
   donde se postula ahí mismo. Nunca agregadores ni sitios de pago (lista en `datos/dominios.yaml`); se busca el
   original o la vacante no se guarda. **Enlace principal = LinkedIn** si está ahí; el de la empresa va en
   `enlace_directo` (v3, v5).
-- **Vigencia:** para seleccionar, comprobación positiva o cierre 24 h y bloqueo 30 min; para compartir (lista, WhatsApp,
+- **Vigencia:** para seleccionar vale una comprobación positiva de hace 24 h o menos; un cierre se recuerda 24 h y un
+  bloqueo o fallo temporal 30 min antes de volver a comprobar; para compartir (lista, WhatsApp,
   CSV), comprobada en las últimas **24 h** (v9, v31).
 - HTTP 200 no prueba que la ficha siga vigente; un 403/429, login, captcha o bloqueo **nunca** es cierre. Se rechazan
   404/410, agregadores, cobro por postular, cierres y expiración (v3, v39).
@@ -188,7 +200,7 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
 | Fuente | Regla vigente | Origen |
 |---|---|---|
 | LinkedIn público | Sin sesión ni cookie de nadie. Busca con los lugares de cada perfil (países de fuera por su nombre en inglés). Busca hasta la mitad de su tiempo y lee fichas el resto; un tiempo restante de 0 la detiene. Lee primero las fichas de avisos cuyo título es de un cargo buscado; reparte fichas entre lugares; la relectura va por turnos entre personas, primero quien va corta | v24, v32, v36, v37, v50 |
-| Indeed (JobSpy) | 62 países, solo los de los perfiles. Repasa cada noche los 30 días con varios nombres por combinación (`indeed_repaso`, solo en la búsqueda completa). No se comprueba directo: vale «visto hoy». JobSpy no se copia al repo ni se usa su clave fuera de JobSpy | v36, v40, v41, v50 |
+| Indeed (JobSpy) | 62 países, solo los de los perfiles. Repasa cada noche los 30 días con varios nombres por combinación (`indeed_repaso`, solo en la búsqueda completa). No se comprueba directo: vale «visto hoy» o que su `enlace_directo` de la empresa esté comprobado. JobSpy no se copia al repo ni se usa su clave fuera de JobSpy | v36, v40, v41, v50 |
 | Portales de empresas (`ats.py`) | Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Recruitee; la lista crece con las empresas que traen las demás fuentes, Open Seat, RemotosLatam y WeRemoto. Un aviso que desaparece de un portal leído completo cuenta como cerrado | v2, v42, v44 |
 | Open Seat, RemotosLatam, WeRemoto | Solo para descubrir empresas; nunca se toman sus avisos | v44 |
 | Computrabajo | 18 países de LATAM; fecha de `datePosted`, nunca la de actualización; lee solo fichas de cargos buscados y relee las guardadas sin descripción; turno propio en español | v44, v49 |
@@ -196,7 +208,7 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
 | Get on Board | Política remota leída (§2); consulta en español por cargo | v18, v44 |
 | Hireline (MX, CO) y Magneto (CO) | Sitemap + `JobPosting`; nunca su búsqueda con parámetros ni su API (robots.txt) | v44 |
 | Bumeran, Laborum, Multitrabajos, Konzerta | AR, MX, PE, VE, CL, EC, PA. API pública del portal; comprobación con su ficha (activo y mismo título); verse en la búsqueda **no** comprueba; un portal en descanso recibe una oportunidad más al final | v50, v51 |
-| InfoJobs (ES) | Nunca se abre la ficha (captcha). 5 búsquedas por corrida y 15 páginas al día; se detiene al primer captcha. Con `INFOJOBS_CLIENT_ID`/`INFOJOBS_CLIENT_SECRET` usa la API oficial (solo en `bodega.yml` y `profunda.yml`) | v50 |
+| InfoJobs (ES) | Nunca se abre la ficha (captcha). 5 búsquedas por corrida y 15 páginas al día; se detiene al primer captcha. Con `INFOJOBS_CLIENT_ID`/`INFOJOBS_CLIENT_SECRET` usa la API oficial (solo en `bodega.yml` y `profunda.yml`): una ficha de hoy «activo» con descripción comprueba, «archivado» o «borrado» cierra, lo demás —también un 404— no decide; la captura horaria y el panel no reciben las claves y vale la comprobación de la última búsqueda (24 h) | v50 |
 | Tecnoempleo (ES) | Portal (no agregador) por decisión de Oscar; ficha con `JobPosting`; comprobación normal | v50 |
 | Tableros remotos | Remotive y Working Nomads con el enlace original; Himalayas, We Work Remotely, RemoteOK y Jobicy solo aportan empresas | reglas de integridad |
 | Apify | Ver §10 | v11, v28 |
@@ -333,6 +345,8 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
 - Estado operativo: SQL 003 + `ESTADO_SUPABASE_ACTIVO=true`; no asumir que está desplegado; no volver al contador local
   en silencio ni vaciar reservas o colas para resolver errores. Catálogo/horario: SQL 002 + `CAPTURA_HORARIA_ACTIVA=true`
   (v2; `docs/CONTRATO_ESTADO_OPERATIVO.md`).
+- No se modifica el estado histórico v1 (`ofertas` y sus snapshots) (v4). El horario consulta la marca privada de
+  activación aunque no exista la variable antigua (instalación automática).
 - Activar requiere migración y variable: no afirmar que algo está activo porque el código existe; acreditarlo con su
   ejecución (v2).
 - `python -m pruebas.probar_migraciones` solo en PostgreSQL aislado.
@@ -351,6 +365,8 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
 - Despliegue del panel: Docker y guía sin proveedor obligatorio (`docs/PANEL_CONTROL.md`).
 
 ## 18. Seguridad y lo prohibido
+
+Las «Reglas innegociables» de `CLAUDE.md` son el resumen de esta sección: si una cambia, se cambian las dos.
 
 - **Sin IA en la búsqueda, la afinidad ni el aprendizaje.** La IA solo ayuda a ampliar el mapa leyendo archivos cortos
   (`reportes/`), nunca la bodega completa (v17; reglas de integridad).
@@ -381,3 +397,5 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
 2. **Brasil como residencia (v12 frente a v23).** v12 dice que el panel no ofrece Brasil como residencia y que una
    vacante solo para Brasil no se entrega; v23 abre la residencia a cualquier país. ¿Quien vive en Brasil puede recibir
    vacantes de Brasil?
+
+Mientras Oscar no decida, no se cambia el código actual en ninguno de los dos puntos.

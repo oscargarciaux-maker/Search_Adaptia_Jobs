@@ -4,7 +4,7 @@
 Cada mañana el sistema busca vacantes en portales públicos y, con los criterios de cada cliente, asigna las que le
 sirven. Un panel privado (React/Vite + FastAPI) deja al operador gestionar clientes, perfiles, cargos y metas diarias
 bajo un techo del día, revisar vacantes, descargar CSV y copiar el WhatsApp de cada cliente para enviarlo a mano.
-Sin versión de panel vigente sigue la captura heredada de seis cargos por veinte.
+Sin versión de panel vigente sigue la captura heredada: seis cargos fijos, veinte vacantes por cargo.
 
 **Las reglas vigentes están en `docs/CONTRATO_VIGENTE.md`: es la fuente principal y gana sobre cualquier otro
 documento.** Los `docs/CONTRATO_DATOS_vNN.md` son históricos (el código los cita): no se editan.
@@ -69,11 +69,13 @@ y después al código. Si una regla nueva contradice otra, se reemplaza la vieja
   `auditor-ux` (no implementa sin aprobación), `auditoria-codigo`, `thermos`.
 
 ## Dónde leer más
+Leer antes de trabajar: `docs/GUIA_CLIENTE.md`, `docs/OPERACION_Y_RECUPERACION.md` y `docs/ACEPTACION_Y_ESTADO.md`.
 - Uso y panel: `docs/GUIA_CLIENTE.md`, `docs/PANEL_CONTROL.md`.
 - Operación e incidentes: `docs/OPERACION_Y_RECUPERACION.md`; riesgos: `docs/REVISION_FIABILIDAD.md`.
 - Estado comprobado y pendientes: `docs/ACEPTACION_Y_ESTADO.md`; cambios: `docs/HISTORIAL_CAMBIOS.md`.
 - Reservas y pendientes centrales: `docs/CONTRATO_ESTADO_OPERATIVO.md`, `docs/ACTIVAR_ESTADO_OPERATIVO.md`.
 - Instalación: `docs/INSTALACION_AUTOMATICA.md` (camino preferido), `docs/INSTALACION.md`.
 - Entrega, traspaso y cesión: `docs/ENTREGA_AL_CLIENTE.md`, `docs/TRASPASO.md`, `docs/CEDER_EL_PROYECTO.md`.
-- Enlaces: `docs/CONTROL_CALIDAD_ENLACES.md`; cobertura histórica: `docs/COBERTURA_HISTORICO.md`.
+- Enlaces: `docs/CONTROL_CALIDAD_ENLACES.md`; cobertura histórica: `docs/COBERTURA_HISTORICO.md`;
+  alternativas de producto: `docs/REVISION_PRODUCTO.md`.
 - Activaciones: `docs/ACTIVAR_RELOJ.md`, `docs/ACTIVAR_CAPTURA_HORARIA.md`, `docs/ACTIVAR_INFOJOBS_API.md`.
