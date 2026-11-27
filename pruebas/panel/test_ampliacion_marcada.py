@@ -13,7 +13,7 @@ from pruebas.panel.test_control import SIN_DATO, _elegir, _oferta, cfg, cfg_un_p
 
 
 @pytest.fixture
-def presencial(cfg_un_perfil):
+def presencial(cfg_un_perfil):  # noqa: F811 (la fixture importada de test_control)
     cfg_un_perfil["perfiles"][0].update(aceptar_experiencia_sin_dato=True, aceptar_ingles_sin_dato=True,
                                        ubicaciones=[{"paises": ["CO"], "ciudades": ["Bogotá"],
                                                      "modalidades": ["presencial"]}])
