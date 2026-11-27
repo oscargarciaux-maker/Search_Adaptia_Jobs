@@ -1,11 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Check, Loader2, ShieldCheck, X } from "lucide-react";
 import { api } from "./api";
 import type {
   Cargo,
   Cliente,
-  Configuracion,
   EstadoConfig,
   Resultados,
   Sesion,
@@ -34,9 +33,9 @@ import { useWhatsApp, DialogoWhatsApp } from "./vistas/DialogoWhatsApp";
 import { EliminarCargoDialog, ArchivarDialog } from "./vistas/DialogosArchivo";
 import { InicioSesion } from "./vistas/InicioSesion";
 import { Cabecera } from "./vistas/Cabecera";
+import { useConfiguracion } from "./configuracion";
 import "./style.css";
 
-const vacio: Configuracion = { clientes: [], cargos: [], perfiles: [] };
 // Contrato v22: prioridades que solo ordenan y restricciones que descartan con evidencia clara.
 // Sección 5 (13 nov): sin menú propio; cada sección tiene su dirección y se abre desde las tarjetas del resumen.
 const secciones: Record<string, string> = {
@@ -63,28 +62,9 @@ function seccionDeHash() {
 // Contrato v29: el Resumen pide una página corta; el total y el conteo por cliente cubren todas las pendientes.
 const PENDIENTES_RESUMEN = "/revisiones?pagina=1&por_pagina=1";
 
-// Compara dos configuraciones por su contenido, sin importar el orden de las claves.
-function ordenado(v: unknown): unknown {
-  if (Array.isArray(v)) return v.map(ordenado);
-  if (v && typeof v === "object")
-    return Object.fromEntries(
-      Object.keys(v as Record<string, unknown>)
-        .sort()
-        .map((k) => [k, ordenado((v as Record<string, unknown>)[k])]),
-    );
-  return v;
-}
-function mismoContenido(a: unknown, b: unknown) {
-  return JSON.stringify(ordenado(a)) === JSON.stringify(ordenado(b));
-}
-
 function App() {
   const [sesion, setSesion] = useState<Sesion | null>(null),
-    [estado, setEstado] = useState<EstadoConfig | null>(null),
-    [draft, setDraft] = useState<Configuracion>(vacio),
-    [marcado, setDirty] = useState(false),
     [tab, setTab] = useState(seccionDeHash),
-    [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [toast, setToast] = useState<{
@@ -92,8 +72,6 @@ function App() {
       error: boolean;
       accion?: { texto: string; hacer: () => void };
     } | null>(null),
-    // Contrato v49: por qué no se pudo dejar en uso lo guardado (se ve junto al botón hasta aplicar bien).
-    [noAplica, setNoAplica] = useState(""),
     // Contrato v49: «Buscar ahora» disponible (el servidor tiene la llave de GitHub).
     [puedeBuscar, setPuedeBuscar] = useState(false),
     [modal, setModal] = useState<
@@ -114,6 +92,21 @@ function App() {
     [runs, setRuns] = useState<Ejecucion[]>([]),
     [email, setEmail] = useState(""),
     [password, setPassword] = useState("");
+  const {
+    estado,
+    setEstado,
+    draft,
+    setDraft,
+    setDirty,
+    dirty,
+    busy,
+    setBusy,
+    noAplica,
+    pendienteDeAplicar,
+    aplicarPendientes,
+    cambiar,
+    aplicar,
+  } = useConfiguracion(notify);
   const peticionResultados = useRef(0);
   // Contrato v48: al llegar desde «Tomar vacantes» del detalle, el foco queda en «Copiar WhatsApp».
   const enfocarWhatsApp = useRef(false);
@@ -169,25 +162,11 @@ function App() {
   const previaCargos = useVistaPrevia(
     tab === "Cargos y metas" && sesion?.sesion ? draft : null,
   );
-  // Lista grande (17 nov): hay cambios solo si lo editado es distinto de lo guardado. Si deshaces lo que cambiaste,
-  // vuelve a «sin cambios» y no pide aplicar otra vez.
-  const dirty = useMemo(
-    () => marcado && mismoContenido(draft, estado?.borrador) === false,
-    [marcado, draft, estado?.borrador],
-  );
   const metas = conMetas(draft),
     total = metas.total,
     excede = metas.reales > metas.techo,
     clientes = draft.clientes.filter((c) => c.activo),
     cargos = metas.cargos.filter((c) => c.activo);
-  // Contrato v49: cambios que la próxima búsqueda aún no usa (sin guardar, o guardados pero sin aplicar porque algo
-  // lo impidió, o importados). El botón «Aplicar cambios» de la cabecera solo aparece entonces.
-  const pendienteDeAplicar =
-    dirty ||
-    Boolean(estado?.revision && estado.publicada?.revision !== estado.revision);
-  async function aplicarPendientes() {
-    return (await aplicar()).aplicado;
-  }
   function notify(
     texto: string,
     error = false,
@@ -342,86 +321,6 @@ function App() {
   const diaResultados = (results?.ejecucion?.fecha || "").slice(0, 10);
   const diaAnterior = Boolean(results?.dia_anterior);
   const paraCopiar = results?.para_copiar ?? results?.listas ?? 0;
-  function cambiar(v: Configuracion) {
-    setDraft(v);
-    setDirty(true);
-  }
-  // Contrato v49 (pedido de Oscar, 26 nov): un solo «Aplicar cambios» que guarda (PUT /config) y deja en uso
-  // (POST /config/publicar, rige desde hoy: la próxima búsqueda ya lo usa; lo entregado no cambia). Si guardar
-  // falla, nada cambia y se dice por qué. Si guarda pero no se puede dejar en uso (p. ej. metas por encima del
-  // techo), los cambios quedan guardados, el motivo queda a la vista y el botón de la cabecera sigue pendiente.
-  async function aplicar(
-    config: Configuracion = draft,
-    exito = "Cambios aplicados: la próxima búsqueda los usa.",
-  ): Promise<{ guardado: boolean; aplicado: boolean; motivo: string }> {
-    if (!estado)
-      return { guardado: false, aplicado: false, motivo: "Recarga la página." };
-    setBusy(true);
-    let actual = estado;
-    try {
-      if (!mismoContenido(config, estado.borrador)) {
-        const r = await api<
-          Partial<EstadoConfig> & { revision: number; borrador: Configuracion }
-        >("/config", {
-          method: "PUT",
-          body: JSON.stringify({
-            revision: estado.revision,
-            configuracion: config,
-          }),
-        });
-        actual = { ...estado, ...r };
-        setEstado(actual);
-      }
-      // También cuando lo pedido ya era lo guardado (p. ej. reactivar lo que se había archivado sin aplicar).
-      setDraft(actual.borrador);
-      setDirty(false);
-    } catch (e) {
-      const motivo = (e as Error).message;
-      notify("No se guardaron los cambios: " + motivo, true);
-      setBusy(false);
-      return { guardado: false, aplicado: false, motivo };
-    }
-    try {
-      // Lo que se sabe sin preguntar al servidor (el mismo cálculo que `validar_publicacion`).
-      const m = conMetas(actual.borrador);
-      if (m.reales > m.techo)
-        throw new Error(
-          `Las metas suman ${m.reales} y el cupo diario es ${m.techo}: baja algunas metas o sube el cupo diario en «Cargos y metas», y vuelve a pulsar «Aplicar cambios».`,
-        );
-      if (m.total < 1)
-        throw new Error(
-          "Ningún perfil activo tiene meta diaria: da una meta a algún perfil y vuelve a pulsar «Aplicar cambios».",
-        );
-      const r = await api<{ revision: number; vigente_desde: string }>(
-        "/config/publicar",
-        { method: "POST", body: JSON.stringify({ revision: actual.revision }) },
-      );
-      const primera = !actual.publicada;
-      setEstado({
-        ...actual,
-        publicada: { ...r, configuracion: structuredClone(actual.borrador) },
-      });
-      setNoAplica("");
-      notify(
-        exito +
-          (primera
-            ? " Desde ahora solo se buscan los cargos de tu lista (no los seis fijos de antes)."
-            : ""),
-      );
-      return { guardado: true, aplicado: true, motivo: "" };
-    } catch (e) {
-      const motivo = (e as Error).message;
-      setNoAplica(motivo);
-      notify(
-        "Tus cambios quedaron guardados, pero la búsqueda todavía no los usa: " +
-          motivo,
-        true,
-      );
-      return { guardado: true, aplicado: false, motivo };
-    } finally {
-      setBusy(false);
-    }
-  }
   const {
     descargandoBase,
     csvFecha,
