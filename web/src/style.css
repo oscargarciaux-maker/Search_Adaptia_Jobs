@@ -2548,8 +2548,7 @@ h1 {
   line-height: 1.45;
   color: var(--osc-text-neutro-medio, #5f6b62);
 }
-.vacancy-tags .amplified,
-.item-etiquetas .amplified {
+.amplified {
   background: var(--osc-bg-ambar-3, #fbf3e2);
   border-color: var(--osc-line-ambar, #ecd9ae);
   color: var(--osc-text-ambar-fuerte, #7a5a17);

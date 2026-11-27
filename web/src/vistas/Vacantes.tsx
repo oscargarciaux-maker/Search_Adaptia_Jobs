@@ -5,6 +5,7 @@ import { ArrowLeft, Megaphone } from "lucide-react";
 import { IdVacante, modos } from "../comunes";
 import type { Vacante } from "../types";
 import {
+  EtiquetaAmpliada,
   FichaVacante,
   claseEstado,
   etiquetaEstado,
@@ -96,14 +97,7 @@ export function ListaVacantes({ vacantes }: { vacantes: Vacante[] }) {
                     {etiquetaPost(v)}
                   </span>
                 )}
-                {v.ampliacion && (
-                  <span
-                    className="amplified"
-                    title="Entró para completar el mínimo de 5 de este perfil, aunque no es lo que pidió."
-                  >
-                    Ampliada: {v.ampliacion}
-                  </span>
-                )}
+                <EtiquetaAmpliada v={v} />
                 {(v.avisos || []).slice(0, 2).map((a) => (
                   <span key={a} className="no-cumple">
                     {a}
