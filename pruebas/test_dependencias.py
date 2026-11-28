@@ -6,15 +6,11 @@ from pathlib import Path
 import pytest
 
 RAIZ = Path(__file__).resolve().parent.parent
-COMANDO = "uv pip compile --universal --generate-hashes --python-version 3.12 -o requirements.txt requirements.in"
-# P-13.2 (28 nov): el lock es universal (vale para Linux, Windows y macOS a la vez), así que lo que solo usa Windows
+COMANDO = "uv pip compile --universal --generate-hashes --python-version 3.12 -o {base}.txt {base}.in"
+# P-13.2 (28 nov): el lock es universal (un solo lock para Linux y Windows), así que lo que solo usa Windows
 # (colorama, `sys_platform == 'win32'`) queda en el .txt con su marcador y sus huellas aunque se compile en Linux.
 # Dependabot (ecosistema `uv`) lee la cabecera del .txt y recompila con las mismas opciones, `--universal` incluida.
-
-
-def _comando(base):
-    """El comando de `COMANDO` para `requirements` o `requirements-auditoria` (es el que queda en la cabecera)."""
-    return COMANDO.replace("requirements", base)
+# Para regenerar en local: `pip install uv` (o `pipx run uv ...`) y el comando de arriba.
 
 
 def _marcador(texto):
@@ -48,21 +44,24 @@ def _bloqueadas(archivo="requirements.txt"):
 def test_lock_coincide_con_requirements_y_todo_lleva_huella(base):
     directas, bloqueadas = _directas(base + ".in"), _bloqueadas(base + ".txt")
     for nombre, (version, marcador) in directas.items():
-        assert nombre in bloqueadas, f"{nombre} falta en {base}.txt; regenera con: {_comando(base)}"
+        assert nombre in bloqueadas, f"{nombre} falta en {base}.txt; regenera con: {COMANDO.format(base=base)}"
         assert bloqueadas[nombre][:2] == (version, marcador), \
-            f"{nombre} difiere de {base}.txt (versión o marcador); regenera con: {_comando(base)}"
+            f"{nombre} difiere de {base}.txt (versión o marcador); regenera con: {COMANDO.format(base=base)}"
     assert all(con_huella for *_, con_huella in bloqueadas.values()), "toda pieza del lock lleva su sha256"
 
 
 @pytest.mark.parametrize("base", ["requirements", "requirements-auditoria"])
 def test_lock_universal_compilado_con_uv(base):
     """Un lock de pip-compile (o de uv sin `--universal`) pierde colorama al compilarse en Linux: la cabecera lo delata."""
-    cabecera = (RAIZ / (base + ".txt")).read_text(encoding="utf-8").splitlines()[1]
-    assert cabecera.strip("# ") == _comando(base), f"{base}.txt no es un lock universal de uv; regenera con: {_comando(base)}"
+    lineas = (RAIZ / (base + ".txt")).read_text(encoding="utf-8").splitlines()
+    cabecera = next((l.strip("# ") for l in lineas[:5] if l.strip("# ").startswith("uv pip compile")), "")
+    assert all(o in cabecera.split() for o in ("--universal", "--generate-hashes", "--python-version", "3.12")), \
+        f"{base}.txt no es un lock universal de uv; regenera con: {COMANDO.format(base=base)}"
 
 
 def test_colorama_queda_fijada_para_windows():
-    """pytest, click y bandit piden colorama solo en Windows; sin ella en el lock, `--require-hashes` falla allí."""
+    """pytest, click y bandit piden colorama solo en Windows: el .in debe pedirla con su marcador (que el lock la
+    conserve lo exige `test_lock_coincide_con_requirements_y_todo_lleva_huella`)."""
     for base in ("requirements", "requirements-auditoria"):
         assert _directas(base + ".in").get("colorama", ("", ""))[1] == 'sys_platform=="win32"', base
 
