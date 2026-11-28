@@ -503,11 +503,12 @@ def cargos_operativos(repo, cfg):
 
 
 def leer_recibidas(repo, perfil_ids):
-    """P-12.1: lo que cada persona ya recibió (`panel_asignaciones`, todo el historial), leído UNA vez por corrida para
-    los tres pasos que completan (reutilizar, rescatar y posts; antes eran tres lecturas). Trae una entrada por cada
-    persona pedida, aunque no tenga historial. Si la lectura falla devuelve None con un aviso sin datos de clientes, y
-    en esta corrida no se completa a nadie (la siguiente vuelve a intentarlo): con un historial a medias podría
-    repetirse una vacante."""
+    """P-12.1: lo que cada persona ya recibió (`panel_asignaciones`, todo el historial), leído UNA vez por corrida.
+    P-12.15: la usan el lote del día, los tres pasos que completan (reutilizar, rescatar y posts) y la bandeja «Por
+    confirmar» (antes eran dos lecturas por corrida, y el lote no miraba ninguna). Trae una entrada por cada persona
+    pedida, aunque no tenga historial. Si la lectura falla devuelve None con un aviso sin datos de clientes, y en esta
+    corrida no se completa a nadie (la siguiente vuelve a intentarlo): con un historial a medias podría repetirse una
+    vacante."""
     try:
         return recibidas_de(repo.pedir, perfil_ids, tamano=500)
     except Exception as e:  # noqa: BLE001 — sin el historial completo no se completa a nadie (regla de no repetir)
@@ -515,6 +516,21 @@ def leer_recibidas(repo, perfil_ids):
             f"{type(e).__name__}: no se pudo leer completo lo que ya recibió cada persona; en esta corrida no se "
             "completa a nadie con días anteriores, la bodega ni posts"))
         return None
+
+
+def _ya_la_tuvo(row, recibidas, antes):
+    """P-12.15: si la persona ya tuvo esta vacante del lote. Su propio id cuenta si lo recibió en otra ejecución (`antes`);
+    el de una copia fusionada (`_ids_fusionados`) cuenta siempre, también hoy: sería la misma oferta dos veces."""
+    otros = set((row.get("snapshot") or {}).get("_ids_fusionados") or ()) - {row["vacante_id"]}
+    return row["vacante_id"] in antes or bool(otros & recibidas)
+
+
+def _antes_de_esta_ejecucion(recibidas, ya_hoy):
+    """P-12.15: {persona: lo que recibió en OTRAS ejecuciones}. Lo de las pasadas anteriores de hoy (`ya_hoy`) no es
+    una repetición: la fila ya existe en esta ejecución, la base ignora la copia y sigue contando para la meta, el techo
+    y Comunidad como siempre. Si `ya_hoy` no se pudo leer (None), todo lo recibido queda fuera: mejor no volver a
+    registrar una copia de hoy que repetir una de otro día."""
+    return {perfil: vacantes - set((ya_hoy or {}).get(perfil, ())) for perfil, vacantes in recibidas.items()}
 
 
 def _vistas(recibidas, filas, bajos):
@@ -795,6 +811,20 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
     seleccionadas = list(paginar(repo.pedir, "entregas_diarias", "vacante_id",
                                  {"delivery_date": "eq." + fecha, "select": "*"}))
     filas, conteos, estrictas, ampliables = [], {}, {}, []
+    ya_hoy = {}
+    if hasattr(repo, "asignadas_de"):
+        try:  # contrato v49: lo de las pasadas anteriores de hoy cuenta para la meta y el techo
+            ya_hoy = repo.asignadas_de(ejecucion["id"])
+        except Exception as e:  # noqa: BLE001 — sin el dato no se completa de más: solo hasta el mínimo de siempre
+            registro.aviso("ejecutor:ya-hoy", e)
+            ya_hoy = None
+    # P-12.1 y P-12.15: una sola lectura de lo que ya recibió cada persona de los cargos activos. La usan el lote, los
+    # pasos que completan y «Por confirmar». Si falla, esta corrida solo registra el lote (sin poder filtrarlo, como
+    # antes de la 12.15) y no completa a nadie: nada se completa con datos a medias.
+    recibidas = leer_recibidas(repo, dict.fromkeys(str(p.id) for c in cfg.cargos if c.activo
+                                                   for p in cfg.perfiles_activos(str(c.id))))
+    antes = _antes_de_esta_ejecucion(recibidas, ya_hoy) if recibidas is not None else {}
+    lote_ya_recibidas = 0
     def fila(row, p, cargo_id, pruebas, extra=()):
         # Contrato v49: el cargo operativo (el mismo con que se clasificó), la coincidencia del cargo que la RECIBE
         # (antes, en el cruce entre cargos y al reutilizar, quedaba la del cargo de origen) y lo que dicen sus funciones.
@@ -822,6 +852,16 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
                 candidatos += [(p, otro) for p in cfg.perfiles_activos(otro)]
         for p, cid in candidatos:
             match = evaluar(row["snapshot"], p, fecha)
+            # P-12.15: nunca otra vez a quien ya la recibió en otra ejecución (rescate, posts, «Sirve», otro día). Se
+            # cuenta solo si se le habría ofrecido (la cumple o es ampliable para ella).
+            if recibidas is not None and _ya_la_tuvo(row, recibidas.get(str(p.id), set()), antes.get(str(p.id), set())):
+                lote_ya_recibidas += bool(match["compatible"] or (
+                    cid == cargo_id and row["snapshot"].get("_ampliacion") in AMPLIACIONES))
+                if ya_hoy is None and match["compatible"]:
+                    # Sin lo de hoy, pudo ser de una pasada anterior de hoy: cuenta para su meta como antes (se
+                    # completa de menos, nunca de más).
+                    estrictas[p.id] = estrictas.get(p.id, 0) + 1
+                continue
             if match["compatible"]:
                 if de_comunidad(p):  # después de los clientes reales (abajo)
                     comunidad.append((row, p, cid, match["pruebas"]))
@@ -838,13 +878,6 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
             continue
         estrictas[p.id] = estrictas.get(p.id, 0) + 1
         filas.append(fila(row, p, cid, pruebas))
-    ya_hoy = {}
-    if hasattr(repo, "asignadas_de"):
-        try:  # contrato v49: lo de las pasadas anteriores de hoy cuenta para la meta y el techo
-            ya_hoy = repo.asignadas_de(ejecucion["id"])
-        except Exception as e:  # noqa: BLE001 — sin el dato no se completa de más: solo hasta el mínimo de siempre
-            registro.aviso("ejecutor:ya-hoy", e)
-            ya_hoy = None
 
     def con_hoy(p):
         """Lo que la persona ya tiene hoy: esta pasada más las anteriores (sin contar dos veces una vacante)."""
@@ -866,9 +899,6 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
     completar = Completar(cfg, estrictas, filas, [r["vacante_id"] for r in seleccionadas], ya_hoy)
     if ya_hoy is None:
         completar.metas = dict.fromkeys(completar.metas, MINIMO_POR_PERFIL)
-    # P-12.1: una sola lectura de lo que ya recibió cada persona que va corta (los posts solo miran a quien va bajo 5,
-    # que ya está entre ellas). Si falla, esta corrida solo registra el lote: nada se completa con datos a medias.
-    recibidas = leer_recibidas(repo, [str(p.id) for _, p in completar.bajos(cfg)])
     if recibidas is not None:
         try:
             reutilizadas = _reutilizar(repo, cfg, fecha, completar, filas, fila, operativos, recibidas)
@@ -903,7 +933,7 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
         try:  # contrato v16: bandeja «Por confirmar» (y lo que las reglas del operador ya resuelven solas)
             from panel import revision
             bodega.etapa("Preparar la bandeja «Por confirmar»")
-            por_confirmar = revision.preparar_cola(repo, cfg, fecha, estrictas, filas)
+            por_confirmar = revision.preparar_cola(repo, cfg, fecha, estrictas, filas, recibidas=recibidas)
         except Exception:  # noqa: BLE001 — la bandeja es una ayuda; nunca impide registrar lo del día
             por_confirmar = {}
     faltantes = {c.nombre: max(0, c.cupo - conteos.get(str(c.id), 0)) for c in cfg.cargos if c.activo}
@@ -925,6 +955,7 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
                           "asignaciones": len(filas),
                           "ampliadas": sum(any(isinstance(e, dict) and e.get("ampliacion") for e in f["explicacion"]) for f in filas),
                           "reutilizadas": reutilizadas, "rescatadas": rescatadas, "posts": posts, **por_confirmar,
+                          "lote_ya_recibidas": lote_ya_recibidas,  # P-12.15: repeticiones del lote evitadas
                           **({"apify": aporte_apify} if aporte_apify else {}),
                           **({"busquedas_por_perfil": b} if (b := _sumar_busquedas(
                               (ejecucion.get("resumen") or {}).get("busquedas_por_perfil"),

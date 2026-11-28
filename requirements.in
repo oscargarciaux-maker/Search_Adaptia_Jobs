@@ -1,7 +1,6 @@
 pyyaml==6.0.4
 pytest==9.2.0
-# Solo en Windows: pytest y click la piden allí. pip-compile en Linux la deja fuera; si pasa, se copia a mano al .txt
-# con su marcador y sus dos huellas (la prueba de dependencias avisa).
+# Solo en Windows: pytest y click la piden allí. El lock universal de uv la conserva con su marcador (P-13.2).
 colorama==0.4.6 ; sys_platform == "win32"
 rapidfuzz==3.14.6
 requests==2.34.2

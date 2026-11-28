@@ -14,11 +14,9 @@ y [TRASPASO.md](TRASPASO.md). No repetir la activación si ya está comprobada e
    [`supabase/migraciones/002_catalogo.sql`](../supabase/migraciones/002_catalogo.sql). Se crean
    `catalogo_vacantes` y `entregas_diarias` con permisos privados. `ofertas` y sus datos existentes permanecen.
    No basta con ejecutar la migración en una base temporal. La clave REST del scraper no permite aplicar SQL.
-2. Si se usa GitHub Pages (como el sitio revisado), en **Settings → Pages → Build and deployment → Source** elegir
-   **GitHub Actions**. Crear la variable de Actions `PAGES_POR_ACTIONS=true`. El flujo **Actualizar página** despliega
-   explícitamente después de las capturas; también se puede ejecutar manualmente. Si el entorno `github-pages` tiene
-   restricciones de rama, permitir `main`, donde se ejecuta este flujo. Para Cloudflare Pages, conservar su conexión a
-   `publicado` y dejar esta variable desactivada.
+2. GitHub Pages **no se usa**: el panel privado y Supabase reemplazaron la página pública, y ningún flujo ni código
+   lee `PAGES_POR_ACTIONS` ni usa el entorno `github-pages`. Si Settings → Pages sigue activo (la página da 404),
+   desactivarlo (ver la fila de Pages en [CREDENCIALES_Y_ACCESOS.md](CREDENCIALES_Y_ACCESOS.md)).
 3. En **GitHub → Settings → Secrets and variables → Actions → Variables → New repository variable**, crear
    `CAPTURA_HORARIA_ACTIVA` con valor `true`. Es una variable, no una contraseña. También activa el catálogo v2 de la
    captura nocturna. Los secretos Supabase existentes se reutilizan.

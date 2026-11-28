@@ -182,10 +182,19 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
 - Una oportunidad cuenta **una vez** aunque esté en varios portales o la reciban varios clientes; `ofertas` tiene una
   fila por vacante reconocida y no se rellenan cupos con copias (v5, v6).
 - Variedad en el lote: idioma, nivel, país, modalidad y fuente; **máximo 2 por empresa** (4 solo como último recurso)
-  (v11, v27). Nunca dos veces la misma vacante a la misma persona (v11). Para eso se lee **todo** lo que cada
-  persona ya recibió, sin tope de filas, una vez por corrida; si esa lectura falla o no termina, en esa corrida no
-  se completa a nadie (ni reutilización, ni rescate, ni posts): solo se registra el lote, con un aviso sin datos de
-  clientes (P-12.1, 28 nov).
+  (v11, v27). Nunca dos veces la misma vacante a la misma persona (v11), venga del lote o de cualquier paso que
+  completa. Para eso se lee **todo** lo que cada persona de los cargos activos ya recibió, sin tope de filas, **una
+  vez por corrida**, y esa lectura la usan el lote, la reutilización, el rescate, los posts y «Por confirmar» (P-12.1,
+  P-12.15, 28 nov). **El lote del día tampoco repite:** una vacante del lote no se asigna a quien ya la recibió en otra
+  ejecución (por el rescate, un post, «Sirve» u otro día), ni si trae entre sus `_ids_fusionados` una copia que la
+  persona ya recibió (también hoy); a quien nunca la recibió le llega igual. Lo de las pasadas anteriores del mismo
+  día con el mismo id no es una repetición: se vuelve a registrar como siempre (la base ignora la copia). Si no se
+  pudo leer lo de hoy, todo lo ya recibido queda fuera del lote y lo que la persona cumple cuenta para su meta (se
+  completa de menos, nunca de más). `resumen.lote_ya_recibidas` cuenta las repeticiones que el lote evitó: pares
+  (persona, vacante) ya recibidos que se le habrían ofrecido (la cumple o es ampliable para ella) (P-12.15). Si la
+  lectura de lo recibido falla o no termina, en esa corrida no se completa a nadie (ni reutilización, ni rescate, ni
+  posts): solo se registra el lote, sin poder filtrarlo, con un aviso sin datos de clientes (P-12.1); «Por
+  confirmar» lo vuelve a leer por su cuenta.
 - **Completar a quien va corto:** hasta su **meta diaria**. Hasta 5 vacantes siempre cabe; del mínimo a la meta, una
   vacante que hoy aún no usa nadie solo entra mientras lote + añadidas no pasen del techo del día. Orden: lote → reutilización de vacantes de otros días que esa persona nunca recibió → rescate con toda
   la bodega (cargo, ubicación e idioma; 2 por empresa; enlace de 24 h) → ampliación como último recurso y **solo hasta 5**

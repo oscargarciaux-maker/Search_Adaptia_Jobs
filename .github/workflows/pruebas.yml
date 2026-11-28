@@ -4,7 +4,6 @@ name: Pruebas
 on:
   push:
   pull_request:
-  workflow_dispatch:  # lo pide reponer_colorama.yml tras su push (un push con GITHUB_TOKEN no lanza «Pruebas»)
 
 permissions:
   contents: read
