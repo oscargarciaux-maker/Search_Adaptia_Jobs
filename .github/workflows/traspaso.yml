@@ -1,7 +1,9 @@
 name: Traspaso a otro Supabase
 
 # Copia todo el historial al proyecto Supabase de destino (por ejemplo, el de pago del cliente) y comprueba que coincida.
-# Antes: guardar en Secrets SUPABASE_URL_DESTINO y SUPABASE_DB_URL_DESTINO (Session pooler, puerto 5432, del destino).
+# Antes: guardar en Secrets SUPABASE_URL_DESTINO, SUPABASE_DB_URL_DESTINO (Session pooler, puerto 5432) y
+# SUPABASE_SECRET_KEY_DESTINO (Secret key), los tres del destino. La copia cifrada del traspaso se guarda en el bucket
+# PRIVADO `respaldos` del destino antes de restaurar (buscador/almacen_respaldos.py); si no se puede, no se traspasa.
 # El destino debe ser un proyecto nuevo y vacío, distinto del de la página web; si no, el traspaso se niega.
 # Después: cambiar SUPABASE_URL, SUPABASE_SECRET_KEY y SUPABASE_DB_URL por los del destino. Mientras tanto, las
 # capturas se detienen solas para no escribir en dos bases. Guía paso a paso: docs/ENTREGA_AL_CLIENTE.md
@@ -54,13 +56,16 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           SUPABASE_URL_DESTINO: ${{ secrets.SUPABASE_URL_DESTINO }}
           SUPABASE_DB_URL_DESTINO: ${{ secrets.SUPABASE_DB_URL_DESTINO }}
+          SUPABASE_SECRET_KEY_DESTINO: ${{ secrets.SUPABASE_SECRET_KEY_DESTINO }}
           SUPABASE_BACKUP_KEY: ${{ secrets.SUPABASE_BACKUP_KEY }}
         run: python -m buscador.traspaso --fase traspaso --salida salida --privado privado ${{ inputs.ensayo && '--ensayo' || '' }}
-      - name: Conservar la copia cifrada del traspaso
+      # Red de seguridad TEMPORAL (27 nov): hasta confirmar en real la primera subida a Storage. El repo es público:
+      # 1 día y no 90. Oscar decide quitarla tras una corrida real correcta.
+      - name: Red de seguridad temporal (1 día)
         if: ${{ always() && hashFiles('privado/respaldos/*.enc') != '' }}
         uses: actions/upload-artifact@v6
         with:
           name: respaldo-traspaso-${{ github.run_id }}
           path: privado/respaldos/*.enc
           if-no-files-found: error
-          retention-days: 90
+          retention-days: 1

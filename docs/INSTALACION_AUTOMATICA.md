@@ -104,8 +104,8 @@ El resumen de Actions indica migraciones aplicadas o ya vigentes, respaldo gener
 captura debe mostrar `estado_operativo.activo: true`, cero pendientes y su SHA. Eso no acredita calidad de todos los enlaces.
 No se ha configurado ni ejecutado esta instalación en la base real durante el desarrollo del cambio.
 
-Las copias se suben como artefactos **respaldo-instalacion-…**, cifrados, con retención de 14 días. Descargarlas a almacenamiento
-privado duradero según la política acordada. Una copia previa a migración no sustituye backups periódicos ni un monitor
+Las copias se guardan cifradas en el bucket privado `respaldos` de Supabase Storage, carpeta `instalacion/` (queda la última
+válida; ver `docs/OPERACION_Y_RECUPERACION.md` §8). Si no se pueden guardar, no se migra. Una copia previa a migración no sustituye backups periódicos ni un monitor
 independiente. El respaldo se comprime y cifra en flujo; los originales de trabajo se conservan en su ubicación habitual.
 
 La restauración se ensaya en una base vacía y aislada: preparar el esquema, descifrar/verificar la copia, restaurar tablas

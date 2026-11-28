@@ -49,14 +49,26 @@ runs:
         CAPTURA_HORARIA_ACTIVA: ${{ inputs.captura }}
         ESTADO_SUPABASE_ACTIVO: ${{ inputs.central }}
       run: python -m buscador.preparar --fase respaldo --modo "${{ inputs.modo }}" ${{ inputs.prueba == 'true' && '--prueba' || '' }} ${{ inputs.manual == 'true' && '--manual' || '' }}
-    - name: Conservar respaldo antes de cambiar SQL
+    # Solo hay copia cuando falta una migración: si no, este paso no corre y Storage ni se consulta. Si la copia no
+    # se puede guardar en el bucket PRIVADO `respaldos` (buscador/almacen_respaldos.py), el paso falla y NO se migra.
+    - name: Guardar respaldo antes de cambiar SQL (Storage privado)
+      if: ${{ steps.respaldo.outputs.respaldo != '' }}
+      shell: bash
+      env:
+        SUPABASE_URL: ${{ inputs.url }}
+        SUPABASE_SECRET_KEY: ${{ inputs.clave_rest }}
+        COPIA: ${{ steps.respaldo.outputs.respaldo }}
+      run: python -m buscador.almacen_respaldos subir --tipo instalacion --archivo "$COPIA"
+    # Red de seguridad TEMPORAL (27 nov): hasta confirmar en real la primera subida a Storage. El repo es público:
+    # 1 día y no 14. Oscar decide quitarla tras una corrida real correcta.
+    - name: Red de seguridad temporal (1 día)
       if: ${{ always() && hashFiles('privado/respaldos/*.enc') != '' }}
       uses: actions/upload-artifact@v6
       with:
         name: respaldo-instalacion-${{ github.run_id }}-${{ github.job }}-${{ github.run_attempt }}
         path: privado/respaldos/*.enc
         if-no-files-found: error
-        retention-days: 14
+        retention-days: 1
     - name: Aplicar y comprobar preparación
       id: aplicar
       shell: bash

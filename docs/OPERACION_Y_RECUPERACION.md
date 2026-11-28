@@ -233,9 +233,8 @@ para evaluar: copia diaria y antes de cambios, con recuperación probada; el adm
 ## 8. Respaldo completo y restauración comprobable
 
 El instalador produce antes de cambios un corte cifrado de las tablas del proyecto, secuencias y `trabajo/`; la acción
-debe subirlo correctamente antes de aplicar SQL. Esos artefactos duran 14 días (todavía no van a Storage; los
-semanales sí, ver abajo). Descargar cortes a almacenamiento privado
-duradero según la política acordada, guardando la clave de cifrado fuera de GitHub. No incluye Auth, Storage ni otros
+debe guardarlo en Storage privado (tipo `instalacion`, ver abajo) antes de aplicar SQL: si no se puede guardar, no se
+migra. Guardar la clave de cifrado fuera de GitHub. No incluye Auth, Storage ni otros
 esquemas de Supabase. No sustituye una copia periódica ni la supervisión independiente del servicio.
 
 El módulo `buscador.respaldo.restaurar` verifica AES-GCM antes de insertar; solo acepta tablas de negocio vacías y una
@@ -250,27 +249,41 @@ copia recuperable para el cliente.
 
 ### Respaldos guardados en Supabase Storage (desde el 27 nov)
 
-Los respaldos semanales (`respaldo.yml`, domingos) y los de «antes de limpiar» están en el bucket **privado**
-`respaldos` de Supabase Storage del mismo proyecto: carpetas `semanal/AAAA-MM-DD_<ejecución>/` y
-`antes-de-limpiar/…`, cada una con trozos `parte-000`, `parte-001`… y un `manifiesto.json`. Una carpeta sin manifiesto
-es una subida a medias: no sirve. Quedan las últimas 4 semanales; las de «antes de limpiar» no se borran solas.
-También se ven en el panel de Supabase: Storage > Buckets > `respaldos` (no hacer público nunca ese bucket).
+Todas las copias cifradas de la base están en el bucket **privado** `respaldos` de Supabase Storage, en una carpeta
+por tipo: `<tipo>/AAAA-MM-DD_<ejecución>/`, cada una con trozos `parte-000`, `parte-001`… y un `manifiesto.json`. Una
+carpeta sin manifiesto es una subida a medias: no sirve. También se ven en el panel de Supabase: Storage > Buckets >
+`respaldos` (no hacer público nunca ese bucket).
+
+| Tipo | Cuándo se crea | En qué proyecto buscarlo | Quedan | Cuándo usarlo |
+|---|---|---|---|---|
+| `semanal` | domingos (`respaldo.yml`) | el actual | las 2 últimas | recuperar la base de una fecha |
+| `instalacion` | antes de aplicar una migración (acción «Preparar Supabase») | el actual | la última | una migración dejó mal la base: volver a justo antes |
+| `antes-de-limpiar` | antes de `limpiar_fuera_objetivo.yml` | el actual | todas | deshacer una limpieza |
+| `traspaso` | al traspasar (`traspaso.yml`), antes de restaurar | el **destino** del traspaso | todas | el destino quedó mal después del traspaso y el Supabase antiguo ya no existe |
+
+Si el traspaso falla, el origen no se toca ni se marca: sigue operando y no hace falta ninguna copia. Mientras el
+Supabase antiguo exista, volver atrás es más simple con él que con la copia.
 
 Para recuperar, en un equipo de confianza (no en Actions) con `SUPABASE_URL` y `SUPABASE_SECRET_KEY` del proyecto en el
 entorno, sin escribirlos en la línea de órdenes ni en archivos del repositorio:
 
 ```bash
-python -m buscador.almacen_respaldos listar --tipo semanal          # fecha, tamaño y sha256 de cada uno
-python -m buscador.almacen_respaldos bajar --respaldo semanal/2026-11-30_123456789 --salida /ruta/privada/copia.enc
+python -m buscador.almacen_respaldos listar --tipo semanal          # o instalacion, antes-de-limpiar, traspaso
+python -m buscador.almacen_respaldos bajar --respaldo semanal/2026-11-30_123456789-respaldo-1 --salida /ruta/privada/copia.enc
 ```
+
+Para `traspaso`, usar la URL y la Secret key del **destino** (después del traspaso ya son los `SUPABASE_URL` y
+`SUPABASE_SECRET_KEY` de siempre).
 
 `bajar` reúne los trozos y comprueba el sha256 de cada uno y del total. El `.enc` resultante es el mismo que crea
 `buscador.respaldo.crear`: se restaura con la función `buscador.respaldo.restaurar` (no tiene línea de órdenes;
 `traspaso.yml` NO sirve: hace un corte nuevo de la base actual) en un destino aislado vacío con el esquema ya preparado
 y `SUPABASE_BACKUP_KEY`, siguiendo el ensayo de abajo. Si el resumen de la copia semanal avisa de que la
 próxima copia podría no caber (el bucket más una copia nueva pasa de 800 MB), decidir esa misma semana entre pasar a
-Pro o guardar menos semanas (`CONSERVAR` en `buscador/almacen_respaldos.py`). Si se llega al 1 GB, la subida falla y
-la poda no corre: borrar a mano en Storage la carpeta semanal más vieja con manifiesto (nunca la más nueva) y relanzar.
+Pro o guardar menos copias (`CONSERVAR` en `buscador/almacen_respaldos.py`). Si se llega al 1 GB, la subida falla y
+la poda no corre: borrar a mano en Storage la carpeta semanal más vieja con manifiesto (nunca la más nueva de cada
+tipo) y relanzar. Si la que falla es la de «Preparar Supabase», la migración no se aplica y la captura queda en rojo
+hasta liberar espacio y relanzar.
 
 ### Corte y respaldo
 

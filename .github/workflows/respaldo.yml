@@ -1,7 +1,7 @@
 name: Copia de seguridad semanal
 
 # Copia cifrada de las tablas del sistema, sus secuencias y la carpeta de trabajo. Se guarda en el bucket PRIVADO
-# `respaldos` de Supabase Storage (buscador/almacen_respaldos.py): quedan las últimas 4 semanas (27 nov).
+# `respaldos` de Supabase Storage (buscador/almacen_respaldos.py): quedan las últimas 2 semanas (27 nov).
 # Complementa (no sustituye) las copias diarias que Supabase incluye en sus planes de pago.
 # Usa SUPABASE_DB_URL y SUPABASE_BACKUP_KEY; sin la clave de cifrado la copia no se puede leer: guardarla aparte.
 # Domingos 5:41 a. m. de Bogotá (10:41 UTC). A mano: Actions > Copia de seguridad semanal > Run workflow.

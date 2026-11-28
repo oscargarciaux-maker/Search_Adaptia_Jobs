@@ -6,14 +6,16 @@ de Supabase admite como máximo 50 MB por archivo y 1 GB en total, por eso:
 - cada respaldo es una carpeta `<tipo>/<AAAA-MM-DD>_<ejecución>/` con `parte-000`, `parte-001`… y, al final,
   `manifiesto.json` (tamaño y sha256 del total y de cada trozo). Sin manifiesto el respaldo no cuenta como válido;
 - tras subir se vuelve a bajar cada trozo y se compara tamaño y sha256: si algo no cuadra, el job falla;
-- de los semanales se conservan los últimos `CONSERVAR` válidos; nunca se borra el último válido. Los de
-  «antes de limpiar» no se borran solos.
+- retención por tipo (`CONSERVAR`): de los semanales quedan los 2 últimos válidos y de los de instalación (antes de
+  migrar, acción «Preparar Supabase») el último; nunca se borra el último válido de ningún tipo. Los de «antes de
+  limpiar» y los del traspaso no se borran solos (plan gratuito, decisión de Oscar 27 nov).
+- el del traspaso se guarda en el bucket del proyecto de DESTINO (`traspaso.py`): es el que queda en uso.
 
 Usa SUPABASE_URL y SUPABASE_SECRET_KEY (la clave nunca se imprime). Nada aquí descifra: la clave de cifrado no hace falta.
 Restaurar: `listar` y `bajar` (ver docs/OPERACION_Y_RECUPERACION.md §8).
 """
 import argparse
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import os
@@ -31,11 +33,12 @@ from buscador import registro, supabase
 BUCKET = "respaldos"
 TROZO = 40 * 1024 * 1024        # bajo el máximo de 50 MB por archivo del plan gratuito
 LIMITE_BUCKET = 50 * 1000 * 1000  # el bucket rechaza cualquier archivo mayor
-CONSERVAR = 4                    # semanales válidos que se guardan (decisión de Oscar, 27 nov)
+# Válidos que se guardan por tipo (decisión de Oscar, 27 nov: plan gratuito, la base crece unos 23 MB por semana).
+# Los tipos que no están aquí no se borran solos.
+CONSERVAR = {"semanal": 2, "instalacion": 1}
 CUOTA_GRATUITA = 1000 * 1000 * 1000  # 1 GB de Storage en el plan gratuito
 AVISO = 0.8                      # aviso si la próxima copia (mientras convive con las demás) pasaría del 80 %
-TIPOS = ("semanal", "antes-de-limpiar")
-PODABLES = ("semanal",)
+TIPOS = ("semanal", "antes-de-limpiar", "instalacion", "traspaso")
 MANIFIESTO = "manifiesto.json"
 _ID = "A-Za-z0-9-"
 _CARPETA = re.compile(rf"^\d{{4}}-\d{{2}}-\d{{2}}_[{_ID}]+$")
@@ -250,22 +253,29 @@ def validos(almacen, tipo, todas=None):
     return salida
 
 
-def podar(almacen, tipo, conservar=CONSERVAR):
-    """Borra los semanales más viejos que los últimos `conservar` válidos (y los incompletos anteriores al último
-    válido). Nunca borra el último válido. Devuelve las carpetas borradas."""
-    if tipo not in PODABLES:
+def podar(almacen, tipo, conservar=None, ahora=None):
+    """Borra los respaldos del tipo más viejos que los últimos `conservar` válidos (y los incompletos anteriores al
+    último válido). Nunca borra el último válido. Devuelve las carpetas borradas. Los tipos sin retención no se tocan.
+    Un incompleto de hoy o de ayer puede ser otro trabajo subiendo a la vez (dos capturas preparando la misma
+    migración): se deja; si quedó a medias, lo borra una poda posterior."""
+    if tipo not in CONSERVAR:
         return []
-    conservar = max(1, conservar)
+    conservar = max(1, CONSERVAR[tipo] if conservar is None else conservar)
+    desde_ayer = f"{(ahora or datetime.now(timezone.utc)) - timedelta(days=1):%Y-%m-%d}"
     todas = carpetas(almacen, tipo)
     buenos = validos(almacen, tipo, todas)
     if not buenos:
         return []
-    quedan = {c for c, _ in buenos[-conservar:]}
+    completas = {c for c, _ in buenos}
+    conservados = {c for c, _ in buenos[-conservar:]}
     ultimo = buenos[-1][0]
     borradas = []
     for carpeta in todas:
-        if carpeta in quedan or carpeta >= ultimo:
+        if carpeta in conservados or carpeta >= ultimo:
             continue
+        fecha = carpeta.split("/", 1)[1][:10]  # AAAA-MM-DD (lo garantiza _CARPETA)
+        if carpeta not in completas and fecha >= desde_ayer:
+            continue  # puede estar subiéndose ahora
         almacen.borrar([f"{carpeta}/{e['name']}" for e in almacen.listar(carpeta + "/")])
         borradas.append(carpeta)
     return borradas
@@ -302,7 +312,7 @@ def bajar(almacen, carpeta, destino):
 
 
 # ---------------------------------------------------------------- línea de órdenes
-def _mb(n):
+def mb(n):
     return f"{n / 1_000_000:.1f} MB"
 
 
@@ -314,6 +324,13 @@ def _resumen(texto):
     print(texto)
 
 
+def ejecucion_actual():
+    """Ejecución-trabajo-intento de Actions: distingue un «Re-run» y dos trabajos de la misma ejecución (la acción
+    «Preparar Supabase» corre en varios). Fuera de Actions, «local»."""
+    partes = (os.environ.get("GITHUB_RUN_ID"), os.environ.get("GITHUB_JOB"), os.environ.get("GITHUB_RUN_ATTEMPT"))
+    return "-".join(filter(None, partes)) or "local"
+
+
 def _archivo_unico(carpeta):
     encontrados = sorted(Path(carpeta).glob("*.enc"))
     if len(encontrados) != 1:
@@ -322,22 +339,23 @@ def _archivo_unico(carpeta):
 
 
 def _subir_cli(args, almacen):
-    ejecucion = "-".join(filter(None, (os.environ.get("GITHUB_RUN_ID"), os.environ.get("GITHUB_RUN_ATTEMPT"))))
-    m = subir(almacen, _archivo_unico(args.carpeta), args.tipo, ejecucion or "local")
+    archivo = Path(args.archivo) if args.archivo else _archivo_unico(args.carpeta)
+    m = subir(almacen, archivo, args.tipo, ejecucion_actual())
     lineas = [f"Respaldo guardado en Storage (bucket privado `{BUCKET}`): `{m['carpeta']}`",
-              f"- {_mb(m['tamano'])} en {len(m['partes'])} trozos, comprobados al bajarlos de nuevo",
+              f"- {mb(m['tamano'])} en {len(m['partes'])} trozos, comprobados al bajarlos de nuevo",
               f"- sha256 `{m['sha256']}`"]
     try:
         borradas = podar(almacen, args.tipo)
         if borradas:
-            lineas.append(f"- Se borraron {len(borradas)} respaldos semanales viejos (quedan los últimos {CONSERVAR})")
+            lineas.append(f"- Se borraron {len(borradas)} respaldos «{args.tipo}» viejos "
+                          f"(quedan los últimos {CONSERVAR[args.tipo]})")
         usado = ocupado(almacen)
-        lineas.append(f"- El bucket ocupa {_mb(usado)} de {_mb(CUOTA_GRATUITA)} del plan gratuito")
+        lineas.append(f"- El bucket ocupa {mb(usado)} de {mb(CUOTA_GRATUITA)} del plan gratuito")
         # La próxima copia se sube antes de podar: durante la subida convive con todas las de ahora.
         if usado + m["tamano"] > AVISO * CUOTA_GRATUITA:
             lineas.append("- ⚠️ La próxima copia podría no caber: decidir ya si pasar a Pro o guardar menos semanas "
                           "(docs/OPERACION_Y_RECUPERACION.md §8)")
-            registro.aviso("almacen_respaldos.espacio", RuntimeError(f"el bucket ocupa {_mb(usado)}"))
+            registro.aviso("almacen_respaldos.espacio", RuntimeError(f"el bucket ocupa {mb(usado)}"))
     except (RuntimeError, ValueError, KeyError) as e:
         registro.aviso("almacen_respaldos.podar", e)
         lineas.append("- No se pudo revisar ni podar los respaldos viejos (ver aviso en el registro); el nuevo sí quedó")
@@ -349,7 +367,9 @@ def main(argv=None):
     sub = p.add_subparsers(dest="orden", required=True)
     s = sub.add_parser("subir", help="Sube el único .enc de la carpeta y lo comprueba")
     s.add_argument("--tipo", choices=TIPOS, required=True)
-    s.add_argument("--carpeta", default="privado/respaldos")
+    origen = s.add_mutually_exclusive_group()
+    origen.add_argument("--carpeta", default="privado/respaldos", help="Sube el único .enc de esta carpeta")
+    origen.add_argument("--archivo", help="El .enc exacto a subir")
     lst = sub.add_parser("listar", help="Respaldos guardados, del más viejo al más nuevo")
     lst.add_argument("--tipo", choices=TIPOS, default="semanal")
     b = sub.add_parser("bajar", help="Reúne un respaldo en un archivo .enc")
@@ -362,11 +382,11 @@ def main(argv=None):
     elif args.orden == "listar":
         for carpeta in carpetas(almacen, args.tipo):
             m = leer_manifiesto(almacen, carpeta)
-            estado = f"{_mb(m['tamano'])}  sha256 {m['sha256'][:12]}…" if m else "INCOMPLETO (no sirve)"
+            estado = f"{mb(m['tamano'])}  sha256 {m['sha256'][:12]}…" if m else "INCOMPLETO (no sirve)"
             print(f"{carpeta}  {estado}")
     else:
         m = bajar(almacen, args.respaldo, args.salida)
-        print(f"Respaldo reunido en {args.salida} ({_mb(m['tamano'])}, sha256 comprobado).")
+        print(f"Respaldo reunido en {args.salida} ({mb(m['tamano'])}, sha256 comprobado).")
 
 
 if __name__ == "__main__":
