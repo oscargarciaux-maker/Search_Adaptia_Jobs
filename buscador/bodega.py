@@ -889,7 +889,8 @@ def main():
     reporte = correr(a.salida, a.modo, a.consulta or None, a.pais or None, prueba=a.prueba)
     print(json.dumps({k: reporte[k] for k in ("fecha", "minutos", "vacantes_en_bodega", "nuevas_hoy", "crudas_hoy",
                                               "descartes")}, ensure_ascii=False, indent=1))
-    for n, s in reporte["fuentes"].items():
+    from buscador.estado_privado import fuentes_publicas
+    for n, s in fuentes_publicas(reporte["fuentes"]).items():  # registro público: sin lugares ni términos (9.6)
         print(f"  {n}: {s}")
     print("Verificación de enlaces:", json.dumps(reporte["verificacion_enlaces"], ensure_ascii=False))
     e = reporte.get("entrega") or {}

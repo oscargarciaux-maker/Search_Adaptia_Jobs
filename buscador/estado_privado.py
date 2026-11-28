@@ -19,7 +19,8 @@ estado completo y de una sola corrida, la corrida se detiene: nunca sigue con el
 elegiría otra entrega del mismo día.
 
 El reporte público se arma con lista blanca (`CAMPOS_REPORTE`): un campo nuevo del reporte no se publica hasta que
-alguien decide cómo (la prueba `test_estado_privado.py` falla si `bodega.correr` emite uno sin clasificar).
+alguien decide cómo. Lo mismo dentro de cada fuente (`fuentes` y las rondas de `refuerzos`, 9.6): solo cifras; los
+desgloses por lugar, término o país buscado quedan en la copia privada (la prueba `test_estado_privado.py` falla si `bodega.correr` emite uno sin clasificar).
 """
 import argparse
 import base64
@@ -109,9 +110,46 @@ def seleccion_publica(seleccion):
             "vacantes": sum(len(r.get("vacantes") or []) for r in roles)}
 
 
+# 9.6: de cada fuente se publican solo cifras y mensajes fijos del código. Las listas y los desgloses dicen dónde y con
+# qué términos se buscó (lugares con ciudad e idioma, términos de los cargos, países consultados, ejecuciones de Apify
+# con su id): con pocos clientes dejan deducir dónde vive y qué busca una persona. Quedan solo en la copia privada.
+# Lista blanca: un desglose nuevo no se publica hasta clasificarlo aquí.
+DESGLOSES_FUENTE = frozenset({"relectura", "descartadas"})   # contadores con claves fijas del código (estados, motivos)
+
+
+def _es_contador(valor):
+    return isinstance(valor, dict) and all(isinstance(n, (int, float)) and not isinstance(n, bool)
+                                           for n in valor.values())
+
+
+def fuente_publica(stats):
+    if not isinstance(stats, dict):
+        return stats
+    return {k: v for k, v in stats.items()
+            if not isinstance(v, (dict, list)) or (k in DESGLOSES_FUENTE and _es_contador(v))}
+
+
+def fuentes_publicas(fuentes):
+    """También para lo que la bodega imprime en el registro de Actions, que es público."""
+    if not isinstance(fuentes, dict):
+        return {}
+    return _sin_cargos({nombre: fuente_publica(s) for nombre, s in fuentes.items()})
+
+
+CAMPOS_RONDA = ("ronda", "crudas")
+
+
 def refuerzos_publicos(refuerzos):
-    return [dict(r, faltantes_antes=sum(_entero(n) for n in (r.get("faltantes_antes") or {}).values()))
-            if isinstance(r, dict) else r for r in refuerzos or []]
+    """Por ronda: número, crudas, faltantes antes (total) y las cifras de cada fuente; nada por lugar, cargo o término."""
+    rondas = []
+    for r in refuerzos or []:
+        if isinstance(r, dict):
+            faltantes = r.get("faltantes_antes")
+            rondas.append({**{k: r[k] for k in CAMPOS_RONDA if k in r},
+                           "faltantes_antes": (sum(_entero(n) for n in faltantes.values())
+                                               if isinstance(faltantes, dict) else _entero(faltantes)),
+                           "fuentes": fuentes_publicas(r.get("fuentes"))})
+    return rondas
 
 
 def resultado_del_dia(reporte):
@@ -130,11 +168,12 @@ _IGUAL = _sin_cargos
 # Lista blanca del reporte público. Lo que no está aquí no se publica (y queda nombrado en `campos_no_publicados`).
 CAMPOS_REPORTE = {
     **{k: _IGUAL for k in ("fecha", "hora_utc", "modo", "codigo_commit", "ejecucion_id", "pais", "minutos",
-                           "vacantes_en_bodega", "crudas_hoy", "nuevas_hoy", "fuentes", "descartes", "por_familia",
+                           "vacantes_en_bodega", "crudas_hoy", "nuevas_hoy", "descartes", "por_familia",
                            "por_pais", "por_fuente", "por_modalidad", "ubicacion_por_confirmar", "catalogo",
                            "capturada_en", "frescura", "embudo_idioma", "verificacion_enlaces", "estado_operativo",
                            "apify")},  # 8.2: gasto y rendimiento de Apify, solo cifras del día y del mes
     "consulta": lambda v: "(privada)" if v else "",   # texto de una búsqueda profunda: puede ser el nombre de un cargo
+    "fuentes": fuentes_publicas,
     "entrega": lambda v: _sin_cargos(entrega_publica(v)),
     "seleccion_actual": seleccion_publica,
     "refuerzos": lambda v: _sin_cargos(refuerzos_publicos(v)),
