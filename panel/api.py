@@ -71,8 +71,8 @@ _SIN_EFECTO_EN_VACANTES = frozenset({
     "ajuste", "asignadas_de", "base_ofertas", "borradores", "candidatas_por_confirmar", "candidatas_por_funciones",
     "catalogo_vigente", "clientes_de", "con_resumen", "config", "contactos", "contar", "contar_por_confirmar",
     "conteo_asignaciones", "conteo_dudosas", "decisiones_ubicacion", "descripciones", "ejecucion", "ejecuciones",
-    "filas_catalogo", "numeros", "ofertas_de", "operativa", "recibidas", "reglas", "resultados", "revisiones",
-    "vacante", "vacantes_asignadas", "vacantes_por_cliente", "versiones"})
+    "filas_catalogo", "leer_resumenes", "numeros", "ofertas_de", "operativa", "recibidas", "reglas", "resultados",
+    "revisiones", "vacante", "vacantes_asignadas", "vacantes_por_cliente", "versiones", "ya_recibieron"})
 
 
 class _DecisionAnotada:

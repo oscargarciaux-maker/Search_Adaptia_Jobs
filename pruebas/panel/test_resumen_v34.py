@@ -96,7 +96,7 @@ def test_supabase_lee_ligero_solo_si_existe_la_columna(existe):
     repo._paginas = lambda tabla, orden, params, tam: iter([{"vacante_id": "a", "params": params}])
     fila = repo.revisiones(estado="pendiente", ligera=True)[0]
     assert ("catalogo_vacantes" in fila["params"]["select"]) is (not existe)
-    assert ("resumen" in fila["params"]["select"]) is existe
+    assert "resumen" not in fila["params"]["select"]  # P-12.11: el resumen se pide después, solo para la página
     repo.revisiones(estado="pendiente", ligera=True)
     assert sum(1 for m, _, p in repo.sesion.pedidas if p == {"select": "resumen", "limit": 1}) == 1  # una vez
 

@@ -355,3 +355,15 @@ def test_al_arrancar_se_rehacen_los_mensajes_que_un_reinicio_dejo_pendientes(mon
         hilo.join(5)
     _esperar_mensajes(app)
     assert llamadas == ["todos"] and not repo.ajuste("mensajes_por_rehacer", {})
+
+
+def test_cada_metodo_que_usa_la_bandeja_tiene_su_efecto_en_vacantes_decidido():
+    """Si la bandeja empieza a usar otro método del repositorio, hay que decidir si cambia «Vacantes»: sin decidirlo,
+    cada decisión renovaría todas las copias (seguro, pero lento)."""
+    import re
+    from pathlib import Path
+    from panel import api as modulo
+    usados = set(re.findall(r"\brepo\.(\w+)\(", (Path(modulo.__file__).parent / "revision.py").read_text(encoding="utf-8")))
+    anotados = {"crear_asignaciones", "actualizar_catalogo_datos", "archivar_catalogo"}
+    renuevan_todas = {"guardar_ajuste"}  # títulos aprendidos: miran todos los cargos
+    assert usados - modulo._SIN_EFECTO_EN_VACANTES - anotados - renuevan_todas == set()

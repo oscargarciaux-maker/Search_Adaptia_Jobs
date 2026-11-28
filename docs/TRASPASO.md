@@ -131,11 +131,15 @@ copia local antigua. Si aún no estaba activo, seguir [ACTIVAR_ESTADO_OPERATIVO.
 1. Crear claves del cliente y actualizar los secretos `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `APIFY_TOKEN` y los opcionales (entre ellos `INFOJOBS_CLIENT_ID` e `INFOJOBS_CLIENT_SECRET`, si se usa la API de InfoJobs: `docs/ACTIVAR_INFOJOBS_API.md`).
    En modo automático, incluir `SUPABASE_DB_URL` del destino y `SUPABASE_BACKUP_KEY`. Conservar también, en su gestor,
    las claves de cifrado anteriores mientras se retengan copias; cambiar el secreto no vuelve legibles los cortes viejos.
-2. Confirmar las variables `CAPTURA_HORARIA_ACTIVA=true` y `PAGES_POR_ACTIONS` según el alojamiento.
+2. Confirmar la variable `CAPTURA_HORARIA_ACTIVA=true` (`PAGES_POR_ACTIONS` ya no existe: Pages no se usa).
    Conservar además `ESTADO_SUPABASE_ACTIVO=true` si se traspasa una instancia central con SQL 003 restaurado.
    Las variables de captura/estado anteriores son del camino manual; el automático usa su marca privada. El alojamiento
    sí conserva configuración propia. Ejecutar Preparar Supabase tras restaurar en destino, dejando Instancia nueva apagada.
 3. Si cambia el repositorio/propietario, revisar enlaces a Actions y permisos del nuevo propietario.
+   **No hacer privado el repositorio en el plan Free de GitHub:** el entorno `reloj` pierde el Wait timer (solo existe
+   en repos públicos, o en privados con plan de pago), así que el Reloj se para y la búsqueda vuelve a llegar 8 a 12 horas
+   tarde, y los minutos de Actions dejan de ser gratis. Si el cliente exige repo privado, antes debe contratar un plan
+   de pago de GitHub y volver a crear el entorno `reloj` con su Wait timer de 30 minutos.
 4. No se transfiere un sitio web ni marcas del navegador: la operación utiliza Supabase y Actions.
 
 Los secretos antiguos se revocan en el proveedor cuando ya no hagan falta. Cambiar solo el valor en GitHub no invalida
