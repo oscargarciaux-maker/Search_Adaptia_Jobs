@@ -351,6 +351,16 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
 - Sesión con cookie de acceso de 1 h y de renovación de 30 días (httponly, secure, samesite strict) hasta «Cerrar
   sesión» (v31).
 - «Cobertura por persona» solo con lo medido, con «Qué hacer» por persona; nada se aplica solo (v37, v44).
+- **Huecos por país** (decisiones del cliente, 27 nov; sección 8.1), bajo «Cobertura por persona»: (1) puede haber
+  clientes en cualquier país, sin lista de países prioritarios; (2) hueco = un perfil que recibe menos de 5, sin
+  porcentajes ni días de gracia; (3) la fuente nueva se añade el mismo día, semiautomática (skill `nueva-fuente` + PR
+  revisado, nunca se activa sola); (4) el cliente no ve avisos de cobertura, solo el operador. Al guardar, un país
+  nuevo de un perfil (donde vive, o donde acepta híbrido/presencial; la remota no crea país) sin fuente local —solo
+  LinkedIn, portales de empresas y Get on Board— avisa «riesgo» sin bloquear. Tras la búsqueda, un perfil bajo 5
+  cuya causa medida es la falta de vacantes en las fuentes (no su cargo, enlaces por comprobar, listas sin recibir ni
+  un ajuste del perfil) marca «hueco». El «Copiar pedido de fuente nueva» lleva solo país, idiomas, familias y
+  modalidades. Nada de esto va a mensajes, logs de Actions, `publicado` ni `reportes/`: solo panel y su API
+  autenticada. Guía: `docs/PANEL_CONTROL.md` §3b.
 - Ficha de la vacante con la descripción en bloques, nunca como HTML; la descripción que falta se trae una vez de la
   ficha original solo de dominios de la lista fija (1 MB, 12 s) (v29). `**negritas**` de LinkedIn se pintan como texto
   (v34).

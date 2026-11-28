@@ -371,9 +371,26 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
     def config():
         return a_v8(repo.config())
 
+    def _avisos_cobertura(anterior, nueva):
+        """8.1: países nuevos sin fuente local, para avisar al operador al guardar. Nunca impide guardar."""
+        from panel import huecos
+        try:
+            return huecos.aviso_al_guardar(anterior, nueva)
+        except Exception as e:  # noqa: BLE001 - el aviso es una ayuda; lo guardado no depende de él
+            registro.aviso("api:avisos-cobertura", e)
+            return []
+
     @app.put("/api/config")
     def guardar(body: Guardar):
-        return repo.guardar(body.revision, body.configuracion.model_dump(mode="json"))
+        nueva = body.configuracion.model_dump(mode="json")
+        try:
+            anterior = repo.config().get("borrador")
+        except ErrorRepositorio as e:  # sin lo anterior, se avisa de todos los países sin fuente local
+            registro.aviso("api:config-anterior", e)
+            anterior = None
+        r = repo.guardar(body.revision, nueva)
+        avisos = _avisos_cobertura(anterior, nueva)
+        return {**r, "avisos_cobertura": avisos} if isinstance(r, dict) else r
 
     # Importar clientes desde un CSV (15 nov): vista previa sin guardar, e importación todo o nada.
     @app.get("/api/clientes/plantilla.csv")
@@ -394,8 +411,10 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         from panel import importar
         if body.revision is None:
             raise HTTPException(422, "Falta la revisión de la configuración.")
+        anterior = repo.config().get("borrador")
         r = importar.importar(repo, body.revision, body.contenido, body.actuales, body.confirmacion)
-        return {**r, "estado": a_v8(repo.config())}
+        estado = repo.config()
+        return {**r, "estado": a_v8(estado), "avisos_cobertura": _avisos_cobertura(anterior, estado.get("borrador"))}
 
     @app.post("/api/clientes/{cliente_id}/borrar")
     def borrar_cliente(cliente_id: UUID, body: BorrarCliente):
@@ -426,8 +445,20 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
 
     @app.get("/api/cobertura")
     def ver_cobertura():
-        """Contrato v37: cobertura por persona (panel privado)."""
-        return servicio.cobertura(repo, hoy())
+        """Contrato v37: cobertura por persona (panel privado). 8.1: con la tabla «Huecos por país» (solo aquí: nunca en
+        mensajes, logs, `publicado` ni reportes)."""
+        from panel import huecos
+        from panel.ejecutor import validar_version
+        fecha = hoy()
+        cob = servicio.cobertura(repo, fecha)
+        if cob.get("sin_configuracion"):
+            return {**cob, "huecos": []}
+        try:
+            tabla = huecos.por_pais(cob, validar_version(repo.operativa(fecha)))
+        except Exception as e:  # noqa: BLE001 - la cobertura por persona se muestra aunque la tabla falle
+            registro.aviso("api:huecos-por-pais", e)
+            tabla = []
+        return {**cob, "huecos": tabla}
 
     @app.post("/api/cargos/expandir")
     def expandir(body: Expansion):

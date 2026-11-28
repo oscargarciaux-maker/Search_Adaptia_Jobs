@@ -1963,3 +1963,73 @@ test("contrato v49: una fila presencial o híbrida sin ciudad no se aplica y el 
   await expect(page.getByRole("dialog")).toContainText("Falta la ciudad");
   expect(await page.evaluate(revisarContraste)).toEqual([]);
 });
+
+// 8.1: un perfil en un país sin fuente local avisa al guardar y aparece en «Huecos por país» con su pedido.
+test("huecos por país: aviso al aplicar, tabla y copiar pedido de fuente nueva", async ({
+  page,
+  request,
+}) => {
+  const cab = { Origin: "http://127.0.0.1:8001" };
+  const estado = await (await request.get("/api/config")).json();
+  const cfg = structuredClone(estado.borrador);
+  cfg.perfiles[0] = { ...cfg.perfiles[0], vive_en: "GH", ubicaciones: [] };
+  const r = await request.put("/api/config", {
+    headers: cab,
+    data: { revision: estado.revision, configuracion: cfg },
+  });
+  expect(r.ok()).toBe(true);
+  const guardado = await r.json();
+  expect(guardado.avisos_cobertura).toEqual([
+    "Ghana: sin fuente local; riesgo de quedar bajo 5.",
+  ]);
+  const publicar = await request.post("/api/config/publicar", {
+    headers: cab,
+    data: { revision: guardado.revision },
+  });
+  expect(publicar.ok()).toBe(true);
+  await page.goto("/#historial");
+  const tabla = page.locator(".huecos-pais");
+  await expect(
+    tabla.getByRole("heading", { name: /Huecos por país/ }),
+  ).toBeVisible();
+  const fila = tabla.getByRole("row", { name: /Ghana/ });
+  await expect(fila).toContainText("Riesgo");
+  await expect(fila).toContainText(
+    "LinkedIn, Portales de empresas, Get on Board (remotas)",
+  );
+  await expect(tabla.getByRole("row", { name: /Colombia/ })).toContainText(
+    "Cubierto",
+  );
+  await fila
+    .getByRole("button", { name: "Copiar pedido de fuente nueva para Ghana" })
+    .click();
+  await expect(tabla.getByText("Pedido de Ghana copiado")).toBeVisible();
+  const texto = await page.evaluate(() => navigator.clipboard.readText());
+  expect(texto).toMatch(/^Usa la skill nueva-fuente para Ghana: idioma\(s\) /);
+  expect(texto).toContain("Es para hoy: deja el PR listo para revisar.");
+  expect(texto).not.toMatch(/Cliente de ejemplo|\d/);
+  // El aviso también sale en el mensaje de «Aplicar cambios» del panel (no bloquea el guardado).
+  await page.route("**/api/config", async (route) => {
+    if (route.request().method() !== "PUT") return route.fallback();
+    const resp = await route.fetch();
+    const json = await resp.json();
+    await route.fulfill({
+      response: resp,
+      json: {
+        ...json,
+        avisos_cobertura: ["Kenia: sin fuente local; riesgo de quedar bajo 5."],
+      },
+    });
+  });
+  await page.goto("/");
+  await ir(page, "Clientes");
+  await page
+    .getByRole("button", { name: "Editar Cliente de ejemplo 02", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel(/Es un grupo de WhatsApp/).check();
+  await dialog.getByRole("button", { name: "Aplicar cambios" }).click();
+  await expect(
+    page.getByText(/Aviso de cobertura: Kenia: sin fuente local/),
+  ).toBeVisible();
+});

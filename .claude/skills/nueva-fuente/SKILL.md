@@ -15,3 +15,8 @@ description: Agrega una fuente de vacantes nueva (un portal como Computrabajo, B
 4. Conéctala en `buscador/bodega.py` (función `recoger`), con su presupuesto en `datos/config.yaml`.
 5. Pruebas sin red en `pruebas/test_fuentes.py` con una respuesta guardada. `python -m pytest -q`.
 6. Prueba en vivo: `python -m buscador.bodega --salida /tmp/prueba --prueba`. Rama + PR.
+7. Si viene de un pedido de «Huecos por país» (sección 8.1, es para el mismo día): en la prueba en vivo cuenta cuántos
+   avisos de la fuente nueva son **de ese país** y de las familias pedidas (solo conteos, sin datos de nadie) y ponlo en
+   el PR; si son 0, la fuente no resuelve el hueco. Para que `panel/ejecutor.py` `fuentes_en` la muestre en la tabla,
+   declara sus países (como `PAISES` o `SITIOS` en las demás) y añádela allí. Si ningún portal pasa la prueba en vivo
+   (§9 del contrato), no la fuerces: dilo en el informe; el perfil sigue con las genéricas y Apify (8.2).

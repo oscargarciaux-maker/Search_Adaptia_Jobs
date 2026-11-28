@@ -696,6 +696,10 @@ h1 {
   background: var(--osc-bg-ambar-3, #faf2e1);
   color: var(--osc-text-ambar-medio, #7a653c);
 }
+.pill.red {
+  background: var(--osc-bg-rojo-2, #fdecec);
+  color: var(--osc-text-rojo-medio, #b91c1c);
+}
 .quota-track {
   height: 7px;
   border-radius: 4px;
@@ -5850,4 +5854,16 @@ select,
   font-size: 12px;
   font-weight: 600;
   color: var(--osc-text-rojo-medio, #8f5c4b);
+}
+
+/* 8.1: huecos por país, bajo la cobertura por persona. */
+.huecos-pais {
+  margin-top: 18px;
+}
+.huecos-pais h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+.huecos-pais td .button {
+  margin-left: 8px;
 }
