@@ -3,6 +3,5 @@ ruff==0.17.6
 vulture==2.16
 bandit==1.9.4
 pip-audit==2.10.1
-# Solo en Windows: bandit la pide allí. pip-compile en Linux la deja fuera; si pasa, se copia a mano al .txt
-# con su marcador y sus dos huellas (la prueba de dependencias avisa).
+# Solo en Windows: bandit la pide allí. El lock universal de uv la conserva con su marcador (P-13.2).
 colorama==0.4.6 ; sys_platform == "win32"

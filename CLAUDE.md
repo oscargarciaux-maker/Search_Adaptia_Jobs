@@ -50,8 +50,9 @@ y después al código. Si una regla nueva contradice otra, se reemplaza la vieja
   antes de pedir revisión.
 - Antes de cada push: `python -m pytest -q`. CI también prueba PostgreSQL; la interfaz necesita Node 24 y CI revisa
   formato, compilación y recorridos Playwright. `python -m pruebas.probar_migraciones` solo en PostgreSQL aislado.
-- **Dependencias con huella:** `requirements.in` compilado con pip-compile en `requirements.txt` (comando en
-  `pruebas/test_dependencias.py`); nunca `pip install` sin `--require-hashes`. JobSpy no se copia al repo.
+- **Dependencias con huella:** `requirements.in` compilado con `uv pip compile --universal` en `requirements.txt`
+  (lock único para Linux y Windows; comando en `pruebas/test_dependencias.py`); nunca `pip install` sin
+  `--require-hashes`. JobSpy no se copia al repo.
 - Calidad: job `auditoria` en CI (ruff, pip-audit, bandit alto, eslint y npm audit bloquean; vulture y knip informan),
   prueba axe, `docs/estandares/LISTA_DE_CONTROL.md` y skill `auditoria-codigo`. Un error tolerado deja `registro.aviso`.
 - Prueba en vivo corta (unos 5 min, con internet): `python -m buscador.bodega --salida /tmp/prueba --prueba`.
