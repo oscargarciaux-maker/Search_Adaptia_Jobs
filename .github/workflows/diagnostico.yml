@@ -33,6 +33,10 @@ on:
         description: "Prueba explícita de una oferta LinkedIn: cargo máximo USD 0,01; sin guardar en Supabase"
         type: boolean
         default: false
+      medir_entrega:
+        description: "P-16.1: entrega por perfil anónimo (14 días, embudo, «Por confirmar», repeticiones); solo lectura"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -40,7 +44,7 @@ permissions:
 jobs:
   diagnostico:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -74,7 +78,7 @@ jobs:
           VACANTE_PUBLICA_URL: ${{ inputs.vacante_url }}
         run: python -m buscador.auditoria_producto
       - name: Revisar
-        if: ${{ !inputs.ensayar_migraciones && !inputs.reconciliar_ofertas && !inputs.auditar_producto && !inputs.solo_conexion_db && !inputs.solo_supabase && !inputs.probar_apify }}
+        if: ${{ !inputs.ensayar_migraciones && !inputs.reconciliar_ofertas && !inputs.auditar_producto && !inputs.solo_conexion_db && !inputs.solo_supabase && !inputs.probar_apify && !inputs.medir_entrega }}
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -92,3 +96,19 @@ jobs:
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
         run: python -m buscador.diagnostico_apify
+      - name: Medir la entrega por perfil (solo lectura)
+        # P-16.1: solo cifras y un índice anónimo por perfil (lista blanca en buscador/diagnostico_entrega.py).
+        if: ${{ inputs.medir_entrega }}
+        timeout-minutes: 15
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python -m buscador.diagnostico_entrega --salida diagnostico_entrega
+      - name: Guardar la medición (1 día)
+        if: ${{ inputs.medir_entrega && always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: medicion-entrega-${{ github.run_id }}
+          path: diagnostico_entrega/
+          if-no-files-found: ignore
+          retention-days: 1
