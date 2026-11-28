@@ -263,6 +263,18 @@ def resolver_oferta(cliente, item, familias_validas):
     return None
 
 
+def _agotado(control_gasto):
+    return {"credito_agotado": True} if getattr(control_gasto, "bloqueado", False) else {}
+
+
+def _sin_credito(control_gasto, ejecucion):
+    """8.2: Apify dijo que el plan no tiene crédito: aviso (no avería) y nada más se reserva este mes."""
+    if hasattr(control_gasto, "marcar_agotado"):
+        control_gasto.marcar_agotado()
+    return {"credito_agotado": True, "aviso": ejecucion.get("aviso", ""),
+            "usd_reservado": ejecucion.get("tope_reservado_usd") or 0, "usd_reportado": 0}
+
+
 def buscar(cliente, actor, consultas, familias_validas, hoy, maximo=60, token=None, reloj=time.monotonic,
            control_gasto=None):
     """Corre el actor una vez con todas las consultas. Devuelve (vacantes crudas, estadísticas)."""
@@ -277,10 +289,12 @@ def buscar(cliente, actor, consultas, familias_validas, hoy, maximo=60, token=No
     control_gasto = control_gasto or Presupuesto({}, hoy)
     cargo = control_gasto.reservar(0.025)
     if not cargo:
-        return [], {"omitida": "presupuesto de Apify agotado"}
+        return [], {"omitida": "presupuesto de Apify agotado", **_agotado(control_gasto)}
     por_consulta = max(1, maximo // len(consultas))
     items, ejecucion = ejecutar(cliente, actor, entrada(actor, consultas, por_consulta, hoy), token,
                                 cargo, max_items=maximo, limite_segundos=180)
+    if ejecucion.get("credito_agotado"):
+        return [], _sin_credito(control_gasto, ejecucion)
     if ejecucion.get("error"):
         return [], ejecucion
     crudas, motivos, revision = [], {}, []
@@ -360,9 +374,11 @@ def buscar_posts(cliente, actor, consultas, familias_validas, hoy, maximo=30, to
     control_gasto = control_gasto or Presupuesto({}, hoy)
     cargo = control_gasto.reservar(round(maximo * 0.002 + 0.01, 3))  # ≈ USD 2 por 1.000 posts
     if not cargo:
-        return [], [], {"omitida": "presupuesto de Apify agotado"}
+        return [], [], {"omitida": "presupuesto de Apify agotado", **_agotado(control_gasto)}
     items, ejecucion = ejecutar(cliente, actor, entrada(actor, consultas, max(1, maximo // len(consultas)), hoy), token,
                                 cargo, max_items=maximo, limite_segundos=180)
+    if ejecucion.get("credito_agotado"):
+        return [], [], _sin_credito(control_gasto, ejecucion)
     if ejecucion.get("error"):
         return [], [], {k: ejecucion[k] for k in ("error", "clave_invalida") if k in ejecucion}
     formales, posts, motivos, vistos = [], [], {}, set()
@@ -406,4 +422,5 @@ def buscar_posts(cliente, actor, consultas, familias_validas, hoy, maximo=30, to
                              "fichas_formales": len(formales), "posts": len(posts), "descartadas": motivos,
                              "ubicacion_deducida": deducidas,
                              "ubicacion_sin_confirmar": sum(1 for p in posts if p.get("ubicacion_sin_confirmar")),
-                             "gasto_reservado_usd": cargo}
+                             "gasto_reservado_usd": cargo, "usd_reservado": cargo,
+                             "usd_reportado": ejecucion.get("costo_uso_reportado_usd") or 0}

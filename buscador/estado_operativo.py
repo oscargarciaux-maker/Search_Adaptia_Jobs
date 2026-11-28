@@ -147,8 +147,8 @@ class Central:
         guardar_registro(registro)
         return memoria
 
-    def control_apify(self, hoy, mensual=5, corrida=3):
-        return PresupuestoCentral(self, hoy, mensual, corrida)
+    def control_apify(self, hoy, mensual=5, corrida=3, diario=None):
+        return PresupuestoCentral(self, hoy, mensual, corrida, diario)
 
 
 class Cola:
@@ -192,25 +192,42 @@ class Cola:
 
 
 class PresupuestoCentral:
-    def __init__(self, central, hoy, mensual, corrida):
-        import calendar
-        from datetime import date
+    """8.2: reserva con `apify_reservar_ritmo` (SQL 023): ritmo diario propio y tope del mes de hasta USD 100."""
+
+    def __init__(self, central, hoy, mensual, corrida, diario=None):
+        from buscador.apify import ritmo
         self.central, self.hoy = central, hoy
         self.mensual, self.corrida = float(mensual), float(corrida)
-        d = date.fromisoformat(hoy)
-        self.diario = self.mensual / calendar.monthrange(d.year, d.month)[1]
+        self.diario = ritmo(self.mensual, diario, hoy)
         self.reservado = 0.0
         self.lock = threading.Lock()
 
+    @property
+    def bloqueado(self):
+        return bool((self.central.presupuesto or {}).get("bloqueado"))
+
+    def usado_mes(self):
+        return round(sum((self.central.presupuesto or {}).get("reservas", {}).values()), 6)
+
+    def _estado(self, estado):
+        self.central._validar_presupuesto(estado)
+        self.central.presupuesto = estado
+        self.central.guardar_presupuesto(estado)
+
+    def marcar_agotado(self):
+        with self.lock:
+            self._estado(self.central.rpc("apify_marcar_agotado", {"p_fecha": self.hoy}))
+
     def reservar(self, monto):
         with self.lock:
-            r = self.central.rpc("apify_reservar", {"p_solicitud": str(uuid4()), "p_ejecucion": self.central.ejecucion,
-                "p_fecha": self.hoy, "p_mensual": micro(self.mensual), "p_corrida": micro(self.corrida), "p_monto": micro(monto)})
+            if self.bloqueado:
+                return 0.0
+            r = self.central.rpc("apify_reservar_ritmo", {"p_solicitud": str(uuid4()), "p_ejecucion": self.central.ejecucion,
+                "p_fecha": self.hoy, "p_mensual": micro(self.mensual), "p_diario": micro(self.diario),
+                "p_corrida": micro(self.corrida), "p_monto": micro(monto)})
             n = r.get("monto_micro") if isinstance(r, dict) else None
             if not isinstance(n, int) or n < 0 or n > micro(monto):
                 raise RuntimeError("Reserva central no confirmada; no ejecutar Apify.")
-            self.central._validar_presupuesto(r.get("estado"))
-            self.central.presupuesto = r["estado"]
-            self.central.guardar_presupuesto(r["estado"])
+            self._estado(r.get("estado"))
             self.reservado = round(self.reservado + n / 1_000_000, 6)
             return n / 1_000_000

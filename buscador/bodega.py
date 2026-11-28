@@ -141,6 +141,7 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
     control_apify = control_apify or Presupuesto(
         _leer_json(trabajo / "apify_presupuesto.json", {}), hoy,
         mensual=cfg["apify"].get("tope_mensual_usd", 5), corrida=cfg["apify"].get("tope_por_corrida_usd", 3),
+        diario=cfg["apify"].get("ritmo_diario_usd"),
         guardar=lambda datos: _guardar_json(trabajo / "apify_presupuesto.json", datos))
     salud = {}
     # Contrato v47: «Buscar ahora» para quien falta. Sin los pasos fijos que no le sirven a esas personas: los portales
@@ -520,7 +521,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         if central:
             central.guardar_lote(datos)
     control_central = central.control_apify(hoy, cfg["apify"].get("tope_mensual_usd", 5),
-        cfg["apify"].get("tope_por_corrida_usd", 3)) if central else None
+        cfg["apify"].get("tope_por_corrida_usd", 3), cfg["apify"].get("ritmo_diario_usd")) if central else None
     argumentos_central = {"control_apify": control_central} if central else {}
     # Contrato v43: una pasada horaria arma lote solo si el panel lo pide (configuración confirmada hoy después del
     # lote); entonces lee también lo entregado hoy en Supabase, como la diaria, para no repetir nada.
@@ -678,6 +679,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
             control = control_central or Presupuesto(
                 _leer_json(trabajo / "apify_presupuesto.json", {}), hoy,
                 mensual=cfg["apify"].get("tope_mensual_usd", 5), corrida=cfg["apify"].get("tope_por_corrida_usd", 3),
+                diario=cfg["apify"].get("ritmo_diario_usd"),
                 guardar=lambda datos: _guardar_json(trabajo / "apify_presupuesto.json", datos))
 
             def buscar_apify(combinaciones):
@@ -817,6 +819,9 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
                 entrada["motivo_no_encaja"] = motivo_no_encaja(original, rol, roles_actuales)
             entradas.append(entrada)
         seleccion_actual["roles"][rol["id"]] = {"nombre": rol["nombre"], "meta": entrega.meta_de(rol, config_entrega), "vacantes": entradas}
+    apify_medido = None
+    if not prueba and not consulta and modo != "incremental":
+        apify_medido = _medir_apify(trabajo, hoy, salud, cfg["apify"])
     reporte = {
         "fecha": hoy, "hora_utc": datetime.now(timezone.utc).strftime("%H:%M"), "modo": modo,
         "codigo_commit": os.environ.get("GITHUB_SHA", ""), "ejecucion_id": os.environ.get("GITHUB_RUN_ID", ""),
@@ -843,9 +848,31 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
             "catalogo": len(pendientes_catalogo), "ofertas": len(pendientes_v1), "registro": len(pendientes_registro)},
             "lotes_pendientes": len(central.lote.valores) if central else None, "reintentos": reintentos_centrales},
     }
+    if apify_medido:
+        reporte["apify"] = apify_medido
     from buscador import publicar
     publicar.publicar(salida, vacantes, reporte, sin_familia)
     return reporte
+
+
+def _medir_apify(trabajo, hoy, salud, cfg_apify):
+    """8.2: gasto y avisos de Apify de esta corrida, acumulados en el mes (solo cifras), y los avisos de crédito
+    agotado o del 80 % del tope. Un fallo aquí nunca tumba la corrida."""
+    from buscador import medicion_apify, registro
+    try:
+        corrida = medicion_apify.de_corrida(salud)
+        datos = medicion_apify.anotar_corrida(trabajo, hoy, corrida)
+        avisos = medicion_apify.avisos_de_gasto(_leer_json(trabajo / "apify_presupuesto.json", {}),
+                                                cfg_apify.get("tope_mensual_usd", 5))
+        for texto in avisos:
+            registro.aviso("apify", RuntimeError(texto))
+        print(medicion_apify.linea(datos), flush=True)
+        return {"corrida": corrida, "mes": medicion_apify.del_mes(datos), "avisos": avisos,
+                "tope_mensual_usd": cfg_apify.get("tope_mensual_usd", 5),
+                "ritmo_diario_usd": cfg_apify.get("ritmo_diario_usd")}
+    except Exception as e:  # noqa: BLE001 — la medición es una ayuda
+        registro.aviso("apify:medicion", e)
+        return None
 
 
 def main():

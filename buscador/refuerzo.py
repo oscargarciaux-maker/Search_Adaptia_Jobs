@@ -61,6 +61,24 @@ def completar(vacantes, entregadas, hoy, cfg_entrega, cfg_refuerzo, mapa, recoge
     return vacantes, rondas
 
 
+# Lo que el rescate y los posts devuelven de su gasto (8.2): solo cifras y motivos, nunca perfiles ni cargos.
+CAMPOS_GASTO = ("error", "clave_invalida", "omitida", "credito_agotado", "aviso", "usd_reservado", "usd_reportado")
+
+
+def sin_fuente_local(p):
+    """8.2: el perfil vive (o acepta oficina) en un país que solo buscan LinkedIn, los portales de empresas y Get on
+    Board (la misma regla de la 8.1, `panel.huecos`; Indeed cuenta como local). Su gasto de Apify va primero."""
+    from panel.huecos import fuentes_locales, paises_del_perfil
+    from panel.modelos import Perfil
+    return any(not fuentes_locales(c) for c in paises_del_perfil(Perfil.model_validate(p)))
+
+
+def prioridad(deficit, p):
+    """Orden del gasto de Apify (8.2): primero quien está bajo 5 y no tiene fuente local; después el resto con déficit
+    (como antes, el de más déficit primero)."""
+    return (not sin_fuente_local(p), -deficit[p["id"]])
+
+
 def rescate_apify(vacantes, entregadas, hoy, cfg_entrega, mapa, buscar_apify, incorporar, iniciales=None,
                   max_busquedas=4):
     """Contrato v11: Apify solo donde falta. Para cada perfil por debajo del mínimo (los de más déficit primero) busca
@@ -74,8 +92,8 @@ def rescate_apify(vacantes, entregadas, hoy, cfg_entrega, mapa, buscar_apify, in
     if not deficit:
         return vacantes, {"perfiles_con_deficit": 0, "omitida": "todos los perfiles llegan al mínimo"}
     por_id = {f["id"]: f for f in mapa}
-    pedidos = sorted(((deficit[p["id"]], rol, p) for rol in cfg_entrega["roles"] for p in rol.get("_perfiles") or []
-                      if p["id"] in deficit), key=lambda x: -x[0])
+    pedidos = sorted(((prioridad(deficit, p), rol, p) for rol in cfg_entrega["roles"] for p in rol.get("_perfiles") or []
+                      if p["id"] in deficit), key=lambda x: x[0])
     combinaciones, vistas = [], set()
     for _, rol, p in pedidos:
         familia = por_id.get(rol["familias"][0])
@@ -93,8 +111,9 @@ def rescate_apify(vacantes, entregadas, hoy, cfg_entrega, mapa, buscar_apify, in
     if crudas:
         vacantes = incorporar(vacantes, crudas)
     return vacantes, {"perfiles_con_deficit": len(deficit), "faltan_para_minimo": sum(deficit.values()),
+                      "perfiles_sin_fuente_local": sum(1 for prio, _, _ in pedidos if not prio[0]),
                       "busquedas": stats.get("busquedas", 0), "avisos": len(crudas),
-                      **{k: stats[k] for k in ("error", "clave_invalida", "omitida") if k in stats}}
+                      **{k: stats[k] for k in CAMPOS_GASTO if k in stats}}
 
 
 def rescate_posts(vacantes, entregadas, hoy, cfg_entrega, mapa, buscar_posts, incorporar, iniciales=None,
@@ -111,14 +130,16 @@ def rescate_posts(vacantes, entregadas, hoy, cfg_entrega, mapa, buscar_posts, in
     if not deficit:
         return vacantes, {"perfiles_con_deficit": 0, "omitida": "todos los perfiles llegan al mínimo"}, []
     por_id = {f["id"]: f for f in mapa}
+    # 8.2: primero los cargos con alguien bajo 5 sin fuente local; dentro, el de más déficit (como antes).
     roles = sorted((r for r in cfg_entrega["roles"] if any(p["id"] in deficit for p in r.get("_perfiles") or [])),
-                   key=lambda r: -sum(deficit.get(p["id"], 0) for p in r.get("_perfiles") or []))
+                   key=lambda r: (not any(sin_fuente_local(p) for p in r.get("_perfiles") or [] if p["id"] in deficit),
+                                  -sum(deficit.get(p["id"], 0) for p in r.get("_perfiles") or [])))
     consultas, validas = [], set()
     nombres = {p["codigo"]: p["nombre"] for p in paises.datos()["paises"]}
     for rol in roles:
         # Contrato v28: también posts que nombran dónde vive quien va corto (o «remoto»), así llegan con ubicación.
         lugares = []
-        for p in rol.get("_perfiles") or []:
+        for p in sorted(rol.get("_perfiles") or [], key=lambda p: p["id"] not in deficit or not sin_fuente_local(p)):
             if p["id"] in deficit:
                 lugares += [nombres.get(p.get("vive_en"), "")] + (["remoto"] if "remoto" in (p.get("modalidades") or []) else [])
         lugares = [x for x in dict.fromkeys(lugares) if x][:2]
@@ -134,5 +155,5 @@ def rescate_posts(vacantes, entregadas, hoy, cfg_entrega, mapa, buscar_posts, in
     return vacantes, {"perfiles_con_deficit": len(deficit), "consultas": len(consultas),
                       **{k: v for k, v in stats.items() if k in ("publicaciones", "fichas_formales", "posts", "descartadas",
                                                                   "ubicacion_deducida", "ubicacion_sin_confirmar",
-                                                                  "error", "clave_invalida", "omitida")}}, \
+                                                                  *CAMPOS_GASTO)}}, \
         posts

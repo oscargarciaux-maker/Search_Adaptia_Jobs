@@ -8,20 +8,57 @@ from urllib.parse import urlencode
 API = "https://api.apify.com/v2"
 
 
+# 8.2 (28 nov): tipos de error con que la API de Apify rechaza iniciar una ejecución porque el plan no tiene crédito
+# (enumerados en https://docs.apify.com/api/v2/actors-runs-post). En la cuenta gratis Apify BLOQUEA hasta el ciclo
+# siguiente; también cuenta un HTTP 402. No es una avería: se avisa y la fuente queda detenida el resto del mes.
+ERRORES_CREDITO = ("not-enough-usage-to-run-paid-actor", "limit-reached", "monthly-usage-limit-too-low",
+                   "monthly-usage-hard-limit-exceeded", "x402-payment-required")
+AVISO_GASTO = 0.8  # aviso cuando lo reservado en el mes pasa del 80 % del tope
+
+
+def credito_agotado(detalle):
+    detalle = detalle if isinstance(detalle, dict) else {}
+    return detalle.get("http") == 402 or str(detalle.get("tipo") or "") in ERRORES_CREDITO
+
+
+def ritmo(mensual, diario, hoy):
+    """Lo que se puede reservar por día: `diario` (8.2: 0,63 = ritmo de Starter) o, sin él, el tope del mes repartido
+    entre sus días (lo de antes). Nunca más que el tope del mes."""
+    if diario is None:
+        dia = date.fromisoformat(hoy)
+        return float(mensual) / calendar.monthrange(dia.year, dia.month)[1]
+    return min(float(diario), float(mensual))
+
+
 class Presupuesto:
-    def __init__(self, estado, hoy, mensual=5, corrida=3, guardar=None):
+    def __init__(self, estado, hoy, mensual=5, corrida=3, guardar=None, diario=None):
         self.estado, self.hoy, self.guardar = estado, hoy, guardar
         self.mensual, self.corrida = float(mensual), float(corrida)
-        dia = date.fromisoformat(hoy)
-        self.diario = self.mensual / calendar.monthrange(dia.year, dia.month)[1]
+        self.diario = ritmo(self.mensual, diario, hoy)
         self.reservado = 0.0
         self.lock = threading.Lock()
         if estado.get("mes") != hoy[:7]:
-            estado.clear()
+            estado.clear()  # mes nuevo: reservas y bloqueo empiezan de cero
             estado.update(mes=hoy[:7], reservas={})
+
+    @property
+    def bloqueado(self):
+        return bool(self.estado.get("bloqueado"))
+
+    def usado_mes(self):
+        return round(sum(self.estado.get("reservas", {}).values()), 6)
+
+    def marcar_agotado(self):
+        """Apify dijo que el plan no tiene crédito: nada más se reserva este mes (también en las corridas siguientes)."""
+        with self.lock:
+            self.estado["bloqueado"] = True
+            if self.guardar:
+                self.guardar(self.estado)
 
     def reservar(self, monto):
         with self.lock:
+            if self.bloqueado:
+                return 0.0
             reservas = self.estado["reservas"]
             disponible = min(self.mensual - sum(reservas.values()), self.corrida - self.reservado,
                              self.diario - reservas.get(self.hoy, 0), float(monto))
@@ -50,6 +87,9 @@ def ejecutar(cliente, actor, entrada, token, max_usd, max_items=20, build=None, 
         detalle = getattr(cliente, "ultimo_error", None)
         if detalle:
             stats["detalle"] = {k: v.replace(token, "[oculto]") if isinstance(v, str) else v for k, v in detalle.items()}
+        if credito_agotado(detalle):
+            return [], dict(stats, credito_agotado=True,
+                            aviso="Apify no tiene crédito en el plan: la fuente se detiene hasta el mes siguiente")
         if (detalle or {}).get("http") in (401, 403):
             # Clave revocada o rotada (p. ej. incidente de seguridad de Apify, nov 2026): no insistir y avisar.
             return [], dict(stats, clave_invalida=True,

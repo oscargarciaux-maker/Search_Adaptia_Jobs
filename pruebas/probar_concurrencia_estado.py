@@ -77,6 +77,33 @@ def main():
         assert sql("set role service_role;select public.estado_confirmar('catalogo','" + vieja + "');", True).returncode != 0
         assert sql("select count(*) from public.estado_operativo where cola='catalogo' and identificador='x';").stdout.strip() == "1"
         print("Concurrencia aprobada: tope diario/mensual, solicitud repetida, actualización única y confirmación antigua.")
+        # 8.2 (SQL 023): ritmo diario propio (0,63), tope del mes que nunca se pasa y bloqueo por crédito agotado.
+        ejecutar((raiz / "supabase/migraciones/023_apify_ritmo.sql").read_text(encoding="utf-8"), db)
+        def reservar_ritmo(mensual=5_000_000, diario=630_000, monto=25_000, permitir_error=False):
+            q = (f"set role service_role; select public.apify_reservar_ritmo('{uuid4()}','{uuid4()}','{fecha}',"
+                 f"{mensual},{diario},3000000,{monto});")
+            r = sql(q, permitir_error)
+            return r if permitir_error else json.loads(r.stdout.strip().splitlines()[-1])["monto_micro"]
+        sql("delete from public.apify_reservas;")
+        with ThreadPoolExecutor(12) as ex:
+            ritmo = list(ex.map(lambda _: reservar_ritmo(), range(40)))
+        assert sum(ritmo) == 630_000 == int(sql("select sum(micro_usd) from public.apify_reservas;").stdout.strip())
+        sql("delete from public.apify_reservas;")
+        sql(f"insert into public.apify_reservas(solicitud,fecha,micro_usd,origen) values('legado:x','{otra}',4990000,'legado');")
+        with ThreadPoolExecutor(10) as ex:
+            resto = list(ex.map(lambda _: reservar_ritmo(), range(30)))
+        assert sum(resto) == 10_000  # con ritmo de Starter, el tope del mes (5) sigue mandando
+        sql("delete from public.apify_reservas;")
+        assert reservar_ritmo(mensual=19_000_000) == 25_000  # Starter: tope 19 admitido (la 003 solo admite 5)
+        assert reservar_ritmo(mensual=5_000_000, diario=6_000_000, permitir_error=True).returncode != 0
+        assert reservar_ritmo(mensual=200_000_000, permitir_error=True).returncode != 0
+        estado = json.loads(sql(f"set role service_role; select public.apify_marcar_agotado('{fecha}');").stdout.strip().splitlines()[-1])
+        assert estado["bloqueado"] is True and reservar_ritmo() == 0
+        assert json.loads(sql("select public.apify_estado();").stdout.strip())["bloqueado"] is True
+        assert sql(f"set role anon; select public.apify_marcar_agotado('{fecha}');", True).returncode != 0
+        assert sql("set role anon; select count(*) from public.apify_bloqueos;", True).returncode != 0
+        sql("delete from public.apify_bloqueos; delete from public.apify_reservas;")
+        print("SQL 023 aprobada: ritmo diario, tope del mes, tope de Starter, bloqueo por crédito y permisos.")
         # Respaldo completo de datos + las dos secuencias en otro destino vacío.
         sql("""insert into public.catalogo_vacantes(id,datos,observed_at,status,reason)
           values('aaaaaaaaaaaaaaaa','{"titulo":"Prueba"}',now(),'closed','cierre de ensayo');

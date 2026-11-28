@@ -78,8 +78,10 @@ def identidades(conn):
 # 020 solo añade el número corto de cada vacante (`catalogo_vacantes.numero`, su secuencia y disparadores; contrato v48).
 # 021 solo reemplaza la reconciliación por lotes cortos y añade un índice parcial; sin tablas ni datos nuevos.
 # 022 solo crea la tabla privada `estado_trabajo` (detalle por cargo fuera de la rama pública); sin tocar otras.
+# 023 solo añade la tabla privada `apify_bloqueos` y las funciones de reserva con ritmo diario (8.2); reemplaza
+# `apify_estado` con un campo más. No toca datos.
 ENSAYABLES = {"006", "007", "008", "009", "010", "011", "012", "013", "014", "015", "016", "017", "018", "019", "020",
-              "021", "022"}
+              "021", "022", "023"}
 
 
 def ensayar(conn):

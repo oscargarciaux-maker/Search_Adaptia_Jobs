@@ -42,21 +42,27 @@ refuerzo:
   indeed_busquedas: 6
   getonbrd_busquedas: 6
 
-# Apify: crédito gratuito de hasta USD 5 por mes calendario para ofertas formales de LinkedIn.
-# Actor comprobado contra su esquema público; no se envían cookies ni sesión personal.
-# Las reservas conservadoras de cargo se guardan en trabajo/apify_presupuesto.json antes de cada ejecución.
-# Se reparte el tope mensual entre los días del mes, además del límite por consulta y corrida.
+# Apify: ofertas formales de LinkedIn para perfiles bajo 5. Actor comprobado contra su esquema público; no se envían
+# cookies ni sesión personal. Las reservas conservadoras de cargo se guardan (Supabase, SQL 023, y su espejo
+# trabajo/apify_presupuesto.json) antes de cada ejecución. Además del límite por consulta y corrida, hay dos cifras:
+# - tope_mensual_usd: el crédito del plan contratado. Hoy 5 (cuenta gratis: Apify BLOQUEA al agotarlo). Al comprar
+#   Starter (USD 19/mes con USD 19 de uso incluidos), cambiar a 19. Nunca se reserva más que esto en el mes.
+# - ritmo_diario_usd: lo que se puede gastar por día. 0,63 = 19/30, el ritmo de Starter (sección 8.2: la prueba gasta
+#   los USD 5 gratis a ese ritmo, en unos 8 días, para medir si vale la pena). Para volver al reparto parejo del
+#   tope entre los días del mes, borrar la línea.
+# Si Apify dice que el plan no tiene crédito, la fuente se detiene hasta el mes siguiente (aviso, no avería).
 # La búsqueda pagada del feed queda desactivada para priorizar las fichas formales con este crédito.
 apify:
   actor_publicaciones: "harvestapi/linkedin-post-search"
   publicaciones_por_dia: 0  # reservar el crédito gratuito para fichas de empleo
   actor_linkedin: "curious_coder/linkedin-jobs-scraper"
-  rescate_busquedas: 4         # modo panel: búsquedas dirigidas a perfiles con menos de 5 (≈60 % del crédito diario)
+  rescate_busquedas: 16        # modo panel: búsquedas dirigidas a perfiles con menos de 5 (16 × 0,025 = USD 0,40 del ritmo diario)
   posts_rescate: 50            # modo panel: posts de LinkedIn para quien sigue bajo 5 (≈USD 0,11; contratos v11 y v28)
   build_linkedin: "1.7.18"
   ofertas_por_busqueda: 10
   tope_consulta_usd: 0.025
-  tope_mensual_usd: 5
+  tope_mensual_usd: 5          # plan contratado: gratis = 5; Starter = 19
+  ritmo_diario_usd: 0.63       # ritmo de Starter (19/30)
   actor_linkedin_respaldo: ""
   tope_por_corrida_usd: 3
 

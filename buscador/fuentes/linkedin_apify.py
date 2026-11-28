@@ -17,6 +17,12 @@ NOMBRE = "LinkedIn (Apify)"
 API = "https://api.apify.com/v2/acts/{actor}/run-sync-get-dataset-items"
 
 
+def gasto(ejecuciones):
+    """8.2: lo reservado por estas ejecuciones y lo que Apify informó que costaron (`usageTotalUsd`), en USD."""
+    return {"usd_reservado": round(sum(e.get("tope_reservado_usd") or 0 for e in ejecuciones), 6),
+            "usd_reportado": round(sum(e.get("costo_uso_reportado_usd") or 0 for e in ejecuciones), 6)}
+
+
 def url_busqueda(consultas, params, dias):
     q = dict(params, keywords=linkedin_publico.consulta_or(consultas), f_TPR=f"r{dias * 86400}")
     return "https://www.linkedin.com/jobs/search/?" + urlencode(q)
@@ -87,6 +93,9 @@ def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=20, pres
         return [], {"omitida": "sin APIFY_TOKEN o sin actor en datos/config.yaml"}
     inicio = reloj()
     control_gasto = control_gasto or Presupuesto({}, hoy)
+    if getattr(control_gasto, "bloqueado", False):
+        return [], {"busquedas": 0, "avisos": 0, "credito_agotado": True,
+                    "omitida": "Apify sin crédito en el plan este mes; vuelve el mes siguiente"}
     # `ordenar=False`: el rescate ya las trae en orden de urgencia (perfiles con más déficit primero).
     pendientes = (cobertura.repartir(combinaciones, estado, hoy, prioritarias) if ordenar else list(combinaciones))[:presupuesto]
     crudas, ejecuciones, descartes = [], [], {}
@@ -115,6 +124,11 @@ def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=20, pres
         por_lugar[lugar] = por_lugar.get(lugar, 0) + 1
         if stats.get("clave_invalida"):
             break  # con la clave rechazada, ninguna otra búsqueda puede funcionar
+        if stats.get("credito_agotado"):
+            # 8.2: el plan no tiene crédito. Aviso, no avería; nada más se reserva este mes.
+            if hasattr(control_gasto, "marcar_agotado"):
+                control_gasto.marcar_agotado()
+            break
         if stats.get("error"):
             continue
         for item in items:
@@ -138,12 +152,16 @@ def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=20, pres
     resumen = {"busquedas": len(ejecuciones), "avisos": len(crudas), "descartadas": descartes,
                     "por_familia": por_familia, "por_lugar": por_lugar, "ejecuciones": ejecuciones,
                     "reserva_corrida_usd": control_gasto.reservado,
-                    "tope_mes_usd": control_gasto.mensual, "tope_diario_usd": round(control_gasto.diario, 6)}
+                    "tope_mes_usd": control_gasto.mensual, "tope_diario_usd": round(control_gasto.diario, 6),
+                    **gasto(ejecuciones)}
+    if any(e.get("credito_agotado") for e in ejecuciones):
+        resumen["credito_agotado"] = True
+        resumen["aviso"] = "Apify sin crédito en el plan: la fuente se detiene hasta el mes siguiente"
     if not ejecuciones:
         resumen["omitida"] = "presupuesto diario/mensual reservado o tiempo agotado"
     elif any(e.get("clave_invalida") for e in ejecuciones):
         resumen["clave_invalida"] = True
         resumen["error"] = "Apify rechazó la clave (APIFY_TOKEN): reemplazarla por la vigente en los secretos de GitHub"
-    elif any(e.get("error") for e in ejecuciones) and not crudas:
+    elif any(e.get("error") for e in ejecuciones if not e.get("credito_agotado")) and not crudas:
         resumen["error"] = "Apify no produjo ofertas: revisar sus ejecuciones y crédito disponible"
     return crudas, resumen

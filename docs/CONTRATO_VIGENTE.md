@@ -294,9 +294,23 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
 
 ## 10. Posts y Apify
 
-- **Apify:** actor formal `curious_coder/linkedin-jobs-scraper` (build fijado en `datos/config.yaml`) sin cookies, tope **USD 5 al mes** con reservas
-  durables; en modo panel solo busca para perfiles con déficit (primero en español). Una clave rechazada detiene la
-  fuente y avisa (v11, v44). El feed pagado de posts sigue desactivado (`publicaciones_por_dia=0`).
+- **Apify:** actor formal `curious_coder/linkedin-jobs-scraper` (build fijado en `datos/config.yaml`) sin cookies, con
+  reservas durables antes de cada ejecución (Supabase, SQL 023). Dos cifras en `datos/config.yaml` (8.2, decisión de
+  Oscar del 28 nov): `tope_mensual_usd` = el crédito del plan contratado (hoy **5**, cuenta gratis; con Starter, 19) y
+  nunca se reserva más en el mes, aunque haya reintentos; `ritmo_diario_usd` = lo que se puede reservar por día (hoy
+  **0,63** = 19/30, el ritmo de Starter: los USD 5 se gastan en unos 8 días para medir si vale la pena comprarlo; sin
+  esa cifra, el tope se reparte entre los días del mes). En modo panel solo busca para perfiles bajo 5: **primero los
+  que viven (o aceptan oficina) en un país sin fuente local** (la regla de la 8.1; Indeed cuenta como local), después
+  el resto con déficit, el de más déficit primero; con quien solo habla español, primero en español (v11, v44). Una
+  clave rechazada detiene la fuente y avisa. **Si Apify dice que el plan no tiene crédito** (HTTP 402 o sus tipos de
+  error de uso agotado) es un **aviso, no una avería**: el mes queda bloqueado y la fuente no vuelve a reservar hasta
+  el mes siguiente. Otro aviso cuando lo reservado del mes pasa del **80 %** del tope. El feed pagado de posts sigue
+  desactivado (`publicaciones_por_dia=0`).
+- **Medición de Apify** (8.2): por corrida (`apify` en el reporte) y acumulada en el mes (`trabajo/apify_medicion.json`),
+  solo cifras: USD reservados y reportados por Apify, avisos traídos, vacantes de la selección que **solo** trajo
+  Apify, las que llegaron a un cliente («útiles»), perfiles que llegan a 5 gracias a ellas y USD por vacante útil. En
+  los registros públicos, solo esos totales. Regla para decidir: **comprar Starter si los USD 5 llevaron a 5 a perfiles
+  que si no se quedaban cortos, a un costo por vacante útil que Oscar acepte.**
 - `Central.rpc` abre conexión nueva tras 120 s sin uso; una reserva ambigua no se reintenta sola (v51).
 - **Posts** de LinkedIn: solo como último recurso para perfiles bajo 5, etiquetados «Post», después de las vacantes
   formales; filtro estricto contra basura; nunca van a `ofertas`, al cupo ni a `trabajo/`. Si enlazan una ficha formal

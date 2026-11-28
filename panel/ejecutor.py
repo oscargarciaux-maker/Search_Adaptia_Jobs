@@ -868,6 +868,15 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
         posts = _posts(repo, cfg, fecha, estrictas, filas, fila, operativos)
     except Exception as e:  # noqa: BLE001 — los posts son el último recurso; nunca impiden registrar lo del día
         registro.aviso("ejecutor:334", e)
+    aporte_apify = None
+    try:  # 8.2: qué aportó Apify a lo asignado hoy (solo conteos; nunca perfiles ni vacantes)
+        from buscador import medicion_apify
+        por_id = {v.get("id"): v for v in vacantes or []}
+        aporte_apify = medicion_apify.contar_asignacion(
+            filas, {r["vacante_id"]: r["snapshot"] for r in seleccionadas}, cfg.perfiles_activos(), de_comunidad,
+            MINIMO_POR_PERFIL, ya_hoy, por_id.get)
+    except Exception as e:  # noqa: BLE001 — la medición es una ayuda; nunca impide registrar lo del día
+        registro.aviso("ejecutor:medicion-apify", e)
     for inicio in range(0, len(filas), 250):
         repo.pedir("POST", "panel_asignaciones", params={"on_conflict": "ejecucion_id,perfil_id,vacante_id"},
                     json=filas[inicio:inicio + 250], headers={"Prefer":"resolution=ignore-duplicates"})
@@ -898,6 +907,7 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
                           "asignaciones": len(filas),
                           "ampliadas": sum(any(isinstance(e, dict) and e.get("ampliacion") for e in f["explicacion"]) for f in filas),
                           "reutilizadas": reutilizadas, "rescatadas": rescatadas, "posts": posts, **por_confirmar,
+                          **({"apify": aporte_apify} if aporte_apify else {}),
                           **({"busquedas_por_perfil": b} if (b := _sumar_busquedas(
                               (ejecucion.get("resumen") or {}).get("busquedas_por_perfil"),
                               (reporte or {}).get("busquedas_por_perfil"))) else {}),
@@ -907,6 +917,7 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
                           **({"embudo": embudo} if (embudo := _embudo_por_nombre(reporte) or
                                                     (ejecucion.get("resumen") or {}).get("embudo")) else {})},
               "terminada_en": datetime.now().astimezone().isoformat()})
+    return aporte_apify
 
 
 def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPLETO):
@@ -1003,11 +1014,18 @@ def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPL
             # Contrato v36: la bodega completa de la noche, para completar a cada persona hasta su meta (v49).
             trabajo = Path(salida) / "trabajo"
             vacantes = bodega._leer_json(trabajo / "bodega.json.gz", [])
-            registrar(repo, version, fecha, dict(reporte or {}, busquedas_por_perfil=busquedas), reglas_info,
-                      vacantes=vacantes,
+            aporte_apify = registrar(repo, version, fecha, dict(reporte or {}, busquedas_por_perfil=busquedas),
+                      reglas_info, vacantes=vacantes,
                       cache_enlaces=bodega._leer_json(trabajo / "verificacion_enlaces.json", {}),
                       limites_rescate=(30, 60) if modo == "incremental" else (MAX_COMPROBAR_RESCATE, SEGUNDOS_RESCATE),
                       revision_lote=version["revision"] if modo != "incremental" or arma_lote else None)
+            if aporte_apify:
+                try:  # 8.2: acumulado del mes en trabajo/apify_medicion.json; en el registro público, solo totales
+                    from buscador import medicion_apify
+                    print(medicion_apify.linea(medicion_apify.anotar_asignacion(trabajo, fecha, aporte_apify)),
+                          flush=True)
+                except Exception as e:  # noqa: BLE001 — la medición es una ayuda
+                    registro.aviso("ejecutor:medicion-apify", e)
             if modo != "incremental":
                 try:  # borradores de WhatsApp listos para revisar; un fallo aquí nunca tumba la búsqueda
                     from panel import borradores
