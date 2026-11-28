@@ -143,6 +143,13 @@ def fuentes_en(pais):
     return salida
 
 
+def fuentes_locales(pais):
+    """Decisión del 28 nov (8.1b), única definición para lo que ve el operador (tabla de huecos y «Cobertura limitada»
+    de la fila de la persona): fuente local = toda fuente de `fuentes_en` que no sea LinkedIn, Portales de empresas ni
+    Get on Board. Indeed cuenta como local. El reparto de turnos de v40 (`_con_fuentes_propias`) no cambia."""
+    return [f for f in fuentes_en(pais) if f not in FUENTES_GENERICAS]
+
+
 PESO_CORTO = 2
 PESO_POCAS_FUENTES = 2
 # Contrato v49: quien solo acepta avisos en español tiene unas 10 veces menos de dónde elegir (medido el 25 nov: 241 de

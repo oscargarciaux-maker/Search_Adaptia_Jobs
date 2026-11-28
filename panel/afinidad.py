@@ -247,6 +247,7 @@ def lugar(v, p):
 
 
 MOTIVO_SIN_CIUDAD = "falta la ciudad en el perfil"
+MOTIVO_OTRO_PAIS = "oficina en otro país"
 MOTIVO_CIUDAD_SIN_CONFIRMAR = "oficina sin ciudad confirmada"
 
 
@@ -260,13 +261,13 @@ def _en_fila(v, fila, modo, abiertos, mundial, horario, sin_pais):
         return motivos + ["país sin elegibilidad confirmada"], ""
     if modo in ("hibrido", "presencial"):
         if motivos:  # la fila no acepta esa modalidad: su ciudad no viene al caso
-            return motivos + ([] if abiertos & paises_fila else ["oficina en otro país"]), ""
+            return motivos + ([] if abiertos & paises_fila else [MOTIVO_OTRO_PAIS]), ""
         if not fila.ciudades:
             return [MOTIVO_SIN_CIUDAD], ""
         if en_sus_ciudades(v, fila.ciudades, paises_fila):
             return motivos, "Oficina en su ciudad"
         if paises_fila and not abiertos & paises_fila:
-            return motivos + ["oficina en otro país"], ""
+            return motivos + [MOTIVO_OTRO_PAIS], ""
         return motivos + ["oficina en otra ciudad" if otra_ciudad(v, fila.ciudades, paises_fila)
                           else MOTIVO_CIUDAD_SIN_CONFIRMAR], ""
     if horario:  # el aviso no nombra país: lo que la admite es la franja que el perfil marcó
