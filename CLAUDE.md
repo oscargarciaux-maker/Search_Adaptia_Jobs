@@ -15,9 +15,10 @@ documento.** Los `docs/CONTRATO_DATOS_vNN.md` son históricos (el código los ci
 Panorama para el operador: `docs/COMO_FUNCIONA_AHORA.md`. `docs/PLAN.md` es diseño histórico y no prevalece.
 
 ## Reglas innegociables
-- **Sin IA en la búsqueda, la afinidad ni el aprendizaje.** Todo es código con pruebas. La IA solo amplía el mapa de
-  cargos leyendo archivos cortos (`reportes/`), nunca la bodega completa. No inventar sinónimos ni un puntaje de
-  contratación.
+- **Sin IA en la afinidad ni el aprendizaje.** Todo es código con pruebas. La IA solo amplía el mapa de cargos leyendo
+  archivos cortos (`reportes/`), nunca la bodega completa, y (P-14.2, con interruptor) un LLM puede PROPONER términos
+  de búsqueda de un cargo que después filtra y reconoce el código (`panel/ampliados.py`); nunca decide qué vacante
+  sirve ni comprueba enlaces, y no recibe datos de personas. No inventar sinónimos a mano ni un puntaje de contratación.
 - **Nada se envía solo.** WhatsApp solo con `wa.me` y a mano; no hay API de WhatsApp ni automatización de mensajes.
 - **LinkedIn nunca con la sesión ni la cookie de nadie** (`li_at` incluida), ni actores de Apify que la pidan.
 - **No modificar SQL ya registrado** en `supabase/migraciones/`: se añade una migración nueva (y se agrega a

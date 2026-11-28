@@ -67,17 +67,21 @@ def distintivo(nombre):
     return _unicos(re.sub(r"^de(?:l)? ", "", f.strip(), flags=re.I) for f in formas)
 
 
-def cargo_operativo(cargo, aprendidos=(), huella_auto=()):
+def cargo_operativo(cargo, aprendidos=(), huella_auto=(), ampliados=()):
     """El cargo como lo usa el motor (un dict nuevo; no cambia lo guardado). A lo que escribió el operador le añade:
     los nombres sugeridos si no puso ninguno, los títulos aprendidos (v25), la huella de funciones (la suya; si no
     tiene, las `herramientas` de su familia del mapa más la huella calculada de noche), los `excluir` de su familia como
-    señales de otro oficio (solo si el cargo es título exacto de esa familia) y su distintivo si es compuesto.
-    Aplicarlo dos veces da lo mismo."""
+    señales de otro oficio (solo si el cargo es título exacto de esa familia), su distintivo si es compuesto y los
+    términos ampliados por el LLM (P-14.2). Aplicarlo dos veces da lo mismo."""
     c = dict(cargo)
     nombre = c.get("nombre") or ""
     if not c.get("terminos_exactos"):
         c["terminos_exactos"] = terminos.sugerir(nombre, consultar_esco=False)["terminos_exactos"]
     c["terminos_similares"] = _unicos([*(c.get("terminos_similares") or []), *(aprendidos or ())])
+    # P-14.2: los términos ampliados por el LLM (ya filtrados, `panel.ampliados`) van aparte: `grado` solo los reconoce
+    # contenidos en el título, nunca por similitud textual.
+    if ampliados or c.get("terminos_ampliados"):  # sin ellos, el cargo queda igual que antes (ni la clave)
+        c["terminos_ampliados"] = _unicos([*(c.get("terminos_ampliados") or []), *(ampliados or ())])
     familia, nivel = familia_del_mapa(nombre)
     if not c.get("funciones"):
         c["funciones"] = _unicos([*((familia or {}).get("herramientas") or []), *(huella_auto or ())])[:40]

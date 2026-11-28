@@ -125,6 +125,17 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
   español de su familia (v49). Plurales cuentan como singular y femenino = masculino (v37, v49).
 - Un oficio parecido no se vuelve equivalente solo; no se inventan sinónimos. La expansión usa normalización,
   variantes, ESCO y términos editables; un cargo que solo busca por su nombre lo avisa (v6, v37).
+- **Términos ampliados por un LLM** (P-14.2, IA acotada, decisión de Oscar del 28 nov; **apagado** hasta encender
+  `llm.terminos_activo` en `datos/config.yaml` y elegir un proveedor): en la búsqueda del día, una llamada por cargo
+  nuevo o cambiado propone nombres del MISMO oficio en español y en inglés (`buscador/llm.py`, `panel/ampliados.py`);
+  se guardan en `panel_ajustes.terminos_ampliados` con la huella del cargo y no se vuelven a pedir. Al LLM solo van el
+  nombre del cargo y sus términos exactos y similares, nunca datos de personas. Lo propuesto pasa un filtro
+  determinista cada vez que se usa (`terminos.filtrar_ampliados`): al menos dos palabras, el idioma que dice
+  `titulos_idioma`, sin repetir lo que el cargo ya usa, sin un excluido del operador o del mapa y sin el nombre de otro
+  oficio del mapa; hasta 8 por idioma. Lo que pasa entra al cargo operativo como un título aprendido (grado similar):
+  se busca y se reconoce con `grado`, en la búsqueda, el lote y el panel. Si el LLM falla, no responde o se llega al
+  tope de llamadas, todo sigue con lo guardado (aviso en el registro). Apagar el interruptor deja de usarlos: lo de
+  hoy que entró solo por uno de ellos queda «ya no encaja» (no se comparte).
 - Una vacante del lote llega también a perfiles de otro cargo que la reconoce exacta o similar (nunca solo cercana);
   cuenta para su meta, no ocupa cupo del lote y nunca llega dos veces a la misma persona (v43). El `match_grade` es el
   del cargo que la recibe (v49).
@@ -549,8 +560,11 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
 
 Las «Reglas innegociables» de `CLAUDE.md` son el resumen de esta sección: si una cambia, se cambian las dos.
 
-- **Sin IA en la búsqueda, la afinidad ni el aprendizaje.** La IA solo ayuda a ampliar el mapa leyendo archivos cortos
-  (`reportes/`), nunca la bodega completa (v17; reglas de integridad).
+- **Sin IA en la afinidad ni el aprendizaje; en la búsqueda, solo para proponer términos.** La IA ayuda a ampliar el
+  mapa leyendo archivos cortos (`reportes/`), nunca la bodega completa (v17; reglas de integridad). Desde el 28 nov
+  (P-14.2, IA acotada) un LLM puede PROPONER términos de búsqueda de un cargo (§4), con interruptor, tope de llamadas,
+  sin datos de personas y con filtro determinista; nunca decide si una vacante sirve, nunca comprueba enlaces y no se
+  usan agregadores como fuente.
 - **Nada se envía solo** (WhatsApp, correos de clientes) (v10).
 - **LinkedIn sin sesión ni cookie de nadie** (`li_at` incluida), ni actores de Apify que la pidan.
 - Ninguna clave, ID, correo, teléfono ni dato de clientes en el repositorio, registros de Actions, reportes públicos,
@@ -569,6 +583,9 @@ Las «Reglas innegociables» de `CLAUDE.md` son el resumen de esta sección: si 
 - Reportes públicos solo con conteos, sin datos de clientes: `embudo_idioma` (v50), `embudo[cargo].por_idioma` y
   `verificacion_enlaces.en_la_corrida` (v51). Cifras por persona solo en el resumen privado (v40).
 - `python -m buscador.medicion --bodega …` mide sobre una bodega guardada (v49).
+- `python -m buscador.evaluar_terminos --bodega … --terminos …` (P-14.2) cuenta, con perfiles y cargos ficticios, cuántas
+  vacantes de una bodega guardada pasan cargo → lugar → idioma → requisitos con y sin los términos ampliados, y saca una
+  muestra de las nuevas para revisarlas a mano. Se corre antes de encender `llm.terminos_activo`.
 - **Entrega por perfil** (P-16.1, 28 nov, autorizado por Oscar): «Diagnóstico» con `medir_entrega` (`buscador/diagnostico_entrega.py`, solo lectura) publica en el resumen, el registro y un artefacto de 1 día cifras por perfil con un **índice anónimo** (P01…, ordenado por lo que recibe, no por cliente) que pasa una lista blanca: lo recibido en 14 días, el embudo de la bodega de hoy, «Por confirmar», la causa y las repeticiones. Es la única excepción a «cifras por persona solo en privado»: nunca nombres, ids, lugares, cargos ni términos. La meta no sale como cifra, aunque el embudo y la causa de un perfil anónimo permiten acotarla (no identifica a nadie).
 - Línea base del objetivo mundial: `--comparar pruebas/datos/linea_base_mundial.json` repite 8 escenarios ficticios del
   modo panel sobre la bodega fijada y falla si cambia el de control (`docs/LINEA_BASE_MUNDIAL.md`, 27 nov).

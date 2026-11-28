@@ -23,6 +23,22 @@ cobertura:
   aviso_bajo: 10
   rescate_bajo: 5
 
+# P-14.2 (IA acotada, decisión de Oscar del 28 nov): un LLM PROPONE nombres del mismo oficio para buscar cada cargo
+# (una llamada cuando el cargo es nuevo o cambia; se guarda en panel_ajustes.terminos_ampliados). Qué vacante sirve lo
+# sigue decidiendo el código. Al LLM solo va el nombre del cargo y sus términos: nunca datos de personas.
+# - terminos_activo: interruptor. Apagado, todo queda como antes (no se pide ni se usa nada guardado).
+# - proveedor: «ninguno» u «openai_compatible» (formato /chat/completions). GitHub Models se retiró el 30 jul 2026.
+# - url y modelo del proveedor; clave_env: NOMBRE del secreto con la clave (nunca la clave aquí).
+llm:
+  terminos_activo: false
+  proveedor: ninguno
+  url: ""
+  modelo: ""
+  clave_env: LLM_API_KEY
+  llamadas_por_corrida: 20
+  segundos_por_llamada: 30
+  reintentos: 2
+
 # Hora de la bodega nocturna en Bogotá (UTC−5). El horario real está en .github/workflows/bodega.yml (paso 7).
 hora_bodega_bogota: "06:30"
 

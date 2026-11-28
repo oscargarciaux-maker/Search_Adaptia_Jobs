@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 
 import requests
-from rapidfuzz import fuzz
+from rapidfuzz import fuzz, process
 import yaml
 
 from buscador import familias, normalizar
@@ -357,9 +357,128 @@ def grado(titulo, cargo, cercanos=False):
         if _cuenta(base, canon, cargo, base):  # P-7.F: con la misma guarda del nombre más largo
             regla = "título en español del mapa" if origen == "mapa" else "nombre hermano en español"
             return "similar", {"regla": regla, "termino": t, "grado": "similar"}
+    # P-14.2: los términos ampliados por el LLM, solo si el título los contiene (con la guarda del nombre más largo).
+    for t in cargo.get("terminos_ampliados") or ():
+        if _cuenta(base, _base(t), cargo, base)                 or (plural != base and _cuenta(plural, _base(_singular(_base(t))), cargo, base)):
+            return "similar", {"regla": "término ampliado", "termino": t, "grado": "similar"}
     if cercanos:
         for t in cargo.get("terminos_cercanos", []):
             canon = _base(t)
             if canon and normalizar.contiene_frase(base, canon):
                 return "cercano", {"regla": "cargo cercano", "termino": t, "grado": "cercano"}
     return None, None
+
+
+# P-14.2 (IA acotada, decisión de Oscar del 28 nov): un LLM PROPONE nombres del mismo oficio para buscar; estas
+# funciones arman lo que se le envía (solo el nombre del cargo, sus términos y los idiomas: nunca datos de personas) y filtran lo
+# que devuelve con las mismas reglas deterministas de siempre. Quien decide si un aviso sirve sigue siendo `grado`.
+VERSION_AMPLIADOS = 1  # cambiarla vuelve a pedir los términos de todos los cargos (cambió el prompt o el filtro)
+MAX_AMPLIADOS = 8      # por idioma: cada término nuevo reparte los turnos de búsqueda del cargo
+ESQUEMA_AMPLIADOS = {
+    "type": "object", "additionalProperties": False, "required": ["es", "en"],
+    "properties": {idioma: {"type": "array", "maxItems": 20, "items": {"type": "string", "maxLength": 80}}
+                   for idioma in ("es", "en")}}
+SISTEMA_AMPLIADOS = ("Eres un experto en títulos de ofertas de empleo. Respondes solo con JSON, sin texto alrededor.")
+_CARACTERES = re.compile(r"^[^\W\d_][\w .,/&+#()'-]*$")
+
+
+def _terminos_enviados(cargo):
+    """Lo que se envía al LLM: el nombre y los términos que escribió el operador (sin los aprendidos ni excluidos)."""
+    nombre = " ".join(str(cargo.get("nombre") or "").split())
+    propios = [" ".join(str(x).split()) for k in ("terminos_exactos", "terminos_similares")
+               for x in cargo.get(k) or [] if isinstance(x, str)]
+    return nombre, [x for x in dict.fromkeys(propios) if x and _base(x) != _base(nombre)][:20]
+
+
+def huella_ampliados(cargo):
+    """Huella de lo que se envía: si no cambia, no se vuelve a pedir (caché en `panel_ajustes.terminos_ampliados`)."""
+    import hashlib
+    import json
+    nombre, propios = _terminos_enviados(cargo)
+    datos = [VERSION_AMPLIADOS, _base(nombre), sorted(_base(x) for x in propios)]
+    return hashlib.sha256(json.dumps(datos, ensure_ascii=False).encode("utf-8")).hexdigest()[:24]
+
+
+def prompt_ampliados(cargo):
+    nombre, propios = _terminos_enviados(cargo)
+    ya = "; ".join(propios) if propios else "(ninguno)"
+    return (
+        f"Cargo: {nombre}\nTérminos que ya usamos: {ya}\n\n"
+        "Propón títulos de ofertas de empleo que las empresas publican para ESTE MISMO trabajo con otro nombre: "
+        "sinónimos, variantes regionales (España y Latinoamérica) y la forma habitual en inglés. Reglas:\n"
+        "- El mismo oficio y las mismas funciones. NO oficios vecinos ni más amplios (para «Diseñador UX» no vale "
+        "«Diseñador gráfico» ni «Desarrollador frontend»).\n"
+        "- Sin nivel ni seniority (nada de junior, senior, lead), sin empresa, lugar, modalidad ni herramientas.\n"
+        "- Cada título con al menos dos palabras, como aparece en un aviso real. Sin repetir los que ya usamos.\n"
+        f"- Hasta {MAX_AMPLIADOS} en español y hasta {MAX_AMPLIADOS} en inglés. Si no hay más, devuelve menos.\n"
+        'Responde solo con este JSON: {"es": ["…"], "en": ["…"]}')
+
+
+def _familia_propia(nombre):
+    """Las familias del mapa del oficio del cargo: donde su nombre es el id o un título exacto (o similar si no es
+    exacto en ninguna), o la de su oficio base si es compuesto. Más estrecho que `_contexto_propio`, que también suma
+    las familias de sus términos (un Product Manager con «product lead» tocaría Product Owner)."""
+    coincidencias = _familias_de(_base(nombre)) if nombre else []
+    if coincidencias:
+        mejor = min(n for n, _, _ in coincidencias)
+        return frozenset(f["id"] for n, _, f in coincidencias if n == mejor)
+    _, base = modificador(nombre or "")
+    return frozenset({base["id"]}) if base else frozenset()
+
+
+@lru_cache(maxsize=4096)
+def _de_otro_oficio(clave, propia):
+    """¿`clave` (título normalizado) es un título de OTRA familia del mapa, igual o casi igual (similitud ≥ 90, la
+    misma que acepta `grado`)? «Product Owner» no amplía Product Manager, ni «Product Owners», casi igual. Un cargo
+    que no está en el mapa no tiene familia propia: para él, cualquier título del mapa es de otro oficio (si fuera el
+    suyo, el cargo estaría en el mapa)."""
+    exactas = {f["id"] for _, _, f in _familias_de(clave)}
+    if exactas:  # un título del mapa: vale si es también de su familia
+        return not exactas & propia
+    for f in familias.mapa_base():
+        if f["id"] in propia:
+            continue
+        titulos = [*f["_titulos"]["exacto"], *f["_titulos"]["similar"]]
+        if titulos and process.extractOne(clave, titulos, scorer=fuzz.token_sort_ratio, score_cutoff=90):
+            return True
+    return False
+
+
+def filtrar_ampliados(propuesta, cargo, maximo=MAX_AMPLIADOS):
+    """Los términos propuestos que se pueden usar, en su idioma: los de `es` deben reconocerse como título en español
+    (`en_espanol`) y los de `en`, no (ni portugués). Fuera: de una sola palabra, con cifras o símbolos raros, los que
+    el cargo ya usa (o sus hermanos en español), los que traen un excluido del operador o del mapa, y los que son el
+    nombre de OTRO oficio del mapa (7.E: «Diseñador gráfico» no es «Diseñador UX»). Se aplica cada vez que se usan,
+    con el cargo vigente: un excluido nuevo los saca sin volver a pedir nada."""
+    if not isinstance(propuesta, dict):
+        return []
+    nombre = cargo.get("nombre") or ""
+    vistos = {_base(x) for x in [nombre, *(cargo.get("terminos_exactos") or []),
+                                 *(cargo.get("terminos_similares") or []),
+                                 *(cargo.get("terminos_cercanos") or [])] if isinstance(x, str)}
+    vistos |= {_base(x) for x, _ in hermanos_es(nombre)}
+    excluidos = [_texto(x) for x in [*(cargo.get("terminos_excluidos") or []), *(cargo.get("excluir_mapa") or [])]
+                 if isinstance(x, str) and _texto(x)]
+    propia = _familia_propia(nombre)
+    salida = []
+    for idioma in ("es", "en"):
+        tomados = 0
+        for t in propuesta.get(idioma) or []:
+            if tomados >= maximo:
+                break
+            if not isinstance(t, str):
+                continue
+            t = " ".join(t.split()).strip(" .,;")
+            clave = _base(t)
+            if not (4 <= len(t) <= 60) or not _CARACTERES.match(t) or len(clave.split()) < 2 or clave in vistos:
+                continue
+            if (idioma == "es") != en_espanol(t) or en_portugues(t):
+                continue
+            if any(normalizar.contiene_frase(_texto(t), e) for e in excluidos):
+                continue
+            if _de_otro_oficio(clave, propia):
+                continue
+            vistos.add(clave)
+            salida.append(t)
+            tomados += 1
+    return salida

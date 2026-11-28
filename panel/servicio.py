@@ -271,7 +271,7 @@ class _ConfiguracionVigente:
         self.repo = repo
         self.perfiles = {str(p.get("id")): p for p in r.get("perfiles") or [] if isinstance(p, dict)}
         self.cargos = {str(c.get("id")): c for c in r.get("cargos") or [] if isinstance(c, dict)}
-        self._perfil, self._cargo, self._aprendidos = {}, {}, None
+        self._perfil, self._cargo, self._aprendidos, self._ampliados = {}, {}, None, {}
 
     def perfil(self, perfil_id):
         if perfil_id not in self._perfil:
@@ -290,10 +290,15 @@ class _ConfiguracionVigente:
             if crudo and self._aprendidos is None:
                 try:  # los títulos aprendidos (v25) también cuentan: sin ellos se retiraría lo aprobado a mano
                     self._aprendidos = (self.repo.ajuste("titulos_aprendidos", {}) or {}) if hasattr(self.repo, "ajuste") else {}
+                    # P-14.2: y los términos ampliados por el LLM (con el interruptor encendido), los mismos que usó la
+                    # búsqueda: sin ellos se retiraría como «ya no encaja» lo que entró por uno de ellos.
+                    from panel import ampliados
+                    self._ampliados = ampliados.leer(self.repo, self.cargos)
                 except Exception as e:  # noqa: BLE001 — sin el dato no se mira el cargo (no se retira de más)
                     registro.aviso("servicio:aprendidos", e)
                     self._aprendidos = False
-            self._cargo[cargo_id] = contenido.cargo_operativo(crudo, self._aprendidos.get(cargo_id)) \
+            self._cargo[cargo_id] = contenido.cargo_operativo(crudo, self._aprendidos.get(cargo_id),
+                                                              ampliados=self._ampliados.get(cargo_id)) \
                 if crudo and self._aprendidos is not False else None
         return self._cargo[cargo_id]
 
@@ -316,7 +321,7 @@ class _ConfiguracionVigente:
 
 # Lo del cargo que decide si un título le corresponde (`grado`); la huella y las funciones solo ordenan.
 _CAMPOS_DEL_TITULO = ("nombre", "terminos_exactos", "terminos_similares", "terminos_excluidos", "terminos_cercanos",
-                      "excluir_mapa")
+                      "excluir_mapa", "terminos_ampliados")
 
 
 def _cargo_editado(vigente, guardado):

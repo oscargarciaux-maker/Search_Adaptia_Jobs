@@ -184,7 +184,8 @@ def consultas_espanol(cargo, raw, maximo=12):
     del glosario; contrato v50, se usan solos salvo los que el operador excluyó). Solo entra lo que después se
     reconoce al clasificar (v49): `grado` reconoce los mismos nombres, así que estos turnos no se pierden."""
     candidatos = [cargo.nombre, *raw["terminos_exactos"], *raw["terminos_similares"],
-                  *[x for x, _ in hermanos_del_cargo({**raw, "nombre": cargo.nombre})]]  # `raw` puede venir sin nombre
+                  *[x for x, _ in hermanos_del_cargo({**raw, "nombre": cargo.nombre})],  # `raw` puede venir sin nombre
+                  *raw.get("terminos_ampliados", [])]  # P-14.2: solo pasan los que `en_espanol` reconoce
     vistos, salida = set(), []
     for t in candidatos:
         clave = normalizar.texto(t)
@@ -213,7 +214,7 @@ SEGUNDOS_FALTANTES = {"verificacion": 240, "ubicacion": 150}
 RESERVA_REFUERZO = 60  # contrato v48: segundos de la comprobación que la primera pasada deja al refuerzo y al rescate
 
 
-def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=None):
+def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=None, ampliados=None):
     """`cortos` (contrato v37): ids de perfiles que en la última búsqueda quedaron bajo el mínimo (o no recibieron
     nada, como los nuevos). Sus lugares van primero en cada fuente y sus avisos reciben ficha primero.
     `enfocar` (contrato v45/v47, «Buscar ahora» para quien falta): ids de los perfiles que hoy no llegan a su meta. Solo
@@ -224,7 +225,7 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=N
     enfocar = None if enfocar is None else {str(x) for x in enfocar}
     cortos = enfocar if enfocar is not None else {str(x) for x in cortos}
     primero, personas = {}, []
-    aprendidos, huellas = aprendidos or {}, huellas or {}
+    aprendidos, huellas, ampliados = aprendidos or {}, huellas or {}, ampliados or {}
     mapa, roles = [], []
     nombres = {**{p["codigo"]: p["nombre"] for p in paises.mundo()["lista"]},
                **{p["codigo"]: p["nombre"] for p in paises.datos()["paises"]}}
@@ -237,7 +238,8 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=N
             continue
         # Contrato v49: el mismo cargo «rellenado» que usan la asignación, el rescate y el panel (nombres sugeridos,
         # títulos aprendidos, huella de funciones y señales de otro oficio heredadas del mapa).
-        raw = contenido.cargo_operativo(c.model_dump(mode="json"), aprendidos.get(str(c.id)), huellas.get(str(c.id)))
+        raw = contenido.cargo_operativo(c.model_dump(mode="json"), aprendidos.get(str(c.id)), huellas.get(str(c.id)),
+                                        ampliados.get(str(c.id)))
         lugares = {}
         for p in perfiles:
             lugares.update(lugares_perfil(p, nombres))
@@ -259,7 +261,8 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=N
         for p in acepta_es:
             lugares_es.update({k: v for k, v in lugares_perfil(p, nombres).items() if k != "REMOTO_MUNDO"})
         similares = raw["terminos_similares"]  # con los títulos aprobados desde «Coincide por funciones» (v25)
-        mapa.append({"id": rid, "nombre": c.nombre, "consultas": [c.nombre, *raw["terminos_exactos"], *raw["terminos_similares"]],
+        mapa.append({"id": rid, "nombre": c.nombre, "consultas": [c.nombre, *raw["terminos_exactos"], *raw["terminos_similares"],
+                                                                 *raw.get("terminos_ampliados", [])],  # P-14.2
             "exactos": raw["terminos_exactos"], "similares": similares, "cercanos": raw.get("terminos_cercanos", []),
             # v25: «Coincide por funciones» (otro título) solo con la huella que escribió el operador; la heredada y
             # la automática (v49) van en `_control_cargo` y solo sirven para comprobar los títulos que sí coinciden.
@@ -317,8 +320,8 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=N
 
 
 @contextmanager
-def activar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=None):
-    mapa, cfg, motor = preparar(version, fecha, aprendidos, cortos, enfocar, huellas)
+def activar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=None, ampliados=None):
+    mapa, cfg, motor = preparar(version, fecha, aprendidos, cortos, enfocar, huellas, ampliados)
     from buscador import cobertura, contrato
     cobertura.configurar_primero(motor.get("lugares_primero"))
     cobertura.configurar_personas(motor.get("personas_busqueda"))
@@ -477,6 +480,14 @@ def ajuste(repo, clave):
         return {}
 
 
+def ampliados_de(repo, cfg):
+    """P-14.2: {cargo_id: términos ampliados por el LLM que siguen valiendo}, solo con `llm.terminos_activo` ({} si
+    está apagado). Entran al cargo operativo (`terminos_ampliados`): la búsqueda, el lote y el panel ven el mismo
+    cargo."""
+    from panel import ampliados
+    return ampliados.leer(repo, {str(c.id): c.model_dump(mode="json") for c in cfg.cargos})
+
+
 def guardar_huellas(repo, version, vacantes):
     """Contrato v49: al final de la búsqueda del día (no en la captura de cada hora) calcula, de la bodega, la huella
     de funciones por idioma de los cargos activos sin huella propia y la guarda en `panel_ajustes.huellas_cargos`. La
@@ -486,8 +497,9 @@ def guardar_huellas(repo, version, vacantes):
     try:
         bodega.etapa("Calcular la huella de funciones de los cargos")
         cfg = validar_version(version)
-        aprendidos = ajuste(repo, "titulos_aprendidos")
-        cargos = [contenido.cargo_operativo(c.model_dump(mode="json"), aprendidos.get(str(c.id)))
+        aprendidos, extra = ajuste(repo, "titulos_aprendidos"), ampliados_de(repo, cfg)
+        cargos = [contenido.cargo_operativo(c.model_dump(mode="json"), aprendidos.get(str(c.id)),
+                                            ampliados=extra.get(str(c.id)))
                   for c in cfg.cargos if c.activo and not c.funciones]
         return repo.guardar_ajuste("huellas_cargos", contenido.huellas_automaticas(vacantes, cargos))
     except Exception as e:  # noqa: BLE001
@@ -496,10 +508,12 @@ def guardar_huellas(repo, version, vacantes):
 
 
 def cargos_operativos(repo, cfg):
-    """Contrato v49: {id: cargo operativo} con los títulos aprendidos (v25) y la huella calculada de noche."""
+    """Contrato v49: {id: cargo operativo} con los títulos aprendidos (v25), la huella calculada de noche y (P-14.2)
+    los términos ampliados por el LLM."""
     aprendidos, huellas = ajuste(repo, "titulos_aprendidos"), ajuste(repo, "huellas_cargos")
+    extra = ampliados_de(repo, cfg)
     return {str(c.id): contenido.cargo_operativo(c.model_dump(mode="json"), aprendidos.get(str(c.id)),
-                                                 huellas.get(str(c.id))) for c in cfg.cargos}
+                                                 huellas.get(str(c.id)), extra.get(str(c.id))) for c in cfg.cargos}
 
 
 def leer_recibidas(repo, perfil_ids):
@@ -1033,12 +1047,21 @@ def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPL
     try:
         # Contrato v25: títulos aprendidos en la bandeja. Contrato v49: y la huella de funciones de la noche anterior,
         # para que la clasificación y el lote usen el mismo cargo operativo que la asignación (`cargos_operativos`).
+        # P-14.2: en la búsqueda del día (no en la captura de cada hora), los términos ampliados de los cargos nuevos o
+        # cambiados. Solo con el interruptor encendido; sin LLM sigue con lo guardado.
+        from panel import ampliados
+        if modo != "incremental" and ampliados.activo():
+            cifras = ampliados.actualizar(repo, validar_version(version))
+            bodega.etapa("Términos ampliados (LLM): {pendientes} cargos sin términos, {pedidos} pedidos, {nuevos} "
+                         "nuevos, {fallidos} fallidos".format(**cifras))
         aprendidos, huellas = ajuste(repo, "titulos_aprendidos"), ajuste(repo, "huellas_cargos")
+        extra = ampliados_de(repo, validar_version(version))
         # Contrato v43 (decisión de Oscar, 18 nov): si la configuración se confirmó hoy después de armar el lote, la
         # siguiente pasada horaria también arma lote para lo que falte (excepción a «la captura horaria no entrega»).
         lote_de = (ejecucion.get("resumen") or {}).get("revision_del_lote")
         arma_lote = modo == "incremental" and lote_de is not None and lote_de != version["revision"]
-        with activar(version, fecha, aprendidos, perfiles_cortos(repo, version, fecha) | primero, enfocar, huellas):
+        with activar(version, fecha, aprendidos, perfiles_cortos(repo, version, fecha) | primero, enfocar, huellas,
+                     **({"ampliados": extra} if extra else {})):  # apagado: la llamada de siempre
             if arma_lote:
                 bodega._config_operativa["completar_lote"] = True
             if hasattr(repo, "decisiones_ubicacion"):
