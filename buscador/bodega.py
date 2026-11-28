@@ -481,6 +481,12 @@ PRUEBA = {"minutos_por_fuente": 3, "linkedin_busquedas": 6, "linkedin_fichas": 8
 
 
 def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=False):
+    """Una búsqueda completa, con la memoria de la normalización activa solo mientras dura (P-12.2)."""
+    with normalizar.con_memoria():
+        return _correr(salida, modo, consulta, pais, hoy, prueba)
+
+
+def _correr(salida, modo, consulta, pais, hoy, prueba):
     inicio = time.monotonic()
     inicio_utc = tiempos.ahora()
     cfg = config()
