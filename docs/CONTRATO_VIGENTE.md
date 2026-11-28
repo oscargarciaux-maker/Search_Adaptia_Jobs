@@ -253,6 +253,12 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
   caracteres (v50). No cuentan así Computrabajo, Get on Board ni Bumeran y portales hermanos (v42, v50).
 - LinkedIn se comprueba con su ficha pública, de una en una, con pausa, en su propia fila; tras 3 bloqueos descansa la
   ronda. Los demás sitios van en paralelo. Primero lo de quien va corto (`cola_por_necesidad`) (v39, v41, v49, v50).
+  «Quien va corto» = quien tiene menos candidatas con el enlace ya comprobado; el tope de 2 por plaza de su meta cuenta
+  las ya comprobadas y salta las rechazadas, y lo que sobre del presupuesto va a sus demás candidatas por abrir, en el
+  mismo orden (P-11.1, 28 nov).
+- **«Postular» con la cuenta del mismo portal** (decisión de Oscar, 28 nov, P-11.1): si la ficha ya cumple (título,
+  descripción, sin cierre) y su paso «Postular» lleva al inicio de sesión del **mismo** sitio (Get on Board pide su
+  cuenta), la ficha comprueba la vacante y el login no se abre. Un login en otro sitio sigue sin comprobar.
 - Presupuestos: 800 enlaces en 10 min por búsqueda diaria; rescate hasta 200 enlaces en 5 min (30 en 60 s en las
   horarias); en «Buscar ahora» para quien falta, 240 s con el tiempo de ordenar incluido y 60 s reservados al refuerzo
   (v36, v39, v48, v49). El rescate comprueba hasta 3 candidatas por plaza que falta; una ampliada solo si todavía

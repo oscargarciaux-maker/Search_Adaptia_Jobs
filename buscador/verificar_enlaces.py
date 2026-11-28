@@ -35,6 +35,9 @@ _NEGACION = re.compile(r"(?:never|not required|no fees|no payment|do not charge|
                        r"no (?:te )?pediremos|sin (?:coste|costo|pago)|não cobramos)", re.I)
 _BLOQUEO = re.compile(r"captcha|verify (?:you are|you're) human|access denied|checking your browser|just a moment", re.I)
 _LOGIN = re.compile(r"^(?:sign in|log in|iniciar sesi[oó]n|acceder|login)(?:\s|$)", re.I)
+# El paso «Postular» de un portal que pide su propia cuenta (P-11.1): /login, /webpros/login, /users/sign_in…
+_RUTA_LOGIN = re.compile(r"/(?:log-?in|sign[-_]?in|ingresar|iniciar[-_]sesion)(?:/|$)", re.I)
+POSTULAR_CON_CUENTA = "ficha específica accesible; postular pide cuenta del portal"
 _APLICAR = re.compile(r"^(?:apply(?: now| for (?:this )?(?:job|position))?|postular(?:me)?|aplicar(?: ahora)?|"
                        r"candidatar(?:-se)?|inscrever-se|solicitar (?:este )?empleo)$", re.I)
 
@@ -259,7 +262,12 @@ def comprobar(url, titulo, *, sesion=None, validar_url=publica, ahora=None, plaz
             timeout = min(12, max(0.1, plazo - time.monotonic())) if plazo else 12
             estado, motivo, codigo = jobint.estado_del_aviso(sesion, url, titulo, _coincide, timeout, NAVEGADOR)
             return resultado(estado, motivo)
+        sitio_ficha = ""  # el sitio de la ficha ya aprobada, cuando se sigue su paso de aplicación
         while True:
+            if sitio_ficha and enlaces.host(destino) == sitio_ficha and _RUTA_LOGIN.search(urlparse(destino).path):
+                # P-11.1 (decisión de Oscar del 28 nov): «Postular» lleva al inicio de sesión del mismo portal (Get on
+                # Board pide su cuenta): la ficha ya abierta comprueba la vacante. En otro sitio, el login no cuenta.
+                return resultado("verificada", POSTULAR_CON_CUENTA)
             if plazo and time.monotonic() >= plazo:
                 return resultado("pendiente", "presupuesto de comprobación agotado")
             clave = urldefrag(destino)[0]
@@ -303,8 +311,11 @@ def comprobar(url, titulo, *, sesion=None, validar_url=publica, ahora=None, plaz
             if estado == "verificada" and siguiente and not pasos_aplicacion:
                 # Solo un paso visible de aplicación, sin enviar formularios ni recorrer cuentas.
                 pasos_aplicacion += 1
+                sitio_ficha = enlaces.host(destino)
                 destino = siguiente
                 continue
+            if sitio_ficha and motivo == "requiere iniciar sesión" and enlaces.host(destino) == sitio_ficha:
+                return resultado("verificada", POSTULAR_CON_CUENTA)
             return resultado(estado, motivo)
     except (requests.RequestException, ValueError, OSError):
         return resultado("pendiente", "error de conexión o URL no comprobable")
@@ -469,6 +480,12 @@ def cola_por_necesidad(vacantes, hoy):
     return entrega.candidatas_por_persona(vacantes, hoy)
 
 
+def colas_por_necesidad(vacantes, hoy):
+    """(cola con tope, cola sin tope) de `entrega.colas_por_persona`: la segunda usa lo que sobre del presupuesto."""
+    from buscador import entrega
+    return entrega.colas_por_persona(vacantes, hoy)
+
+
 def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, cfg=None):
     """Comprueba candidatas antes de la selección; lo no revisado nunca se da por aprobado.
     Orden: el lote ya registrado hoy (plazo para compartir), las que elegiría la selección en su orden y, en las
@@ -495,10 +512,11 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
                                segundos=max(0, plazo - time.monotonic()), vigencia=VIGENCIA_COMPARTIR)
     revisadas = set()
     por_necesidad = 0
+    resto_necesidad = []
     # Contrato v49: primero las candidatas de cada persona, con la mitad del presupuesto que queda. Contrato v50: esa
     # mitad es para los sitios en paralelo; las de LinkedIn van aparte, hasta donde alcance su parte del tiempo.
     try:
-        necesidad = cola_por_necesidad(vacantes, hoy)
+        necesidad, resto_necesidad = colas_por_necesidad(vacantes, hoy)
         if necesidad and revisadas_n < maximo:
             parte = 3 if incremental else 2
             cupo = max(1, (maximo - revisadas_n) // parte)
@@ -533,6 +551,13 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
         revisadas.update(v["id"] for v in grupo if all(vigente(cache.get(u, {}), v["titulo"], datetime.now(timezone.utc)) for u in urls(v)))
         if incremental or n == 0:
             break
+    # P-11.1 (28 nov): lo que sobre del presupuesto va a las demás candidatas de cada persona, por turnos y primero
+    # quien va corta. Antes las dos colas de arriba se acababan pronto (la Bodega del 27 abrió 213 enlaces con cupo de
+    # 800 y 600 s) y las de Computrabajo, Bumeran, Laborum o Magneto casi nunca llegaban a abrirse.
+    if resto_necesidad and revisadas_n < maximo and time.monotonic() < plazo:
+        n = auditar(resto_necesidad, cache, maximo=maximo - revisadas_n, segundos=max(0, plazo - time.monotonic()))
+        revisadas_n += n
+        por_necesidad += n
     for v in vacantes:
         anotar(v, cache)
     actuales = [dict(por_id.get(v["id"], v)) for lista in iniciales.values() for v, _ in lista]
