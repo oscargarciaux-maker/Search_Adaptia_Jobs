@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../api";
 import { Ayuda, Plegable } from "../comunes";
 import type { Embudo, Regla } from "../types";
+import { HuecosPorPais, type HuecoPais } from "./HuecosPais";
 
 // Contrato v17: reglas de ubicación. Las «aprendidas» las crea el código solo a partir de tus decisiones.
 export function ReglasAprendidas({
@@ -320,6 +321,7 @@ type Cobertura = {
   grupos: Record<"cargo" | "pais" | "idioma", Record<string, Grupo>>;
   alertas: string[];
   nota: string;
+  huecos?: HuecoPais[];
 };
 const ESTADO_COBERTURA: Record<FilaCobertura["estado"], [string, string]> = {
   cubierto: ["Mínimo cubierto", "green"],
@@ -513,6 +515,7 @@ export function CoberturaPersonas({
             </table>
           </div>
           <p className="helper">{datos.nota}</p>
+          <HuecosPorPais filas={datos.huecos || []} minimo={datos.minimo} />
         </>
       )}
     </section>

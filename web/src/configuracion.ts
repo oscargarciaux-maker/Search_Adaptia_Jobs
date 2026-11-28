@@ -21,6 +21,15 @@ function mismoContenido(a: unknown, b: unknown) {
   return JSON.stringify(ordenado(a)) === JSON.stringify(ordenado(b));
 }
 
+// 8.1: el aviso temprano de cobertura, para añadir al mensaje de «Aplicar cambios».
+export function avisosCobertura(avisos?: string[]) {
+  return avisos?.length
+    ? " Aviso de cobertura: " +
+        avisos.join(" ") +
+        " Mira «Huecos por país» en Historial para pedir una fuente nueva hoy."
+    : "";
+}
+
 export function useConfiguracion(notify: (s: string, error?: boolean) => void) {
   const [estado, setEstado] = useState<EstadoConfig | null>(null),
     [draft, setDraft] = useState<Configuracion>(vacio),
@@ -58,10 +67,16 @@ export function useConfiguracion(notify: (s: string, error?: boolean) => void) {
       return { guardado: false, aplicado: false, motivo: "Recarga la página." };
     setBusy(true);
     let actual = estado;
+    // 8.1: países nuevos sin fuente local (solo para el operador; no bloquea el guardado).
+    let riesgo = "";
     try {
       if (!mismoContenido(config, estado.borrador)) {
         const r = await api<
-          Partial<EstadoConfig> & { revision: number; borrador: Configuracion }
+          Partial<EstadoConfig> & {
+            revision: number;
+            borrador: Configuracion;
+            avisos_cobertura?: string[];
+          }
         >("/config", {
           method: "PUT",
           body: JSON.stringify({
@@ -69,7 +84,9 @@ export function useConfiguracion(notify: (s: string, error?: boolean) => void) {
             configuracion: config,
           }),
         });
-        actual = { ...estado, ...r };
+        const { avisos_cobertura, ...guardado } = r;
+        riesgo = avisosCobertura(avisos_cobertura);
+        actual = { ...estado, ...guardado };
         setEstado(actual);
       }
       // También cuando lo pedido ya era lo guardado (p. ej. reactivar lo que se había archivado sin aplicar).
@@ -106,7 +123,8 @@ export function useConfiguracion(notify: (s: string, error?: boolean) => void) {
         exito +
           (primera
             ? " Desde ahora solo se buscan los cargos de tu lista (no los seis fijos de antes)."
-            : ""),
+            : "") +
+          riesgo,
       );
       return { guardado: true, aplicado: true, motivo: "" };
     } catch (e) {
@@ -114,7 +132,8 @@ export function useConfiguracion(notify: (s: string, error?: boolean) => void) {
       setNoAplica(motivo);
       notify(
         "Tus cambios quedaron guardados, pero la búsqueda todavía no los usa: " +
-          motivo,
+          motivo +
+          riesgo,
         true,
       );
       return { guardado: true, aplicado: false, motivo };

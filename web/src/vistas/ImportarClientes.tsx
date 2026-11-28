@@ -4,6 +4,7 @@ import { Upload } from "lucide-react";
 import { api } from "../api";
 import type { EstadoConfig, PreviaImportacion } from "../types";
 import { Dialog, nombrePais } from "../comunes";
+import { avisosCobertura } from "../configuracion";
 
 // Importar clientes desde un CSV (15 nov): vista previa sin guardar y luego importación todo o nada. Los clientes
 // quedan guardados como si se hubieran creado a mano; la búsqueda los usa desde que se pulsa «Aplicar cambios».
@@ -62,6 +63,7 @@ export function ImportarClientes({
         borrados: number;
         archivados: number;
         estado: EstadoConfig;
+        avisos_cobertura?: string[];
       }>("/clientes/importar", {
         method: "POST",
         body: JSON.stringify({ contenido, actuales, revision, confirmacion }),
@@ -71,7 +73,8 @@ export function ImportarClientes({
         `${r.actualizados} ${r.actualizados === 1 ? "cliente actualizado" : "clientes actualizados"} (conservan lo que recibieron), ${r.nuevos} ${r.nuevos === 1 ? "nuevo" : "nuevos"}` +
           (r.borrados ? `, ${r.borrados} borrados` : "") +
           (r.archivados ? `, ${r.archivados} archivados` : "") +
-          ". Revísalos y pulsa «Aplicar cambios».",
+          ". Revísalos y pulsa «Aplicar cambios»." +
+          avisosCobertura(r.avisos_cobertura),
       );
     } catch (e) {
       notify((e as Error).message, true);
