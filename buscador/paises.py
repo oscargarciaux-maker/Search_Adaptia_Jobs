@@ -389,6 +389,106 @@ _ENTRE_LUGARES = re.compile(r"(?:(?:y|o|e|u|ni|tambien|como|toda|todo|todos|toda
 _NEGADA = re.compile(r"\b(?:no|sin|tampoco|nunca|excepto|salvo)\b")
 
 
+# P-16.4 (28 nov): la misma letra pequeña en inglés. Solo frases que dicen desde dónde puede trabajar LA PERSONA o el
+# puesto, seguidas de la lista de lugares: «remote latin america», «100% remote, LATAM only», «location: remote
+# Philippines or Latin America», «fully remote, based in Colombia, Mexico or Argentina», «candidates located in LATAM»,
+# «open to candidates residing in Latin America», «residing in any Latin American country», «you are based in Europe or
+# the Americas», «this role will be based remotely in the Americas region», «collaborate remotely from anywhere in the
+# world». Las de la empresa («our team based in Latin America», «clients worldwide», «a US-based company») no empiezan así
+# y no abren nada. Texto normalizado.
+_APERTURA_EN = re.compile(
+    r"\b(?:"
+    r"(?:fully\s+|100\s+)?remote(?:ly)?\s+(?:only\s+)?(?:based\s+)?(?:(?:from|in|within|across|for)\s+)?"
+    r"|(?:candidates?|applicants?|you\s+are|you\s+re)\s+(?:who\s+are\s+|that\s+are\s+)?(?:currently\s+)?"
+    r"(?:located|based|residing|living)\s+(?:anywhere\s+)?(?:in|within|across|from)\s+(?:any\s+)?"
+    r"|residing\s+in\s+any\s+"
+    r"|(?:role|position|job|seat)\s+(?:is|will\s+be|can\s+be)\s+(?:based\s+)?(?:remotely\s+|remote\s+)?(?:based\s+)?"
+    r"(?:in|within|from|across)\s+(?:either\s+)?"
+    r")(?:the\s+)?")
+_ENTRE_LUGARES_EN = re.compile(r"(?:(?:and|or|the|any|either|of|country|countries|region|time\s+zones?)\s+){0,4}")
+_NEGADA_EN = re.compile(r"\b(?:not|no|cannot|can t|unable|except|excluding|outside)\b")
+# Thermos (P-16.4): la negación también puede venir DESPUÉS de la lista («candidates located in Mexico are not
+# eligible», «…should not apply», «…must apply via our MX page»), y la lista puede describir a la empresa («a fully
+# remote Latin American startup», «remote in LATAM since 2015», «we support customers remotely worldwide»).
+_NEGADA_DESPUES = re.compile(
+    r"\s*(?:\w+\s+){0,4}?(?:(?:are|is|will|would|should|must|may|can|do|does)\s+not\b|cannot\b|can t\b|won t\b|"
+    r"aren t\b|isn t\b|ineligible\b|excluded\b|must\s+apply\s+(?:via|through)\b|"
+    r"no\s+(?:son|seran|pueden|podran|se\s+consideran?)\b|quedan\s+excluid)")
+_DE_LA_EMPRESA = re.compile(r"\s*(?:startups?|teams?|company|companies|business(?:es)?|clients?|customers?|markets?|"
+                            r"offices?|employees|staff|since|firm|agency|ecosystem|operations)\b")
+_SUJETO_EMPRESA = re.compile(r"\b(?:we|we re|we ve|our|us|support|serve|serving|customers|clients)\s+(?:\w+\s+){0,3}$")
+
+
+def _lista_tras_apertura(desc, frase, entre, negada):
+    """Los lugares que siguen a una frase de apertura (texto normalizado), o "". Solo la lista pegada a la frase:
+    «abierto a candidatos de colombia y peru» → «colombia y peru», sin lo que venga en la oración siguiente. Primero el
+    lugar tal cual («cualquier parte del mundo» es un alcance entero); si no, tras los conectores. «Anywhere in the US»
+    no es el mundo: un alcance mundial acotado corta la lista (P-16.4)."""
+    lugar = _lugares_de_apertura()
+    for m in frase.finditer(desc):
+        if negada.search(desc[max(0, m.start() - 35):m.start()]):
+            continue
+        if m.group(0).startswith(("remote", "fully", "100")) and _SUJETO_EMPRESA.search(
+                desc[max(0, m.start() - 30):m.start()]):
+            continue  # «we are a fully remote…», «we have been remote in…», «we support customers remotely…»
+        fin = m.end()
+        while True:
+            hallado = lugar.match(desc, fin) or lugar.match(desc, entre.match(desc, fin).end())
+            if not hallado or _MUNDO_ACOTADO.match(desc, hallado.start()):
+                break
+            fin = hallado.end()
+            fin += len(desc[fin:]) - len(desc[fin:].lstrip())
+        if fin > m.end() and not (_NEGADA_DESPUES.match(desc, fin) or _DE_LA_EMPRESA.match(desc, fin)):
+            return desc[m.end():fin].strip()
+    return ""
+
+
+def _apertura_en(desc):
+    return _lista_tras_apertura(desc, _APERTURA_EN, _ENTRE_LUGARES_EN, _NEGADA_EN)
+
+
+_EUROPA_LARGA = ("europe", "europa", "emea", "european union", "union europea")  # «eu» solo es ambiguo («Eu, France»)
+
+
+def _region_en_ubicacion(ubicacion_original, ambito):
+    """P-16.4: la ubicación nombra Europa o EMEA como región («Remote, Ireland, Europe, United States», «Remote, Canada,
+    EMEA, United States», «Remote - Americas, Remote EU»). «EU» solo en mayúsculas: «Eu, N, France» es un pueblo."""
+    # Thermos: «LATAM / EU timezone overlap» o «(EU hours)» hablan del horario, no de dónde vive la persona.
+    horario = r"(?!\s*(?:time|timezone|tz|hours|business\s+hours|overlap|shift))"
+    return re.search(r"\b(?:europe|europa|emea|european\s+union|union\s+europea)\b" + horario, ambito or "") is not None \
+        or re.search(r"\b(?:EU|EMEA)\b" + horario, ubicacion_original or "") is not None
+
+
+def _region_es_opcion(ubicacion_original, ambito):
+    """La región es una opción más de una lista («Remote, Canada, EMEA, United States», «Remote - US or EU») y no lo que
+    precisa al país del aviso («Estonia (Remote, EMEA)» sigue siendo Estonia): 2 países o más, o «or», «;», «/», «|»."""
+    return len(paises_en_texto(ambito)) >= 2 or re.search(r"[;/|]|\b(?:or|o)\b", ubicacion_original or "") is not None
+
+
+_EUROPA_PARCIAL = re.compile(r"\b(?:eastern|central|northern|nordic|baltic)\s+(?:and\s+(?:eastern|central)\s+)?europe\b")
+
+
+def _sumados(apertura, d, europa=_EUROPA_LARGA):
+    """Los países cubiertos que abre una lista de lugares de la letra pequeña: los nombrados, sus subregiones, LATAM,
+    Europa (solo con su nombre largo; «Eastern Europe» no es España) y todos si es para cualquier país."""
+    if not apertura:
+        return set()
+    sumados = set(_paises_nombrados(apertura)) | set(subregiones(apertura, d))
+    if _nombra(apertura, d["toda_latam"]):
+        sumados |= set(d["latam"])
+    if _nombra(_EUROPA_PARCIAL.sub(" ", apertura), list(europa)):
+        sumados |= set(d["europa"])
+    if _nombra(apertura, d["mundo"]):
+        sumados |= set(d["codigos"])
+    return sumados
+
+
+def subregiones(texto, d=None):
+    """Contrato v18: los países de todas las subregiones nombradas («Sudamérica, Centroamérica o México»)."""
+    d = d or datos()
+    return ordenar([c for r in d["subregiones"] if _nombra(texto, r["nombres"]) for c in r["paises"]])
+
+
 @lru_cache(maxsize=1)
 def _lugares_de_apertura():
     """Patrón con los nombres de países de todo el mundo, las subregiones y los alcances (LATAM, Europa, todo el mundo):
@@ -400,23 +500,7 @@ def _lugares_de_apertura():
 
 
 def _apertura_nombrada(desc):
-    """Los lugares que siguen a una frase de apertura en español (texto normalizado), o "". Solo la lista pegada a la
-    frase: «abierto a candidatos de colombia y peru» → «colombia y peru», sin lo que venga en la oración siguiente."""
-    lugar = _lugares_de_apertura()
-    for m in _APERTURA_ES.finditer(desc):
-        if _NEGADA.search(desc[max(0, m.start() - 35):m.start()]):
-            continue
-        fin = m.end()
-        while True:
-            # Primero el lugar tal cual («cualquier parte del mundo» es un alcance entero); si no, tras los conectores.
-            hallado = lugar.match(desc, fin) or lugar.match(desc, _ENTRE_LUGARES.match(desc, fin).end())
-            if not hallado:
-                break
-            fin = hallado.end()
-            fin += len(desc[fin:]) - len(desc[fin:].lstrip())
-        if fin > m.end():
-            return desc[m.end():fin].strip()
-    return ""
+    return _lista_tras_apertura(desc, _APERTURA_ES, _ENTRE_LUGARES, _NEGADA)
 
 
 def modalidad(titulo, ubicacion, descripcion="", remoto=None):
@@ -1001,8 +1085,7 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
             ambito = f"{ambito} {titulo_n}"
     def subregion(texto):
         # Contrato v18: todas las subregiones nombradas («Sudamérica, Centroamérica o México»), no solo la primera.
-        hallados = [c for r in d["subregiones"] if _nombra(texto, r["nombres"]) for c in r["paises"]]
-        return ordenar(hallados) if hallados else None
+        return subregiones(texto, d) or None
 
     def r(paises, confianza, nota):
         # Contrato v12: un país reconocido pero sin cobertura (Brasil) nunca queda como país desde el que se aplica.
@@ -1077,13 +1160,13 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
     # aviso («Remoto, Chile» + «abierto a candidatos de Colombia y Perú» → Chile, Colombia y Perú). Solo cuando la
     # ubicación nombra un país concreto: si ya es una región, LATAM o no dice país, deciden las reglas de abajo (una
     # frase así nunca recorta lo que el aviso ya abría).
-    if nombrados and not (es_latam or es_mundo or es_europa or fuera or subregion(ambito)):
-        apertura = _apertura_nombrada(desc)
-        sumados = set(_paises_nombrados(apertura)) | set(subregion(apertura) or []) if apertura else set()
-        if apertura and _nombra(apertura, d["toda_latam"]):
-            sumados |= set(latam)
-        if apertura and _nombra(apertura, d["mundo"]):
-            sumados |= set(todos)
+    # P-16.4 (28 nov): también en inglés («remote Latin America», «candidates based in Argentina, Brazil and Mexico»)
+    # y cuando el país nombrado es de fuera (la sede: «Remote, USA» + «open to candidates residing in Latin America»).
+    region_lugar = _region_en_ubicacion(ubicacion_original, ambito)
+    if (nombrados or fuera) and not (es_latam or es_mundo or es_europa or subregion(ambito)):
+        # En inglés, «Europa» no: «Remote Europa · deutscher Arbeitsvertrag» es un aviso en alemán para Alemania.
+        sumados = _sumados(_apertura_nombrada(desc), d) | _sumados(_apertura_en(desc), d, ("europe", "emea",
+                                                                                            "european union"))
         if sumados - set(nombrados):
             return r(ordenar(list(sumados) + [c for c in nombrados if c in todos]), "alta", NOTA_APERTURA)
     if es_mundo or (_REMOTO.search(titulo_normalizado) and _nombra(titulo_normalizado,d["mundo"])
@@ -1092,10 +1175,12 @@ def _elegibles(titulo, ubicacion, descripcion="", remoto=None):
     region = subregion(ambito)
     if region:
         return r(ordenar(region + nombrados), "alta", "restricción regional")
-    if es_latam:
-        return r(sorted(set(latam) | (set(europa) & set(nombrados))), "alta", "")
+    if es_latam:  # P-16.4: «Remote - Americas, Remote EU» también abre Europa
+        return r(sorted(set(latam) | (set(europa) if region_lugar else set(europa) & set(nombrados))), "alta", "")
     if nombrados:
         return r(nombrados, "media" if len(nombrados) == 1 else "alta", "")
+    if fuera and region_lugar and _region_es_opcion(ubicacion_original, ambito):  # P-16.4: «Remote, Ireland, Europe…»
+        return r(europa, "alta", "remoto para Europa")
     if fuera:
         return r([], "alta", "remoto fuera de LATAM y España")
     if es_europa:
