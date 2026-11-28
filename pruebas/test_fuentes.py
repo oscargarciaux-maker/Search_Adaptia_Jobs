@@ -300,3 +300,35 @@ def test_un_error_con_texto_en_vez_de_objeto_no_rompe_la_peticion():
     assert cliente.post_json("https://portal.example/api", {}) is None
     assert motivo_del_fallo(cliente) == "HTTP 403"
 
+
+
+def test_getonbrd_catalogo_recorre_categorias_con_paginas_y_respeta_el_tope():
+    # P-17.2: sin red; respuesta guardada con 2 categorías, una de 2 páginas.
+    def item(slug, **a):
+        return {"attributes": {"title": "Dev", "remote": True, "remote_modality": "remote_local",
+                               "countries": ["Remote"], "location_tenants": {"data": [
+                                   {"attributes": {"name": "Chile"}}, {"attributes": {"name": "Peru"}}]}, **a},
+                "links": {"public_url": f"https://www.getonbrd.com/jobs/{slug}"}}
+
+    class Falso:
+        def __init__(self):
+            self.urls = []
+
+        def json(self, url, params=None, **_):
+            self.urls.append((url, (params or {}).get("page")))
+            if url.endswith("/categories"):
+                return {"data": [{"id": "programming"}, {"id": "design-ux"}]}
+            if "programming" in url:
+                p = params["page"]
+                return {"data": [item(f"p{p}"), item("repetida")], "meta": {"total_pages": 2}}
+            return {"data": [item("repetida"), item("d1")], "meta": {"total_pages": 1}}
+
+    c = Falso()
+    crudas, stats = getonbrd.catalogo(c, 10, {"https://www.getonbrd.com/jobs/ya"})
+    enlaces = [v["enlace"].rsplit("/", 1)[1] for v in crudas]
+    assert sorted(enlaces) == ["d1", "p1", "p2", "repetida"] and stats["catalogo_peticiones"] == 4
+    assert all(v["ubicacion"] == "Remote - Chile; Peru" for v in crudas)
+    c2 = Falso()
+    _, stats = getonbrd.catalogo(c2, 3)
+    assert stats["catalogo_peticiones"] == 3 and len(c2.urls) == 3  # lista + 1.ª página de cada categoría
+    assert getonbrd.catalogo(Falso(), 0)[0] == []
