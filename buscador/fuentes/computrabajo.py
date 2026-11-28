@@ -1,7 +1,8 @@
 """Computrabajo: portal donde se postula en el mismo sitio, en 17 países de la región. Sin sesión ni cookies.
 
 Se leen solo rutas permitidas por su robots.txt: la búsqueda `/trabajo-de-<cargo>` (con `?p=` para paginar, sin los
-filtros que bloquea) y la ficha `/ofertas-de-trabajo/...`. La publicación sale de `datePosted` (schema.org) de la ficha;
+filtros que bloquea), su variante remota `/trabajo-de-<cargo>-en-remoto` (P-17.1: es un camino, no un filtro) y la ficha
+`/ofertas-de-trabajo/...`. La publicación sale de `datePosted` (schema.org) de la ficha;
 el texto visible suele ser la fecha de actualización («(actualizada)») y esa nunca se toma como publicación.
 Como LinkedIn, rota las combinaciones (familia, país) y cada corrida toma las que hace más tiempo no se revisan.
 """
@@ -57,7 +58,8 @@ def tarjetas(pagina, sitio):
         empresa = re.search(r'offer-grid-article-company-url>(.*?)</a>', cuerpo, re.S) or \
             re.search(r'<p class="dFlex[^"]*fs16[^"]*">(.*?)</p>', cuerpo, re.S)
         lugar = re.search(r'<p class="fs16 fc_base mt5">\s*<span class="mr10">(.*?)</span>', cuerpo, re.S)
-        modo = re.search(r'i_home_office"></span>(.*?)</span>', cuerpo, re.S)
+        # «Presencial y remoto» lleva el icono `i_home_office`; el remoto completo, `i_home` (antes no se leía: P-17.1).
+        modo = re.search(r'icon i_home(?:_office)?"></span>(.*?)</span>', cuerpo, re.S)
         if not (enlace and titulo):
             continue
         ruta = enlace.group(1)
@@ -96,23 +98,36 @@ def modalidad(texto):
     return None, ""
 
 
+def _remoto_en(lugares):
+    """Países de Computrabajo donde alguien del cargo acepta remoto («REMOTO_CO» en los lugares del panel)."""
+    claves = {x[0] if isinstance(x, (list, tuple)) else x for x in lugares or []}
+    return {c[7:] for c in claves if isinstance(c, str) and c.startswith("REMOTO_") and c[7:] in SITIOS}
+
+
 def combinaciones(mapa, nombres):
     """(familia, consultas, lugar, {}) por cargo y país. Contrato v44: los títulos en español tienen su propio turno
-    («CO:ES») en los países de quienes aceptan avisos en español (v50); antes compartían la rotación con los de inglés."""
+    («CO:ES») en los países de quienes aceptan avisos en español (v50); antes compartían la rotación con los de inglés.
+    P-17.1: si alguien del cargo acepta remoto en ese país, además su turno remoto («CO:REMOTO», «CO:ES:REMOTO»), que
+    pide `/trabajo-de-<cargo>-en-remoto`. Rota con los demás: el presupuesto de búsquedas no cambia."""
     salida = []
     for f in mapa:
         es = list(f.get("consultas_es") or [])
         resto = [c for c in cobertura.consultas(f) if c not in es]
+        remoto, remoto_es = _remoto_en(f.get("lugares")), _remoto_en(f.get("lugares_es"))
         for codigo in f.get("paises_objetivo", list(nombres)):
             if codigo not in SITIOS:
                 continue
             con_es = bool(es) and codigo in (f.get("paises_es") or [])
-            if resto:
-                salida.append((f["id"], resto, codigo, {}))
-            if con_es:
-                salida.append((f["id"], es, codigo + ":ES", {}))
-            elif not resto and es:  # todos sus títulos son en español: un solo turno, sin repetir la misma búsqueda
-                salida.append((f["id"], es, codigo, {}))
+            for sufijo, abierto in (("", True), (":REMOTO", codigo in remoto)):
+                if not abierto:
+                    continue
+                if resto:
+                    salida.append((f["id"], resto, codigo + sufijo, {}))
+                if con_es:
+                    if not sufijo or codigo in remoto_es:
+                        salida.append((f["id"], es, codigo + ":ES" + sufijo, {}))
+                elif not resto and es:  # todos sus títulos son en español: un solo turno, sin repetir la misma búsqueda
+                    salida.append((f["id"], es, codigo + sufijo, {}))
     return salida
 
 
@@ -127,6 +142,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
     todas = cobertura.repartir(todas, estado, hoy, prioritarias)
     avisos, vistos = [], set()
     hechas = fallidas = seguidas = 0
+    remotas = {"busquedas": 0, "avisos": 0}
     for familia, consultas, lugar, _ in todas:
         codigo = lugar.split(":")[0]
         if hechas >= presupuesto or seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
@@ -136,12 +152,15 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
             continue
         consulta = b.terminos[0]
         sitio = SITIOS[codigo]
+        en_remoto = lugar.endswith(":REMOTO")
+        ruta = f"/trabajo-de-{slug(consulta)}" + ("-en-remoto" if en_remoto else "")
         for pagina in range(b.desde + 1, b.desde + max_paginas + 1):  # en Computrabajo las páginas empiezan en 1
             if hechas >= presupuesto:
                 break
-            url = f"https://{sitio}.computrabajo.com/trabajo-de-{slug(consulta)}" + (f"?p={pagina}" if pagina > 1 else "")
+            url = f"https://{sitio}.computrabajo.com{ruta}" + (f"?p={pagina}" if pagina > 1 else "")
             r = cliente.get(url)
             hechas += 1
+            remotas["busquedas"] += en_remoto
             if r is None or r.status_code != 200:
                 fallidas += 1
                 seguidas += 1
@@ -151,7 +170,10 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
             for f in filas:
                 if f["id"] not in vistos:
                     vistos.add(f["id"])
-                    avisos.append(dict(f, pais=codigo, familia=familia))
+                    remotas["avisos"] += en_remoto
+                    # La búsqueda remota solo lista remotas: si la tarjeta no lo dice, lo dice la ruta pedida.
+                    avisos.append(dict(f, pais=codigo, familia=familia,
+                                       modalidad=f["modalidad"] or ("Remoto" if en_remoto else "")))
             cobertura.anotar_paginas(estado, b, hoy, pagina, len(filas) < POR_PAGINA)
             if len(filas) < POR_PAGINA:
                 break
@@ -184,7 +206,8 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
                        "descripcion": descripcion, "fecha": fecha, "enlace": a["enlace"], "enlace_directo": "",
                        "remoto": remoto, "fuente": NOMBRE})
     return crudas, {"busquedas": hechas, "fallidas": fallidas, "avisos": len(avisos), "del_cargo": len(del_cargo),
-                    "con_descripcion": con_ficha, "cerradas": cerradas, "combinaciones_total": len(todas)}
+                    "con_descripcion": con_ficha, "cerradas": cerradas, "combinaciones_total": len(todas),
+                    "busquedas_remoto": remotas["busquedas"], "avisos_remoto": remotas["avisos"]}
 
 
 def completar_descripciones(cliente, previas, max_fichas, hoy=None, max_dias=30, reloj=time.monotonic,
