@@ -7,6 +7,7 @@ from buscador import apify, catalogo, contrato, entrega, familias, refuerzo, vac
 from buscador.fuentes import publicaciones_apify as pa
 from panel import borradores, ejecutor
 from panel.repositorio import configuracion_demo, hoy
+from pruebas.postgrest_falso import como_postgrest
 
 VALIDAS = {"diseno-producto-ux", "qa"}
 PERFIL = "https://www.linkedin.com/in/reclutadora-ejemplo"
@@ -185,6 +186,7 @@ def test_registrar_asigna_posts_solo_hasta_cinco_y_sin_repetir(cfg):
     class Repo:
         ejecucion = None
 
+        @como_postgrest
         def pedir(self, metodo, ruta, **op):
             params = op.get("params") or {}
             if params.get("offset"):

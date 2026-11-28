@@ -8,6 +8,7 @@ from buscador.fuentes import linkedin_apify
 from panel import afinidad, ejecutor
 from panel.modelos import Perfil
 from panel.repositorio import configuracion_demo, hoy
+from pruebas.postgrest_falso import como_postgrest
 
 CON_DATO = ("We require 3 years of experience. English B2 required. We design digital products, "
             "test software and work with engineering and user research. ") * 4
@@ -103,6 +104,7 @@ def test_reutiliza_vacantes_de_dias_anteriores_sin_repetir_a_la_misma_persona(cf
     class Repo:
         ejecucion = None
 
+        @como_postgrest
         def pedir(self, metodo, ruta, **op):
             params = op.get("params") or {}
             if ruta == "panel_ejecuciones":

@@ -8,6 +8,7 @@ import pytest
 
 from panel import ejecutor
 from panel.repositorio import RepositorioDemo, configuracion_demo, hoy
+from pruebas.postgrest_falso import como_postgrest
 from pruebas.panel.test_control import trabajo
 
 
@@ -19,6 +20,7 @@ class Repo:
     def operativa(self, fecha):
         return self.version_nueva
 
+    @como_postgrest
     def pedir(self, metodo, ruta, **op):
         if ruta == "panel_ejecuciones":
             if metodo == "GET":

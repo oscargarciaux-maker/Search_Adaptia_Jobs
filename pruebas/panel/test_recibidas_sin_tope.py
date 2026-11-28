@@ -46,11 +46,13 @@ def _cumple(valor, filtro):
 
 class PostgREST:
     """Supabase mínimo que respeta filtros, `order`, `limit` y `offset` como PostgREST. Sin `order` devuelve las filas
-    en el orden en que se guardaron (como PostgreSQL, sin garantía)."""
+    en el orden en que se guardaron (como PostgreSQL, sin garantía). `max_filas` imita el máximo de filas por
+    respuesta de Supabase (`max-rows`): nunca devuelve más, aunque se pidan más."""
     ESPECIALES = {"select", "order", "limit", "offset", "on_conflict"}
 
-    def __init__(self, tablas, fallar=None):
+    def __init__(self, tablas, fallar=None, max_filas=None):
         self.tablas, self.fallar, self.ejecucion, self.asignadas, self.lecturas = tablas, fallar, None, [], []
+        self.max_filas = max_filas
 
     def pedir(self, metodo, ruta, **op):
         params = dict(op.get("params") or {})
@@ -74,7 +76,8 @@ class PostgREST:
             columna, _, sentido = parte.partition(".")
             filas = sorted(filas, key=lambda f: str(f.get(columna) or ""), reverse=sentido == "desc")
         inicio = int(params.get("offset") or 0)
-        return filas[inicio:inicio + int(params["limit"])] if "limit" in params else filas[inicio:]
+        cuantas = min(int(params.get("limit") or len(filas)), self.max_filas or len(filas))
+        return filas[inicio:inicio + cuantas]
 
 
 def _historial(perfil_id, ya_recibidas, total=12_000):
@@ -105,13 +108,28 @@ def test_doce_mil_asignaciones_anteriores_no_repiten_ninguna(cfg, registrar):
     assert repo.ejecucion["resumen"]["rescatadas"] == 1
 
 
+def test_supabase_con_menos_filas_por_respuesta_no_corta_la_lectura(cfg, registrar):
+    """Riesgo 2 de P-12.1: si Supabase devuelve menos filas de las pedidas (su `max-rows` es menor que la página), una
+    página corta no es el final: se sigue hasta una página vacía y no se repite ninguna."""
+    p = cfg["perfiles"][0]
+    bodega = [_vacante(n) for n in range(6)]
+    nueva = _vacante(99)
+    repo = PostgREST({"panel_asignaciones": _historial(p["id"], [v["id"] for v in bodega])}, max_filas=300)
+    registrar(repo, cfg, bodega + [nueva])
+    assert [a["vacante_id"] for a in repo.asignadas if a["perfil_id"] == p["id"]] == [nueva["id"]]
+    lecturas = [params for ruta, params in repo.lecturas if ruta == "panel_asignaciones"]
+    assert len(lecturas) == 12_000 // 300 + 1 and all(params["limit"] == 500 for params in lecturas)
+
+
 def test_recibidas_se_pide_una_sola_vez_por_corrida(cfg, registrar):
     p = cfg["perfiles"][0]
     repo = PostgREST({"panel_asignaciones": _historial(p["id"], [], total=3)})
     registrar(repo, cfg, [_vacante(n) for n in range(3)])
     lecturas = [params for ruta, params in repo.lecturas if ruta == "panel_asignaciones" and "perfil_id" in params]
-    assert len(lecturas) == 1  # antes: una en reutilizar, otra en el rescate y otra en los posts
-    assert lecturas[0]["order"] == "id" and "id" in lecturas[0]["select"].split(",")
+    primeras = [params for params in lecturas if "id" not in params]  # cada lectura: sus páginas hasta una vacía
+    assert len(primeras) == 1  # antes: una en reutilizar, otra en el rescate y otra en los posts
+    assert len(lecturas) == 2  # las 3 filas y la página vacía que confirma el final
+    assert primeras[0]["order"] == "id" and "id" in primeras[0]["select"].split(",")
     assert repo.ejecucion["resumen"]["rescatadas"] == 3  # lo asignado por un paso lo ve el siguiente: sin repetir
 
 
@@ -151,7 +169,7 @@ def test_el_lote_del_dia_se_lee_completo_aunque_pase_de_500(cfg):
     ejecutor.registrar(repo, {"revision": 1, "configuracion": cfg}, hoy())
     del_dia = [params for ruta, params in repo.lecturas
                if ruta == "entregas_diarias" and params.get("delivery_date") == "eq." + hoy()]
-    assert len(del_dia) == 2 and del_dia[1]["vacante_id"] == "gt." + filas[499]["vacante_id"]
+    assert len(del_dia) == 3 and del_dia[1]["vacante_id"] == "gt." + filas[499]["vacante_id"]  # 500, 100 y vacía
 
 
 # ── paginar: nunca una lectura a medias en silencio ────────────────────────────────────────────────────────────────
@@ -160,7 +178,19 @@ def test_paginar_lee_todo_en_orden_de_clave():
     filas = [{"id": f"{n:04d}"} for n in reversed(range(1234))]
     repo = PostgREST({"t": filas})
     assert [f["id"] for f in paginar(repo.pedir, "t", "id", {"select": "id"}, 100)] == sorted(f["id"] for f in filas)
-    assert len(repo.lecturas) == 13 and all("offset" not in params for _, params in repo.lecturas)
+    assert len(repo.lecturas) == 14 and all("offset" not in params for _, params in repo.lecturas)  # 13 y la vacía
+
+
+def test_paginar_sigue_si_supabase_devuelve_menos_filas_de_las_pedidas():
+    filas = [{"id": f"{n:04d}"} for n in range(1234)]
+    repo = PostgREST({"t": filas}, max_filas=100)
+    assert [f["id"] for f in paginar(repo.pedir, "t", "id", {"select": "id"}, 1000)] == [f["id"] for f in filas]
+    assert len(repo.lecturas) == 14  # 13 páginas cortas (100 de 1.000 pedidas) y la vacía: nada se pierde
+
+
+def test_paginar_falla_si_una_fila_no_trae_la_clave():
+    with pytest.raises(ErrorRepositorio):
+        list(paginar(lambda *a, **k: [{"x": 1}], "t", "id", {}, 2))
 
 
 def test_por_ids_no_filtra_por_la_clave_con_que_pagina():

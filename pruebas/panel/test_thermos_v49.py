@@ -9,6 +9,7 @@ from panel.afinidad import evaluar
 from panel.api import crear_app
 from panel.modelos import Perfil
 from panel.repositorio import ErrorRepositorio, hoy
+from pruebas.postgrest_falso import como_postgrest
 from pruebas.panel.test_buscar_ahora import H, GitHubAnotado, _cliente_con_perfiles, _repo_pedido
 from pruebas.panel.test_espanol_v49 import _vacante
 from pruebas.panel.test_espanol_v49 import cfg  # noqa: F401 — un perfil solo español con meta de 8
@@ -41,6 +42,7 @@ class RepoDelDia(Repo):
             salida.setdefault(a["perfil_id"], set()).add(a["vacante_id"])
         return salida
 
+    @como_postgrest
     def pedir(self, metodo, ruta, **op):
         if ruta == "panel_asignaciones" and metodo == "GET":
             return [{"perfil_id": a["perfil_id"], "vacante_id": a["vacante_id"]} for a in self.asignaciones] \
@@ -186,9 +188,9 @@ def test_un_cargo_retirado_hoy_conserva_su_lote_y_no_tumba_la_busqueda(cfg):  # 
     # La asignación por persona no reparte nada a nombre de ese cargo; si otro cargo vigente la reconoce (v43), le
     # llega a sus perfiles con su propio cargo.
     repo = Repo()
-    repo.pedir = lambda metodo, ruta, **op: (
+    repo.pedir = como_postgrest(lambda metodo, ruta, **op: (
         [{"role_id": retirado, "vacante_id": ya["id"], "match_grade": "exact", "snapshot": ya}]
-        if ruta == "entregas_diarias" else Repo.pedir(repo, metodo, ruta, **op))
+        if ruta == "entregas_diarias" else Repo.pedir(repo, metodo, ruta, **op)))
     ejecutor.registrar(repo, {"revision": 1, "configuracion": cfg}, hoy())
     assert repo.ejecucion["resumen"]["vacantes_anteriores"] == 1 and repo.ejecucion["resumen"]["vacantes_vigentes"] == 0
     assert all(a["cargo_id"] != retirado.split(":")[1] for a in repo.asignaciones)

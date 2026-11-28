@@ -33,20 +33,23 @@ class ErrorRepositorio(Exception):
 def paginar(pedir, ruta, clave, params, tamano=500):
     """Lee TODAS las filas por páginas ordenadas por `clave` (única), pidiendo cada una desde la última leída (keyset),
     sin tope. P-12.1: antes el ejecutor paginaba con OFFSET, sin orden y se detenía en 5.000 filas sin avisar.
-    Nunca devuelve una lectura a medias en silencio: una respuesta que no es una lista, más larga de lo pedido o que
-    no avanza es un error. La página corta marca el final: `tamano` no debe pasar del máximo de filas de PostgREST
-    (Supabase: 1.000). El `select` debe traer la clave."""
+    Nunca devuelve una lectura a medias en silencio: una respuesta que no es una lista, más larga de lo pedido, sin la
+    clave o que no avanza es un error. Solo una página VACÍA marca el final: si PostgREST devuelve menos filas de las
+    pedidas (su máximo de filas por respuesta es menor que `tamano`), se sigue pidiendo desde la última. Cuesta una
+    petición más por lectura. El `select` debe traer la clave."""
     ultimo = None
     while True:
         lote = pedir("GET", ruta, params={**params, "order": clave, "limit": tamano,
                                           **({clave: "gt." + str(ultimo)} if ultimo is not None else {})})
         if not isinstance(lote, list) or len(lote) > tamano:
             raise ErrorRepositorio("Lectura por páginas con una respuesta inesperada.")
-        yield from lote
-        if len(lote) < tamano:
+        if not lote:
             return
+        if clave not in lote[-1]:
+            raise ErrorRepositorio("Lectura por páginas sin la clave para seguir.")
         if lote[-1][clave] == ultimo:
             raise ErrorRepositorio("Lectura por páginas que no avanza.")
+        yield from lote
         ultimo = lote[-1][clave]
 
 

@@ -507,7 +507,7 @@ def leer_recibidas(repo, perfil_ids):
     los tres pasos que completan (reutilizar, rescatar y posts; antes eran tres lecturas). Trae una entrada por cada
     persona pedida, aunque no tenga historial. Si la lectura falla devuelve None con un aviso sin datos de clientes, y
     en esta corrida no se completa a nadie (la siguiente vuelve a intentarlo): con un historial a medias podría
-    repetirse una vacante. Páginas de 500, la mitad del máximo de filas de Supabase."""
+    repetirse una vacante."""
     try:
         return recibidas_de(repo.pedir, perfil_ids, tamano=500)
     except Exception as e:  # noqa: BLE001 — sin el historial completo no se completa a nadie (regla de no repetir)

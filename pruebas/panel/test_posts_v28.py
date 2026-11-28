@@ -6,6 +6,7 @@ from panel.repositorio import hoy
 import pytest
 
 from panel.repositorio import configuracion_demo
+from pruebas.postgrest_falso import como_postgrest
 from pruebas.panel.test_posts import PERFIL, VALIDAS, _post
 
 
@@ -123,6 +124,7 @@ def test_registrar_da_posts_sin_confirmar_solo_hasta_dos_y_marcados(cfg):
     class Repo:
         ejecucion = None
 
+        @como_postgrest
         def pedir(self, metodo, ruta, **op):
             params = op.get("params") or {}
             if params.get("offset"):
