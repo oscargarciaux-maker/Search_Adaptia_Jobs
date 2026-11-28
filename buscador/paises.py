@@ -407,26 +407,44 @@ _APERTURA_EN = re.compile(
     r")(?:the\s+)?")
 _ENTRE_LUGARES_EN = re.compile(r"(?:(?:and|or|the|any|either|of|country|countries|region|time\s+zones?)\s+){0,4}")
 _NEGADA_EN = re.compile(r"\b(?:not|no|cannot|can t|unable|except|excluding|outside)\b")
+# Thermos (P-16.4): la negación también puede venir DESPUÉS de la lista («candidates located in Mexico are not
+# eligible», «…should not apply», «…must apply via our MX page»), y la lista puede describir a la empresa («a fully
+# remote Latin American startup», «remote in LATAM since 2015», «we support customers remotely worldwide»).
+_NEGADA_DESPUES = re.compile(
+    r"\s*(?:\w+\s+){0,4}?(?:(?:are|is|will|would|should|must|may|can|do|does)\s+not\b|cannot\b|can t\b|won t\b|"
+    r"aren t\b|isn t\b|ineligible\b|excluded\b|must\s+apply\s+(?:via|through)\b|"
+    r"no\s+(?:son|seran|pueden|podran|se\s+consideran?)\b|quedan\s+excluid)")
+_DE_LA_EMPRESA = re.compile(r"\s*(?:startups?|teams?|company|companies|business(?:es)?|clients?|customers?|markets?|"
+                            r"offices?|employees|staff|since|firm|agency|ecosystem|operations)\b")
+_SUJETO_EMPRESA = re.compile(r"\b(?:we|we re|we ve|our|us|support|serve|serving|customers|clients)\s+(?:\w+\s+){0,3}$")
 
 
-def _apertura_en(desc):
-    """Los lugares que siguen a una frase de apertura en inglés (texto normalizado), o "". Como `_apertura_nombrada`:
-    solo la lista pegada a la frase. «Anywhere in the US» no es el mundo: un alcance mundial acotado corta la lista."""
+def _lista_tras_apertura(desc, frase, entre, negada):
+    """Los lugares que siguen a una frase de apertura (texto normalizado), o "". Solo la lista pegada a la frase:
+    «abierto a candidatos de colombia y peru» → «colombia y peru», sin lo que venga en la oración siguiente. Primero el
+    lugar tal cual («cualquier parte del mundo» es un alcance entero); si no, tras los conectores. «Anywhere in the US»
+    no es el mundo: un alcance mundial acotado corta la lista (P-16.4)."""
     lugar = _lugares_de_apertura()
-    for m in _APERTURA_EN.finditer(desc):
-        if _NEGADA_EN.search(desc[max(0, m.start() - 35):m.start()]):
+    for m in frase.finditer(desc):
+        if negada.search(desc[max(0, m.start() - 35):m.start()]):
             continue
+        if m.group(0).startswith(("remote", "fully", "100")) and _SUJETO_EMPRESA.search(
+                desc[max(0, m.start() - 30):m.start()]):
+            continue  # «we are a fully remote…», «we have been remote in…», «we support customers remotely…»
         fin = m.end()
         while True:
-            inicio = _ENTRE_LUGARES_EN.match(desc, fin).end() if fin > m.end() else fin
-            hallado = lugar.match(desc, inicio)
+            hallado = lugar.match(desc, fin) or lugar.match(desc, entre.match(desc, fin).end())
             if not hallado or _MUNDO_ACOTADO.match(desc, hallado.start()):
                 break
             fin = hallado.end()
             fin += len(desc[fin:]) - len(desc[fin:].lstrip())
-        if fin > m.end():
+        if fin > m.end() and not (_NEGADA_DESPUES.match(desc, fin) or _DE_LA_EMPRESA.match(desc, fin)):
             return desc[m.end():fin].strip()
     return ""
+
+
+def _apertura_en(desc):
+    return _lista_tras_apertura(desc, _APERTURA_EN, _ENTRE_LUGARES_EN, _NEGADA_EN)
 
 
 _EUROPA_LARGA = ("europe", "europa", "emea", "european union", "union europea")  # «eu» solo es ambiguo («Eu, France»)
@@ -435,7 +453,10 @@ _EUROPA_LARGA = ("europe", "europa", "emea", "european union", "union europea") 
 def _region_en_ubicacion(ubicacion_original, ambito):
     """P-16.4: la ubicación nombra Europa o EMEA como región («Remote, Ireland, Europe, United States», «Remote, Canada,
     EMEA, United States», «Remote - Americas, Remote EU»). «EU» solo en mayúsculas: «Eu, N, France» es un pueblo."""
-    return _nombra(ambito, list(_EUROPA_LARGA)) or re.search(r"\b(?:EU|EMEA)\b", ubicacion_original or "") is not None
+    # Thermos: «LATAM / EU timezone overlap» o «(EU hours)» hablan del horario, no de dónde vive la persona.
+    horario = r"(?!\s*(?:time|timezone|tz|hours|business\s+hours|overlap|shift))"
+    return re.search(r"\b(?:europe|europa|emea|european\s+union|union\s+europea)\b" + horario, ambito or "") is not None \
+        or re.search(r"\b(?:EU|EMEA)\b" + horario, ubicacion_original or "") is not None
 
 
 def _region_es_opcion(ubicacion_original, ambito):
@@ -479,23 +500,7 @@ def _lugares_de_apertura():
 
 
 def _apertura_nombrada(desc):
-    """Los lugares que siguen a una frase de apertura en español (texto normalizado), o "". Solo la lista pegada a la
-    frase: «abierto a candidatos de colombia y peru» → «colombia y peru», sin lo que venga en la oración siguiente."""
-    lugar = _lugares_de_apertura()
-    for m in _APERTURA_ES.finditer(desc):
-        if _NEGADA.search(desc[max(0, m.start() - 35):m.start()]):
-            continue
-        fin = m.end()
-        while True:
-            # Primero el lugar tal cual («cualquier parte del mundo» es un alcance entero); si no, tras los conectores.
-            hallado = lugar.match(desc, fin) or lugar.match(desc, _ENTRE_LUGARES.match(desc, fin).end())
-            if not hallado:
-                break
-            fin = hallado.end()
-            fin += len(desc[fin:]) - len(desc[fin:].lstrip())
-        if fin > m.end():
-            return desc[m.end():fin].strip()
-    return ""
+    return _lista_tras_apertura(desc, _APERTURA_ES, _ENTRE_LUGARES, _NEGADA)
 
 
 def modalidad(titulo, ubicacion, descripcion="", remoto=None):

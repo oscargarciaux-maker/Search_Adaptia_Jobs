@@ -222,8 +222,9 @@ def embudo(del_cargo, p, fecha, recibidas_antes, asignadas_hoy, por_fuente=None,
 
 def causa_de(pasos, enlace, objetivo, hoy_n):
     """(causa, paso) de lo que le falta hoy: el primer paso del embudo que queda por debajo de su meta.
-    P-16.4: si frena «no recibida», las candidatas existen pero ya le llegaron otros días y las que quedan (las nuevas)
-    no alcanzan su meta: es el flujo del mercado, no una pérdida del sistema (ENTREGA.md §6)."""
+    P-16.4: si frena «no recibida», las candidatas existen pero ya le llegaron otros días y las que aún no recibió no
+    alcanzan su meta: es el flujo del mercado, no una pérdida del sistema (ENTREGA.md §6). «nuevas_hoy» (las vistas
+    por primera vez en la última búsqueda) es otra cifra: mide el flujo, no decide la causa."""
     if hoy_n >= objetivo:
         return CAUSA_CUMPLE, ""
     freno = next((k for k in PASOS if pasos[k] < objetivo), "asignada")
@@ -495,8 +496,8 @@ def resumen_md(r):
         "",
         f"**Perfiles: {t['perfiles']} · en 0 algún día: {t['en_0_algun_dia']} · bajo 5 de media: {t['bajo_5_de_media']}"
         f" · estables en su meta: {t['estables_en_meta']}** · cumplen hoy: {t['cumplen_hoy']} · sin datos: "
-        f"{t['sin_datos']} · Comunidad: {t['comunidad']} · faltan hoy: {t['faltan_hoy']} · nuevas de hoy (clientes): "
-        f"{t['nuevas_hoy']}",
+        f"{t['sin_datos']} · Comunidad: {t['comunidad']} · faltan hoy: {t['faltan_hoy']} · nuevas de hoy "
+        f"(pares perfil-vacante de clientes): {t['nuevas_hoy']}",
         "",
         "### Causas (vacantes/día que faltan)",
         _tabla(["causa", "paso", "perfiles", "faltan hoy", "déficit medio 14 d"],

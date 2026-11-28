@@ -90,7 +90,19 @@ def test_la_apertura_suma_sin_quitar_el_pais_del_aviso():
     ("Estonia (Remote, EMEA)", "Fully remote team.", "ES"),  # la región precisa el país; no es una lista de opciones
     ("Colombia", "Location: remote Latin America or Eastern Europe preferred.", "ES"),
     ("Alemania", "Markt Deutschland, remote Europa, deutscher Arbeitsvertrag.", "ES"),
+    # Thermos: la negación después de la lista y las frases de la empresa
+    ("Remote, USA", "Candidates located in Canada or Mexico are not eligible.", "MX"),
+    ("Remote, USA", "Candidates based in Mexico or Brazil will not be considered.", "MX"),
+    ("Remote, USA", "Remote US position. Candidates located in Brazil or Mexico should not apply.", "MX"),
+    ("Remote, USA", "Applicants located in Mexico must apply via our MX entity page instead.", "MX"),
+    ("Remote, USA", "We are a fully remote Latin American startup.", "MX"),
+    ("Remote, USA", "Our 100% remote Latin American team builds payments.", "MX"),
+    ("Remote, USA", "We have been remote in LATAM since 2015.", "MX"),
+    ("Remote, USA", "We work remote across Latin America and the US with distributed teams.", "MX"),
+    ("Remote, USA", "We support customers remotely worldwide.", "MX"),
+    ("Remote, USA", "We are remote for Mexico City clients.", "MX"),
 ])
+
 def test_la_restriccion_real_o_la_frase_de_empresa_no_abren(ubicacion, descripcion, pais):
     assert not pasa(ubicacion, descripcion, pais)
 
@@ -98,3 +110,8 @@ def test_la_restriccion_real_o_la_frase_de_empresa_no_abren(ubicacion, descripci
 def test_una_lista_cerrada_sigue_cerrada_para_los_demas():
     """«candidates based in Colombia, Mexico or Argentina» no abre Chile."""
     assert not pasa("Buenos Aires, Argentina", "Location: fully remote, based in Colombia, Mexico or Argentina.", "CL")
+
+
+@pytest.mark.parametrize("ubicacion", ["Remote, LATAM / EU timezone overlap", "Remote - Latin America (EU hours)"])
+def test_eu_como_horario_no_abre_europa(ubicacion):
+    assert pasa(ubicacion, "Fully remote team.", "MX") and not pasa(ubicacion, "Fully remote team.", "ES")

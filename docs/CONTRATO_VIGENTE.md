@@ -60,7 +60,8 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
   will be based remotely in…» o «remotely from anywhere in the world» **suman** los países de la lista que sigue a una
   remota que nombra un país concreto, también si ese país es de fuera (la sede: «Remote, USA» + «open to candidates
   residing in Latin America»); nunca recortan ni pisan una restricción de residencia. «Anywhere in the US» no es el
-  mundo y «Eastern Europe» no es España. Las frases de la empresa («our team based in…», «clients worldwide»), de
+  mundo, «Eastern Europe» no es España y «… are not eligible» después de la lista no abre. Las frases de la empresa
+  («our team based in…», «a fully remote Latin American startup», «clients worldwide»), de
   beneficios o vagas no abren nada (v50; P-16.4).
 - **Región escrita en la ubicación** junto a países de fuera: «Remote, Ireland, Europe, United States» o «Remote,
   Canada, EMEA, United States» abren Europa; «Remote - Americas, Remote EU», LATAM y Europa. «EU» solo cuenta en
