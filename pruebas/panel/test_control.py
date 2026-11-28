@@ -268,7 +268,9 @@ def test_api_demo_guarda_conflictos_programa_y_bloquea_origen_ajeno():
         assert resultados["listas"] == 50
         msg = c.get("/api/whatsapp/" + cfg["borrador"]["clientes"][0]["id"]).json()
         # Contrato v43: 10 por defecto y 2 por empresa (la demostración tiene 5 empresas); el resto, «Tengo N más».
-        assert msg["vacantes"] == 10 and "Hola" in msg["texto"] and msg["sobran"] == 40 and "Tengo 40" in msg["texto"]
+        from panel.borradores import SALUDOS  # el saludo cambia con la fecha («¡Buen día!» el 28 nov)
+        assert msg["vacantes"] == 10 and msg["sobran"] == 40 and "Tengo 40" in msg["texto"]
+        assert any(msg["texto"].startswith(s.split("{")[0]) for s in SALUDOS)
         assert "service_role" not in c.get("/api/session").text
 
 
