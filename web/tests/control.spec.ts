@@ -337,7 +337,10 @@ test("gestión completa: clientes, términos abiertos, cupos, programación y Wh
   await dialog
     .getByRole("button", { name: "Copiar el mensaje", exact: true })
     .click();
-  const tres = await page.evaluate(() => navigator.clipboard.readText());
+  // En Windows el portapapeles devuelve los saltos como \r\n: se normalizan a \n.
+  const tres = (
+    await page.evaluate(() => navigator.clipboard.readText())
+  ).replace(/\r\n/g, "\n");
   expect((tres.match(/https:\/\//g) || []).length).toBe(3);
   expect(tres).toContain("Tengo 47 vacantes más");
   // Contrato v48: cada vacante lleva su número corto, el mismo del panel y del CSV.
@@ -1646,7 +1649,10 @@ test("contrato v31: mi número, mandarme todos a mi WhatsApp y lista de enviados
   await page
     .getByRole("button", { name: "Copiar mensaje", exact: true })
     .click();
-  const copiado = await page.evaluate(() => navigator.clipboard.readText());
+  // En Windows el portapapeles devuelve los saltos como \r\n: se normalizan a \n.
+  const copiado = (
+    await page.evaluate(() => navigator.clipboard.readText())
+  ).replace(/\r\n/g, "\n");
   expect(copiado).toBe(decodeURIComponent(href.split("text=")[1]));
   expect(copiado).toContain("\n\n");
   // Lista de enviados: marcar uno sube la cuenta.

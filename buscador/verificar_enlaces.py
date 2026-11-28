@@ -35,6 +35,9 @@ _NEGACION = re.compile(r"(?:never|not required|no fees|no payment|do not charge|
                        r"no (?:te )?pediremos|sin (?:coste|costo|pago)|não cobramos)", re.I)
 _BLOQUEO = re.compile(r"captcha|verify (?:you are|you're) human|access denied|checking your browser|just a moment", re.I)
 _LOGIN = re.compile(r"^(?:sign in|log in|iniciar sesi[oó]n|acceder|login)(?:\s|$)", re.I)
+# El paso «Postular» de un portal que pide su propia cuenta (P-11.1): /login, /webpros/login, /users/sign_in…
+_RUTA_LOGIN = re.compile(r"/(?:log-?in|sign[-_]?in|ingresar|iniciar[-_]sesion)(?:/|$)", re.I)
+POSTULAR_CON_CUENTA = "ficha específica accesible; postular pide cuenta del portal"
 _APLICAR = re.compile(r"^(?:apply(?: now| for (?:this )?(?:job|position))?|postular(?:me)?|aplicar(?: ahora)?|"
                        r"candidatar(?:-se)?|inscrever-se|solicitar (?:este )?empleo)$", re.I)
 
@@ -220,6 +223,12 @@ def contenido(html, url, titulo, ahora):
     return "verificada", "ficha específica accesible", aplicar
 
 
+def _login_del_portal(destino, sitio_ficha, ruta=False):
+    """El paso «Postular» de una ficha ya aprobada sigue en el mismo sitio (y, con `ruta`, su dirección es de login)."""
+    return bool(sitio_ficha) and enlaces.host(destino) == sitio_ficha and (
+        not ruta or bool(_RUTA_LOGIN.search(urlparse(destino).path)))
+
+
 def comprobar(url, titulo, *, sesion=None, validar_url=publica, ahora=None, plazo=None, max_saltos=5, max_bytes=1_000_000):
     ahora = ahora or datetime.now(timezone.utc)
     propia = sesion is None
@@ -259,7 +268,12 @@ def comprobar(url, titulo, *, sesion=None, validar_url=publica, ahora=None, plaz
             timeout = min(12, max(0.1, plazo - time.monotonic())) if plazo else 12
             estado, motivo, codigo = jobint.estado_del_aviso(sesion, url, titulo, _coincide, timeout, NAVEGADOR)
             return resultado(estado, motivo)
+        sitio_ficha = ""  # el sitio de la ficha ya aprobada, cuando se sigue su paso de aplicación
         while True:
+            if _login_del_portal(destino, sitio_ficha, ruta=True):
+                # P-11.1 (decisión de Oscar del 28 nov): «Postular» lleva al inicio de sesión del mismo portal (Get on
+                # Board pide su cuenta): la ficha ya abierta comprueba la vacante. En otro sitio, el login no cuenta.
+                return resultado("verificada", POSTULAR_CON_CUENTA)
             if plazo and time.monotonic() >= plazo:
                 return resultado("pendiente", "presupuesto de comprobación agotado")
             clave = urldefrag(destino)[0]
@@ -303,8 +317,11 @@ def comprobar(url, titulo, *, sesion=None, validar_url=publica, ahora=None, plaz
             if estado == "verificada" and siguiente and not pasos_aplicacion:
                 # Solo un paso visible de aplicación, sin enviar formularios ni recorrer cuentas.
                 pasos_aplicacion += 1
+                sitio_ficha = enlaces.host(destino)
                 destino = siguiente
                 continue
+            if _login_del_portal(destino, sitio_ficha) and motivo == "requiere iniciar sesión":
+                return resultado("verificada", POSTULAR_CON_CUENTA)
             return resultado(estado, motivo)
     except (requests.RequestException, ValueError, OSError):
         return resultado("pendiente", "error de conexión o URL no comprobable")
@@ -463,10 +480,11 @@ def cola_de_seleccion(vacantes, entregadas, hoy, cache, iniciales, maximo, ahora
 
 def cola_por_necesidad(vacantes, hoy):
     """Contrato v49 (solo modo panel): las candidatas de cada persona, por turnos y primero quien tiene menos
-    (`entrega.candidatas_por_persona`). Antes la cola salía solo de lo que elegiría el lote: de 21 remotas en español
-    abiertas a Colombia para un cargo, 1 tenía el enlace comprobado, y sin enlace comprobado no se completa a nadie."""
+    candidatas con el enlace comprobado (P-11.1), hasta `entrega.POR_PLAZA` por plaza de su meta. Antes la cola salía
+    solo de lo que elegiría el lote: de 21 remotas en español abiertas a Colombia para un cargo, 1 tenía el enlace
+    comprobado, y sin enlace comprobado no se completa a nadie."""
     from buscador import entrega
-    return entrega.candidatas_por_persona(vacantes, hoy)
+    return entrega.colas_por_persona(vacantes, hoy)[0]
 
 
 def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, cfg=None):
@@ -497,8 +515,13 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
     por_necesidad = 0
     # Contrato v49: primero las candidatas de cada persona, con la mitad del presupuesto que queda. Contrato v50: esa
     # mitad es para los sitios en paralelo; las de LinkedIn van aparte, hasta donde alcance su parte del tiempo.
+    # P-11.1 (28 nov): detrás del tope de cada persona va el resto de sus candidatas por abrir. LinkedIn, de una en una,
+    # se come todo el tiempo de cada fase y los demás sitios solo avanzan con lo que esté en la misma fase: la Bodega
+    # del 27 abrió 213 enlaces con cupo de 800 y 600 s, y Computrabajo, Bumeran, Laborum o Magneto casi nunca.
     try:
-        necesidad = cola_por_necesidad(vacantes, hoy)
+        from buscador import entrega
+        con_tope, resto = entrega.colas_por_persona(vacantes, hoy)
+        necesidad = con_tope + resto
         if necesidad and revisadas_n < maximo:
             parte = 3 if incremental else 2
             cupo = max(1, (maximo - revisadas_n) // parte)
