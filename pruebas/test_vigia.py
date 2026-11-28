@@ -8,7 +8,6 @@ import re
 from types import SimpleNamespace
 
 import pytest
-import requests
 import yaml
 
 from buscador import almacen_respaldos as ar, arranque, vigia
