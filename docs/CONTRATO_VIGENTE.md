@@ -302,7 +302,7 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
 | InfoJobs (ES) | Nunca se abre la ficha (captcha). 5 búsquedas por corrida y 15 páginas al día; se detiene al primer captcha. Con `INFOJOBS_CLIENT_ID`/`INFOJOBS_CLIENT_SECRET` usa la API oficial (solo en `bodega.yml` y `profunda.yml`): una ficha de hoy «activo» con descripción comprueba, «archivado» o «borrado» cierra, lo demás —también un 404— no decide; la captura horaria y el panel no reciben las claves y vale la comprobación de la última búsqueda (24 h) | v50 |
 | Tecnoempleo (ES) | Portal (no agregador) por decisión de Oscar; ficha con `JobPosting`; comprobación normal | v50 |
 | Tableros remotos | Remotive y Working Nomads con el enlace original; Himalayas, We Work Remotely, RemoteOK y Jobicy solo aportan empresas | reglas de integridad |
-| Apify | Ver §10 | v11, v28 |
+| Apify | Ver §10: solo posts para quien va corto | v11, v28, P-16.2 |
 | Descartadas | OCC (bloquea); Brave y avisos por correo retirados el 16 nov | v27, v50 |
 
 - Cualquier país del mundo se busca, como mínimo, con LinkedIn, portales de empresas y remotas de Get on Board (v44).
@@ -317,20 +317,33 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
 
 ## 10. Posts y Apify
 
-- **Apify:** actor formal `curious_coder/linkedin-jobs-scraper` (build fijado en `datos/config.yaml`) sin cookies, con
-  reservas durables antes de cada ejecución (Supabase, SQL 023). Dos cifras en `datos/config.yaml` (8.2, decisión de
-  Oscar del 28 nov): `tope_mensual_usd` = el crédito del plan contratado (hoy **5**, cuenta gratis; con Starter, 19) y
-  nunca se reserva más en el mes, aunque haya reintentos; `ritmo_diario_usd` = lo que se puede reservar por día (hoy
-  **0,63** = 19/30, el ritmo de Starter: los USD 5 se gastan en unos 8 días para medir si vale la pena comprarlo; sin
-  esa cifra, el tope se reparte entre los días del mes). En modo panel solo busca para perfiles bajo el umbral del rescate pagado
-  (`cobertura.rescate_bajo`, hoy 5; sube a 10 al comprar Starter): **primero los
-  que viven (o aceptan oficina) en un país sin fuente local** (la regla de la 8.1; Indeed cuenta como local), después
-  el resto con déficit, el de más déficit primero; con quien solo habla español, primero en español (v11, v44). Una
-  clave rechazada detiene la fuente y avisa. **Si Apify dice que el plan no tiene crédito** (HTTP 402 o sus tipos de
-  error de uso agotado; no `limit-reached`, que es genérico) es un **aviso, no una avería**: el mes queda bloqueado con
-  el tope que había y la fuente no vuelve a reservar hasta el mes siguiente, salvo que se suba el tope (se compró un
-  plan mayor). El ciclo de crédito de Apify va por fecha de facturación, no por mes calendario. Otro aviso cuando lo reservado del mes pasa del **80 %** del tope. El feed pagado de posts sigue
-  desactivado (`publicaciones_por_dia=0`).
+- **Apify = posts para quien va corto (P-16.2, idea de Oscar del 28 nov).** Todo el crédito va a posts de LinkedIn
+  (actor `harvestapi/linkedin-post-search`, pago por post, sin cookies ni sesión): el mercado oculto que la búsqueda
+  gratis no ve. El rescate de fichas formales (`curious_coder/linkedin-jobs-scraper`, build fijado) queda **apagado**
+  (`apify.rescate_busquedas: 0`; se puede volver a encender): traía las mismas fichas que LinkedIn gratis (el 28 nov,
+  147 de 154 ya recibidas y el 84 % no pasaba el lugar). El feed general sin perfil sigue apagado
+  (`publicaciones_por_dia=0`). Reservas durables antes de cada ejecución (Supabase, SQL 023). Cifras de
+  `datos/config.yaml`: `tope_mensual_usd` = el crédito del plan (hoy **5**, cuenta gratis; con Starter, 19), nunca se
+  reserva más en el mes, aunque haya reintentos; `ritmo_diario_usd` = lo que se puede reservar por día (hoy **0,16** =
+  5/31: alcanza un mes de 31 días aunque el ciclo de Apify no empiece el día 1; con Starter, 0,61); `posts_rescate` =
+  tope de posts por corrida (300): se piden los que caben en lo reservado del día (≈ USD 0,002 por post + 0,01 por
+  corrida: **75 al día** con la cuenta gratis, 300 con Starter), sin tocar la cifra al cambiar de plan;
+  `posts_consultas` = consultas por corrida (12; cada una trae hasta posts ÷ consultas). Solo para perfiles bajo el
+  umbral del rescate pagado (`cobertura.rescate_bajo`, hoy 5; sube a 10 al comprar Starter): **primero quien hoy va
+  en 0**, después quien vive (o acepta oficina) en un país sin fuente local (la regla de la 8.1; Indeed cuenta como
+  local), después el de más déficit. Una clave rechazada detiene la fuente y avisa. **Si Apify dice que el plan no
+  tiene crédito** (HTTP 402 o sus tipos de error de uso agotado; no `limit-reached`, que es genérico) es un **aviso, no
+  una avería**: el mes queda bloqueado con el tope que había y la fuente no vuelve a reservar hasta el mes siguiente,
+  salvo que se suba el tope (se compró un plan mayor). El ciclo de crédito de Apify va por fecha de facturación, no por
+  mes calendario. Otro aviso cuando lo reservado del mes pasa del **80 %** del tope.
+- **Consultas de posts (P-16.2):** cada persona que va corta aporta las suyas y se toman por turnos, una de cada una
+  por vuelta: palabras de contratación **en el idioma del perfil** (español: contratando, vacante, buscamos, «estamos
+  buscando»; inglés: hiring, «we are hiring», «join our team») + un nombre del cargo entre comillas (de dos palabras o
+  más si los hay; sin cercanos; en español se alternan los títulos en español y los generales; cada día rota uno, y
+  entran los términos ampliados de la 14.2 cuando existan) + «remoto»/«remote» si acepta remoto (quien acepta oficina,
+  también sin modalidad). **Nunca un país ni una ciudad:** remoto = de todo el mundo con los demás requisitos (decisión
+  de Oscar, 28 nov), y así la consulta no lleva datos de nadie (solo cargo, idioma y modalidad). Solo posts de las
+  últimas 24 h (cada noche, posts nuevos).
 - **Medición de Apify** (8.2): por corrida (`apify` en el reporte) y acumulada en el mes (`trabajo/apify_medicion.json`),
   solo cifras: USD reservados y reportados por Apify, avisos traídos, vacantes de la selección que **solo** trajo
   Apify, las que llegaron a un cliente («útiles»), perfiles que llegan a 5 gracias a ellas y USD por vacante útil. En
@@ -341,8 +354,11 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
   «Post», después de las vacantes formales (al asignarlos, solo completan hasta el mínimo de 5 de la selección); filtro estricto contra basura; nunca van a `ofertas`, al cupo ni a `trabajo/`. Si enlazan una ficha formal
   legible, se entrega esa ficha (v11).
 - Ubicación de posts por pistas (autor, prefijo, moneda, dominio, empresa, ficha enlazada). Un post sin pistas puede
-  completar el mínimo con «ubicación sin confirmar»; máximo 2 posts con país o modalidad perdonados por perfil al día;
-  `posts_rescate` 50 (v28, v49).
+  completar el mínimo con «ubicación sin confirmar»; máximo 2 posts con país o modalidad perdonados por perfil al día
+  (v28, v49). **Un post «remoto» que no dice para qué países** también queda «ubicación sin confirmar» (antes se
+  descartaba como «elegibilidad regional por confirmar»: 8 de 23 el 28 nov); las pistas de dónde está la empresa no se
+  usan para él (no dicen a quién contrata en remoto) y, si el texto o la ficha enlazada dicen la región, manda eso
+  (P-16.2).
 
 ## 11. «Por confirmar» y aprendizaje
 

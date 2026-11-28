@@ -53,27 +53,35 @@ refuerzo:
   indeed_busquedas: 6
   getonbrd_busquedas: 6
 
-# Apify: ofertas formales de LinkedIn para perfiles bajo `cobertura.rescate_bajo`. Actor comprobado contra su esquema
-# público; no se envían cookies ni sesión personal. Las reservas conservadoras de cargo se guardan (Supabase, SQL 023,
-# y su espejo trabajo/apify_presupuesto.json) antes de cada ejecución. Además del límite por consulta y corrida, hay dos cifras:
+# Apify (P-16.2, idea de Oscar del 28 nov): el crédito va entero a POSTS de LinkedIn («estamos contratando…», el
+# mercado oculto) para los perfiles bajo `cobertura.rescate_bajo`, primero quien hoy va en 0. Las fichas formales de
+# LinkedIn ya las trae gratis la búsqueda pública (el 28 nov, 147 de 154 del rescate formal ya se habían recibido).
+# Sin cookies ni sesión personal. Las reservas conservadoras se guardan (Supabase, SQL 023, y su espejo
+# trabajo/apify_presupuesto.json) antes de cada ejecución. Cifras:
 # - tope_mensual_usd: el crédito del plan contratado. Hoy 5 (cuenta gratis: Apify BLOQUEA al agotarlo). Al comprar
 #   Starter (USD 19/mes con USD 19 de uso incluidos), cambiar a 19. Nunca se reserva más que esto en el mes.
-# - ritmo_diario_usd: lo que se puede gastar por día. 0,63 = 19/30, el ritmo de Starter (sección 8.2: la prueba gasta
-#   los USD 5 gratis a ese ritmo, en unos 8 días, para medir si vale la pena). Para volver al reparto parejo del
-#   tope entre los días del mes, borrar la línea.
+# - ritmo_diario_usd: lo que se puede reservar por día. 0,16 = 5/31: los USD 5 alcanzan el mes entero, aunque tenga
+#   31 días y aunque el ciclo de Apify no empiece el día 1 (31 × 0,16 = 4,96). Con Starter: 0,61 (19/31).
+# - posts_rescate: TOPE de posts por corrida. Lo que se pide es lo que cabe en el ritmo del día: (0,16 − 0,01) / 0,002
+#   = 75 posts con la cuenta gratis (≈ USD 2 por 1.000 posts + 0,01 de margen); con Starter, 300. No hay que tocarlo.
+# - posts_consultas: consultas por corrida (cargo + idioma del perfil + «remoto»/«remote», sin país); cada una trae
+#   hasta posts ÷ consultas (75 ÷ 12 = 6).
+# - rescate_busquedas: búsquedas de fichas formales (actor_linkedin) para quien va corto. 0 = apagado; si se enciende,
+#   cada una reserva tope_consulta_usd y lo que gasten deja menos para los posts ese día.
 # Si Apify dice que el plan no tiene crédito, la fuente se detiene hasta el mes siguiente (aviso, no avería).
-# La búsqueda pagada del feed queda desactivada para priorizar las fichas formales con este crédito.
+# El feed general de posts (publicaciones_por_dia, sin perfil) sigue apagado: sus consultas no son las de quien va corto.
 apify:
   actor_publicaciones: "harvestapi/linkedin-post-search"
-  publicaciones_por_dia: 0  # reservar el crédito gratuito para fichas de empleo
+  publicaciones_por_dia: 0  # feed general sin perfil: apagado (el crédito va a los posts de quien va corto)
   actor_linkedin: "curious_coder/linkedin-jobs-scraper"
-  rescate_busquedas: 16        # modo panel: búsquedas dirigidas a perfiles bajo cobertura.rescate_bajo (16 × 0,025 = USD 0,40 del ritmo diario)
-  posts_rescate: 50            # modo panel: posts de LinkedIn para quien sigue bajo cobertura.rescate_bajo (≈USD 0,11; contratos v11 y v28)
+  rescate_busquedas: 0         # P-16.2: fichas formales apagadas en modo panel (antes 16 = USD 0,40 al día)
+  posts_rescate: 300           # P-16.2: tope por corrida; con la cuenta gratis caben 75 al día (contratos v11 y v28)
+  posts_consultas: 12          # P-16.2: consultas de posts por corrida
   build_linkedin: "1.7.18"
   ofertas_por_busqueda: 10
   tope_consulta_usd: 0.025
   tope_mensual_usd: 5          # plan contratado: gratis = 5; Starter = 19
-  ritmo_diario_usd: 0.63       # ritmo de Starter (19/30)
+  ritmo_diario_usd: 0.16       # 5/31 (gratis); con Starter, 0.61 (19/31)
   actor_linkedin_respaldo: ""
   tope_por_corrida_usd: 3
 

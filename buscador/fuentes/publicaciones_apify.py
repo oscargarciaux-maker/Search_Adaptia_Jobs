@@ -212,6 +212,12 @@ def a_vacante(item, familias_validas, hoy=None, max_dias=30, empresas_pais=None)
         if not nombrados:
             nombrados, deducida = pistas_ubicacion(texto, item, empresa, empresas_pais)
         sin_confirmar = not nombrados
+    elif not nombrados:
+        # P-16.2: «remoto» sin decir para qué países. Antes se descartaba siempre («elegibilidad regional por
+        # confirmar»: 8 de 23 el 28 nov). Las pistas de dónde está la empresa no dicen a quién contrata en remoto, así
+        # que no se deduce nada: queda «ubicación sin confirmar» (v28), marcada y con el tope de 2 por perfil y día. Si
+        # el texto o la ficha enlazada sí dicen la región, manda eso.
+        sin_confirmar = True
     if not ACCION.search(t) and not re.search(r"https?://", texto):
         return None, "no pide postular ni escribir"
     fecha = str(_campo(item, "postedAt.date", "postedAt", "publishedAt", "date"))[:10]
@@ -319,15 +325,35 @@ def buscar(cliente, actor, consultas, familias_validas, hoy, maximo=60, token=No
                     "descartadas": motivos, **gasto([ejecucion])}
 
 
-def consultas_post(terminos, maximo=2, lugares=()):
-    """Consultas del buscador de posts para un cargo: contratación + el término exacto (máx. 5 operadores). Contrato
-    v28: con `lugares` (países de los perfiles con déficit o «remoto»), una consulta más por lugar con el primer
-    término, para traer posts que sí nombran dónde es."""
-    terminos = list(dict.fromkeys(terminos))
-    salida = [f'(hiring OR contratando OR vacante OR buscamos) "{t}"' for t in terminos[:maximo]]
-    if terminos:
-        salida += [f'(hiring OR contratando OR buscamos) "{terminos[0]}" {lugar}' for lugar in lugares]
-    return salida
+# P-16.2: precio del actor de posts (harvestapi/linkedin-post-search, pago por post: «USD 2 por 1.000» en su página;
+# el 28 nov Apify informó USD 0,049 por 23 posts) y un margen fijo por corrida. Solo sirve para reservar: Apify nunca
+# cobra más que lo reservado (`maxTotalChargeUsd`).
+USD_POR_POST, USD_POR_CORRIDA = 0.002, 0.01
+
+
+def costo_posts(n):
+    """Lo que se reserva para pedir `n` posts."""
+    return round(n * USD_POR_POST + USD_POR_CORRIDA, 3)
+
+
+def posts_que_caben(reservado, maximo):
+    """Posts que se pueden pedir con lo reservado, sin pasar de `maximo` (al menos 1: Apify corta en lo reservado)."""
+    return max(1, min(int(maximo), int((float(reservado) - USD_POR_CORRIDA) / USD_POR_POST + 1e-9)))
+
+
+# P-16.2: palabras de contratación en el idioma del perfil, para que el post venga en ese idioma (un post en español
+# suele nombrar el cargo en inglés: «Buscamos Product Designer»), y la modalidad en ese idioma. Nunca un país ni una
+# ciudad: remoto = de todo el mundo con los demás requisitos (decisión de Oscar, 28 nov), y así la consulta no lleva
+# datos de nadie (solo cargo, idioma y modalidad).
+CONTRATA_POST = {"es": '(contratando OR vacante OR buscamos OR "estamos buscando")',
+                 "en": '(hiring OR "we are hiring" OR "join our team")'}
+REMOTO_POST = {"es": "remoto", "en": "remote"}
+
+
+def consulta_post(termino, idioma="en", remoto=False):
+    """Una consulta del buscador de posts: contratación en `idioma` + el término exacto (+ «remoto»/«remote»)."""
+    salida = f'{CONTRATA_POST.get(idioma, CONTRATA_POST["en"])} "{termino}"'
+    return f"{salida} {REMOTO_POST.get(idioma, REMOTO_POST['en'])}" if remoto else salida
 
 
 # Lectura acotada compartida con la ficha del panel (contrato v29): mismos límites que en el contrato v28.
@@ -370,9 +396,12 @@ def buscar_posts(cliente, actor, consultas, familias_validas, hoy, maximo=30, to
     if not consultas or maximo <= 0:
         return [], [], {"omitida": "sin consultas o sin posts en el presupuesto"}
     control_gasto = control_gasto or Presupuesto({}, hoy)
-    cargo = control_gasto.reservar(round(maximo * 0.002 + 0.01, 3))  # ≈ USD 2 por 1.000 posts
+    cargo = control_gasto.reservar(costo_posts(maximo))
     if not cargo:
         return [], [], {"omitida": "presupuesto de Apify agotado", **_sin_reserva(control_gasto)}
+    # P-16.2: `maximo` es un tope; lo que se pide es lo que cabe en lo reservado (el ritmo del día). Así el mismo
+    # `posts_rescate` sirve con la cuenta gratis y con Starter, sin tocarlo. Apify nunca cobra más que `cargo`.
+    maximo = posts_que_caben(cargo, maximo)
     items, ejecucion = ejecutar(cliente, actor, entrada(actor, consultas, max(1, maximo // len(consultas)), hoy), token,
                                 cargo, max_items=maximo, limite_segundos=180)
     if ejecucion.get("credito_agotado"):
