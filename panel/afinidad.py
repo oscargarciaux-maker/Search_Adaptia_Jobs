@@ -29,18 +29,44 @@ def ligera(datos, descripcion=None):
     return v
 
 
-# Contrato v27: regla del sistema (no del perfil): nunca se entrega una vacante publicada hace más de 30 días.
-def _dias_maximos():
+def _config_yaml():
+    """`datos/config.yaml` como dict; vacío si no se puede leer (entonces se usan los valores del contrato)."""
     try:
         import yaml
         from pathlib import Path
         ruta = Path(__file__).resolve().parent.parent / "datos" / "config.yaml"
-        return int(yaml.safe_load(ruta.read_text(encoding="utf-8")).get("dias_maximos", 30))
-    except Exception:  # noqa: BLE001 — sin config se usa el valor del contrato
+        datos = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+        return datos if isinstance(datos, dict) else {}
+    except Exception:  # noqa: BLE001 — sin config se usan los valores del contrato
+        return {}
+
+
+# Contrato v27: regla del sistema (no del perfil): nunca se entrega una vacante publicada hace más de 30 días.
+def _dias_maximos():
+    try:
+        return int(_config_yaml().get("dias_maximos", 30))
+    except (TypeError, ValueError):
         return 30
 
 
 ANTIGUEDAD_SISTEMA = _dias_maximos()  # el mismo límite que usa la captura (`datos/config.yaml`)
+
+
+def _umbrales_cobertura():
+    """P-11.3 (decisión de Oscar, 28 nov): dos cifras separadas en `datos/config.yaml` → `cobertura`.
+    - aviso_bajo (10, la meta): desde cuántas vacantes al día el operador deja de ver a la persona como «va corta»
+      (cobertura por persona, huecos por país, aviso al guardar, «Cobertura limitada», resumen del panel).
+    - rescate_bajo (5): bajo esta cifra se gasta el rescate (refuerzo gratuito, Apify y posts de LinkedIn).
+    Un valor que falta o no es un entero positivo vuelve al del contrato, sin mover la otra cifra."""
+    datos = _config_yaml().get("cobertura") or {}
+    salida = []
+    for clave, defecto in (("aviso_bajo", 10), ("rescate_bajo", 5)):
+        valor = datos.get(clave, defecto) if isinstance(datos, dict) else defecto
+        salida.append(valor if isinstance(valor, int) and not isinstance(valor, bool) and valor > 0 else defecto)
+    return tuple(salida)
+
+
+AVISO_BAJO, RESCATE_BAJO = _umbrales_cobertura()
 AVISO_RESTRICCION = {"salario menor al aceptado": "Salario menor al que pide",
                      "menciona algo que el perfil no acepta": "Menciona algo que no acepta",
                      "tipo de contrato no aceptado": "Tipo de contrato que no acepta"}
@@ -111,6 +137,8 @@ def faltas(resultado):
 
 # Contrato v9: niveles de ampliación para que cada perfil reciba un mínimo diario. País, idioma, plazo, enlace y los
 # requisitos que el aviso sí declara nunca se amplían.
+# Es el mínimo de la SELECCIÓN (ampliadas, reutilizar, completar, posts asignados, comunidad, turnos): no sale de
+# `config.yaml`. Los avisos usan AVISO_BAJO y el rescate pagado RESCATE_BAJO (P-11.3).
 MINIMO_POR_PERFIL = 5
 # Contrato v27: los datos sin informar ya no descartan y los cargos cercanos entran directamente, así que solo quedan como
 # último recurso la remota abierta a su país (un perfil sin «remoto») y más vacantes de la misma empresa (v11).

@@ -91,7 +91,7 @@ def test_linkedin_deja_la_mitad_del_tiempo_para_leer_fichas():
 def test_cobertura_por_persona_en_la_demostracion():
     r = servicio.cobertura(RepositorioDemo())
     assert r["perfiles"] and {f["estado"] for f in r["perfiles"]} <= {"cubierto", "pendiente", "sin_datos"}
-    corto = next(f for f in r["perfiles"] if f["hoy"] < 5)
+    corto = next(f for f in r["perfiles"] if f["hoy"] < r["minimo"])
     assert corto["estado"] == "sin_datos" and corto["causa"]  # la demo solo tiene una búsqueda
     assert all(f["listas"] >= 0 and f["por_comprobar"] >= 0 for f in r["perfiles"])
     assert set(r["grupos"]) == {"cargo", "pais", "idioma"} and "no es una promesa" in r["nota"]
@@ -112,7 +112,7 @@ def test_cobertura_avisa_a_quien_lleva_3_dias_bajo_el_minimo():
 def test_api_de_cobertura():
     api = TestClient(crear_app(demo=True, repositorio=RepositorioDemo()))
     r = api.get("/api/cobertura")
-    assert r.status_code == 200 and r.json()["minimo"] == 5
+    assert r.status_code == 200 and r.json()["minimo"] == servicio.AVISO_BAJO == 10  # P-11.3: la meta, no el rescate
 
 
 # ── Matriz de oficios que no están en el mapa ───────────────────────────────────────────────────────────────────────
