@@ -468,9 +468,12 @@ def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None, todas=None,
             if r["vacante_id"] in originales:
                 originales[r["vacante_id"]]["resumen"] = res  # la copia en memoria ya no lo vuelve a calcular
         frase = r.get("pista", "") if r.get("motivo") in DUDAS_DE_CARGO else res.get("frase", "")
-        salida.append({**{k: res.get(k, "") for k in ("titulo", "empresa", "ubicacion", "modalidad", "salario",
+        # P-7.F: el resumen guardado de noche trae el texto del portal; se corrige al mostrar, no al guardar.
+        lugar, lugar_portal = paises.ubicacion_a_mostrar(res.get("ubicacion"))
+        salida.append({**{k: res.get(k, "") for k in ("titulo", "empresa", "modalidad", "salario",
                                                        "idioma", "publicada", "enlace", "sugerida", "por_que",
                                                        "nivel", "extracto")},
+                       "ubicacion": lugar, "ubicacion_portal": lugar_portal,
                        "cargos": sorted({nombres_cargo.get(p.get("cargo_id"), "") for p in r.get("perfiles") or []}
                                         - {""}),
                        "vacante_id": r["vacante_id"], "paises_sugeridos": res.get("paises_sugeridos") or [],
@@ -694,7 +697,7 @@ def exportar_csv(repo, fecha):
         nombres = sorted({clientes.get(p["cliente_id"], "") for p in r.get("perfiles") or []} - {""})
         filas.append(((s["grupo"], -r.get("prioridad", 0)), [
             ETIQUETA[s["decision"]], texto_paises(s["paises"]), s["motivo"], datos.get("titulo", ""),
-            datos.get("empresa", ""), datos.get("ubicacion", ""), datos.get("modalidad", ""), s["frase"],
+            datos.get("empresa", ""), paises.corregir_ubicacion(datos.get("ubicacion")), datos.get("modalidad", ""), s["frase"],
             datos.get("enlace", ""), ", ".join(nombres), "", "", por_id.get(r["vacante_id"], ""), r["vacante_id"]]))
     for _, fila in sorted(filas, key=lambda x: x[0]):
         escritor.writerow(fila)
@@ -936,6 +939,8 @@ def exportar_base(repo, fecha=None, cliente_id=None, todo=False):
     escritor = csv.writer(salida)
     escritor.writerow(columnas + ["numero"])  # contrato v48: el «ID 1234» de los mensajes, al final
     for f in incluidas:
+        # P-7.F: `ofertas.location` guarda el texto del portal (v1 no se reescribe); el CSV lleva el corregido.
+        f = {**f, "location": paises.corregir_ubicacion(f.get("location"))} if f.get("location") else f
         escritor.writerow([_celda(c, f.get(c)) for c in columnas] + [por_id.get(f.get("vacante_id"), "")])
     return "\ufeff" + salida.getvalue(), len(incluidas), len(filas) - len(incluidas), sin_fila
 

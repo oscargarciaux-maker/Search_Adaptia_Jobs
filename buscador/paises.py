@@ -91,6 +91,15 @@ def corregir_ubicacion(ubicacion):
     """La ubicación corregida si el texto entero está en `datos/ubicaciones_corregidas.yaml`; si no, la misma."""
     return ubicaciones_corregidas().get(clave(ubicacion), ubicacion or "")
 
+
+def ubicacion_a_mostrar(ubicacion):
+    """P-7.F (27 nov): (lo que ve el cliente, lo que escribió el portal si se corrigió). El cliente ve la ubicación
+    corregida en todo (WhatsApp, Vacantes, ficha, «Por confirmar» y CSV); el texto del portal queda solo para que el
+    operador lo revise. Sin corrección: (la misma, "")."""
+    original = str(ubicacion or "")
+    corregida = corregir_ubicacion(original)
+    return corregida, (original if corregida != original else "")
+
 _REMOTO = re.compile(r"\b(remote|remoto|remota|remotely|teletrabajo|home ?office|work from home|wfh|trabajo a distancia|"
                      r"100% remoto|distributed|fully distributed|anywhere|desde casa|trabajo desde casa|remote work)\b")
 # Contrato v49: la descripción llega normalizada (sin «%» ni «:»), así que «Modalidad: 100% remoto» es «modalidad 100

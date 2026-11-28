@@ -290,8 +290,10 @@ def _oficio_ajeno(texto, cargo, palabra):
             continue
         for patron in (f["_re"]["exacto"], f["_re"]["similar"]):
             for m in patron.finditer(texto) if patron else ():
-                if m.group(0) not in propios and normalizar.contiene_frase(m.group(0), palabra):
-                    return m.group(0)
+                nombre = m.group(0)  # P-7.F: también en singular, para la vuelta de plurales («analista de prueba»)
+                if nombre not in propios and any(len(x) > len(palabra) and normalizar.contiene_frase(x, palabra)
+                                                 for x in (nombre, _base(_singular(nombre)))):
+                    return nombre
     return ""
 
 
@@ -302,11 +304,13 @@ def _excluido_del_mapa(completo, cargo):
 
 
 def _cuenta(texto, canon, cargo, base):
-    """El término del cargo está en el título y, si es de una sola palabra, no es parte del nombre de otro oficio (en el
-    título tal cual ni en singular: «Analista de Datos» también es «analista de dato»)."""
+    """El término del cargo está en el título y no es parte de un nombre más largo de otro oficio (en el título tal cual
+    ni en singular: «Analista de Datos» también es «analista de dato»). 7.E lo pedía a los de una sola palabra; P-7.F
+    (27 nov) también a los de varias: «analista de pruebas» (QA) dentro de «analista de pruebas de seguridad»
+    (Ciberseguridad) no basta, porque el nombre más largo dice el oficio."""
     if not canon or not normalizar.contiene_frase(texto, canon):
         return False
-    return " " in canon or not (_oficio_ajeno(base, cargo, canon) or _oficio_ajeno(texto, cargo, canon))
+    return not (_oficio_ajeno(base, cargo, canon) or _oficio_ajeno(texto, cargo, canon))
 
 
 def grado(titulo, cargo, cercanos=False):
@@ -343,7 +347,7 @@ def grado(titulo, cargo, cercanos=False):
     # Contrato v50: y los nombres que arma el glosario para un cargo compuesto, que también se usan solos.
     for t, origen in hermanos_es(cargo.get("nombre") or ""):
         canon = _base(t)
-        if canon and normalizar.contiene_frase(base, canon):
+        if _cuenta(base, canon, cargo, base):  # P-7.F: con la misma guarda del nombre más largo
             regla = "título en español del mapa" if origen == "mapa" else "nombre hermano en español"
             return "similar", {"regla": regla, "termino": t, "grado": "similar"}
     if cercanos:

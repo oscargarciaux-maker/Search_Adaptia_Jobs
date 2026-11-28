@@ -75,6 +75,11 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
   Brasil» es solo Brasil; «Birmingham, Alabama, United States», solo EE. UU.). Los errores conocidos de un portal se
   corrigen por texto exacto en `datos/ubicaciones_corregidas.yaml`, con evidencia del aviso («California, Pará,
   Brasil» de LinkedIn es EE. UU.) (7.E, 27 nov).
+- **El cliente ve la ubicación corregida** en todo lo que recibe o puede ver: WhatsApp, Vacantes, ficha, «Por
+  confirmar» y los dos CSV («California, United States», no «California, Pará, Brasil»). El operador ve además el
+  texto del portal en el detalle («según el portal: …»), para revisarlo. `ofertas` v1 y los resúmenes guardados
+  conservan el texto del portal: la corrección se aplica al mostrar, no al guardar. Sin corrección, se ve igual que
+  antes (decisión de Oscar, P-7.F, 27 nov).
 - «Autorizado para trabajar en el país» se refiere al país del propio aviso (v14). `puede_trabajar_en` admite hasta 60
   países y el importador acepta regiones (v26).
 - **Get on Board:** `fully_remote` = cualquier país; `remote_local` = los países de `location_tenants`; sin país,
@@ -121,10 +126,16 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
   del cargo que la recibe (v49).
 - El importador añade nombres y funciones a cargos existentes; nunca quita (v27).
 - Desarrollo genérico no cuenta como QA ni como IA (v4).
-- **El nombre más largo dice el oficio:** un término de una sola palabra del cargo («tester», «qa») no basta si es parte
-  del nombre de varias palabras de otro oficio del mapa que trae el título («Penetration Tester» es Ciberseguridad, no
-  QA; «QA Tester» o «Software Tester» siguen siendo QA). La similitud textual no cuenta si el título trae un `excluir`
-  de la familia del cargo en el mapa («Analista de Pentesting» no es «analista de testing») (7.E, 27 nov).
+- **El nombre más largo dice el oficio:** un término del cargo no basta si es parte de un nombre más largo de otro
+  oficio del mapa que trae el título, tanto si el término es de una palabra («tester» dentro de «Penetration Tester»:
+  Ciberseguridad, no QA) como de varias («analista de pruebas» dentro de «Analista de Pruebas de Seguridad»). Vale
+  también en plural y para los títulos en español del mapa. «QA Tester» o «Software Tester» siguen siendo QA. La
+  similitud textual no cuenta si el título trae un `excluir` de la familia del cargo en el mapa («Analista de
+  Pentesting» no es «analista de testing») (7.E y P-7.F, 27 nov).
+- **Probar la seguridad es Ciberseguridad, no QA:** «Technical Security Tester», «Security Tester», «Analista de
+  Pruebas de Seguridad» y sus equivalentes son similares de Ciberseguridad y QA los excluye («security tester»,
+  «security testing», «pruebas de seguridad»). QA conserva sus tester de verdad (QA Tester, Software Tester, Test
+  Engineer, Analista de Pruebas, QA funcional) (decisión de Oscar, P-7.F, 27 nov).
 
 ## 5. Qué descarta y qué solo ordena
 
