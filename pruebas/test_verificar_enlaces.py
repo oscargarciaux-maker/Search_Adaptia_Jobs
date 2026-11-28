@@ -332,7 +332,8 @@ def test_validacion_no_aprueba_historial_si_sus_enlaces_actuales_fallaron():
     assert not validacion.errores(r)
     r["seleccion_actual"] = {"roles": {"qa": {"nombre": "QA", "vacantes": [
         {"afinidad_vigente": False, "catalog_status": "active", "verificacion": {"estado": "verificada"}}]}}}
-    assert any("ya no encajan en ningún perfil" in error for error in validacion.errores(r))
+    # 7.G (27 nov): ya no es avería sino CORTA; no se comparten.
+    assert not validacion.errores(r) and any("ya no encajan en ningún perfil" in c for c in validacion.cortos(r))
     r["seleccion_actual"]["roles"]["qa"]["vacantes"] = [
         {"afinidad_vigente": False, "catalog_status": "closed", "verificacion": {"estado": "rechazada"}}]
     assert not validacion.errores(r) and validacion.avisos(r) == [
@@ -453,8 +454,8 @@ def test_los_mensajes_publicos_no_nombran_cargos():
     roles = {"qa": {"nombre": "QA", "vacantes": [{"afinidad_vigente": False, "catalog_status": "active"}]},
              "ux": {"nombre": "UX", "vacantes": [{"afinidad_vigente": False, "catalog_status": "closed"}]}}
     r = {"seleccion_actual": {"roles": roles}}
-    assert validacion.errores(r, detalle=False)[-1] == ("1 vacantes de la selección de hoy ya no encajan en ningún "
-                                                       "perfil del cargo. (1 cargo)")
+    assert validacion.cortos(r, detalle=False)[-1] == ("1 vacantes de la selección de hoy ya no encajan en ningún "
+                                                      "perfil del cargo; no se comparten. (1 cargo)")
     assert validacion.avisos(r, detalle=False) == [
         "1 vacantes elegidas hoy cerraron o salieron del inventario después; no se comparten. (1 cargo)"]
     assert validacion.avisos(r) == ["UX: 1 vacantes elegidas hoy cerraron o salieron del inventario después; "
