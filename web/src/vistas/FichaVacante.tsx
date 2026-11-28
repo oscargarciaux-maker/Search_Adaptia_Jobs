@@ -52,6 +52,8 @@ export function textoExperiencia(anos: number | null | undefined) {
 export function etiquetaEstado(v: Vacante) {
   if (v.estado === "lista") return v.tipo === "post" ? "Vigente" : "Verificada";
   if (v.estado === "retirada") return "Retirada";
+  // 7.G: se editó el perfil o el cargo después de asignarla; no se comparte.
+  if (v.estado === "no_encaja") return "Ya no encaja con el cargo";
   if (v.estado === "entregada")
     return `Entregada el ${fecha(v.entregada_el || "")}`;
   return "Por confirmar";

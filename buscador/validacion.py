@@ -2,12 +2,13 @@
 
 Contrato v52 (27 nov, decisión de Oscar): la búsqueda diaria termina en uno de tres estados.
 - COMPLETA: todo bien → éxito.
-- CORTA: la meta del día quedó incompleta o hay vacantes de la selección con el enlace sin comprobar (no se comparten
-  hasta comprobarlo). Es un resultado de negocio, no una avería → éxito con ::warning:: y resumen de qué faltó. La
-  segunda pasada de las 8:30 y su respaldo siguen completando la meta: deciden con `trabajo/metricas_entrega.json`
-  (`buscador/arranque.py`, `falta_completar`), no con el color de la corrida.
-- AVERÍA: Supabase, catálogo, reconciliación (incluido 57014), registro de la selección, operaciones centrales, sin
-  catálogo o vacantes que ya no encajan → fallo (exit 1) y aviso /fail.
+- CORTA: la meta del día quedó incompleta, hay vacantes de la selección con el enlace sin comprobar (no se comparten
+  hasta comprobarlo) o vacantes de la selección que ya no encajan (no se comparten: el panel las vuelve a evaluar con
+  el perfil y el cargo vigentes; 7.G, 27 nov). Es un resultado de negocio, no una avería → éxito con ::warning:: y
+  resumen de qué faltó. La segunda pasada de las 8:30 y su respaldo siguen completando la meta: deciden con
+  `trabajo/metricas_entrega.json` (`buscador/arranque.py`, `falta_completar`), no con el color de la corrida.
+- AVERÍA: Supabase, catálogo, reconciliación (incluido 57014), registro de la selección, operaciones centrales o sin
+  catálogo → fallo (exit 1) y aviso /fail.
 `--catalogo` (captura horaria y búsqueda profunda) no cambia: solo mira `errores_catalogo`."""
 import argparse
 import json
@@ -45,16 +46,43 @@ def errores(reporte, detalle=True):
         fallos.append("La selección no quedó registrada en Supabase; conservar pendientes y reintentar.")
     if reporte.get("catalogo") is not None:
         fallos.extend(errores_catalogo(reporte))
-    fallos.extend(_por_cargo(
-        [(rol.get("nombre", ""), sum(1 for v in rol.get("vacantes", [])
-                                     if not v.get("afinidad_vigente") and not _cerro_despues(v)))
-         for rol in (reporte.get("seleccion_actual") or {}).get("roles", {}).values()],
-        "vacantes de la selección de hoy ya no encajan en ningún perfil del cargo.", detalle))
     return fallos
 
 
-def cortos(reporte):
-    """Contrato v52: la corrida funcionó pero el día quedó corto. No falla: avisa, y la segunda pasada completa."""
+# 7.G: por qué una vacante de la selección ya no encaja (lo anota `bodega.afinidad_vigente`). Solo en el detalle privado.
+MOTIVOS_NO_ENCAJA = {"vacante": "cambió la vacante", "configuracion": "se editó el cargo o el perfil"}
+
+
+def _ya_no_encajan(reporte, detalle):
+    """7.G (decisión de Oscar, 27 nov): vacantes de la selección de hoy que ya no encajan = CORTA, no AVERÍA. Es un
+    cambio de datos (la vacante, el cargo o el perfil), no algo roto. No se comparten: el panel las evalúa con el perfil
+    y el cargo vigentes. En lo público (sin `detalle`) solo el total y cuántos cargos."""
+    roles = (reporte.get("seleccion_actual") or {}).get("roles", {}).values()
+    mensaje = "vacantes de la selección de hoy ya no encajan en ningún perfil del cargo; no se comparten."
+    if not detalle:
+        return _por_cargo([(rol.get("nombre", ""), len(_no_encajan(rol))) for rol in roles], mensaje, False)
+    salida = []
+    for rol in roles:
+        lista = _no_encajan(rol)
+        if not lista:
+            continue
+        motivos = {}
+        for v in lista:
+            motivo = MOTIVOS_NO_ENCAJA.get(v.get("motivo_no_encaja"))
+            if motivo:
+                motivos[motivo] = motivos.get(motivo, 0) + 1
+        extra = f" ({', '.join(f'{n} {m}' for m, n in motivos.items())})" if motivos else ""
+        salida.append(f"{rol.get('nombre', '')}: {len(lista)} {mensaje}{extra}")
+    return salida
+
+
+def _no_encajan(rol):
+    return [v for v in rol.get("vacantes", []) if not v.get("afinidad_vigente") and not _cerro_despues(v)]
+
+
+def cortos(reporte, detalle=True):
+    """Contrato v52: la corrida funcionó pero el día quedó corto. No falla: avisa, y la segunda pasada completa.
+    Sin `detalle` (registros públicos de Actions), sin nombres de cargo."""
     e = reporte.get("entrega") or {}
     salida = []
     if not e or not e.get("meta_cumplida"):
@@ -64,6 +92,7 @@ def cortos(reporte):
     if revision and revision.get("vacantes") and revision.get("estados", {}).get("pendiente", 0):
         salida.append(f"{revision['estados']['pendiente']} vacantes de la selección de hoy tienen el enlace sin comprobar; "
                       "no se comparten hasta comprobarlo.")
+    salida.extend(_ya_no_encajan(reporte, detalle))
     return salida
 
 
@@ -142,6 +171,8 @@ def resumen(reporte, fallos, faltas):
             lineas.append("La segunda pasada (8:30) o «Buscar ahora» completan la meta.")
         if revision.get("vacantes") and (revision.get("estados") or {}).get("pendiente"):
             lineas.append("Las vacantes con el enlace sin comprobar no se comparten hasta comprobarlo.")
+        if _ya_no_encajan(reporte, False):
+            lineas.append("Las vacantes que ya no encajan no se comparten; el detalle por cargo está en el panel.")
         lineas.append("")
     # Termina en línea en blanco: el paso «Resumen» escribe después en el mismo archivo y no debe pegarse a la tabla.
     return "\n".join(lineas) + "\n"
@@ -162,7 +193,7 @@ def main():
         print(CONFIRMADO)
         return
     # Lo que se imprime y el resumen son públicos: sin nombres de cargo (detalle=False). El estado no cambia.
-    fallos, faltas = errores(reporte, detalle=False), cortos(reporte)
+    fallos, faltas = errores(reporte, detalle=False), cortos(reporte, detalle=False)
     for mensaje in avisos(reporte, detalle=False) + faltas:
         print("::warning::" + mensaje)
     for mensaje in fallos:

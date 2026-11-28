@@ -82,8 +82,7 @@ def test_averia_manda_aunque_la_meta_tambien_quede_corta(tmp_path, monkeypatch):
     lambda r: r["entrega"].update(registro_seleccion={"errores": ["x"]}),
     lambda r: r.update(estado_operativo={"activo": True, "pendientes": {"reservas": 1}}),
     lambda r: r.update(vacantes_en_bodega=0),
-    lambda r: r.update(seleccion_actual={"roles": {"qa": {"nombre": "QA", "vacantes": [
-        {"afinidad_vigente": False, "catalog_status": "active"}]}}}),
+    # 7.G: «vacantes que ya no encajan» dejó de ser avería (pruebas/test_no_encajan_corta.py).
 ])
 def test_cada_averia_de_la_decision_falla(romper):
     r = _reporte()

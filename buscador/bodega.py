@@ -51,6 +51,17 @@ def afinidad_vigente(original, actual, rol, roles, inventario):
     return any(r["id"] == rol["id"] for r in empatados)
 
 
+def motivo_no_encaja(original, rol, roles):
+    """7.G: por qué una vacante que sigue en el inventario ya no encaja. Si la copia elegida esta mañana todavía encaja
+    con los cargos y perfiles de ahora, lo que cambió es la vacante; si tampoco encaja, se editó el cargo o el perfil.
+    Solo para el detalle privado (cifras por cargo, sin datos de nadie)."""
+    from buscador import entrega
+    if not original.get("familias"):
+        return ""
+    empatados, _ = entrega.roles_de(original, roles)
+    return "vacante" if any(r["id"] == rol["id"] for r in empatados) else "configuracion"
+
+
 def config():
     if _config_operativa is not None:
         return deepcopy(_config_operativa)
@@ -775,8 +786,11 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         for original, _ in lote_actual.get("elegidas", {}).get(rol["id"], []):
             actual = dict(por_id_vigente.get(original["id"], original))
             revision = verificar_enlaces.anotar(actual, cache_enlaces)
-            entradas.append({"id": actual["id"], "catalog_status": estados_catalogo.get(actual["id"], "sin_catalogo"), "afinidad_vigente":
-                afinidad_vigente(original, actual, rol, roles_actuales, por_id_vigente),
+            vigente = afinidad_vigente(original, actual, rol, roles_actuales, por_id_vigente)
+            entradas.append({"id": actual["id"], "catalog_status": estados_catalogo.get(actual["id"], "sin_catalogo"),
+                "afinidad_vigente": vigente,
+                **({"motivo_no_encaja": motivo_no_encaja(original, rol, roles_actuales)}
+                   if not vigente and actual["id"] in por_id_vigente else {}),
                 "enlace": actual.get("enlace", ""), "enlace_directo": actual.get("enlace_directo", ""),
                 "verificacion": revision})
         seleccion_actual["roles"][rol["id"]] = {"nombre": rol["nombre"], "meta": entrega.meta_de(rol, config_entrega), "vacantes": entradas}

@@ -252,6 +252,66 @@ def calidad(ficha):
             -int((ficha.get("publicada") or "0000-00-00").replace("-", "")[:8] or 0))
 
 
+def _evaluar_asignada(actual, perfil, ampliacion):
+    if ampliacion:
+        return evaluar_ampliada(actual, perfil, hoy(), ampliacion)
+    if actual.get("tipo") == "post":  # contrato v28: post deducido o sin confirmar
+        return evaluar_post(actual, perfil, hoy())
+    return evaluar(actual, perfil, hoy())
+
+
+# 7.G (decisión de Oscar, 27 nov): marca de la vacante de hoy que ya no encaja; no se comparte.
+NO_ENCAJA_PERFIL = "ya no encaja con el cargo: se editó el perfil después de asignarla"
+NO_ENCAJA_CARGO = "ya no encaja con el cargo: se editó el cargo después de asignarla"
+
+
+class _ConfiguracionVigente:
+    """7.G: cada asignación guarda la copia del perfil y del cargo con que se hizo. Si el operador los edita después,
+    la vacante de hoy se vuelve a evaluar con los de la versión vigente de la búsqueda del día; si ya no encaja, no se
+    comparte (ni lista, ni WhatsApp) y queda marcada para el operador. No se borra nada: la asignación sigue guardada.
+    Un perfil o cargo que salió de la configuración no se toca (lo entregado se conserva, v49)."""
+
+    def __init__(self, repo, r):
+        self.repo = repo
+        self.perfiles = {str(p.get("id")): p for p in r.get("perfiles") or [] if isinstance(p, dict)}
+        self.cargos = {str(c.get("id")): c for c in r.get("cargos") or [] if isinstance(c, dict)}
+        self._perfil, self._cargo, self._aprendidos = {}, {}, None
+
+    def perfil(self, perfil_id):
+        if perfil_id not in self._perfil:
+            crudo = self.perfiles.get(perfil_id)
+            try:
+                self._perfil[perfil_id] = Perfil.model_validate(crudo).model_dump(mode="json") if crudo else None
+            except ValueError as e:  # un perfil vigente que no valida no retira nada: queda el aviso
+                registro.aviso("servicio:perfil-vigente", e)
+                self._perfil[perfil_id] = None
+        return self._perfil[perfil_id]
+
+    def cargo(self, cargo_id):
+        if cargo_id not in self._cargo:
+            from panel import contenido
+            crudo = self.cargos.get(cargo_id)
+            if crudo and self._aprendidos is None:
+                try:  # los títulos aprendidos (v25) también cuentan: sin ellos se retiraría lo aprobado a mano
+                    self._aprendidos = (self.repo.ajuste("titulos_aprendidos", {}) or {}) if hasattr(self.repo, "ajuste") else {}
+                except Exception as e:  # noqa: BLE001 — sin el dato no se mira el cargo (no se retira de más)
+                    registro.aviso("servicio:aprendidos", e)
+                    self._aprendidos = False
+            self._cargo[cargo_id] = contenido.cargo_operativo(crudo, self._aprendidos.get(cargo_id)) \
+                if crudo and self._aprendidos is not False else None
+        return self._cargo[cargo_id]
+
+    def motivo(self, row, actual, ampliacion, aprobada):
+        """El motivo si la vacante ya no encaja con el perfil o el cargo vigentes; "" si encaja o no hay con qué mirar."""
+        perfil = self.perfil(str(row.get("perfil_id")))
+        if perfil and perfil != row.get("filtros") and not _evaluar_asignada(actual, perfil, ampliacion)["compatible"]:
+            return NO_ENCAJA_PERFIL
+        cargo = None if aprobada else self.cargo(str(row.get("cargo_id")))
+        if cargo and not grado(actual["titulo"], cargo, cercanos=True)[0]:
+            return NO_ENCAJA_CARGO
+        return ""
+
+
 def resultados(repo, cliente_id=None, fecha=None):
     from panel import contenido
     r = repo.resultados(cliente_id, fecha)
@@ -261,6 +321,7 @@ def resultados(repo, cliente_id=None, fecha=None):
     # v9). Sus vacantes compatibles se muestran «Entregada el …», no «por confirmar» (13 nov).
     dia = ((r.get("ejecucion") or {}).get("fecha") or "")[:10]
     pasada = _es_dia_anterior(r)
+    vigentes = _ConfiguracionVigente(repo, r)
     for row in r["filas"]:
         v = row.get("catalogo_vacantes") or {}
         datos = v.get("datos") or {}
@@ -278,12 +339,7 @@ def resultados(repo, cliente_id=None, fecha=None):
                 v = dict(v, status="active")
                 row = dict(row, catalogo_vacantes=v)
         ampliacion = next((e["ampliacion"] for e in row.get("explicacion") or [] if isinstance(e, dict) and e.get("ampliacion")), "")
-        if ampliacion:
-            filtros = evaluar_ampliada(actual, row["filtros"], hoy(), ampliacion)
-        elif actual.get("tipo") == "post":  # contrato v28: post deducido o sin confirmar
-            filtros = evaluar_post(actual, row["filtros"], hoy())
-        else:
-            filtros = evaluar(actual, row["filtros"], hoy())
+        filtros = _evaluar_asignada(actual, row["filtros"], ampliacion)
         # Contrato v49: el cargo operativo (con los nombres sugeridos y la huella heredada), también para asignaciones
         # anteriores: antes una vacante que entró por un nombre sugerido quedaba «no corresponde al cargo».
         clave_cargo = json.dumps(row["cargo_configuracion"], sort_keys=True, ensure_ascii=False, default=str)
@@ -298,6 +354,12 @@ def resultados(repo, cliente_id=None, fecha=None):
         if not afinidad_cargo and not aprobada:
             filtros["compatible"] = False
             filtros["motivos"].append("el título actual no corresponde al cargo configurado")
+        no_encaja = ""
+        if filtros["compatible"] and not pasada:
+            no_encaja = vigentes.motivo(row, actual, ampliacion, aprobada)
+            if no_encaja:
+                filtros["compatible"] = False
+                filtros["motivos"].append(no_encaja)
         if not aprobada and actual.get("tipo") != "post":  # un post no trae funciones que comparar
             filtros["avisos"] = [*filtros.get("avisos", []), *contenido.avisos(
                 contenido.evidencia(actual["titulo"], actual.get("_descripcion"), cargo))]
@@ -315,6 +377,7 @@ def resultados(repo, cliente_id=None, fecha=None):
             "enlace_directo": datos.get("enlace_directo", ""),
             "cargo_nombre": (row.get("cargo_configuracion") or {}).get("nombre", ""),
             "estado": "lista" if enlace else "retirada" if v.get("status") != "active" else
+                      "no_encaja" if no_encaja else
                       "entregada" if pasada and filtros["compatible"] and not no_apta else "por_confirmar",
             "entregada_el": dia if pasada else "",
             "motivos": filtros["motivos"], "avisos": filtros.get("avisos", []), "ampliacion": ETIQUETAS_AMPLIACION.get(ampliacion, "") if not es_post else "",
