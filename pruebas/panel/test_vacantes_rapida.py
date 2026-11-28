@@ -298,3 +298,60 @@ def test_una_decision_que_usa_otro_metodo_renueva_todas():
     assert not anotada.todas  # lecturas conocidas
     anotada.guardar_ajuste("titulos_aprendidos", {})
     assert anotada.todas  # cualquier otro método: falla hacia lo seguro
+
+
+def test_sirve_y_copiar_al_instante_lleva_la_vacante_y_no_rehace_dos_veces(monkeypatch):
+    from panel.repositorio import hoy
+    cfg = configuracion_demo()
+    destino = cfg["perfiles"][4]["cliente_id"]  # el único cliente de rev-demo-0
+
+    class Repo(Contado):
+        def contactos(self):
+            return [{"cliente_id": destino, "telefono": "+573000000000", "consentimiento": True, "nombre_saludo": "Ana"}]
+    repo = Repo()
+
+    def resultados(r, cliente_id=None, fecha=None):
+        """Las asignaciones de verdad del cliente, ya listas para compartir (la demostración trae una muestra fija)."""
+        filas = [a for a in repo.estado.get("asignaciones_extra", []) if a["cliente_id"] == cliente_id
+                 and (fecha or hoy()) == hoy()]
+        vacantes = [{"id": a["vacante_id"], "estado": "lista", "titulo": "QA Engineer", "empresa": "Lumen",
+                     "modalidad": "remoto", "enlace": "https://example.org/" + a["vacante_id"], "cargo_nombre": "QA"}
+                    for a in filas]
+        return {"ejecucion": {"fecha": hoy()}, "clientes": cfg["clientes"], "vacantes": vacantes,
+                "listas": len(vacantes), "dia_anterior": False, "para_copiar": len(vacantes)}
+    monkeypatch.setattr(servicio, "resultados", resultados)
+    original, llamadas = borradores.generar, []
+
+    def generar(*a, **k):
+        llamadas.append(k.get("clientes"))
+        return original(*a, **k)
+    monkeypatch.setattr(borradores, "generar", generar)
+    app = crear_app(demo=True, repositorio=repo)
+    soltar = _sin_esperar(app)
+    api = TestClient(app)
+    r = api.post("/api/revisiones/rev-demo-0", json={"decision": "sirve", "paises": ["CO"]}, headers=H)
+    assert r.status_code == 200 and r.json()["asignadas"] >= 1
+    copiado = api.get(f"/api/whatsapp/{destino}").json()  # al instante, sin esperar la tanda
+    assert "https://example.org/rev-demo-0" in copiado["texto"]
+    assert llamadas == [{destino}]  # su borrador se rehízo ya, solo el suyo
+    borrador = next(b for b in api.get("/api/borradores").json()["borradores"] if b["cliente_id"] == destino)
+    assert "rev-demo-0" in borrador["vacantes"] and "https://example.org/rev-demo-0" in borrador["texto"]
+    soltar.set()
+    _esperar_mensajes(app)
+    assert llamadas == [{destino}]  # la tanda no lo vuelve a rehacer
+    assert not repo.ajuste("mensajes_por_rehacer", {})  # nada pendiente para un reinicio
+
+
+def test_al_arrancar_se_rehacen_los_mensajes_que_un_reinicio_dejo_pendientes(monkeypatch):
+    from panel.repositorio import hoy
+    llamadas = []
+    monkeypatch.setattr(borradores, "generar", lambda *a, **k: llamadas.append(k.get("clientes", "todos")) or {})
+    repo = RepositorioDemo()
+    repo.guardar_ajuste("mensajes_por_rehacer", {"fecha": hoy()})  # el servidor anterior se apagó en la espera
+    from panel import api as modulo
+    monkeypatch.setattr(modulo, "ESPERA_BORRADORES", 0)
+    app = crear_app(demo=True, repositorio=repo)
+    for hilo in [t for t in threading.enumerate() if t.name == "retomar-mensajes"]:
+        hilo.join(5)
+    _esperar_mensajes(app)
+    assert llamadas == ["todos"] and not repo.ajuste("mensajes_por_rehacer", {})

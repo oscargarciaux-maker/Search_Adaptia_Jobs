@@ -3,6 +3,7 @@ import argparse
 from collections import Counter, defaultdict, deque
 from datetime import date, timedelta
 import hashlib
+import hmac
 import logging
 import os
 from pathlib import Path
@@ -60,6 +61,9 @@ VIGENCIA_PENDIENTES = 300  # s; la búsqueda escribe la bandeja en otro proceso 
 ESPERA_BORRADORES = 60     # s sin decisiones nuevas antes de rehacer los mensajes tras «Sirve»…
 ESPERA_MAXIMA_BORRADORES = 120  # …pero nunca más de 2 min desde la primera decisión de la tanda
 DIAS_MENSAJES = 3          # días anteriores que mira un borrador (`borradores.generar`, `dias_atras`)
+# En `panel_ajustes`: hay mensajes por rehacer de hoy. Si el servidor se reinicia durante la espera, al arrancar se
+# rehacen todos una vez (la lista de clientes pendientes vivía en memoria).
+CLAVE_MENSAJES_PENDIENTES = "mensajes_por_rehacer"
 # Métodos del repositorio que una decisión de la bandeja usa sin cambiar «Vacantes»: lecturas y escrituras de la
 # bandeja y sus reglas. Cualquier otro (p. ej. guardar los títulos aprendidos, o uno nuevo) deja viejas todas las copias.
 _SIN_EFECTO_EN_VACANTES = frozenset({
@@ -249,13 +253,29 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
     # al momento. P-12.10: se espera `ESPERA_BORRADORES` sin decisiones nuevas (como mucho `ESPERA_MAXIMA_BORRADORES`)
     # y se rehacen una vez, en un hilo, solo los de los clientes afectados: los que recibieron asignaciones y los que
     # ya tenían esas vacantes (antes los de todos, de a cuatro, compitiendo con las pantallas). Empieza después de dejar
-    # viejas sus copias (`_renovar_resultados`), así no lee resultados de antes.
+    # viejas sus copias (`_renovar_resultados`), así no lee resultados de antes. Si antes se lee o se usa el mensaje de
+    # un cliente pendiente (`_mensajes_al_dia`), el suyo se rehace en ese momento y sale de la tanda.
     import threading
     regenerar = {"clientes": set(), "vacantes": set(), "todos": False, "hasta": 0.0, "primera": 0.0,
-                 "corriendo": False}
+                 "corriendo": False, "hechos": set(), "version": 0}
     cerrojo_regenerar = threading.Lock()
     # Las pruebas pueden cambiar la espera, el reloj y la forma de esperar.
     app.state.espera_borradores, app.state.reloj, app.state.dormir = ESPERA_BORRADORES, time.monotonic, time.sleep
+
+    def _hay_pendientes():
+        return bool(regenerar["clientes"] or regenerar["vacantes"] or regenerar["todos"])
+
+    def _anotar_pendientes(hay):
+        """Deja escrito (o borra) que hay mensajes de hoy por rehacer, para no perderlos si el servidor se reinicia."""
+        try:
+            repo.guardar_ajuste(CLAVE_MENSAJES_PENDIENTES, {"fecha": hoy()} if hay else {})
+        except Exception as e:  # noqa: BLE001 — solo protege un reinicio; la tanda sigue en memoria
+            registro.aviso("api:mensajes-pendientes", e)
+
+    def _objetivo(clientes, vacantes, todos):
+        """Clientes cuyo mensaje cambia (None = todos)."""
+        otros = None if todos else _clientes_con(vacantes)
+        return None if otros is None else clientes | otros
 
     def _rehacer_borradores():
         from panel import borradores as b
@@ -264,40 +284,102 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
                 falta = regenerar["hasta"] - app.state.reloj()
                 if falta <= 0:
                     clientes, vacantes, todos = regenerar["clientes"], regenerar["vacantes"], regenerar["todos"]
-                    regenerar.update(clientes=set(), vacantes=set(), todos=False)
-                    if not clientes and not todos:
+                    hechos = regenerar["hechos"]
+                    regenerar.update(clientes=set(), vacantes=set(), todos=False, hechos=set())
+                    if not (clientes or vacantes or todos):
                         regenerar["corriendo"] = False
                         return
             if falta > 0:
                 app.state.dormir(falta)
                 continue
             try:
-                otros = None if todos else _clientes_con(vacantes)
-                b.generar(repo, resultados=_resultados, clientes=None if otros is None else clientes | otros, hilos=1)
+                objetivo = _objetivo(clientes, vacantes, todos)
+                if objetivo is None:
+                    b.generar(repo, resultados=_resultados, excluir=hechos, hilos=1)
+                elif objetivo - hechos:
+                    b.generar(repo, resultados=_resultados, clientes=objetivo - hechos, hilos=1)
             except Exception as e:  # noqa: BLE001 — la decisión ya quedó guardada; el borrador se rehace la próxima vez
                 registro.aviso("api:borradores", e)
             sello_mensajes[0] += 1
+            with cerrojo_regenerar:
+                terminada = not _hay_pendientes()
+            if terminada:
+                _anotar_pendientes(False)
 
-    def pedir_borradores(anotada):
-        clientes = {str(c) for c in anotada.clientes if c}
-        if not clientes:
+    def _mensajes_al_dia(cliente=None, fecha=None):
+        """Antes de leer o usar un mensaje de hoy: si una decisión dejó pendiente el de ese cliente (sin cliente, los de
+        todos los pendientes), se rehace ya, en esta petición, y sale de la tanda. El resto sigue esperando."""
+        from panel import borradores as b
+        if fecha and fecha != hoy():
+            return
+        with cerrojo_regenerar:
+            if not _hay_pendientes():
+                return
+            clientes, vacantes, todos = set(regenerar["clientes"]), set(regenerar["vacantes"]), regenerar["todos"]
+            hechos, version = set(regenerar["hechos"]), regenerar["version"]
+        pendientes = _objetivo(clientes, vacantes, todos)
+        if cliente is None:
+            objetivo = pendientes
+        else:
+            objetivo = {cliente} if pendientes is None or cliente in pendientes else set()
+        if objetivo is not None:
+            objetivo -= hechos
+            if not objetivo:
+                return
+        try:
+            b.generar(repo, resultados=_resultados, clientes=objetivo, excluir=hechos, hilos=1)
+        except Exception as e:  # noqa: BLE001 — se muestra lo guardado; la tanda lo vuelve a intentar
+            registro.aviso("api:borradores-al-dia", e)
+            return
+        sello_mensajes[0] += 1
+        with cerrojo_regenerar:
+            if regenerar["version"] != version:
+                return  # llegó otra decisión mientras tanto: la tanda rehace lo que haga falta
+            if objetivo is not None:
+                regenerar["clientes"] -= objetivo
+                regenerar["hechos"] |= objetivo
+                return
+            regenerar.update(clientes=set(), vacantes=set(), todos=False, hechos=set())
+        _anotar_pendientes(False)
+
+    def pedir_borradores(anotada, clientes=None):
+        clientes = {str(c) for c in (anotada.clientes if clientes is None else clientes) if c}
+        if not clientes and not anotada.todas:
             return
         with cerrojo_regenerar:
             ahora = app.state.reloj()
-            if not regenerar["clientes"] and not regenerar["todos"]:
+            empieza = not _hay_pendientes()
+            if empieza:
                 regenerar["primera"] = ahora  # empieza una tanda
             regenerar["clientes"] |= clientes
             regenerar["vacantes"] |= anotada.vacantes
             regenerar["todos"] |= anotada.todas
+            regenerar["hechos"] = set()  # la decisión nueva puede cambiar también lo ya rehecho
+            regenerar["version"] += 1
             regenerar["hasta"] = min(ahora + app.state.espera_borradores,
                                      regenerar["primera"] + max(app.state.espera_borradores, ESPERA_MAXIMA_BORRADORES))
-            if regenerar["corriendo"]:
-                return
+            lanzar = not regenerar["corriendo"]
             regenerar["corriendo"] = True
+        if empieza:
+            _anotar_pendientes(True)
+        if not lanzar:
+            return
         app.state.hilo_borradores = threading.Thread(target=_rehacer_borradores, name="rehacer-borradores", daemon=True)
         app.state.hilo_borradores.start()
 
     app.state.pedir_borradores = pedir_borradores
+
+    class _TodosPendientes:
+        clientes, vacantes, todas = set(), set(), True
+
+    def _retomar_pendientes():
+        """Al arrancar: si el servidor se reinició con mensajes de hoy por rehacer, se rehacen todos una vez."""
+        try:
+            if (repo.ajuste(CLAVE_MENSAJES_PENDIENTES, {}) or {}).get("fecha") == hoy():
+                pedir_borradores(_TodosPendientes())
+        except Exception as e:  # noqa: BLE001 — sin el dato, se rehacen con la próxima decisión
+            registro.aviso("api:retomar-mensajes", e)
+    threading.Thread(target=_retomar_pendientes, name="retomar-mensajes", daemon=True).start()
 
     def _usuario(token):
         huella = hashlib.sha256(token.encode()).hexdigest()
@@ -638,6 +720,7 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
     def leer_borradores(fecha: str | None = None):
         from panel import borradores as b
         fecha = fecha or hoy()
+        _mensajes_al_dia(fecha=fecha)
         contactos = {c["cliente_id"]: c for c in _copia("contactos", "", 30, repo.contactos)}
         de_hoy = _asignadas_hoy(fecha)
         salida = []
@@ -676,6 +759,7 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         """Contrato v46: un solo mensaje a «Mi número», con un enlace corto por cliente."""
         from panel import borradores as b
         fecha = hoy()  # los enlaces cortos valen solo el día de hoy
+        _mensajes_al_dia()
         base = str(request.base_url) if demo else origen
         return b.para_operador(repo, base, fecha, contactos=_copia("contactos", "", 30, repo.contactos),
                                borradores=_copia("borradores", fecha, 20, lambda: repo.borradores(fecha=fecha)),
@@ -691,6 +775,10 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         cambios = body.model_dump(exclude_none=True)
         if "texto" in cambios:
             cambios["editado"] = True
+        cliente = next((x["cliente_id"] for x in repo.borradores(fecha=hoy()) if str(x.get("id")) == str(borrador_id)),
+                       None)
+        if cliente:
+            _mensajes_al_dia(cliente)  # se cambia (o se marca enviado) el mensaje ya con la última decisión
         return repo.actualizar_borrador(str(borrador_id), cambios)
 
     # Contrato v16: bandeja «Por confirmar».
@@ -868,6 +956,7 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         contactos = _copia("contactos", "", 30, repo.contactos)
         if not 1 <= cuantas <= 500:
             raise HTTPException(422, "Elige entre 1 y 500 vacantes.")
+        _mensajes_al_dia(cliente_id, fecha)  # «Copiar WhatsApp» justo después de «Sirve»: su borrador, también al día
         # Contrato v48: un día anterior comprueba al momento los enlaces sin comprobación de 24 h.
         return servicio.whatsapp(repo, cliente_id, fecha, resultados=_resultados(cliente_id, fecha), contactos=contactos,
                                  cuantas=cuantas, comprobar=_comprobador())
@@ -882,6 +971,12 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         agente = request.headers.get("user-agent", "")
         vista_previa = agente.startswith("WhatsApp") or "facebookexternalhit" in agente
         try:
+            borrador_id, _, recibida = ficha[:80].partition(".")
+            firmada = b.FIRMA.match(recibida) and hmac.compare_digest(recibida, b.firma(borrador_id, hoy()))
+            cliente = next((x["cliente_id"] for x in repo.borradores(fecha=hoy()) if str(x.get("id")) == borrador_id),
+                           None) if firmada else None
+            if cliente:
+                _mensajes_al_dia(cliente)  # el chat se abre con el mensaje ya al día
             enlace = b.abrir_corto(repo, ficha[:80], marcar=not vista_previa)
         except Exception as e:  # noqa: BLE001 — sin el dato, la página de «ya no sirve»
             registro.aviso("api:enlace-corto", e)
