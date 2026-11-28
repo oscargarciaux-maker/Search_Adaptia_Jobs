@@ -1,10 +1,11 @@
 # PR 1.5 (16 nov): GitHub propone cada semana las actualizaciones de librerías y de acciones, como PR que pasan por
 # todas las pruebas antes de que Oscar los fusione. Nada se actualiza solo.
-# Python: requirements.in (lo que pedimos) → requirements.txt (pip-compile, con huellas); Dependabot actualiza ambos.
+# Python: requirements.in (lo que pedimos) → requirements.txt (uv pip compile --universal, con huellas); Dependabot
+# actualiza ambos con el ecosistema `uv` (P-13.2; el porqué está en pruebas/test_dependencias.py).
 # Las versiones mayores (cambios que pueden romper) no se proponen solas: se hacen a propósito en un PR revisado.
 version: 2
 updates:
-  - package-ecosystem: pip
+  - package-ecosystem: uv
     directory: /
     schedule: { interval: weekly, day: monday }
     open-pull-requests-limit: 5
