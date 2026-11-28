@@ -40,13 +40,29 @@ def afinidad_vigente(original, actual, rol, roles, inventario):
     - Si ya no está en el inventario (cerrada o vieja), no.
     - Si entró por ampliación (contratos v9 y v11: filtros relajados para llegar a 5), sí: entró así a propósito y va
       marcada; compararla con los filtros estrictos daba una falsa alarma (QA, 13 nov).
-    - Si encaja igual de bien en varios cargos, vale cualquiera de los empatados: esas vacantes se reparten por turnos
-      entre los cargos, y comparar solo con el primero daba otra falsa alarma (UX/UI frente a Product Designer)."""
+    - Modo panel (7.H, decisión de Oscar 28 nov): manda la regla del panel (`panel.afinidad.encaja_asignada`). Sirve si
+      encaja con algún perfil del cargo (Comunidad incluida) y su título corresponde al cargo, aunque otro cargo
+      la reconozca mejor: lo que cuenta es lo que recibe el cliente. Sin `aprobada`: la aprobación a mano («Por
+      confirmar») es de asignaciones del panel, no del lote que elige la Bodega.
+    - Modo heredado: si encaja igual de bien en varios cargos, vale cualquiera de los empatados (se reparten por turnos;
+      comparar solo con el primero daba otra falsa alarma: UX/UI frente a Product Designer)."""
     if actual["id"] not in inventario:
         return False
     if original.get("_ampliacion"):
         return True
-    return _empata(actual, rol, roles)
+    return _encaja(actual, rol, roles)
+
+
+def _es_panel(rol):
+    return "_perfiles" in rol  # como en `entrega.roles_de`: solo los cargos del panel traen sus perfiles
+
+
+def _encaja(v, rol, roles):
+    """¿La vacante le sirve a `rol` con su configuración actual? En modo panel, la regla del panel; si no, `_empata`."""
+    if _es_panel(rol):
+        from panel.afinidad import encaja_asignada  # aquí: el modo heredado no carga el panel
+        return any(encaja_asignada(v, p, rol["_cargo"], rol["_hoy"])["compatible"] for p in rol["_perfiles"])
+    return _empata(v, rol, roles)
 
 
 def _empata(v, rol, roles):
@@ -58,12 +74,14 @@ def _empata(v, rol, roles):
 
 def motivo_no_encaja(original, rol, roles):
     """7.G: por qué una vacante que sigue en el inventario ya no encaja. Si la copia elegida esta mañana todavía encaja
-    con los cargos y perfiles de ahora, lo que cambió es la vacante; si tampoco encaja, se editó el cargo o el perfil.
-    Solo para el detalle privado (cifras por cargo, sin datos de nadie)."""
+    con los cargos y perfiles de ahora (con la misma regla que `afinidad_vigente`), lo que cambió es la vacante; si
+    tampoco encaja, se editó el cargo o el perfil. Solo para el detalle privado (cifras por cargo, sin datos de
+    nadie)."""
     from buscador.validacion import MOTIVO_CONFIGURACION, MOTIVO_VACANTE
-    if not original.get("familias"):
+    sin_datos = not original.get("titulo") if _es_panel(rol) else not original.get("familias")
+    if sin_datos:  # sin datos de la copia no se adivina
         return ""
-    return MOTIVO_VACANTE if _empata(original, rol, roles) else MOTIVO_CONFIGURACION
+    return MOTIVO_VACANTE if _encaja(original, rol, roles) else MOTIVO_CONFIGURACION
 
 
 def config():
