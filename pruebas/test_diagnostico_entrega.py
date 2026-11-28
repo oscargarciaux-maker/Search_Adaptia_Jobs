@@ -31,8 +31,8 @@ def fila(i, titulo="Product Designer", idioma="es", estado="verificada", motivo=
 
 
 CATALOGO = [
-    fila(1),                                                          # pasa todo y se asignó hoy
-    fila(2),                                                          # ya la recibió otro día
+    fila(1, visto_primera_vez=FECHA),                                 # pasa todo, nueva de hoy y se asignó hoy
+    fila(2, visto_primera_vez="2026-11-20"),                          # ya la recibió otro día
     fila(3, estado="pendiente", motivo="presupuesto de comprobación agotado"),
     fila(4, estado="pendiente", motivo="acceso bloqueado"),
     fila(5, idioma="en"),                                             # solo acepta español
@@ -65,11 +65,13 @@ def test_embudo_cuenta_cada_paso_con_las_reglas_de_la_seleccion():
     catalogo = [de._vacante(f) for f in CATALOGO]
     del_cargo = [v for v in catalogo if grado(v["titulo"], cargo, cercanos=True)[0]]
     por_fuente = defaultdict(Counter)
-    pasos, enlace, lugares = de.embudo(del_cargo, p, FECHA, {"v2"}, {"v1"}, por_fuente, AHORA)
+    pasos, enlace, lugares, nuevas = de.embudo(del_cargo, p, FECHA, {"v2"}, {"v1"}, por_fuente, AHORA, FECHA)
     assert pasos == {"cargo": 10, "lugar": 9, "idioma": 8, "requisitos": 7, "enlace": 2, "no_recibida": 1,
                      "asignada": 1}
     assert enlace == {"sin_turno": 1, "bloqueo": 1, "rechazada": 1, "vencida": 1, "solo_vista": 1}
     assert lugares == {"modalidad": 1}
+    assert nuevas == 1  # v1: vista por primera vez el día de la búsqueda y no recibida antes
+    assert de.embudo(del_cargo, p, FECHA, {"v2"}, {"v1"}, None, AHORA)[3] == 0  # sin fecha de búsqueda no se cuenta
     assert por_fuente["_apify"]["cargo"] == 1 and por_fuente["_apify"]["enlace"] == 0
     assert por_fuente["Computrabajo"]["asignada"] == 1
 
@@ -83,6 +85,8 @@ def test_causa_es_el_primer_paso_bajo_la_meta():
     assert de.causa_de({**base, "cargo": 4}, {}, 10, 3) == ("mercado", "cargo")
     assert de.causa_de({**base, "idioma": 2}, {}, 10, 2) == ("sistema", "idioma")
     assert de.causa_de({**base, "enlace": 12, "no_recibida": 12}, {}, 10, 4) == ("sistema", "asignada")
+    # P-16.4: candidatas comprobadas que ya recibió; las nuevas no llegan a la meta → flujo del mercado
+    assert de.causa_de({**base, "enlace": 12, "no_recibida": 4}, {}, 10, 4) == ("mercado_flujo", "no_recibida")
     assert de.causa_de(base, {}, 10, 10) == ("cumple", "")
 
 
@@ -111,7 +115,8 @@ def test_calcular_mide_14_dias_y_ordena_de_quien_menos_recibe():
     primero = r["perfiles"][2]
     assert primero["por_dia"] == [3, 0, 1] and primero["media"] == 1.3 and primero["dias_en_0"] == 1
     assert primero["dias_bajo_5"] == 3 and primero["dias_bajo_meta"] == 3 and primero["hoy"] == 1
-    assert primero["embudo"]["asignada"] == 1
+    assert primero["embudo"]["asignada"] == 1 and primero["nuevas_hoy"] == 1
+    assert r["totales"]["nuevas_hoy"] == 3  # v1 es nueva para los 3 perfiles de clientes con ese cargo
     assert (primero["causa"], primero["paso"]) == ("sistema", "lugar")  # 10 del cargo, 9 pasan el lugar (meta 10)
     assert primero["por_confirmar"] == {"total": 2, "ubicacion": 1, "funciones": 1, "otro_oficio": 0}
     estable = next(f for f in r["perfiles"] if f["media"] == 11.0)

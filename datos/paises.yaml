@@ -163,7 +163,7 @@ palabras_comunes: [como, mayo, alba, laguna, negros, aurora, guarda, antique, ab
                    terni, rieti, imperia, latina, pistoia, matera, verona, varese, parma, monza, teramo, viterbo]
 
 # Palabras que abren una vacante remota a toda LATAM
-toda_latam: [latam, latin america, latinoamerica, america latina, americas, the americas]
+toda_latam: [latam, latin america, latin american, latinoamerica, america latina, americas, the americas]
 
 subregiones:
   - nombres: [south america, sudamerica, suramerica]
