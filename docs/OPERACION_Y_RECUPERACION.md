@@ -15,6 +15,61 @@ además de las siete anteriores. Auth del proveedor se gestiona aparte. No abrir
 
 ## 1. Qué comprobar cada día
 
+**Desde el 28 nov (P-13.1) lo diario lo hace el «Vigía de avisos»** (`vigia.yml`, `buscador/vigia.py`): si no te llega
+un correo, no hay nada que hacer. Una vez al día (lo pide el Reloj desde las 10:30 de Bogotá; el horario de las 10:40
+es su respaldo) mira, sin buscar nada ni escribir en la base:
+
+| Qué mira | Cuándo avisa |
+|---|---|
+| Bodega nocturna, Captura horaria, Reloj y Copia semanal en `main` | La última terminó en rojo (Captura: 2 seguidas; Reloj: 3), lleva demasiado sin terminar bien (Bodega 30 h, Captura 6 h, Reloj 3 h, Copia 8 días) o el flujo está desactivado (p. ej. por los 60 días sin actividad) |
+| Tamaño de la base (`pg_database_size`) | 80 % de 500 MB (aviso) y 95 % (urgente) |
+| Copias en el bucket `respaldos` | 80 % y 95 % de 1 GB |
+| Archivo más grande de la rama `publicado` | 80 % y 95 % de los 100 MB por archivo de GitHub |
+| Días sin commits en `main` | 30 días (urgente a los 50): GitHub apaga los horarios de un repo público a los 60 |
+| `datos/caducidades.yaml` | Fin de soporte 180 días antes; claves 30 días antes; urgente si ya caducó |
+| Algo que no pudo medir | Siempre («No se pudo comprobar…»): sin medir nadie vigila |
+
+Avisa en GitHub, sin cuentas nuevas: mantiene **un solo issue abierto «Atención: Adaptia»** (etiqueta `vigia`). Si
+hay avisos nuevos lo abre, o le añade un comentario, mencionando a la persona de la variable `AVISO_GITHUB_USUARIO`;
+cuando todo vuelve a estar en orden comenta «todo en orden» y lo cierra. Los mismos avisos del día anterior no se
+vuelven a comentar (aunque cambie la cifra), así que cada comentario trae algo nuevo. Si no hay ningún issue
+«Atención: Adaptia» abierto, no hay nada que hacer.
+
+Cada aviso es una frase fija con **un solo paso** («Entra en X y pulsa Y» o «Avisa a soporte técnico con el enlace de
+este issue»). El repositorio es **público** y el issue también: solo lleva frases de la lista blanca de
+`buscador/vigia.py`, cifras enteras, fechas y el texto revisado de `datos/caducidades.yaml`; nunca clientes, lugares,
+cargos, nombres de archivo, mensajes de error ni claves. El mismo texto queda en el resumen de la corrida (Actions →
+Vigía de avisos).
+
+### Activar el Vigía (una vez, unos 3 minutos)
+
+1. En GitHub: Settings → Secrets and variables → Actions → pestaña **Variables** → **New repository variable**.
+   Nombre `AVISO_GITHUB_USUARIO`, valor el usuario de GitHub de la persona que atenderá los avisos (sin «@»). Es una
+   variable, no un secreto: en un repo público ese usuario se verá en el issue.
+2. En GitHub: Actions → **Vigía de avisos** → **Run workflow**. Si hay algo que avisar aparece el issue «Atención:
+   Adaptia» en la pestaña Issues; si no, la corrida queda en verde y no abre nada.
+
+Para que el aviso llegue por correo, esa persona debe tener activado el correo para «Participating, @mentions and
+custom» en GitHub → Settings → Notifications. La documentación de GitHub explica que una mención suscribe a la persona
+y avisa según esa configuración, pero no dice expresamente nada de las menciones hechas por `github-actions[bot]`: la
+primera vez, comprobar que el correo llega. Además, quien vigila el repositorio («Watch») recibe los issues nuevos.
+
+Sin la variable el Vigía abre el issue igual, sin mencionar a nadie, y lo dice en el registro. Si GitHub no deja abrir
+o comentar el issue, la corrida queda en rojo (es la única forma de que se vea). Límite conocido: si el Vigía mismo
+deja de correr (Actions desactivado o los 60 días sin actividad), nadie avisa de eso; el propio Vigía avisa antes, a
+los 30 días sin commits y en cuanto un flujo clave queda desactivado.
+
+Requisitos para que no avise en falso: el Reloj activado (`docs/ACTIVAR_RELOJ.md`) y la copia semanal funcionando
+(`SUPABASE_BACKUP_KEY`); si no, el Vigía avisará de que llevan días sin terminar bien, que es cierto. En la Bodega, los
+horarios de respaldo terminan en verde sin trabajar cuando la de la mañana ya publicó: por eso un rojo de las últimas
+24 horas solo se da por resuelto con una búsqueda pedida que terminó bien después («Buscar ahora» o la del Reloj).
+
+Para añadir una fecha que caduca (otra clave, otra versión) se edita `datos/caducidades.yaml` (solo nombre, fecha y
+un paso; nunca el valor de una clave). Para quitar el aviso de los días sin commits basta un commit en `main`: el
+propio aviso explica cómo hacerlo desde la web cambiando la fecha `revisado` de ese archivo.
+
+### Revisión a mano (si hace falta mirar más a fondo)
+
 1. **Pruebas**: comprobar las del commit de `main` que se desplegó. Un test verde prueba ese código con sus fixtures;
    no prueba que la captura de hoy se haya ejecutado.
 2. **Bodega nocturna**: abrir la ejecución real, leer resumen y comprobar selección por los cargos de la versión activa (seis en legado), faltantes,
@@ -24,8 +79,8 @@ además de las siete anteriores. Auth del proveedor se gestiona aparte. No abrir
 5. **Calidad**: revisar estados y hora de enlaces de la selección del día. La selección histórica puede seguir en 120
    mientras una parte cerró después o está pendiente; no compartir por esa cifra sin mirar el estado actual.
 6. Abrir al menos una muestra de cada rol y revisar cargo afín, residencia, idioma y acceso a postulación.
-7. Revisar avisos/notificaciones GitHub y saldo Apify. Configurar las notificaciones con el responsable; este proyecto
-   no incluye un monitor externo, guardia ni un SLA de respuesta automático.
+7. Revisar el saldo de Apify. El monitor es el Vigía de arriba (más, si se configuraron, los checks opcionales de
+   Healthchecks de [ENTREGA_AL_CLIENTE.md](ENTREGA_AL_CLIENTE.md) §4); no hay guardia ni un SLA de respuesta automático.
 
 La captura solicita ejecución horaria, no entrega una garantía de latencia de una hora. En el diagnóstico de preparación,
 una captura/ofertas sin observación reciente en dos horas no pasan el criterio; es un umbral de revisión del piloto,
@@ -219,7 +274,8 @@ explícita de archivo/respaldos; cambiar un estado a archived no reduce espacio 
 
 **Mensual y al cambiar cuentas:** comprobar ciclo de crédito Apify, reservas, otros proyectos de la cuenta, permisos,
 expiración de tokens, facturación de alojamiento y restauración de un respaldo. Revisar que el repositorio no quede
-sin actividad de mantenimiento: GitHub puede deshabilitar cron en repositorios públicos inactivos según su política.
+sin actividad de mantenimiento: GitHub puede deshabilitar cron en repositorios públicos inactivos según su política
+(el Vigía avisa a los 30 días sin commits en `main` y si un flujo clave queda desactivado).
 
 Los USD 5 limitan Apify del proyecto, no todos los servicios. En repositorio público las condiciones de Actions difieren
 de uno privado; verificar plan actual. Como orden de magnitud, 24 capturas/día de 4,7 min son 3.384 min/mes, más unas
