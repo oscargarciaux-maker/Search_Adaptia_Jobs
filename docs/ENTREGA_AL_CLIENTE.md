@@ -75,10 +75,15 @@ y errores de conexión (`[DB_…]`, revisar la cadena de conexión y la contrase
 | Correo para avisos | El de la persona que atenderá los problemas, no uno personal |
 | Alojamiento del panel | Ver sección 5; solo si van a usar el panel de clientes |
 
-## 4. Avisos por correo (Healthchecks)
+## 4. Avisos
 
-GitHub no avisa cuando una tarea **no llega a ejecutarse**. Healthchecks.io (plan gratuito) sí: cada tarea le dice
-"terminé bien" o "fallé", y si no recibe noticias a tiempo, envía un correo.
+**El aviso principal es el Vigía de avisos, en GitHub y sin cuentas nuevas** ([OPERACION_Y_RECUPERACION.md](OPERACION_Y_RECUPERACION.md)
+§1): crear la variable de repositorio `AVISO_GITHUB_USUARIO` con el usuario de GitHub de la persona que atenderá los
+problemas, lanzar una vez Actions → Vigía de avisos → Run workflow y comprobar que esa persona tiene el correo activado
+para las menciones (GitHub → Settings → Notifications → «Participating, @mentions and custom»).
+
+**Opcional (no hace falta con el Vigía):** si el cliente ya usa Healthchecks.io, cada tarea puede avisarle además
+"terminé bien" o "fallé":
 
 1. Crear cuenta en healthchecks.io con el correo de avisos.
 2. Crear tres *checks* y anotar la URL de *ping* de cada uno:
@@ -88,7 +93,7 @@ GitHub no avisa cuando una tarea **no llega a ejecutarse**. Healthchecks.io (pla
 3. En GitHub, crear los secretos `AVISO_NOCTURNA_URL`, `AVISO_CAPTURA_URL` y `AVISO_RESPALDO_URL` con esas URL.
 4. En Healthchecks, en **Integrations**, usar la opción de prueba junto al correo para comprobar que el aviso llega.
 
-Sin esos secretos todo funciona igual, solo que sin avisos.
+Sin esos secretos todo funciona igual; los avisos llegan por el Vigía.
 
 ## 5. Panel de clientes
 
@@ -156,7 +161,8 @@ Reservar unas 2 horas fuera del horario de la nocturna (entre las 9 a. m. y las 
    sin marcar nada (verde).
 5. **Borrar** los secretos `SUPABASE_URL_DESTINO`, `SUPABASE_DB_URL_DESTINO` y `SUPABASE_SECRET_KEY_DESTINO`.
 6. **Apify**: cambiar `APIFY_TOKEN` por el del cliente.
-7. **Avisos**: crear los secretos `AVISO_…` con el Healthchecks del cliente (sección 4).
+7. **Avisos**: cambiar la variable `AVISO_GITHUB_USUARIO` por el usuario de GitHub de quien atenderá los avisos
+   (sección 4).
 8. **Repositorio**: Settings → General → Danger Zone → *Transfer ownership* a la cuenta del cliente. Después, con la
    cuenta del cliente, revisar que los secretos sigan ahí y que Actions esté habilitado.
 9. **Panel** (si aplica): configurar el alojamiento con las claves del proyecto del cliente (sección 5).

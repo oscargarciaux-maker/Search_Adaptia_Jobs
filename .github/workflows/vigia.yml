@@ -1,0 +1,79 @@
+name: Vigía de avisos
+
+# P-13.1 (28 nov): un aviso diario a UNA persona en un issue de GitHub («Atención: Adaptia», etiqueta `vigia`), con
+# una mención a la variable de repositorio AVISO_GITHUB_USUARIO (decisión de Oscar: sin cuentas nuevas). Mira el
+# estado de la Bodega, la Captura horaria, el Reloj y la Copia semanal, el tamaño de la base y de las copias, el archivo
+# más grande de `publicado`, los días sin commits en `main` y `datos/caducidades.yaml` (buscador/vigia.py). No busca
+# nada ni escribe en la base. El repo es público: el texto solo tiene frases fijas, cifras y fechas (lista blanca).
+# Lo pide el Reloj una vez al día desde las 10:30 de Bogotá (buscador/arranque.py, toca_vigia); el horario de abajo es
+# el respaldo si el Reloj está parado. Sin la variable abre el issue sin mencionar a nadie.
+# Activarlo: docs/OPERACION_Y_RECUPERACION.md §1. A mano: Actions → Vigía de avisos → Run workflow.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "40 15 * * *" # 10:40 de Bogotá (GitHub puede dispararlo horas más tarde: es solo el respaldo)
+
+permissions:
+  actions: read # leer el estado de las corridas y de los flujos
+  contents: read
+  issues: write # solo para el issue del Vigía
+
+concurrency:
+  group: vigia-avisos
+  cancel-in-progress: false
+
+jobs:
+  vigia:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install --require-hashes -r requirements.txt
+      - name: Reunir el estado de GitHub
+        run: |
+          # Lo que no se pueda leer se deja sin archivo: el Vigía lo avisa como «no se pudo comprobar».
+          pedir() { for intento in 1 2 3; do "$@" && return 0; sleep 10; done; return 1; }
+          datos="$RUNNER_TEMP/vigia"
+          mkdir -p "$datos"
+          rama=$(pedir gh repo view --json defaultBranchRef -q .defaultBranchRef.name) || rama=main
+          echo "$rama" > "$datos/rama.txt"
+          campos=databaseId,status,conclusion,createdAt,event,headBranch
+          for par in bodega:bodega.yml captura:incremental.yml reloj:reloj.yml respaldo:respaldo.yml; do
+            destino="$datos/corridas_${par%%:*}.json"
+            pedir gh run list --workflow "${par#*:}" --branch "$rama" --limit 40 --json "$campos" > "$destino" || rm -f "$destino"
+          done
+          pedir gh workflow list --all --json path,state > "$datos/flujos.json" || rm -f "$datos/flujos.json"
+          pedir gh api "repos/$GH_REPO/commits/$rama" -q .commit.committer.date > "$datos/commit.txt" || rm -f "$datos/commit.txt"
+          # Solo los tamaños de los archivos de `publicado`, sin sus nombres.
+          if git fetch -q --depth 1 origin publicado; then
+            git ls-tree -r -l FETCH_HEAD | awk '{print $4}' > "$datos/publicado.txt"
+          fi
+      - name: Traer la firma de los avisos anteriores
+        # Solo un sha256 corto de qué avisos había (sin textos ni cifras): si cambian, el aviso nuevo se reenvía aunque
+        # el issue ya estuviera abierto; si son los mismos de ayer, no se comenta otra vez.
+        uses: actions/cache/restore@v4
+        with:
+          path: vigia-firma.txt
+          key: vigia-firma-${{ github.run_id }}
+          restore-keys: vigia-firma-
+      - name: Revisar y avisar
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          AVISO_GITHUB_USUARIO: ${{ vars.AVISO_GITHUB_USUARIO }}
+        run: python -m buscador.vigia --datos "$RUNNER_TEMP/vigia" --firma vigia-firma.txt
+      - name: Guardar la firma de hoy
+        if: hashFiles('vigia-firma.txt') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: vigia-firma.txt
+          key: vigia-firma-${{ github.run_id }}
