@@ -364,13 +364,17 @@ def posts_que_caben(reservado, maximo):
 # datos de nadie (solo cargo, idioma y modalidad).
 CONTRATA_POST = {"es": '(contratando OR vacante OR buscamos OR "estamos buscando")',
                  "en": '(hiring OR "we are hiring" OR "join our team")'}
-REMOTO_POST = {"es": "remoto", "en": "remote"}
+# Formas de decir «remoto» en cada idioma: cada consulta usa una y rotan por día y por consulta (no suman consultas).
+REMOTO_POST = {"es": ("remoto", "teletrabajo", '"trabajo desde casa"'), "en": ("remote", '"work from home"')}
 
 
 def consulta_post(termino, idioma="en", remoto=False):
-    """Una consulta del buscador de posts: contratación en `idioma` + el término exacto (+ «remoto»/«remote»)."""
+    """Una consulta del buscador de posts: contratación en `idioma` + el término exacto + la modalidad. `remoto`:
+    False (sin modalidad), True (la primera forma de `REMOTO_POST`) o la forma que se quiera usar."""
     salida = f'{CONTRATA_POST.get(idioma, CONTRATA_POST["en"])} "{termino}"'
-    return f"{salida} {REMOTO_POST.get(idioma, REMOTO_POST['en'])}" if remoto else salida
+    if remoto is True:
+        remoto = REMOTO_POST.get(idioma, REMOTO_POST["en"])[0]
+    return f"{salida} {remoto}" if remoto else salida
 
 
 # Lectura acotada compartida con la ficha del panel (contrato v29): mismos límites que en el contrato v28.

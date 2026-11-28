@@ -117,7 +117,8 @@ def test_registrar_da_posts_sin_confirmar_solo_hasta_dos_y_marcados(cfg):
             v, _ = pa.a_vacante(item, {f["id"] for f in familias.mapa()}, hoy())
             post = vacante.crear_post(v["titulo"], v["empresa"], v["enlace"], v["ubicacion"], v["descripcion"],
                                       v["fecha"], v["remoto"], v["contacto"], hoy())
-            post.update(ubicacion_sin_confirmar=True, ubicacion_deducida="")
+            # Como `buscar_posts`: un post sin pistas que no dice la modalidad queda sin ella (no se supone presencial).
+            post.update(ubicacion_sin_confirmar=True, ubicacion_deducida="", modalidad="")
             posts.append(post)
     filas_catalogo = [catalogo.fila(x, x["vista_en"]) for x in posts]
     asignaciones = []

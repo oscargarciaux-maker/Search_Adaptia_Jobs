@@ -348,8 +348,9 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
   por vuelta: palabras de contratación **en el idioma del perfil** (español: contratando, vacante, buscamos, «estamos
   buscando»; inglés: hiring, «we are hiring», «join our team») + un nombre del cargo entre comillas (de dos palabras o
   más si los hay; sin cercanos; en español se alternan los títulos en español y los generales; cada día rota uno, y
-  entran los términos ampliados de la 14.2 cuando existan) + «remoto»/«remote» si acepta remoto (quien acepta oficina,
-  también sin modalidad). **Nunca un país ni una ciudad:** remoto = de todo el mundo con los demás requisitos (decisión
+  entran los términos ampliados de la 14.2 cuando existan) + si acepta remoto, una forma de decirlo en su idioma
+  («remoto», «teletrabajo», «trabajo desde casa»; «remote», «work from home»), que rota por día y por consulta sin
+  sumar consultas (quien acepta oficina, también sin modalidad). **Nunca un país ni una ciudad:** remoto = de todo el mundo con los demás requisitos (decisión
   de Oscar, 28 nov), y así la consulta no lleva datos de nadie (solo cargo, idioma y modalidad). Solo posts de las
   últimas 24 h (cada noche, posts nuevos).
 - **Medición de Apify** (8.2): por corrida (`apify` en el reporte) y acumulada en el mes (`trabajo/apify_medicion.json`),
@@ -366,8 +367,10 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
   (v28, v49). **Un post «remoto» sin región** también queda «ubicación sin confirmar» (antes se descartaba como
   «elegibilidad regional por confirmar»: 8 de 23 el 28 nov), pero solo si dice remoto sin negarlo y no nombra ningún
   país (de cualquier parte), región, zona horaria, restricción de residencia, oficina ni presencialidad: ante cualquier
-  duda, no. Si nombra un país, se evalúa con él como cualquier post. Las pistas de dónde está la empresa no se usan para
-  él (no dicen a quién contrata en remoto) y, si la ficha enlazada dice la región, manda eso (P-16.2).
+  duda, no. Si nombra un país, se evalúa con él como cualquier post. Las pistas de dónde está la empresa no se usan
+  para él (no dicen a quién contrata en remoto) y, si la ficha enlazada dice la región, manda eso. A un post «sin
+  confirmar» la modalidad solo se le perdona si no la dice y la persona acepta remoto: **si el perfil no acepta
+  remoto, no le llega** (y si el post dice remoto, presencial o híbrido, se compara como en cualquier vacante) (P-16.2).
 
 ## 11. «Por confirmar» y aprendizaje
 

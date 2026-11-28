@@ -154,8 +154,10 @@ def terminos_post(familia, idioma):
 def consultas_de_perfil(familia, perfil, hoy):
     """P-16.2: consultas de posts para una persona, de la más útil a la menos, alternando sus idiomas: los nombres
     principales del cargo (en español, el título en español y el general) y uno más que rota cada día (así, en unos
-    días, se prueban todos). Quien acepta remoto busca con «remoto»/«remote»; quien acepta además oficina, también sin
-    modalidad. Solo cargo, idioma y modalidad: nunca su país, su ciudad ni nada suyo."""
+    días, se prueban todos). Quien acepta remoto busca con una forma de decirlo en su idioma («remoto», «teletrabajo»,
+    «trabajo desde casa»; «remote», «work from home») que rota por día y por consulta, sin sumar consultas; quien
+    acepta además oficina, también sin modalidad. Solo cargo, idioma y modalidad: nunca su país, su ciudad ni nada
+    suyo."""
     idiomas = [i for i in ("es", "en") if i in (perfil.get("idiomas") or ("es", "en"))]
     modalidades = set(perfil.get("modalidades") or ())
     con_remoto = "remoto" in modalidades
@@ -166,7 +168,10 @@ def consultas_de_perfil(familia, perfil, hoy):
         terminos = terminos_post(familia, idioma)
         fijos = 2 if idioma == "es" else 1
         elegidos = terminos[:fijos] + cobertura.rotar(terminos[fijos:], hoy, 1)
-        por_idioma.append([publicaciones_apify.consulta_post(t, idioma, remoto) for t in elegidos for remoto in modos])
+        formas = publicaciones_apify.REMOTO_POST[idioma]
+        por_idioma.append([publicaciones_apify.consulta_post(
+            t, idioma, cobertura.rotar(formas, hoy, 1, desfase=k)[0] if remoto else False)
+            for k, t in enumerate(elegidos) for remoto in modos])
     return _intercalar(por_idioma)
 
 

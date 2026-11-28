@@ -12,6 +12,7 @@ from panel.repositorio import configuracion_demo, hoy
 from pruebas.panel.test_posts import BUENO, VALIDAS, ClientePosts, _post
 
 ACTOR = "harvestapi/linkedin-post-search"
+REMOTO_ES, REMOTO_EN = (tuple(" " + x for x in pa.REMOTO_POST[i]) for i in ("es", "en"))
 
 
 def _dia(n):
@@ -95,26 +96,41 @@ def test_consultas_sin_pais_ni_datos_de_la_persona(cfg):
     consultas, _ = _consultas(cfg)
     texto = " ".join(consultas).lower()
     assert consultas and not any(x in texto for x in ("kenya", "kenia", "colombia", "españa", "nairobi"))
-    assert all(q.endswith((" remote", " remoto")) for q in consultas)  # todos aceptan solo remoto
+    assert all(q.endswith(REMOTO_ES + REMOTO_EN) for q in consultas)  # todos aceptan solo remoto
 
 
 def test_el_idioma_del_perfil_decide_las_palabras_de_la_consulta(cfg):
     for p in cfg["perfiles"]:
         p["idiomas"] = ["es"]
     solo_es, _ = _consultas(cfg)
-    assert all(q.startswith(pa.CONTRATA_POST["es"]) and q.endswith(" remoto") for q in solo_es)
+    assert all(q.startswith(pa.CONTRATA_POST["es"]) and q.endswith(REMOTO_ES) for q in solo_es)
     assert any('"Product Designer"' in q for q in solo_es)  # en español también con el título en inglés
     for p in cfg["perfiles"]:
         p["idiomas"] = ["en"]
     solo_en, _ = _consultas(cfg)
-    assert all(q.startswith(pa.CONTRATA_POST["en"]) and q.endswith(" remote") for q in solo_en)
+    assert all(q.startswith(pa.CONTRATA_POST["en"]) and q.endswith(REMOTO_EN) for q in solo_en)
 
 
 def test_quien_acepta_oficina_busca_tambien_sin_modalidad(cfg):
     for p in cfg["perfiles"]:
         p["ubicaciones"] = [{"paises": ["CO"], "ciudades": ["Bogotá"], "modalidades": ["presencial"]}]
     consultas, _ = _consultas(cfg)
-    assert consultas and not any(q.endswith((" remote", " remoto")) for q in consultas)
+    assert consultas and not any(q.endswith(REMOTO_ES + REMOTO_EN) for q in consultas)
+
+
+def test_las_formas_de_decir_remoto_rotan_sin_sumar_consultas():
+    perfil = {"idiomas": ["es", "en"], "modalidades": ["remoto"]}
+    familia = {"consultas": ["Product Designer", "UX Designer", "UI Designer"],
+               "consultas_es": ["Diseñador de producto", "Diseñador UX"]}
+    vistas, cantidades = set(), set()
+    for dia in range(1, 8):
+        consultas = refuerzo.consultas_de_perfil(familia, perfil, f"2027-01-{dia:02d}")
+        cantidades.add(len(consultas))
+        vistas.update(next(f for f in REMOTO_ES + REMOTO_EN if q.endswith(f)) for q in consultas)
+    assert cantidades == {5}  # 3 en español + 2 en inglés, como con una sola forma
+    assert vistas == set(REMOTO_ES + REMOTO_EN)  # en una semana se usan todas
+    assert all(not q.startswith(pa.CONTRATA_POST["en"]) or q.endswith(REMOTO_EN)
+               for q in refuerzo.consultas_de_perfil(familia, perfil, "2027-01-01"))  # cada idioma con las suyas
 
 
 def test_terminos_de_una_palabra_no_se_usan_si_hay_frases():
@@ -169,3 +185,36 @@ def test_remoto_con_region_negado_o_con_oficina_no_queda_sin_confirmar(texto):
     # Lo que dice la región (aunque sea fuera de LATAM), lo niega o habla de oficina no se perdona como «sin región».
     v, motivo = pa.a_vacante(_post(texto), VALIDAS, hoy())
     assert motivo == "" and v["ubicacion_sin_confirmar"] is False
+
+
+# ── Un post sin confirmar no perdona la modalidad a quien no acepta remoto ─────────────────────────────────────────
+
+def _perfil(modalidades):
+    p = configuracion_demo()["perfiles"][0]
+    p["ubicaciones"] = [{"paises": ["CO"], "ciudades": ["Bogotá"] if modalidades != ["remoto"] else [],
+                         "modalidades": modalidades}]
+    return p
+
+
+def _post_sin_confirmar(texto, modalidad=None):
+    v, _ = pa.a_vacante(_post(texto), VALIDAS, hoy())
+    post = vacante.crear_post(v["titulo"], v["empresa"], v["enlace"], v["ubicacion"], v["descripcion"], v["fecha"],
+                              v["remoto"], v["contacto"], hoy())
+    post.update(ubicacion_sin_confirmar=True)
+    if modalidad is not None:
+        post["modalidad"] = modalidad
+    return post
+
+
+def test_post_remoto_sin_confirmar_no_llega_a_quien_solo_acepta_oficina():
+    remoto = _post_sin_confirmar(REMOTO_SIN_REGION)
+    assert remoto["modalidad"] == "remoto"
+    assert not afinidad.evaluar_post(remoto, _perfil(["presencial"]), hoy())["compatible"]
+    assert afinidad.evaluar_post(remoto, _perfil(["remoto"]), hoy())["compatible"]
+
+
+def test_post_sin_modalidad_sin_confirmar_solo_llega_a_quien_acepta_remoto():
+    from pruebas.panel.test_posts_v28 import SIN_LUGAR
+    sin_dato = _post_sin_confirmar(SIN_LUGAR, modalidad="")  # el post no dice cómo es (v28)
+    assert afinidad.evaluar_post(sin_dato, _perfil(["remoto"]), hoy())["compatible"]  # como antes
+    assert not afinidad.evaluar_post(sin_dato, _perfil(["presencial", "hibrido"]), hoy())["compatible"]
