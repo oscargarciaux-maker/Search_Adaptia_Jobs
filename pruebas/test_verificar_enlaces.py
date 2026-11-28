@@ -136,6 +136,27 @@ def test_paso_visible_de_aplicar_tambien_se_revisa():
     assert r["estado"] == "pendiente" and r["motivo"] == "requiere iniciar sesión"
 
 
+def test_postular_con_la_cuenta_del_mismo_portal_no_anula_la_ficha():
+    # P-11.1 (decisión de Oscar del 28 nov): en Get on Board «Postular» lleva a /applications/new y de ahí a su login.
+    ficha = "https://www.getonbrd.com/empleos/diseno-ux/ux-designer-acme-remote"
+    paso = "https://www.getonbrd.com/jobs/ux-designer-acme-remote/applications/new"
+    login = "https://www.getonbrd.com/webpros/login"
+    paginas = {ficha: Respuesta(html(f'<a href="{paso}">Postular</a>')),
+               paso: Respuesta(http=302, headers={"Location": login}), login: Respuesta("<title>Ingresa</title>")}
+    sesion = Sesion(paginas)
+    r = ve.comprobar(ficha, "UX Designer", sesion=sesion, validar_url=lambda u: True, ahora=AHORA)
+    assert r["estado"] == "verificada" and r["motivo"] == ve.POSTULAR_CON_CUENTA
+    assert login not in sesion.consultas  # el login no se abre
+    # Si la página del paso ya es el login del mismo portal, igual.
+    r = comprobar({URL: Respuesta(html('<a href="https://jobs.lever.co/acme/1/apply">Apply now</a>')),
+                   "https://jobs.lever.co/acme/1/apply": Respuesta("<title>Sign in</title><h1>Sign in</h1>")})
+    assert r["estado"] == "verificada"
+    # Un login en OTRO sitio sigue sin comprobar (ver test_paso_visible_de_aplicar_tambien_se_revisa).
+    otro = "https://cuentas.otro-portal.com/login"
+    r = comprobar({URL: Respuesta(html(f'<a href="{otro}">Apply now</a>')), otro: Respuesta("<title>Login</title>")})
+    assert r["estado"] == "pendiente"
+
+
 def test_timeout_y_exceso_bytes_no_aprueban_ni_declaran_cierre():
     assert comprobar({URL: requests.Timeout()})["estado"] == "pendiente"
     assert comprobar({URL: Respuesta(html())}, max_bytes=20)["estado"] == "pendiente"
