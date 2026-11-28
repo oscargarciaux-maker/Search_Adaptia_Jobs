@@ -95,6 +95,8 @@ export type Vacante = {
   titulo: string;
   empresa: string;
   ubicacion: string;
+  // P-7.F: texto del portal cuando el sistema corrigió la ubicación (solo para que el operador lo revise).
+  ubicacion_portal?: string;
   modalidad: string;
   idioma: string;
   publicada: string;
@@ -233,6 +235,8 @@ export type Revision = {
   titulo: string;
   empresa: string;
   ubicacion: string;
+  // P-7.F: texto del portal cuando el sistema corrigió la ubicación (solo para que el operador lo revise).
+  ubicacion_portal?: string;
   modalidad: string;
   idioma: string;
   publicada: string;
@@ -280,6 +284,8 @@ export type FichaVacante = {
   titulo: string;
   empresa: string;
   ubicacion: string;
+  // P-7.F: texto del portal cuando el sistema corrigió la ubicación (solo para que el operador lo revise).
+  ubicacion_portal?: string;
   modalidad: string;
   salario: string;
   publicada: string;

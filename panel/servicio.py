@@ -385,8 +385,9 @@ def resultados(repo, cliente_id=None, fecha=None):
         clave = row["vacante_id"]
         if clave in vistas and (vistas[clave]["estado"] == "lista" or not enlace):
             continue
+        lugar, lugar_portal = paises.ubicacion_a_mostrar(datos.get("ubicacion"))  # P-7.F: el cliente ve la corregida
         ficha = {"id": clave, "titulo": datos.get("titulo", ""), "empresa": datos.get("empresa", ""),
-            "ubicacion": datos.get("ubicacion", ""), "modalidad": datos.get("modalidad", ""),
+            "ubicacion": lugar, "ubicacion_portal": lugar_portal, "modalidad": datos.get("modalidad", ""),
             "idioma": datos.get("idioma", ""), "publicada": datos.get("fecha_publicacion", ""),
             "experiencia": datos.get("anos_min"), "match_grade": row["match_grade"],
             "explicacion": row["explicacion"], "cargo_id": row["cargo_id"], "enlace": enlace,
@@ -452,8 +453,9 @@ def ficha(repo, vacante_id, traer=True, obtener=None):
                     repo.guardar_descripcion(vacante_id, texto)
                 except Exception as e:  # noqa: BLE001 - se muestra aunque no se pueda guardar
                     registro.aviso("servicio:ficha-guardar", e)
+    lugar, lugar_portal = paises.ubicacion_a_mostrar(datos.get("ubicacion"))  # P-7.F
     return {"id": vacante_id, "titulo": datos.get("titulo", ""), "empresa": datos.get("empresa", ""),
-            "ubicacion": datos.get("ubicacion", ""), "modalidad": datos.get("modalidad", ""),
+            "ubicacion": lugar, "ubicacion_portal": lugar_portal, "modalidad": datos.get("modalidad", ""),
             "salario": datos.get("salario") or "", "publicada": datos.get("fecha_publicacion", ""),
             "anos_min": datos.get("anos_min"), "ingles": datos.get("ingles") or "", "nivel": datos.get("nivel") or "",
             "enlace": datos.get("enlace", ""), "enlace_directo": datos.get("enlace_directo", ""),

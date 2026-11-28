@@ -533,6 +533,7 @@ export function PorConfirmar({
               )}
               <DatosAviso
                 ubicacion={r.ubicacion}
+                ubicacionPortal={r.ubicacion_portal}
                 modalidad={r.modalidad}
                 salario={r.salario}
                 publicada={r.publicada}

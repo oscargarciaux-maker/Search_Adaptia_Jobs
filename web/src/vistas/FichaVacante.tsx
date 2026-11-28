@@ -90,6 +90,7 @@ export function ConNegritas({ texto }: { texto: string }) {
 // Lo que se sabe del aviso, igual en «Vacantes» y en «Por confirmar» (contrato v34).
 export function DatosAviso({
   ubicacion,
+  ubicacionPortal,
   modalidad,
   salario,
   publicada,
@@ -98,6 +99,7 @@ export function DatosAviso({
   extra,
 }: {
   ubicacion?: string;
+  ubicacionPortal?: string;
   modalidad?: string;
   salario?: string;
   publicada?: string;
@@ -110,6 +112,10 @@ export function DatosAviso({
       <li>
         <MapPin size={14} />
         {ubicacion || "Ubicación no informada"}
+        {/* P-7.F: el cliente ve la corregida; el operador puede revisar lo que escribió el portal. */}
+        {ubicacionPortal && (
+          <span className="muted"> (según el portal: {ubicacionPortal})</span>
+        )}
       </li>
       <li>
         <Globe2 size={14} />
@@ -251,6 +257,7 @@ export function FichaVacante({
       </header>
       <DatosAviso
         ubicacion={v.ubicacion}
+        ubicacionPortal={v.ubicacion_portal}
         modalidad={v.modalidad}
         salario={ficha?.salario}
         publicada={v.publicada}
