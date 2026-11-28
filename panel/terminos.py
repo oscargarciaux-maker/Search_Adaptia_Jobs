@@ -278,10 +278,10 @@ def _contexto_propio(clave):
 
 
 def _oficio_ajeno(texto, cargo, palabra):
-    """7.E (27 nov): el nombre de varias palabras de OTRO oficio del mapa que trae el título y que contiene `palabra`
+    """7.E (27 nov): el nombre más largo de OTRO oficio del mapa que trae el título y que contiene `palabra`
     («penetration tester» es Ciberseguridad y contiene «tester»), si no es también un término del cargo; si no, ''.
-    Así un término de una sola palabra del cargo no basta cuando es parte del nombre de otro oficio: el nombre más
-    largo dice el oficio, como «New Mexico» no es México. Sin familia del mapa conocida para el cargo, no se aplica."""
+    Así un término del cargo no basta cuando es parte del nombre de otro oficio: el nombre más largo dice el oficio,
+    como «New Mexico» no es México. Sin familia del mapa conocida para el cargo, no se aplica."""
     suyas, propios = _contexto_propio(_clave_cargo(cargo))
     if not suyas:
         return ""
@@ -290,7 +290,8 @@ def _oficio_ajeno(texto, cargo, palabra):
             continue
         for patron in (f["_re"]["exacto"], f["_re"]["similar"]):
             for m in patron.finditer(texto) if patron else ():
-                nombre = m.group(0)  # P-7.F: también en singular, para la vuelta de plurales («analista de prueba»)
+                nombre = m.group(0)
+                # P-7.F: también en singular, para la vuelta de plurales («analista de prueba»)
                 if nombre not in propios and any(len(x) > len(palabra) and normalizar.contiene_frase(x, palabra)
                                                  for x in (nombre, _base(_singular(nombre)))):
                     return nombre
@@ -305,12 +306,18 @@ def _excluido_del_mapa(completo, cargo):
 
 def _cuenta(texto, canon, cargo, base):
     """El término del cargo está en el título y no es parte de un nombre más largo de otro oficio (en el título tal cual
-    ni en singular: «Analista de Datos» también es «analista de dato»). 7.E lo pedía a los de una sola palabra; P-7.F
-    (27 nov) también a los de varias: «analista de pruebas» (QA) dentro de «analista de pruebas de seguridad»
-    (Ciberseguridad) no basta, porque el nombre más largo dice el oficio."""
+    ni en singular: «Analista de Datos» también es «analista de dato»). Un término de una sola palabra no basta nunca
+    dentro de otro oficio (7.E). Uno de varias palabras solo deja de bastar si ese nombre más largo trae además un
+    `excluir` de la familia del cargo en el mapa (P-7.F, 27 nov): «analista de pruebas» (QA) dentro de «analista de
+    pruebas de seguridad» (Ciberseguridad, y QA excluye «pruebas de seguridad») no es QA, pero «marketing manager»
+    dentro de «product marketing manager» sigue siendo Marketing Manager."""
     if not canon or not normalizar.contiene_frase(texto, canon):
         return False
-    return not (_oficio_ajeno(base, cargo, canon) or _oficio_ajeno(texto, cargo, canon))
+    for t in dict.fromkeys((base, texto)):
+        ajeno = _oficio_ajeno(t, cargo, canon)
+        if ajeno and (" " not in canon or _excluido_del_mapa(ajeno, cargo)):
+            return False
+    return True
 
 
 def grado(titulo, cargo, cercanos=False):

@@ -454,7 +454,7 @@ familias:
             # 7.E (27 nov): seguridad ofensiva (Ciberseguridad), no pruebas de software
             penetration tester, pentester, pentesting, red team,
             # P-7.F (27 nov, decisión de Oscar): las pruebas de seguridad son Ciberseguridad
-            security tester, security testing, pruebas de seguridad, tester de seguridad]
+            security tester, security testing, pruebas de seguridad]
 
 # ───────────── Datos e IA ─────────────
 - id: analista-datos
@@ -627,9 +627,9 @@ familias:
               red team, blue team, especialista en ciberseguridad, cybersecurity specialist, ciso,
               # 7.E (27 nov): vistos en la bodega; sin esto se leían como QA («analista de testing», «tester»)
               analista de pentesting, red team tester,
-              # P-7.F (27 nov, decisión de Oscar): probar la seguridad es Ciberseguridad, no QA
-              security tester, technical security tester, analista de pruebas de seguridad, tester de seguridad,
-              security testing engineer, ingeniero de pruebas de seguridad]
+              # P-7.F (27 nov, decisión de Oscar): probar la seguridad es Ciberseguridad, no QA. Vistos en la bodega
+              # («Technical Security Tester», «Analista de Pruebas de Seguridad») más los equivalentes que nombró Oscar
+              security tester, analista de pruebas de seguridad, security testing, pruebas de seguridad]
   cercanos: [administrador de redes, network engineer, devops engineer, auditor de sistemas, it auditor]
   herramientas: [siem, splunk, owasp, iso 27001, nist, firewall, burp suite, kali, edr, soc, pentesting]
   genericos: [security, seguridad, ciberseguridad, cybersecurity]

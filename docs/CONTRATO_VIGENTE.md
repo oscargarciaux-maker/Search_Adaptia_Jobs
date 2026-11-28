@@ -126,14 +126,17 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
   del cargo que la recibe (v49).
 - El importador añade nombres y funciones a cargos existentes; nunca quita (v27).
 - Desarrollo genérico no cuenta como QA ni como IA (v4).
-- **El nombre más largo dice el oficio:** un término del cargo no basta si es parte de un nombre más largo de otro
-  oficio del mapa que trae el título, tanto si el término es de una palabra («tester» dentro de «Penetration Tester»:
-  Ciberseguridad, no QA) como de varias («analista de pruebas» dentro de «Analista de Pruebas de Seguridad»). Vale
-  también en plural y para los títulos en español del mapa. «QA Tester» o «Software Tester» siguen siendo QA. La
+- **El nombre más largo dice el oficio:** un término de una sola palabra del cargo («tester», «qa») no basta si es parte
+  del nombre de varias palabras de otro oficio del mapa que trae el título («Penetration Tester» es Ciberseguridad, no
+  QA; «QA Tester» o «Software Tester» siguen siendo QA). Un término de varias palabras solo deja de bastar si ese
+  nombre más largo trae además un `excluir` de la familia del cargo («analista de pruebas» dentro de «Analista de
+  Pruebas de Seguridad», que QA excluye); sin ese `excluir`, sigue valiendo («Product Marketing Manager» es Marketing
+  Manager). Vale también en plural y para los títulos en español del mapa. La
   similitud textual no cuenta si el título trae un `excluir` de la familia del cargo en el mapa («Analista de
   Pentesting» no es «analista de testing») (7.E y P-7.F, 27 nov).
 - **Probar la seguridad es Ciberseguridad, no QA:** «Technical Security Tester», «Security Tester», «Analista de
-  Pruebas de Seguridad» y sus equivalentes son similares de Ciberseguridad y QA los excluye («security tester»,
+  Pruebas de Seguridad» y sus equivalentes («security testing», «pruebas de seguridad») son similares de
+  Ciberseguridad y QA los excluye («security tester»,
   «security testing», «pruebas de seguridad»). QA conserva sus tester de verdad (QA Tester, Software Tester, Test
   Engineer, Analista de Pruebas, QA funcional) (decisión de Oscar, P-7.F, 27 nov).
 

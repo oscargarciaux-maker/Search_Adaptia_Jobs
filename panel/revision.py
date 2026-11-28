@@ -697,7 +697,8 @@ def exportar_csv(repo, fecha):
         nombres = sorted({clientes.get(p["cliente_id"], "") for p in r.get("perfiles") or []} - {""})
         filas.append(((s["grupo"], -r.get("prioridad", 0)), [
             ETIQUETA[s["decision"]], texto_paises(s["paises"]), s["motivo"], datos.get("titulo", ""),
-            datos.get("empresa", ""), paises.corregir_ubicacion(datos.get("ubicacion")), datos.get("modalidad", ""), s["frase"],
+            datos.get("empresa", ""), paises.corregir_ubicacion(datos.get("ubicacion")), datos.get("modalidad", ""),
+            s["frase"],
             datos.get("enlace", ""), ", ".join(nombres), "", "", por_id.get(r["vacante_id"], ""), r["vacante_id"]]))
     for _, fila in sorted(filas, key=lambda x: x[0]):
         escritor.writerow(fila)
@@ -940,7 +941,7 @@ def exportar_base(repo, fecha=None, cliente_id=None, todo=False):
     escritor.writerow(columnas + ["numero"])  # contrato v48: el «ID 1234» de los mensajes, al final
     for f in incluidas:
         # P-7.F: `ofertas.location` guarda el texto del portal (v1 no se reescribe); el CSV lleva el corregido.
-        f = {**f, "location": paises.corregir_ubicacion(f.get("location"))} if f.get("location") else f
+        f = {**f, "location": paises.corregir_ubicacion(f.get("location"))}
         escritor.writerow([_celda(c, f.get(c)) for c in columnas] + [por_id.get(f.get("vacante_id"), "")])
     return "\ufeff" + salida.getvalue(), len(incluidas), len(filas) - len(incluidas), sin_fila
 

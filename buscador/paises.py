@@ -100,6 +100,7 @@ def ubicacion_a_mostrar(ubicacion):
     corregida = corregir_ubicacion(original)
     return corregida, (original if corregida != original else "")
 
+
 _REMOTO = re.compile(r"\b(remote|remoto|remota|remotely|teletrabajo|home ?office|work from home|wfh|trabajo a distancia|"
                      r"100% remoto|distributed|fully distributed|anywhere|desde casa|trabajo desde casa|remote work)\b")
 # Contrato v49: la descripción llega normalizada (sin «%» ni «:»), así que «Modalidad: 100% remoto» es «modalidad 100

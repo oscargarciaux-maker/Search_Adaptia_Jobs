@@ -75,9 +75,9 @@ def ciber():
     return cargo_operativo(cargo_crudo("Cybersecurity Analyst"))
 
 
+# Los dos vistos en la bodega (1 aviso cada uno) y los equivalentes que nombró Oscar.
 SEGURIDAD = ["Technical Security Tester", "Analista de Pruebas de Seguridad", "Security Tester",
-             "Senior Security Tester", "Security Testing Engineer", "Tester de Seguridad",
-             "Ingeniero de Pruebas de Seguridad"]
+             "Senior Security Tester", "Security Testing Engineer", "Especialista en Pruebas de Seguridad"]
 
 
 @pytest.mark.parametrize("titulo", SEGURIDAD)
@@ -96,3 +96,15 @@ def test_las_pruebas_de_seguridad_son_ciberseguridad(ciber, titulo):
 def test_qa_conserva_sus_tester_de_verdad(qa, ciber, titulo):
     assert grado(titulo, qa)[0] in {"exacto", "similar"}
     assert grado(titulo, ciber)[0] is None
+
+
+@pytest.mark.parametrize("cargo,titulo", [
+    # Thermos: la guarda de varias palabras solo vale con un `excluir` de la familia del cargo; sin él, el nombre más
+    # largo de otra familia no le quita al cargo sus títulos (en main todos son «exacto»).
+    ("Marketing Manager", "Product Marketing Manager"), ("Data Engineer", "Machine Learning Data Engineer"),
+    ("Graphic Designer", "Senior Motion Graphic Designer"), ("Software Engineer", "Mobile Software Engineer"),
+    ("Analista de Sistemas", "Analista de Sistemas de Negocio"), ("Content Writer", "SEO Content Writer"),
+    ("Platform Engineer", "Data Platform Engineer"), ("UX Designer", "Game UX Designer"),
+])
+def test_un_nombre_mas_largo_sin_excluir_no_quita_el_cargo(cargo, titulo):
+    assert grado(titulo, {"nombre": cargo})[0] == "exacto"
