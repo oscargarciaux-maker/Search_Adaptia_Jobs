@@ -35,31 +35,35 @@ from pathlib import Path
 import re
 import sys
 
-from panel.afinidad import evaluar, ligera, lugar
+from panel.afinidad import (MINIMO_POR_PERFIL as MINIMO, MOTIVO_CIUDAD_SIN_CONFIRMAR, MOTIVO_OTRO_PAIS,
+                            MOTIVO_SIN_CIUDAD, evaluar, ligera, lugar)
 from panel.repositorio import paginar
+from panel.servicio import DIAS_COBERTURA as DIAS, DIAS_PARA_MEDIR
 from panel.terminos import grado
 
 PASOS = ("cargo", "lugar", "idioma", "requisitos", "enlace", "no_recibida", "asignada")
-DIAS = 14
-DIAS_PARA_MEDIR = 3
-MINIMO = 5  # el mínimo de la selección (panel.afinidad.MINIMO_POR_PERFIL)
+HORAS_VIGENCIA = 24  # una comprobación vale 24 h para seleccionar y compartir (contrato §8)
 
 CAUSA_CUMPLE, CAUSA_MERCADO, CAUSA_CAPACIDAD, CAUSA_SISTEMA, CAUSA_SIN_DATOS = (
     "cumple", "mercado", "capacidad", "sistema", "sin_datos")
 CAUSAS = (CAUSA_CUMPLE, CAUSA_MERCADO, CAUSA_CAPACIDAD, CAUSA_SISTEMA, CAUSA_SIN_DATOS)
 
 # Enlace sin comprobar: por qué (de `datos.verificacion.motivo`, textos fijos de buscador/verificar_enlaces.py).
-ENLACE_SIN_TURNO, ENLACE_BLOQUEO, ENLACE_NO_COMPROBABLE, ENLACE_RECHAZADA = (
-    "sin_turno", "bloqueo", "no_comprobable", "rechazada")
-ENLACES = (ENLACE_SIN_TURNO, ENLACE_BLOQUEO, ENLACE_NO_COMPROBABLE, ENLACE_RECHAZADA)
-_SIN_TURNO = ("presupuesto", "sin comprobación vigente", "sin comprobacion vigente", "sin comprobación directa",
-              "sin comprobacion directa")
+# «sin_turno» y «vencida» (comprobada hace más de 24 h) son de capacidad: más turnos o tiempo las comprobarían.
+# «solo_vista» (Indeed y otros que solo valen por verse hoy: «sin comprobación directa») no se arregla con turnos.
+ENLACE_SIN_TURNO, ENLACE_VENCIDA, ENLACE_SOLO_VISTA, ENLACE_BLOQUEO, ENLACE_NO_COMPROBABLE, ENLACE_RECHAZADA = (
+    "sin_turno", "vencida", "solo_vista", "bloqueo", "no_comprobable", "rechazada")
+ENLACES = (ENLACE_SIN_TURNO, ENLACE_VENCIDA, ENLACE_SOLO_VISTA, ENLACE_BLOQUEO, ENLACE_NO_COMPROBABLE,
+           ENLACE_RECHAZADA)
+ENLACES_CAPACIDAD = frozenset({ENLACE_SIN_TURNO, ENLACE_VENCIDA})
+_SIN_TURNO = ("presupuesto", "sin comprobación vigente", "sin comprobacion vigente")
+_SOLO_VISTA = ("sin comprobación directa", "sin comprobacion directa")
 _BLOQUEO = ("bloque", "sesión", "sesion", "fallo", "conexión", "conexion", "captcha", "403", "429")
 
 # Lugar: el primer motivo de `panel.afinidad.lugar`, en grupos fijos.
 LUGARES = {"modalidad diferente": "modalidad", "país sin elegibilidad confirmada": "pais_sin_confirmar",
-           "no admite postular desde su país": "no_abierta_a_su_pais", "oficina en otro país": "oficina_otro_pais",
-           "falta la ciudad en el perfil": "sin_ciudad", "oficina sin ciudad confirmada": "ciudad_sin_confirmar",
+           "no admite postular desde su país": "no_abierta_a_su_pais", MOTIVO_OTRO_PAIS: "oficina_otro_pais",
+           MOTIVO_SIN_CIUDAD: "sin_ciudad", MOTIVO_CIUDAD_SIN_CONFIRMAR: "ciudad_sin_confirmar",
            "oficina en otra ciudad": "otra_ciudad"}
 LUGAR_OTRO = "otro"
 
@@ -96,7 +100,7 @@ CAMPOS_CATALOGO = (
     "fecha_estimada:datos->fecha_estimada,ids_agrupados:datos->ids_agrupados,anos_min:datos->anos_min,"
     "ingles:datos->>ingles,requisito_ingles:datos->requisito_ingles,salario:datos->>salario,"
     "duplicada_de:datos->>duplicada_de,tipo:datos->>tipo,verificacion:datos->verificacion->>estado,"
-    "verificacion_motivo:datos->verificacion->>motivo,fuente:datos->>fuente,fuentes:datos->fuentes")
+    "verificacion_motivo:datos->verificacion->>motivo,comprobada_en:datos->verificacion->>comprobada_en,fuente:datos->>fuente,fuentes:datos->fuentes")
 
 
 def familia_fuente(texto):
@@ -104,14 +108,24 @@ def familia_fuente(texto):
     return next((familia for clave, familia in _FUENTES if clave in t), FUENTE_OTRA)
 
 
-def categoria_enlace(v):
-    """'' si el enlace está comprobado; si no, por qué (sin turno, bloqueo, no comprobable o rechazada)."""
+def categoria_enlace(v, ahora=None):
+    """'' si el enlace está comprobado en las últimas 24 h (lo que exige la selección); si no, por qué."""
     estado = v.get("_verificacion") or ""
     if estado == "verificada":
-        return ""
+        ahora = ahora or datetime.now(timezone.utc)
+        try:
+            cuando = datetime.fromisoformat(str(v.get("_comprobada_en") or "").replace("Z", "+00:00"))
+            if cuando.tzinfo is None:
+                cuando = cuando.replace(tzinfo=timezone.utc)
+            vigente = 0 <= (ahora - cuando).total_seconds() < HORAS_VIGENCIA * 3600
+        except ValueError:
+            vigente = False
+        return "" if vigente else ENLACE_VENCIDA
     if estado == "rechazada":
         return ENLACE_RECHAZADA
     motivo = str(v.get("_motivo_enlace") or "").lower()
+    if any(x in motivo for x in _SOLO_VISTA):
+        return ENLACE_SOLO_VISTA
     if not motivo or any(x in motivo for x in _SIN_TURNO):
         return ENLACE_SIN_TURNO
     if any(x in motivo for x in _BLOQUEO):
@@ -128,7 +142,8 @@ def camino(explicacion):
         return "post"
     if any("reutilizada" in e for e in partes):
         return "reutilizada"
-    if any("confirmada" in e or "aprobada_por" in e for e in partes):
+    # «Sirve» de «Por confirmar»: `aprobada_por` desde v49; antes, `{"funciones": True}` (no el nivel de evidencia).
+    if any("confirmada" in e or "aprobada_por" in e or e.get("funciones") is True for e in partes):
         return "sirve"
     if any("ampliacion" in e for e in partes):
         return "lote_ampliada"
@@ -144,6 +159,7 @@ def grupo_de(p):
 def _vacante(d):
     v = ligera(d)
     v["_motivo_enlace"] = d.get("verificacion_motivo") or ""
+    v["_comprobada_en"] = d.get("comprobada_en") or ""
     v["_fuente"] = familia_fuente(d.get("fuente"))
     fuentes = d.get("fuentes") if isinstance(d.get("fuentes"), list) else []
     v["_apify"] = v["_fuente"] == APIFY or any(familia_fuente(f) == APIFY for f in fuentes)
@@ -159,7 +175,7 @@ def leer_catalogo(pedir):
             if not d.get("duplicada_de") and d.get("tipo") != "post"]
 
 
-def embudo(del_cargo, p, fecha, recibidas_antes, asignadas_hoy, por_fuente=None):
+def embudo(del_cargo, p, fecha, recibidas_antes, asignadas_hoy, por_fuente=None, ahora=None):
     """Cuántas vacantes del cargo pasan cada paso para el perfil `p`. `por_fuente` (opcional) acumula lo mismo por
     familia de fuente y para las que trajo Apify."""
     n, enlace, motivos_lugar = Counter(), Counter(), Counter()
@@ -184,7 +200,7 @@ def embudo(del_cargo, p, fecha, recibidas_antes, asignadas_hoy, por_fuente=None)
         if not evaluar(v, p, fecha)["compatible"]:
             continue
         paso(v, "requisitos")
-        categoria = categoria_enlace(v)
+        categoria = categoria_enlace(v, ahora)
         if categoria:
             enlace[categoria] += 1
             continue
@@ -204,7 +220,7 @@ def causa_de(pasos, enlace, objetivo, hoy_n):
     freno = next((k for k in PASOS if pasos[k] < objetivo), "asignada")
     if freno == "cargo":
         return CAUSA_MERCADO, freno
-    if freno == "enlace" and enlace and max(enlace, key=lambda k: (enlace[k], k == ENLACE_SIN_TURNO)) == ENLACE_SIN_TURNO:
+    if freno == "enlace" and sum(enlace.get(k, 0) for k in ENLACES_CAPACIDAD) * 2 > sum(enlace.values()):
         return CAUSA_CAPACIDAD, freno
     return CAUSA_SISTEMA, freno
 
@@ -221,13 +237,16 @@ def _dias(desde, hasta):
         return None
 
 
-def calcular(fecha, cfg, cargos, catalogo, ejecuciones, conteo, metas, recibidas, asignadas_hoy, revisiones):
+def calcular(fecha, cfg, cargos, catalogo, ejecuciones, conteo, metas, recibidas, asignadas_hoy, revisiones,
+             ahora=None):
     """Todo el cálculo, sin leer nada (las pruebas lo llaman con datos sintéticos).
     - cfg: Configuracion vigente · cargos: {cargo_id: cargo operativo} · catalogo: vacantes de `_vacante`
     - ejecuciones: [{id, fecha}] la más reciente primero · conteo: Counter((ejecucion_id, perfil_id))
     - metas: {ejecucion_id: {perfil_id: meta de ese día}} (un perfil ausente no estaba activo ese día)
     - recibidas: {perfil_id: vacantes recibidas alguna vez} · asignadas_hoy: {perfil_id: vacantes de la última}
-    - revisiones: filas pendientes de «Por confirmar» ({motivo, perfiles: [{perfil_id}], creada_en})"""
+    - revisiones: filas pendientes de «Por confirmar» ({motivo, perfiles: [{perfil_id}], creada_en})
+    - ahora: instante para la vigencia de 24 h de los enlaces (por defecto, ahora)"""
+    ahora = ahora or datetime.now(timezone.utc)
     desde = (date.fromisoformat(fecha) - timedelta(days=DIAS - 1)).isoformat()
     ventana = [e for e in ejecuciones if desde <= str(e.get("fecha", ""))[:10] <= fecha]
     ultima = str(ventana[0]["id"]) if ventana else None
@@ -243,20 +262,15 @@ def calcular(fecha, cfg, cargos, catalogo, ejecuciones, conteo, metas, recibidas
                 dudas[str(info["perfil_id"])][tipo_duda(r.get("motivo"))] += 1
     por_fuente = defaultdict(Counter)
     enlace_total, lugar_total = Counter(), Counter()
-    del_cargo = {}
-    filas = []
+    filas = []  # (fila pública, datos solo para los totales: dirían la meta del perfil)
     for c in cfg.cargos:
-        if not c.activo:
-            continue
         raw = cargos.get(str(c.id))
-        if raw is None:
+        perfiles = [p for p in cfg.perfiles_activos(str(c.id)) if p.cliente_id in clientes] if c.activo else []
+        if raw is None or not perfiles:
             continue
-        for p in cfg.perfiles_activos(str(c.id)):
-            if p.cliente_id not in clientes:
-                continue
+        del_cargo = [v for v in catalogo if grado(v.get("titulo") or "", raw, cercanos=True)[0]]
+        for p in perfiles:
             pid = str(p.id)
-            if str(c.id) not in del_cargo:
-                del_cargo[str(c.id)] = [v for v in catalogo if grado(v.get("titulo") or "", raw, cercanos=True)[0]]
             tipo = "comunidad" if p.cliente_id in comunidades else "cliente"
             meta = int(p.meta_diaria or 0)
             serie = []
@@ -267,15 +281,15 @@ def calcular(fecha, cfg, cargos, catalogo, ejecuciones, conteo, metas, recibidas
             hoy_ids = {str(x) for x in asignadas_hoy.get(pid, ())}
             hoy_n = conteo.get((ultima, pid), 0) if ultima else 0
             antes = {str(x) for x in recibidas.get(pid, ())} - hoy_ids
-            pasos, enlace, lugares = embudo(del_cargo[str(c.id)], p, fecha, antes, hoy_ids,
-                                            por_fuente if tipo == "cliente" else None)
+            pasos, enlace, lugares = embudo(del_cargo, p, fecha, antes, hoy_ids,
+                                            por_fuente if tipo == "cliente" else None, ahora)
             if tipo == "cliente":
                 enlace_total.update(enlace)
                 lugar_total.update(lugares)
             causa, freno = causa_de(pasos, enlace, meta, hoy_n) if ultima else (CAUSA_SIN_DATOS, "")
             numeros = [n for n, _ in serie]
-            filas.append({
-                "tipo": tipo, "grupo": grupo_de(p), "dias_medidos": len(serie), "por_dia": numeros,
+            filas.append(({
+                "tipo": tipo, "dias_medidos": len(serie), "por_dia": numeros,
                 "media": round(sum(numeros) / len(numeros), 1) if numeros else None,
                 "minimo": min(numeros) if numeros else None,
                 "dias_en_0": sum(1 for n in numeros if n == 0),
@@ -285,36 +299,36 @@ def calcular(fecha, cfg, cargos, catalogo, ejecuciones, conteo, metas, recibidas
                 "embudo": pasos, "enlace_sin_comprobar": enlace, "lugar_motivos": lugares,
                 "por_confirmar": {"total": sum(dudas[pid].values()), **{k: dudas[pid].get(k, 0) for k in DUDAS}},
                 "causa": causa, "paso": freno,
-                # Solo para los totales (se quitan antes de publicar: dirían la meta del perfil).
-                "_faltan": max(0, meta - hoy_n),
-                "_deficit": round(sum(max(0, m - n) for n, m in serie) / len(serie), 2) if serie else 0.0,
-            })
+            }, {"grupo": grupo_de(p), "faltan": max(0, meta - hoy_n),
+                "deficit": round(sum(max(0, m - n) for n, m in serie) / len(serie), 2) if serie else 0.0}))
     # Índice anónimo: los clientes primero, de quien menos recibe a quien más (sin datos = primero).
-    filas.sort(key=lambda f: (f["tipo"] != "cliente", -1 if f["media"] is None else f["media"], f["hoy"]))
-    for i, f in enumerate(filas, 1):
+    filas.sort(key=lambda x: (x[0]["tipo"] != "cliente", -1 if x[0]["media"] is None else x[0]["media"], x[0]["hoy"]))
+    for i, (f, _) in enumerate(filas, 1):
         f["indice"] = f"P{i:02d}"
-    reales = [f for f in filas if f["tipo"] == "cliente"]
+    con_privado = [(f, privado) for f, privado in filas if f["tipo"] == "cliente"]
     causas = defaultdict(lambda: {"perfiles": 0, "faltan_hoy": 0, "deficit_medio_14d": 0.0})
     grupos = defaultdict(lambda: {"perfiles": 0, "media": 0.0, "en_0_algun_dia": 0, "bajo_5_de_media": 0,
                                   "faltan_hoy": 0})
-    for f in reales:
+    con_datos = Counter()
+    for f, privado in con_privado:
         if f["causa"] != CAUSA_CUMPLE:
             k = causas[(f["causa"], f["paso"])]
             k["perfiles"] += 1
-            k["faltan_hoy"] += f["_faltan"]
-            k["deficit_medio_14d"] = round(k["deficit_medio_14d"] + f["_deficit"], 2)
-        g = grupos[f["grupo"]]
+            k["faltan_hoy"] += privado["faltan"]
+            k["deficit_medio_14d"] = round(k["deficit_medio_14d"] + privado["deficit"], 2)
+        g = grupos[privado["grupo"]]
         g["perfiles"] += 1
-        g["media"] += f["media"] or 0
+        if f["media"] is not None:  # la media del grupo, solo con quien tiene días medidos
+            g["media"] += f["media"]
+            con_datos[privado["grupo"]] += 1
         g["en_0_algun_dia"] += f["dias_en_0"] > 0
         g["bajo_5_de_media"] += f["media"] is not None and f["media"] < MINIMO
-        g["faltan_hoy"] += f["_faltan"]
-    for g in grupos.values():
-        g["media"] = round(g["media"] / g["perfiles"], 1) if g["perfiles"] else 0.0
+        g["faltan_hoy"] += privado["faltan"]
+    for clave, g in grupos.items():
+        g["media"] = round(g["media"] / con_datos[clave], 1) if con_datos[clave] else 0.0
     lista_causas = sorted(({"causa": c, "paso": p, **v} for (c, p), v in causas.items()),
                           key=lambda x: (-x["deficit_medio_14d"], -x["faltan_hoy"], x["causa"], x["paso"]))
-    for f in filas:
-        del f["_faltan"], f["_deficit"], f["grupo"]
+    reales = [f for f, _ in con_privado]
     apify = por_fuente.pop("_apify", Counter())
     return {
         "fecha": fecha, "ultima_busqueda": str(ventana[0].get("fecha", ""))[:10] if ventana else "",
@@ -338,7 +352,7 @@ def calcular(fecha, cfg, cargos, catalogo, ejecuciones, conteo, metas, recibidas
         "por_confirmar": {"pendientes": len(revisiones), "por_antiguedad_dias": {k: edades.get(k, 0)
                                                                                for k in ("0_2", "3_7", "8_o_mas")},
                           **{k: sum(d.get(k, 0) for d in dudas.values()) for k in DUDAS}},
-        "perfiles": filas,
+        "perfiles": [f for f, _ in filas],
     }
 
 
@@ -464,7 +478,7 @@ def resumen_md(r):
     partes = [
         "## P-16.1: entrega por perfil (solo lectura, perfiles anónimos)",
         f"Fecha {r['fecha']} · última búsqueda {r['ultima_busqueda'] or '—'} · {r['busquedas_en_ventana']} búsquedas en "
-        f"{r['dias_ventana']} días · catálogo activo {r['catalogo_activo']}",
+        f"{r['dias_ventana']} días · catálogo activo {r['catalogo_activo']} · «hoy» = la última búsqueda",
         "",
         f"**Perfiles: {t['perfiles']} · en 0 algún día: {t['en_0_algun_dia']} · bajo 5 de media: {t['bajo_5_de_media']}"
         f" · estables en su meta: {t['estables_en_meta']}** · cumplen hoy: {t['cumplen_hoy']} · sin datos: "
@@ -516,12 +530,12 @@ def resumen_md(r):
     return "\n".join(partes) + "\n"
 
 
-def medir(repo, fecha=None):
+def medir(repo, fecha=None, ahora=None):
     """Lee y calcula; los avisos internos del repositorio no se imprimen (podrían traer una dirección con ids)."""
     avisos = io.StringIO()
     with contextlib.redirect_stderr(avisos):
         datos = leer(repo, fecha)
-        resultado = calcular(**datos)
+        resultado = calcular(**datos, ahora=ahora)
         try:
             resultado["repeticiones"] = repeticiones(repo.pedir)
         except Exception:  # noqa: BLE001 - el embudo vale igual sin el conteo

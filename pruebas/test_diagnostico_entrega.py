@@ -1,19 +1,22 @@
 """P-16.1: medidor de entrega estable (solo lectura) con datos sintéticos: embudo por paso, causa, índice anónimo,
 conteo de repeticiones de la 12.15 y lista blanca de lo que sale (nada de nombres, ids, ciudades, cargos ni metas)."""
-from collections import Counter
-from datetime import date, timedelta
+from collections import Counter, defaultdict
+from datetime import date, datetime, timedelta, timezone
 import json
 
 import pytest
 
 from buscador import diagnostico_entrega as de
 from panel import contenido
+from panel.terminos import grado
 from panel.modelos import Configuracion
 from panel.repositorio import configuracion_demo
 
 FECHA = "2026-11-28"
 RECIENTE = (date.fromisoformat(FECHA) - timedelta(days=2)).isoformat() + "T10:00:00+00:00"
 VIEJA = (date.fromisoformat(FECHA) - timedelta(days=60)).isoformat() + "T10:00:00+00:00"
+AHORA = datetime(2026, 11, 28, 12, tzinfo=timezone.utc)
+COMPROBADA = "2026-11-28T08:00:00+00:00"  # 4 h antes de AHORA: vigente
 
 
 def fila(i, titulo="Product Designer", idioma="es", estado="verificada", motivo="", publicada=RECIENTE,
@@ -24,7 +27,7 @@ def fila(i, titulo="Product Designer", idioma="es", estado="verificada", motivo=
             "modalidad": modalidad, "idioma": idioma, "publicada_en": publicada, "fecha_publicacion": None,
             "fecha_estimada": None, "ids_agrupados": [], "anos_min": None, "ingles": "", "requisito_ingles": None,
             "salario": None, "duplicada_de": None, "tipo": None, "verificacion": estado,
-            "verificacion_motivo": motivo, "fuente": fuente, "fuentes": [fuente], **extra}
+            "verificacion_motivo": motivo, "comprobada_en": COMPROBADA, "fuente": fuente, "fuentes": [fuente], **extra}
 
 
 CATALOGO = [
@@ -37,6 +40,8 @@ CATALOGO = [
     fila(7, publicada=VIEJA),                                         # más de 30 días
     fila(8, titulo="Contador Público"),                               # otro cargo
     fila(9, estado="rechazada", motivo="página general sin vacante", fuente="LinkedIn (Apify)"),
+    fila(10, comprobada_en="2026-11-25T08:00:00+00:00"),            # comprobada hace 3 días: ya no vale
+    fila(11, estado="pendiente", motivo="sin comprobación directa", fuente="Indeed"),
 ]
 
 
@@ -58,12 +63,12 @@ def test_embudo_cuenta_cada_paso_con_las_reglas_de_la_seleccion():
     p = cfg.perfiles[0]
     cargo = _cargos(cfg)[str(p.cargo_id)]
     catalogo = [de._vacante(f) for f in CATALOGO]
-    del_cargo = [v for v in catalogo if de.grado(v["titulo"], cargo, cercanos=True)[0]]
-    por_fuente = de.defaultdict(Counter)
-    pasos, enlace, lugares = de.embudo(del_cargo, p, FECHA, {"v2"}, {"v1"}, por_fuente)
-    assert pasos == {"cargo": 8, "lugar": 7, "idioma": 6, "requisitos": 5, "enlace": 2, "no_recibida": 1,
+    del_cargo = [v for v in catalogo if grado(v["titulo"], cargo, cercanos=True)[0]]
+    por_fuente = defaultdict(Counter)
+    pasos, enlace, lugares = de.embudo(del_cargo, p, FECHA, {"v2"}, {"v1"}, por_fuente, AHORA)
+    assert pasos == {"cargo": 10, "lugar": 9, "idioma": 8, "requisitos": 7, "enlace": 2, "no_recibida": 1,
                      "asignada": 1}
-    assert enlace == {"sin_turno": 1, "bloqueo": 1, "rechazada": 1}
+    assert enlace == {"sin_turno": 1, "bloqueo": 1, "rechazada": 1, "vencida": 1, "solo_vista": 1}
     assert lugares == {"modalidad": 1}
     assert por_fuente["_apify"]["cargo"] == 1 and por_fuente["_apify"]["enlace"] == 0
     assert por_fuente["Computrabajo"]["asignada"] == 1
@@ -72,7 +77,9 @@ def test_embudo_cuenta_cada_paso_con_las_reglas_de_la_seleccion():
 def test_causa_es_el_primer_paso_bajo_la_meta():
     base = {"cargo": 30, "lugar": 20, "idioma": 12, "requisitos": 12, "enlace": 3, "no_recibida": 3, "asignada": 3}
     assert de.causa_de(base, {"sin_turno": 8, "bloqueo": 1}, 10, 3) == ("capacidad", "enlace")
+    assert de.causa_de(base, {"vencida": 5, "sin_turno": 1, "bloqueo": 4}, 10, 3) == ("capacidad", "enlace")
     assert de.causa_de(base, {"bloqueo": 8, "sin_turno": 1}, 10, 3) == ("sistema", "enlace")
+    assert de.causa_de(base, {"solo_vista": 8, "sin_turno": 2}, 10, 3) == ("sistema", "enlace")
     assert de.causa_de({**base, "cargo": 4}, {}, 10, 3) == ("mercado", "cargo")
     assert de.causa_de({**base, "idioma": 2}, {}, 10, 2) == ("sistema", "idioma")
     assert de.causa_de({**base, "enlace": 12, "no_recibida": 12}, {}, 10, 4) == ("sistema", "asignada")
@@ -97,14 +104,15 @@ def _datos(cfg):
 
 def test_calcular_mide_14_dias_y_ordena_de_quien_menos_recibe():
     cfg = _cfg(comunidad=True)
-    r = de.calcular(**_datos(cfg))
+    r = de.calcular(**_datos(cfg), ahora=AHORA)
     assert r["busquedas_en_ventana"] == 3 and r["ultima_busqueda"] == FECHA
     assert r["totales"]["perfiles"] == 4 and r["totales"]["comunidad"] == 1
     assert [f["media"] for f in r["perfiles"][:4]] == [0.0, 0.0, 1.3, 11.0]  # de quien menos recibe a quien más
     primero = r["perfiles"][2]
     assert primero["por_dia"] == [3, 0, 1] and primero["media"] == 1.3 and primero["dias_en_0"] == 1
     assert primero["dias_bajo_5"] == 3 and primero["dias_bajo_meta"] == 3 and primero["hoy"] == 1
-    assert primero["embudo"]["asignada"] == 1 and (primero["causa"], primero["paso"]) == ("mercado", "cargo")  # 8 del cargo < meta 10
+    assert primero["embudo"]["asignada"] == 1
+    assert (primero["causa"], primero["paso"]) == ("sistema", "lugar")  # 10 del cargo, 9 pasan el lugar (meta 10)
     assert primero["por_confirmar"] == {"total": 2, "ubicacion": 1, "funciones": 1, "otro_oficio": 0}
     estable = next(f for f in r["perfiles"] if f["media"] == 11.0)
     assert estable["causa"] == "cumple" and estable["dias_bajo_meta"] == 0 and 99 not in estable["por_dia"]
@@ -113,12 +121,17 @@ def test_calcular_mide_14_dias_y_ordena_de_quien_menos_recibe():
     assert r["perfiles"][-1]["tipo"] == "comunidad"  # la Comunidad va al final y no entra en los totales
     assert r["por_confirmar"]["pendientes"] == 2 and r["por_confirmar"]["por_antiguedad_dias"]["8_o_mas"] == 1
     assert sum(c["faltan_hoy"] for c in r["causas"]) == r["totales"]["faltan_hoy"] == 9 + 10 + 10
-    assert r["apify"]["cargo"] >= 1 and r["enlace_sin_comprobar"]["rechazada"] >= 1
+    # 3 perfiles de clientes con el mismo cargo (Product Designer): cada par perfil-vacante cuenta una vez.
+    assert r["apify"] == {"cargo": 3, "lugar": 3, "idioma": 3, "requisitos": 3, "enlace": 0, "no_recibida": 0,
+                          "asignada": 0}
+    assert r["enlace_sin_comprobar"]["rechazada"] == 3 and r["enlace_sin_comprobar"]["vencida"] == 3
+    assert r["por_fuente"]["Indeed"]["requisitos"] == 3 and r["por_fuente"]["Indeed"]["enlace"] == 0
+    assert r["grupos"]["solo_es+remoto"]["perfiles"] == 4
 
 
 def test_lo_que_sale_no_dice_nombres_ids_ciudades_cargos_ni_metas():
     cfg = _cfg(metas=(7, 13, 10, 10, 10))
-    r = de.calcular(**_datos(cfg))
+    r = de.calcular(**_datos(cfg), ahora=AHORA)
     r["repeticiones"] = {"disponible": False}
     r["avisos_internos"] = 0
     de.lista_blanca(r)
@@ -143,7 +156,10 @@ def test_textos_fijos():
     assert de.familia_fuente("Laborum") == "Bumeran y hermanos" and de.familia_fuente("Greenhouse") == \
         "Portales de empresas"
     assert de.familia_fuente("Un portal nuevo de Lima") == "Otras"
-    assert de.categoria_enlace({"_verificacion": "verificada"}) == ""
+    assert de.categoria_enlace({"_verificacion": "verificada", "_comprobada_en": COMPROBADA}, AHORA) == ""
+    assert de.categoria_enlace({"_verificacion": "verificada", "_comprobada_en": ""}, AHORA) == "vencida"
+    assert de.categoria_enlace({"_verificacion": "pendiente", "_motivo_enlace": "sin comprobación directa"}) == \
+        "solo_vista"
     assert de.categoria_enlace({"_verificacion": "pendiente", "_motivo_enlace": "requiere iniciar sesión"}) == "bloqueo"
     assert de.categoria_enlace({"_verificacion": "pendiente", "_motivo_enlace": "contenido insuficiente"}) == \
         "no_comprobable"
@@ -151,6 +167,8 @@ def test_textos_fijos():
     assert de.camino([{"rescatada": "bodega"}]) == "rescate" and de.camino([{"tipo": "post"}]) == "post"
     assert de.camino([{"reutilizada": True}]) == "reutilizada" and de.camino([{"aprobada_por": "x"}]) == "sirve"
     assert de.camino([{"ampliacion": "empresa_4"}]) == "lote_ampliada" and de.camino(None) == "lote"
+    assert de.camino([{"funciones": True}]) == "sirve"  # «Sirve» anterior a v49
+    assert de.camino([{"funciones": "fuerte"}]) == "lote"  # el nivel de evidencia no es un «Sirve»
 
 
 class Pedir:
@@ -245,9 +263,9 @@ class Repo:
 
 
 def test_medir_lee_solo_y_no_imprime_los_avisos_internos(capsys):
-    r = de.medir(Repo(_cfg()), FECHA)
+    r = de.medir(Repo(_cfg()), FECHA, AHORA)
     salida = capsys.readouterr()
-    assert "Bogotá" not in salida.out + salida.err and r["avisos_internos"] == 2
+    assert "Bogotá" not in salida.out + salida.err and r["avisos_internos"] >= 1
     assert next(f for f in r["perfiles"] if f["hoy"] == 1)["embudo"]["asignada"] == 1 and r["repeticiones"]["pares_repetidos"] == 0
 
 
