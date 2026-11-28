@@ -372,9 +372,9 @@ export function CoberturaPersonas({
           Cobertura por persona{" "}
           <Ayuda etiqueta="cobertura por persona">
             Para cada persona: cuántas vacantes recibió hoy, en cuántos de sus
-            últimos días llegó a {datos?.minimo ?? 5} y cuántas hay listas para
-            ella (con enlace comprobado y que nunca recibió). «Aún sin datos»:
-            menos de 3 búsquedas con ese perfil.
+            últimos días llegó a {datos?.minimo ?? "la meta"} y cuántas hay
+            listas para ella (con enlace comprobado y que nunca recibió). «Aún
+            sin datos»: menos de 3 búsquedas con ese perfil.
           </Ayuda>
         </h2>
       </div>

@@ -6,7 +6,7 @@ no el país donde vive: si pide español, solo en español aunque viva en un pa�
 le llegan en inglés aunque viva en un país hispanohablante, en Brasil o en cualquier otro. El origen LATAM/España es
 histórico. Los idiomas de aviso aceptados siguen siendo solo español e inglés.
 
-Fuente principal de las reglas del proyecto (estado al 27 nov 2026, hasta v52 y las decisiones del 27 nov). Cada regla dice cómo es **hoy**; entre
+Fuente principal de las reglas del proyecto (estado al 28 nov 2026, hasta v52 y las decisiones del 27 y 28 nov). Cada regla dice cómo es **hoy**; entre
 paréntesis va el contrato de donde sale, por si hace falta el detalle. Si una versión posterior corrigió a otra, aquí
 solo queda la posterior. Los `docs/CONTRATO_DATOS_vNN.md` son históricos: se conservan porque el código y las pruebas
 los citan, pero no se editan ni se crean nuevos.
@@ -16,7 +16,11 @@ PR que el código, y se actualiza la fecha de arriba. Un campo nuevo se escribe 
 
 **Palabras que se usan aquí:** *perfil* = un cliente + un cargo con sus condiciones · *meta* = vacantes al día de un
 perfil · *techo* = máximo de vacantes nuevas del día · *lote* = las vacantes elegidas del día · *bodega* = todo lo
-guardado de los últimos 30 días · *va corto* = está bajo su meta (o bajo 5) · *rescate* = completar con vacantes de
+guardado de los últimos 30 días · *va corto* = está bajo su meta · *umbral de aviso* = `cobertura.aviso_bajo` de
+`datos/config.yaml` (**10**, la meta): bajo él el operador ve avisos de cobertura · *umbral del rescate pagado* =
+`cobertura.rescate_bajo` (**5**): solo bajo él se gastan el refuerzo por perfil, Apify y los posts (las dos cifras son
+independientes; P-11.3, decisión de Oscar del 28 nov) · *mínimo de 5* = el de la selección (ampliadas, Comunidad,
+posts asignados), fijo en el código · *rescate* = completar con vacantes de
 la bodega · *ampliación* = último recurso que relaja algo · *exacto / similar / cercano* = qué tan parecido es el
 título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
 
@@ -299,7 +303,8 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
   Oscar del 28 nov): `tope_mensual_usd` = el crédito del plan contratado (hoy **5**, cuenta gratis; con Starter, 19) y
   nunca se reserva más en el mes, aunque haya reintentos; `ritmo_diario_usd` = lo que se puede reservar por día (hoy
   **0,63** = 19/30, el ritmo de Starter: los USD 5 se gastan en unos 8 días para medir si vale la pena comprarlo; sin
-  esa cifra, el tope se reparte entre los días del mes). En modo panel solo busca para perfiles bajo 5: **primero los
+  esa cifra, el tope se reparte entre los días del mes). En modo panel solo busca para perfiles bajo el umbral del rescate pagado
+  (`cobertura.rescate_bajo`, hoy 5; sube a 10 al comprar Starter): **primero los
   que viven (o aceptan oficina) en un país sin fuente local** (la regla de la 8.1; Indeed cuenta como local), después
   el resto con déficit, el de más déficit primero; con quien solo habla español, primero en español (v11, v44). Una
   clave rechazada detiene la fuente y avisa. **Si Apify dice que el plan no tiene crédito** (HTTP 402 o sus tipos de
@@ -313,8 +318,8 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
   los registros públicos, solo esos totales. Regla para decidir: **comprar Starter si los USD 5 llevaron a 5 a perfiles
   que si no se quedaban cortos, a un costo por vacante útil que Oscar acepte.**
 - `Central.rpc` abre conexión nueva tras 120 s sin uso; una reserva ambigua no se reintenta sola (v51).
-- **Posts** de LinkedIn: solo como último recurso para perfiles bajo 5, etiquetados «Post», después de las vacantes
-  formales; filtro estricto contra basura; nunca van a `ofertas`, al cupo ni a `trabajo/`. Si enlazan una ficha formal
+- **Posts** de LinkedIn: solo como último recurso para perfiles bajo el umbral del rescate pagado (hoy 5), etiquetados
+  «Post», después de las vacantes formales (al asignarlos, solo completan hasta el mínimo de 5 de la selección); filtro estricto contra basura; nunca van a `ofertas`, al cupo ni a `trabajo/`. Si enlazan una ficha formal
   legible, se entrega esa ficha (v11).
 - Ubicación de posts por pistas (autor, prefijo, moneda, dominio, empresa, ficha enlazada). Un post sin pistas puede
   completar el mínimo con «ubicación sin confirmar»; máximo 2 posts con país o modalidad perdonados por perfil al día;
@@ -397,16 +402,21 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
   publicar, los cambios quedan guardados y el panel dice por qué (v43, v49).
 - Sesión con cookie de acceso de 1 h y de renovación de 30 días (httponly, secure, samesite strict) hasta «Cerrar
   sesión» (v31).
-- «Cobertura por persona» solo con lo medido, con «Qué hacer» por persona; nada se aplica solo (v37, v44).
+- «Cobertura por persona» solo con lo medido, con «Qué hacer» por persona; nada se aplica solo (v37, v44). Un día
+  cuenta como logrado con al menos el umbral de aviso (`cobertura.aviso_bajo`, **10**; antes 5): «cubierto», «Días
+  con 10», «3 o más días seguidos con menos de 10», la causa y «Cobertura limitada» usan esa cifra (P-11.3). El
+  conteo `perfiles_bajo_minimo` del resumen del panel también; el del reporte de la Bodega (`entrega.roles`, público
+  solo como total) sigue con el umbral del rescate pagado, porque decide el refuerzo.
 - **Huecos por país** (decisiones del cliente, 27 nov; sección 8.1), bajo «Cobertura por persona»: (1) puede haber
-  clientes en cualquier país, sin lista de países prioritarios; (2) hueco = un perfil que recibe menos de 5, sin
+  clientes en cualquier país, sin lista de países prioritarios; (2) hueco = un perfil que recibe menos del umbral de aviso (**10**, la meta; decisión de Oscar del 28 nov,
+  antes 5), sin
   porcentajes ni días de gracia; (3) la fuente nueva se añade el mismo día, semiautomática (skill `nueva-fuente` + PR
   revisado, nunca se activa sola); (4) el cliente no ve avisos de cobertura, solo el operador. Al guardar, un país
   nuevo de un perfil (donde vive, o donde acepta híbrido/presencial; la remota no crea país) sin fuente local —solo
-  LinkedIn, portales de empresas y Get on Board— avisa «riesgo» sin bloquear. **Indeed cuenta como fuente local**
+  LinkedIn, portales de empresas y Get on Board— avisa «riesgo de quedar bajo 10» sin bloquear (la cifra sale de `cobertura.aviso_bajo`). **Indeed cuenta como fuente local**
   (decisión del 28 nov), con una sola definición para la tabla y para «Cobertura limitada» en la fila de la persona: un
   país con Indeed no sale en riesgo ni dice «Cobertura limitada». El reparto de turnos de v40 no cambia (ahí Indeed no
-  cuenta como fuente propia). Tras la búsqueda, un perfil bajo 5 cuya causa medida es la falta de vacantes en las
+  cuenta como fuente propia). Tras la búsqueda, un perfil bajo el umbral de aviso cuya causa medida es la falta de vacantes en las
   fuentes (no su cargo, enlaces por comprobar, listas sin recibir ni un ajuste del perfil) marca «hueco». La tabla
   decide con el código estable `causa_codigo` de `cobertura()`, nunca con el texto que lee el operador: es hueco con
   `pocas_en_fuentes` u `otro_pais` (todas las del cargo son de oficina en otro país); no con `sin_vacantes_cargo`,

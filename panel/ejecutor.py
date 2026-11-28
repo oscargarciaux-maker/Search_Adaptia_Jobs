@@ -10,8 +10,8 @@ import yaml
 
 from buscador import bodega, entrega, familias, paises, normalizar
 from buscador import registro
-from panel.afinidad import (AMPLIACIONES, MINIMO_POR_PERFIL, TOPE_POSTS_SIN_CONFIRMAR, evaluar, evaluar_ampliada,
-                            evaluar_post, post_ubicacion)
+from panel.afinidad import (AMPLIACIONES, AVISO_BAJO, MINIMO_POR_PERFIL, TOPE_POSTS_SIN_CONFIRMAR, evaluar,
+                            evaluar_ampliada, evaluar_post, post_ubicacion)
 from panel.acciones import CLAVE_PEDIDA, ENFOQUE_COMPLETO, ENFOQUE_FALTANTES, ENFOQUE_PEDIDO
 from panel import contenido
 from panel.modelos import Configuracion
@@ -920,8 +920,9 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
                               (ejecucion.get("resumen") or {}).get("busquedas_por_perfil"),
                               (reporte or {}).get("busquedas_por_perfil"))) else {}),
                           **({"reglas": reglas_info} if reglas_info else {}),
+                          # P-11.3: aviso al operador con la meta (`cobertura.aviso_bajo`), no con el rescate.
                           "perfiles_bajo_minimo": sum(1 for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id))
-                                                      if estrictas.get(p.id, 0) < MINIMO_POR_PERFIL),
+                                                      if estrictas.get(p.id, 0) < AVISO_BAJO),
                           **({"embudo": embudo} if (embudo := _embudo_por_nombre(reporte) or
                                                     (ejecucion.get("resumen") or {}).get("embudo")) else {})},
               "terminada_en": datetime.now().astimezone().isoformat()})

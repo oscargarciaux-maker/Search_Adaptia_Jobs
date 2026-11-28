@@ -1,6 +1,7 @@
 // 8.1 (decisiones del cliente, 27 nov): huecos por país, solo para el operador. «Riesgo»: un país de algún perfil sin
 // fuente local (solo LinkedIn, portales de empresas y Get on Board). «Hueco»: medido tras la búsqueda, un perfil quedó
-// bajo 5 porque faltan vacantes en las fuentes. El pedido copiado lleva solo país, idiomas, familias y modalidades.
+// bajo el umbral de aviso (`minimo` = `cobertura.aviso_bajo`; P-11.3) porque faltan vacantes en las fuentes. El pedido copiado
+// lleva solo país, idiomas, familias y modalidades.
 import { useState } from "react";
 import { Copy } from "lucide-react";
 import { Ayuda } from "../comunes";

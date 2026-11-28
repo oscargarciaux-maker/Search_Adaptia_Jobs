@@ -1987,7 +1987,7 @@ test("huecos por país: aviso al aplicar, tabla y copiar pedido de fuente nueva"
   expect(r.ok()).toBe(true);
   const guardado = await r.json();
   expect(guardado.avisos_cobertura).toEqual([
-    "Ghana: sin fuente local; riesgo de quedar bajo 5.",
+    "Ghana: sin fuente local; riesgo de quedar bajo 10.",
   ]);
   const publicar = await request.post("/api/config/publicar", {
     headers: cab,
@@ -2024,7 +2024,9 @@ test("huecos por país: aviso al aplicar, tabla y copiar pedido de fuente nueva"
       response: resp,
       json: {
         ...json,
-        avisos_cobertura: ["Kenia: sin fuente local; riesgo de quedar bajo 5."],
+        avisos_cobertura: [
+          "Kenia: sin fuente local; riesgo de quedar bajo 10.",
+        ],
       },
     });
   });

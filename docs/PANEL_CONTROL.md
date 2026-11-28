@@ -123,13 +123,14 @@ El historial puede seguir sumando 120 mientras algunas oportunidades ya no está
 
 ## 3b. Fuente nueva el mismo día (sección 8.1)
 
-Puede haber clientes en cualquier país. Un perfil que recibe **menos de 5** es un hueco, y la fuente nueva debe quedar
+Puede haber clientes en cualquier país. Un perfil que recibe **menos de 10** (la meta: `cobertura.aviso_bajo` en
+`datos/config.yaml`, decisión de Oscar del 28 nov) es un hueco, y la fuente nueva debe quedar
 añadida **el mismo día**, para que la siguiente búsqueda ya la use. Todo esto lo ve solo el operador: el cliente no
 recibe avisos de cobertura, y nada de esto va a los mensajes, a los registros de Actions, a `publicado` ni a `reportes/`.
 
 | Paso | Qué hacer | Cuánto tarda (aprox.) |
 |---|---|---|
-| 1. Aviso | Al pulsar «Aplicar cambios» (o al importar clientes), si un perfil nuevo o editado vive, o acepta híbrido o presencial, en un país sin fuente local (solo lo buscan LinkedIn, Portales de empresas y Get on Board), el mensaje del panel termina con «Aviso de cobertura: <país>: sin fuente local; riesgo de quedar bajo 5». No impide guardar. La remota en cualquier parte no crea país | Al momento |
+| 1. Aviso | Al pulsar «Aplicar cambios» (o al importar clientes), si un perfil nuevo o editado vive, o acepta híbrido o presencial, en un país sin fuente local (solo lo buscan LinkedIn, Portales de empresas y Get on Board), el mensaje del panel termina con «Aviso de cobertura: <país>: sin fuente local; riesgo de quedar bajo 10». No impide guardar. La remota en cualquier parte no crea país | Al momento |
 | 2. Copiar pedido | En **Historial → Cobertura por persona → Huecos por país**, la fila del país (estado «Riesgo» o «Hueco») tiene **Copiar pedido de fuente nueva**. El texto lleva solo el país, los idiomas, las familias de cargo y las modalidades: ni nombres, ni clientes, ni conteos | 1 min |
 | 3. Chat con la skill | Abrir un chat de Claude Code en una carpeta de trabajo propia (`git worktree add`) y pegar el pedido. La skill `nueva-fuente` busca portales locales donde se postula ahí mismo y sin sesión, escribe la fuente con sus pruebas y la prueba en vivo | 1 a 3 h |
 | 4. PR | El chat abre el PR; nunca se activa sola. Revisar que la prueba en vivo trae avisos **de ese país** y que el enlace es de un portal donde se postula | 15 a 30 min |
@@ -137,7 +138,7 @@ recibe avisos de cobertura, y nada de esto va a los mensajes, a los registros de
 | 6. Buscar ahora | En el detalle del cliente, **Buscar ahora**: busca solo para sus perfiles bajo la meta, sin esperar a la Bodega de mañana | unos 30 min |
 
 **Riesgo o hueco.** «Riesgo» es el aviso temprano: el país no tiene fuente local, aunque aún no se haya medido nada.
-«Hueco» es lo medido: tras la última búsqueda, alguien de ese país quedó bajo 5 y la causa es la falta de vacantes en
+«Hueco» es lo medido: tras la última búsqueda, alguien de ese país quedó bajo 10 y la causa es la falta de vacantes en
 las fuentes. No cuenta como hueco si le faltan por su cargo (no hay vacantes del cargo en ningún sitio: revisar el
 cargo), si tiene vacantes listas que aún no recibió o enlaces por comprobar, ni si lo frena un ajuste de su perfil
 (modalidad, plazo, idioma, ciudad): para eso está «Qué hacer». Sí cuenta cuando todas las vacantes del cargo son de

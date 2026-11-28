@@ -12,6 +12,17 @@ confirmar_ubicacion:  # contrato v29: el doble de fichas para que lleguen menos 
 # Vacantes más viejas que esto se borran de la bodega
 dias_maximos: 30
 
+# P-11.3 (decisión de Oscar, 28 nov): dos cifras por persona y día, independientes (cambiar una no mueve la otra).
+# - aviso_bajo: el operador ve a la persona como «va corta» si recibe menos que esto: cobertura por persona, tabla de
+#   huecos por país, aviso al guardar un perfil, «Cobertura limitada» y el conteo del resumen del panel. Es la meta.
+# - rescate_bajo: solo bajo esta cifra se gasta el rescate (refuerzo gratuito, Apify `rescate_busquedas` y
+#   `posts_rescate`). Al comprar Apify Starter (sección 8.2b) se sube a 10; antes, decidir si los posts asignados
+#   también completan hasta 10 (hoy solo hasta 5, como las ampliadas): si no, se pagarían posts que no se asignan.
+# El mínimo de la selección (ampliadas hasta 5, decisión de la 7.A) no se cambia aquí.
+cobertura:
+  aviso_bajo: 10
+  rescate_bajo: 5
+
 # Hora de la bodega nocturna en Bogotá (UTC−5). El horario real está en .github/workflows/bodega.yml (paso 7).
 hora_bodega_bogota: "06:30"
 
@@ -42,9 +53,9 @@ refuerzo:
   indeed_busquedas: 6
   getonbrd_busquedas: 6
 
-# Apify: ofertas formales de LinkedIn para perfiles bajo 5. Actor comprobado contra su esquema público; no se envían
-# cookies ni sesión personal. Las reservas conservadoras de cargo se guardan (Supabase, SQL 023, y su espejo
-# trabajo/apify_presupuesto.json) antes de cada ejecución. Además del límite por consulta y corrida, hay dos cifras:
+# Apify: ofertas formales de LinkedIn para perfiles bajo `cobertura.rescate_bajo`. Actor comprobado contra su esquema
+# público; no se envían cookies ni sesión personal. Las reservas conservadoras de cargo se guardan (Supabase, SQL 023,
+# y su espejo trabajo/apify_presupuesto.json) antes de cada ejecución. Además del límite por consulta y corrida, hay dos cifras:
 # - tope_mensual_usd: el crédito del plan contratado. Hoy 5 (cuenta gratis: Apify BLOQUEA al agotarlo). Al comprar
 #   Starter (USD 19/mes con USD 19 de uso incluidos), cambiar a 19. Nunca se reserva más que esto en el mes.
 # - ritmo_diario_usd: lo que se puede gastar por día. 0,63 = 19/30, el ritmo de Starter (sección 8.2: la prueba gasta
@@ -56,8 +67,8 @@ apify:
   actor_publicaciones: "harvestapi/linkedin-post-search"
   publicaciones_por_dia: 0  # reservar el crédito gratuito para fichas de empleo
   actor_linkedin: "curious_coder/linkedin-jobs-scraper"
-  rescate_busquedas: 16        # modo panel: búsquedas dirigidas a perfiles con menos de 5 (16 × 0,025 = USD 0,40 del ritmo diario)
-  posts_rescate: 50            # modo panel: posts de LinkedIn para quien sigue bajo 5 (≈USD 0,11; contratos v11 y v28)
+  rescate_busquedas: 16        # modo panel: búsquedas dirigidas a perfiles bajo cobertura.rescate_bajo (16 × 0,025 = USD 0,40 del ritmo diario)
+  posts_rescate: 50            # modo panel: posts de LinkedIn para quien sigue bajo cobertura.rescate_bajo (≈USD 0,11; contratos v11 y v28)
   build_linkedin: "1.7.18"
   ofertas_por_busqueda: 10
   tope_consulta_usd: 0.025
