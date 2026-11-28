@@ -8,8 +8,10 @@ vacantes de la bodega de hoy (el catálogo activo de Supabase):
     → asignada hoy
 
 Además: cuántas esperan en «Por confirmar» para ese perfil (y por qué duda), la causa principal de lo que le falta
-(«mercado»: pocas por su cargo; «capacidad»: le servirían pero no se comprobó su enlace por turno o tiempo;
-«sistema»: hay candidatas y se caen en un paso, que se nombra) y el conteo de repeticiones de la 12.15: pares
+(«mercado»: pocas por su cargo; «mercado_flujo»: las candidatas ya le llegaron otros días y las nuevas del día no
+alcanzan su meta (P-16.4); «capacidad»: le servirían pero no se comprobó su enlace por turno o tiempo; «sistema»: hay
+candidatas y se caen en un paso, que se nombra), cuántas «nuevas de hoy» tiene (vistas por primera vez en la última
+búsqueda y que pasan todo el embudo hasta «no recibida») y el conteo de repeticiones de la 12.15: pares
 (perfil, vacante) asignados más de una vez, por camino y por fecha.
 
 Usa las mismas reglas que la selección (`panel.afinidad.lugar` y `evaluar`, `panel.terminos.grado` con el cargo
@@ -44,9 +46,9 @@ from panel.terminos import grado
 PASOS = ("cargo", "lugar", "idioma", "requisitos", "enlace", "no_recibida", "asignada")
 HORAS_VIGENCIA = 24  # una comprobación vale 24 h para seleccionar y compartir (contrato §8)
 
-CAUSA_CUMPLE, CAUSA_MERCADO, CAUSA_CAPACIDAD, CAUSA_SISTEMA, CAUSA_SIN_DATOS = (
-    "cumple", "mercado", "capacidad", "sistema", "sin_datos")
-CAUSAS = (CAUSA_CUMPLE, CAUSA_MERCADO, CAUSA_CAPACIDAD, CAUSA_SISTEMA, CAUSA_SIN_DATOS)
+CAUSA_CUMPLE, CAUSA_MERCADO, CAUSA_MERCADO_FLUJO, CAUSA_CAPACIDAD, CAUSA_SISTEMA, CAUSA_SIN_DATOS = (
+    "cumple", "mercado", "mercado_flujo", "capacidad", "sistema", "sin_datos")
+CAUSAS = (CAUSA_CUMPLE, CAUSA_MERCADO, CAUSA_MERCADO_FLUJO, CAUSA_CAPACIDAD, CAUSA_SISTEMA, CAUSA_SIN_DATOS)
 
 # Enlace sin comprobar: por qué (de `datos.verificacion.motivo`, textos fijos de buscador/verificar_enlaces.py).
 # «sin_turno» y «vencida» (comprobada hace más de 24 h) son de capacidad: más turnos o tiempo las comprobarían.
@@ -100,7 +102,8 @@ CAMPOS_CATALOGO = (
     "fecha_estimada:datos->fecha_estimada,ids_agrupados:datos->ids_agrupados,anos_min:datos->anos_min,"
     "ingles:datos->>ingles,requisito_ingles:datos->requisito_ingles,salario:datos->>salario,"
     "duplicada_de:datos->>duplicada_de,tipo:datos->>tipo,verificacion:datos->verificacion->>estado,"
-    "verificacion_motivo:datos->verificacion->>motivo,comprobada_en:datos->verificacion->>comprobada_en,fuente:datos->>fuente,fuentes:datos->fuentes")
+    "verificacion_motivo:datos->verificacion->>motivo,comprobada_en:datos->verificacion->>comprobada_en,fuente:datos->>fuente,fuentes:datos->fuentes,"
+    "visto_primera_vez:datos->>visto_primera_vez")
 
 
 def familia_fuente(texto):
@@ -164,6 +167,7 @@ def _vacante(d):
     fuentes = d.get("fuentes") if isinstance(d.get("fuentes"), list) else []
     v["_apify"] = v["_fuente"] == APIFY or any(familia_fuente(f) == APIFY for f in fuentes)
     v["_ids"] = {str(d["id"]), *(str(x) for x in (d.get("ids_agrupados") or []) if x)}
+    v["_visto"] = str(d.get("visto_primera_vez") or "")[:10]
     return v
 
 
@@ -175,10 +179,12 @@ def leer_catalogo(pedir):
             if not d.get("duplicada_de") and d.get("tipo") != "post"]
 
 
-def embudo(del_cargo, p, fecha, recibidas_antes, asignadas_hoy, por_fuente=None, ahora=None):
+def embudo(del_cargo, p, fecha, recibidas_antes, asignadas_hoy, por_fuente=None, ahora=None, dia_busqueda=""):
     """Cuántas vacantes del cargo pasan cada paso para el perfil `p`. `por_fuente` (opcional) acumula lo mismo por
-    familia de fuente y para las que trajo Apify."""
+    familia de fuente y para las que trajo Apify. El cuarto valor son las «nuevas de hoy»: llegan hasta «no recibida»
+    y se vieron por primera vez el `dia_busqueda` (la fecha de la última búsqueda): el flujo diario del perfil."""
     n, enlace, motivos_lugar = Counter(), Counter(), Counter()
+    nuevas = 0
 
     def paso(v, nombre):
         n[nombre] += 1
@@ -208,18 +214,24 @@ def embudo(del_cargo, p, fecha, recibidas_antes, asignadas_hoy, por_fuente=None,
         if v["_ids"] & recibidas_antes:
             continue
         paso(v, "no_recibida")
+        nuevas += bool(dia_busqueda) and v.get("_visto") == dia_busqueda
         if v["_ids"] & asignadas_hoy:
             paso(v, "asignada")
-    return {k: n.get(k, 0) for k in PASOS}, dict(enlace), dict(motivos_lugar)
+    return {k: n.get(k, 0) for k in PASOS}, dict(enlace), dict(motivos_lugar), nuevas
 
 
 def causa_de(pasos, enlace, objetivo, hoy_n):
-    """(causa, paso) de lo que le falta hoy: el primer paso del embudo que queda por debajo de su meta."""
+    """(causa, paso) de lo que le falta hoy: el primer paso del embudo que queda por debajo de su meta.
+    P-16.4: si frena «no recibida», las candidatas existen pero ya le llegaron otros días y las que aún no recibió no
+    alcanzan su meta: es el flujo del mercado, no una pérdida del sistema (ENTREGA.md §6). «nuevas_hoy» (las vistas
+    por primera vez en la última búsqueda) es otra cifra: mide el flujo, no decide la causa."""
     if hoy_n >= objetivo:
         return CAUSA_CUMPLE, ""
     freno = next((k for k in PASOS if pasos[k] < objetivo), "asignada")
     if freno == "cargo":
         return CAUSA_MERCADO, freno
+    if freno == "no_recibida":
+        return CAUSA_MERCADO_FLUJO, freno
     if freno == "enlace" and sum(enlace.get(k, 0) for k in ENLACES_CAPACIDAD) * 2 > sum(enlace.values()):
         return CAUSA_CAPACIDAD, freno
     return CAUSA_SISTEMA, freno
@@ -250,6 +262,7 @@ def calcular(fecha, cfg, cargos, catalogo, ejecuciones, conteo, metas, recibidas
     desde = (date.fromisoformat(fecha) - timedelta(days=DIAS - 1)).isoformat()
     ventana = [e for e in ejecuciones if desde <= str(e.get("fecha", ""))[:10] <= fecha]
     ultima = str(ventana[0]["id"]) if ventana else None
+    dia_busqueda = str(ventana[0].get("fecha", ""))[:10] if ventana else ""
     comunidades = {c.id for c in cfg.clientes if c.activo and c.comunidad}
     clientes = {c.id for c in cfg.clientes if c.activo}
     dudas = defaultdict(Counter)
@@ -281,8 +294,8 @@ def calcular(fecha, cfg, cargos, catalogo, ejecuciones, conteo, metas, recibidas
             hoy_ids = {str(x) for x in asignadas_hoy.get(pid, ())}
             hoy_n = conteo.get((ultima, pid), 0) if ultima else 0
             antes = {str(x) for x in recibidas.get(pid, ())} - hoy_ids
-            pasos, enlace, lugares = embudo(del_cargo, p, fecha, antes, hoy_ids,
-                                            por_fuente if tipo == "cliente" else None, ahora)
+            pasos, enlace, lugares, nuevas = embudo(del_cargo, p, fecha, antes, hoy_ids,
+                                                    por_fuente if tipo == "cliente" else None, ahora, dia_busqueda)
             if tipo == "cliente":
                 enlace_total.update(enlace)
                 lugar_total.update(lugares)
@@ -296,7 +309,7 @@ def calcular(fecha, cfg, cargos, catalogo, ejecuciones, conteo, metas, recibidas
                 "dias_bajo_5": sum(1 for n in numeros if n < MINIMO),
                 "dias_bajo_meta": sum(1 for n, m in serie if n < m),
                 "hoy": hoy_n, "cumple_meta_hoy": hoy_n >= meta,
-                "embudo": pasos, "enlace_sin_comprobar": enlace, "lugar_motivos": lugares,
+                "embudo": pasos, "nuevas_hoy": nuevas, "enlace_sin_comprobar": enlace, "lugar_motivos": lugares,
                 "por_confirmar": {"total": sum(dudas[pid].values()), **{k: dudas[pid].get(k, 0) for k in DUDAS}},
                 "causa": causa, "paso": freno,
             }, {"grupo": grupo_de(p), "faltan": max(0, meta - hoy_n),
@@ -342,6 +355,7 @@ def calcular(fecha, cfg, cargos, catalogo, ejecuciones, conteo, metas, recibidas
             "cumplen_hoy": sum(1 for f in reales if f["cumple_meta_hoy"]),
             "sin_datos": sum(1 for f in reales if f["dias_medidos"] < DIAS_PARA_MEDIR),
             "faltan_hoy": sum(c["faltan_hoy"] for c in lista_causas),
+            "nuevas_hoy": sum(f["nuevas_hoy"] for f in reales),
         },
         "causas": lista_causas,
         "grupos": {k: grupos[k] for k in GRUPOS if k in grupos},
@@ -443,7 +457,7 @@ CLAVES = frozenset({
     "hoy", "cumple_meta_hoy", "embudo", "total", "repeticiones", "disponible", "asignaciones_total",
     "pares_distintos", "pares_repetidos", "filas_de_mas", "perfiles_afectados", "clientes_afectados",
     "primer_camino_y_repeticion", "repeticiones_por_fecha", "whatsapp", "pares_repetidos_en_2_o_mas_borradores",
-    "pares_repetidos_enviados_2_o_mas_veces", "avisos_internos"})
+    "pares_repetidos_enviados_2_o_mas_veces", "avisos_internos", "nuevas_hoy"})
 VALORES = frozenset({*PASOS, *CAUSAS, *TIPOS, ""})
 _CAMINO = "(?:" + "|".join(CAMINOS) + ")"
 _LIBRES = re.compile(r"P\d{2,3}|\d{4}-\d{2}-\d{2}|sin_fecha|" + _CAMINO + " -> " + _CAMINO)
@@ -482,7 +496,8 @@ def resumen_md(r):
         "",
         f"**Perfiles: {t['perfiles']} · en 0 algún día: {t['en_0_algun_dia']} · bajo 5 de media: {t['bajo_5_de_media']}"
         f" · estables en su meta: {t['estables_en_meta']}** · cumplen hoy: {t['cumplen_hoy']} · sin datos: "
-        f"{t['sin_datos']} · Comunidad: {t['comunidad']} · faltan hoy: {t['faltan_hoy']}",
+        f"{t['sin_datos']} · Comunidad: {t['comunidad']} · faltan hoy: {t['faltan_hoy']} · nuevas de hoy "
+        f"(pares perfil-vacante de clientes): {t['nuevas_hoy']}",
         "",
         "### Causas (vacantes/día que faltan)",
         _tabla(["causa", "paso", "perfiles", "faltan hoy", "déficit medio 14 d"],
@@ -490,11 +505,11 @@ def resumen_md(r):
                 for c in r["causas"]]),
         "",
         "### Por perfil",
-        _tabla(["perfil", "tipo", "días", "media", "mín", "en 0", "<5", "<meta", "hoy", *PASOS, "sin comprobar",
-                "por confirmar", "causa", "paso"],
+        _tabla(["perfil", "tipo", "días", "media", "mín", "en 0", "<5", "<meta", "hoy", *PASOS, "nuevas hoy",
+                "sin comprobar", "por confirmar", "causa", "paso"],
                [(f["indice"], f["tipo"], f["dias_medidos"], "—" if f["media"] is None else f["media"],
                  "—" if f["minimo"] is None else f["minimo"], f["dias_en_0"], f["dias_bajo_5"], f["dias_bajo_meta"],
-                 f["hoy"], *(f["embudo"][p] for p in PASOS),
+                 f["hoy"], *(f["embudo"][p] for p in PASOS), f["nuevas_hoy"],
                  " ".join(f"{k}:{v}" for k, v in f["enlace_sin_comprobar"].items()) or "—",
                  f["por_confirmar"]["total"], f["causa"], f["paso"] or "—") for f in r["perfiles"]]),
         "",

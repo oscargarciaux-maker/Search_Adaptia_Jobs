@@ -55,9 +55,17 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
   marcado, la vacante sigue «por confirmar» (v35, v49).
 - **Residencia obligatoria:** en una remota con frase de residencia, solo valen los países de esa frase. «US-based»
   solo restringe si habla de la persona o del puesto, no de la empresa (v49).
-- **Letra pequeña en español:** frases como «abierto a candidatos de…» o «puedes postular desde…» **suman** países a
-  una remota que ya nombra un país concreto; nunca recortan ni pisan una restricción de residencia. Las frases de la
-  empresa, de beneficios o vagas no abren nada (v50).
+- **Letra pequeña (español e inglés):** frases como «abierto a candidatos de…», «puedes postular desde…», «remote
+  Latin America», «100% remote, LATAM only», «candidates based/located/residing in…», «you are based in…», «this role
+  will be based remotely in…» o «remotely from anywhere in the world» **suman** los países de la lista que sigue a una
+  remota que nombra un país concreto, también si ese país es de fuera (la sede: «Remote, USA» + «open to candidates
+  residing in Latin America»); nunca recortan ni pisan una restricción de residencia. «Anywhere in the US» no es el
+  mundo, «Eastern Europe» no es España y «… are not eligible» después de la lista no abre. Las frases de la empresa
+  («our team based in…», «a fully remote Latin American startup», «clients worldwide»), de
+  beneficios o vagas no abren nada (v50; P-16.4).
+- **Región escrita en la ubicación** junto a países de fuera: «Remote, Ireland, Europe, United States» o «Remote,
+  Canada, EMEA, United States» abren Europa; «Remote - Americas, Remote EU», LATAM y Europa. «EU» solo cuenta en
+  mayúsculas («Eu, France» es un pueblo) (P-16.4).
 - **Presencial e híbrida exigen ciudad:** la fila necesita ciudades y el aviso debe nombrar una o quedar a 50 km o
   menos. Motivos: «falta la ciudad en el perfil» y «oficina sin ciudad confirmada». Una región no sirve para
   presenciales. La ciudad implica su país (v24, v38, v49).
@@ -569,7 +577,9 @@ Las «Reglas innegociables» de `CLAUDE.md` son el resumen de esta sección: si 
 - Reportes públicos solo con conteos, sin datos de clientes: `embudo_idioma` (v50), `embudo[cargo].por_idioma` y
   `verificacion_enlaces.en_la_corrida` (v51). Cifras por persona solo en el resumen privado (v40).
 - `python -m buscador.medicion --bodega …` mide sobre una bodega guardada (v49).
-- **Entrega por perfil** (P-16.1, 28 nov, autorizado por Oscar): «Diagnóstico» con `medir_entrega` (`buscador/diagnostico_entrega.py`, solo lectura) publica en el resumen, el registro y un artefacto de 1 día cifras por perfil con un **índice anónimo** (P01…, ordenado por lo que recibe, no por cliente) que pasa una lista blanca: lo recibido en 14 días, el embudo de la bodega de hoy, «Por confirmar», la causa y las repeticiones. Es la única excepción a «cifras por persona solo en privado»: nunca nombres, ids, lugares, cargos ni términos. La meta no sale como cifra, aunque el embudo y la causa de un perfil anónimo permiten acotarla (no identifica a nadie).
+- **Entrega por perfil** (P-16.1, 28 nov, autorizado por Oscar): «Diagnóstico» con `medir_entrega` (`buscador/diagnostico_entrega.py`, solo lectura) publica en el resumen, el registro y un artefacto de 1 día cifras por perfil con un **índice anónimo** (P01…, ordenado por lo que recibe, no por cliente) que pasa una lista blanca: lo recibido en 14 días, el embudo de la bodega de hoy, «Por confirmar», la causa y las repeticiones. Desde la P-16.4
+  también las «nuevas de hoy» (vistas por primera vez en la última búsqueda y que llegan hasta «no recibida») y la causa
+  «mercado_flujo» cuando frena «no recibida»: las candidatas ya le llegaron otros días y las nuevas no alcanzan su meta. Es la única excepción a «cifras por persona solo en privado»: nunca nombres, ids, lugares, cargos ni términos. La meta no sale como cifra, aunque el embudo y la causa de un perfil anónimo permiten acotarla (no identifica a nadie).
 - Línea base del objetivo mundial: `--comparar pruebas/datos/linea_base_mundial.json` repite 8 escenarios ficticios del
   modo panel sobre la bodega fijada y falla si cambia el de control (`docs/LINEA_BASE_MUNDIAL.md`, 27 nov).
 
