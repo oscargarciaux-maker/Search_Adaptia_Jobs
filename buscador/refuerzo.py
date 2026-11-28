@@ -50,7 +50,7 @@ def completar(vacantes, entregadas, hoy, cfg_entrega, cfg_refuerzo, mapa, recoge
     for numero in range(1, cfg_refuerzo.get("rondas", 2) + 1):
         _, evaluacion = entrega.elegir(vacantes, entregadas, hoy, cfg_entrega, iniciales=iniciales)
         # Contrato v11: también refuerza un cargo con cupo cubierto si alguno de sus perfiles no llega al umbral del
-        # rescate (`cobertura.rescate_bajo`, 5; P-11.3).
+        # rescate (`cobertura.rescate_bajo`; P-11.3).
         faltantes = {rid: r["faltan"] or r.get("faltan_para_minimo", 0) for rid, r in evaluacion["roles"].items()
                      if r["faltan"] or r.get("perfiles_bajo_minimo")}
         if not faltantes:
@@ -92,7 +92,7 @@ def rescate_apify(vacantes, entregadas, hoy, cfg_entrega, mapa, buscar_apify, in
         return vacantes, {"perfiles_con_deficit": 0, "omitida": "todos los perfiles llegan al mínimo"}
     por_id = {f["id"]: f for f in mapa}
     sin_local = sin_fuente_local(cfg_entrega["roles"], deficit)
-    # 8.2: primero quien está bajo el umbral del rescate (5) sin fuente local; después el resto con déficit, el de más
+    # 8.2: primero quien está bajo el umbral del rescate (`rescate_bajo`) sin fuente local; después el resto con déficit, el de más
     # déficit primero.
     pedidos = sorted([((p["id"] not in sin_local, -deficit[p["id"]]), rol, p) for rol in cfg_entrega["roles"]
                       for p in rol.get("_perfiles") or [] if p["id"] in deficit], key=lambda x: x[0])
@@ -132,8 +132,8 @@ def rescate_posts(vacantes, entregadas, hoy, cfg_entrega, mapa, buscar_posts, in
     if not deficit:
         return vacantes, {"perfiles_con_deficit": 0, "omitida": "todos los perfiles llegan al mínimo"}, []
     por_id = {f["id"]: f for f in mapa}
-    # 8.2: primero los cargos con alguien bajo el umbral del rescate (5) sin fuente local; dentro, el de más déficit
-    # (como antes).
+    # 8.2: primero los cargos con alguien bajo el umbral del rescate (`rescate_bajo`) sin fuente local; dentro, el de
+    # más déficit (como antes).
     sin_local = sin_fuente_local(cfg_entrega["roles"], deficit)
     roles = sorted((r for r in cfg_entrega["roles"] if any(p["id"] in deficit for p in r.get("_perfiles") or [])),
                    key=lambda r: (not any(p["id"] in sin_local for p in r.get("_perfiles") or []),

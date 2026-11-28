@@ -2,7 +2,7 @@
 
 - Riesgo (aviso temprano): un perfil activo cuyo país —donde vive, o donde acepta híbrido/presencial— no tiene fuente
   local: solo lo buscan LinkedIn, los portales de empresas y Get on Board. La remota mundial no crea país.
-- Hueco (medido): tras una búsqueda, un perfil bajo el umbral de aviso (`cobertura.aviso_bajo`, 10) cuya causa es la falta de vacantes en las fuentes, no
+- Hueco (medido): tras una búsqueda, un perfil bajo el umbral de aviso (`cobertura.aviso_bajo`) cuya causa es la falta de vacantes en las fuentes, no
   su cargo (sin vacantes en ningún sitio), ni enlaces por comprobar, ni listas que aún no recibió, ni un ajuste del perfil.
 - El pedido para un chat de Claude Code lleva SOLO país, idiomas, familias de cargo y modalidades: un país con un solo
   perfil delataría a un cliente, así que nada de esto sale del panel privado (ni mensajes, ni logs, ni `publicado`).

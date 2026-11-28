@@ -17,8 +17,9 @@ TITULOS = {"Product Designer": "Product Designer", "Frontend": "Frontend Develop
 
 def test_las_dos_cifras_salen_de_config_yaml():
     datos = yaml.safe_load((Path(__file__).resolve().parents[2] / "datos" / "config.yaml").read_text(encoding="utf-8"))
-    assert datos["cobertura"] == {"aviso_bajo": 10, "rescate_bajo": 5}
-    assert (afinidad.AVISO_BAJO, afinidad.RESCATE_BAJO) == (10, 5)
+    # Las constantes son las del archivo (al comprar Starter, 8.2b, solo cambia `rescate_bajo`).
+    assert (afinidad.AVISO_BAJO, afinidad.RESCATE_BAJO) == (datos["cobertura"]["aviso_bajo"],
+                                                            datos["cobertura"]["rescate_bajo"])
     assert afinidad.MINIMO_POR_PERFIL == 5  # el mínimo de la selección (7.A) no se toca aquí
 
 
@@ -90,8 +91,9 @@ def test_con_menos_de_5_el_rescate_sigue_igual(cfg):
 
 def test_el_rescate_lo_decide_rescate_bajo_y_no_aviso_bajo(cfg, monkeypatch):
     ofertas = _ofertas(cfg, 7)
-    monkeypatch.setattr(afinidad, "AVISO_BAJO", 20)
-    assert _rescate(cfg, ofertas)[1] == []  # subir el aviso no gasta Apify
+    for modulo in (afinidad, servicio, huecos, ejecutor):  # cada módulo que lee la cifra del aviso
+        monkeypatch.setattr(modulo, "AVISO_BAJO", 20)
+    assert _rescate(cfg, ofertas) == (0, [], [])  # subir el aviso no gasta refuerzo, Apify ni posts
     monkeypatch.setattr(afinidad, "RESCATE_BAJO", 10)  # lo que hará la 8.2b al comprar Starter
     bajo, apify, posts = _rescate(cfg, ofertas)
     assert bajo >= 1 and apify and posts
@@ -103,3 +105,9 @@ def test_el_aviso_al_guardar_dice_la_cifra_en_uso(monkeypatch):
     assert huecos.aviso_al_guardar(None, cfg) == ["Ghana: sin fuente local; riesgo de quedar bajo 10."]
     monkeypatch.setattr(huecos, "AVISO_BAJO", 12)
     assert huecos.aviso_al_guardar(None, cfg) == ["Ghana: sin fuente local; riesgo de quedar bajo 12."]
+
+
+def test_un_config_que_no_es_un_diccionario_no_tumba_el_panel(monkeypatch):
+    monkeypatch.setattr(yaml, "safe_load", lambda texto: ["no es un diccionario"])
+    assert afinidad._config_yaml() == {}
+    assert afinidad._dias_maximos() == 30 and afinidad._umbrales_cobertura() == (10, 5)

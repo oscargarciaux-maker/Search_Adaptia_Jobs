@@ -16,7 +16,8 @@ dias_maximos: 30
 # - aviso_bajo: el operador ve a la persona como «va corta» si recibe menos que esto: cobertura por persona, tabla de
 #   huecos por país, aviso al guardar un perfil, «Cobertura limitada» y el conteo del resumen del panel. Es la meta.
 # - rescate_bajo: solo bajo esta cifra se gasta el rescate (refuerzo gratuito, Apify `rescate_busquedas` y
-#   `posts_rescate`). Al comprar Apify Starter (sección 8.2b) se sube a 10.
+#   `posts_rescate`). Al comprar Apify Starter (sección 8.2b) se sube a 10; antes, decidir si los posts asignados
+#   también completan hasta 10 (hoy solo hasta 5, como las ampliadas): si no, se pagarían posts que no se asignan.
 # El mínimo de la selección (ampliadas hasta 5, decisión de la 7.A) no se cambia aquí.
 cobertura:
   aviso_bajo: 10

@@ -10,8 +10,7 @@ import time
 from buscador import contrato, enlaces, paises, registro, vacante
 from buscador.normalizar import titulo_base
 from panel.afinidad import (AMPLIACIONES, AVISO_BAJO, ETIQUETAS_AMPLIACION, MINIMO_POR_PERFIL, MOTIVO_OTRO_PAIS,
-                            encaja_asignada,
-                            enlace_utilizable,
+                            encaja_asignada, enlace_utilizable,
                             evaluar, evaluar_ampliada, evaluar_asignada, post_ubicacion,
                             titulo_del_cargo)
 from panel.modelos import Perfil

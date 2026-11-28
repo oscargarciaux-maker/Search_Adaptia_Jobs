@@ -35,7 +35,8 @@ def _config_yaml():
         import yaml
         from pathlib import Path
         ruta = Path(__file__).resolve().parent.parent / "datos" / "config.yaml"
-        return yaml.safe_load(ruta.read_text(encoding="utf-8")) or {}
+        datos = yaml.safe_load(ruta.read_text(encoding="utf-8"))
+        return datos if isinstance(datos, dict) else {}
     except Exception:  # noqa: BLE001 — sin config se usan los valores del contrato
         return {}
 

@@ -248,7 +248,7 @@ def completar_cupo_por_empresa(elegidas, candidatas, cuantas):
 def deficit_por_perfil(elegidas, roles, hoy):
     """{perfil_id: cuántas le faltan para el umbral del rescate} con lo elegido (estricto o ampliado). Uso interno:
     nunca se escribe en reportes públicos; ahí solo van conteos por cargo. P-11.3: decide el rescate (refuerzo, Apify y
-    posts), así que usa `cobertura.rescate_bajo` de datos/config.yaml (5), no la cifra de los avisos."""
+    posts), así que usa `cobertura.rescate_bajo` de datos/config.yaml, no la cifra de los avisos."""
     from panel.afinidad import RESCATE_BAJO, evaluar, evaluar_ampliada
     salida = {}
     for rol in roles:
