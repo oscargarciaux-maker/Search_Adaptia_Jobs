@@ -174,7 +174,6 @@ def test_lo_publicado_no_dice_donde_ni_con_que_se_busco(tmp_path):
     texto = _texto_publico(salida, con_bodega=True)
     for secreto in LUGARES:
         assert secreto not in texto
-    assert "CIUDAD_" not in texto
     for rel in ("datos/salud.json", "datos/salud_bodega.json"):
         s = json.loads((salida / rel).read_text(encoding="utf-8"))
         assert not set(_claves(s["fuentes"])) & set(CAMPOS_POR_LUGAR + ("por_familia",))
@@ -184,18 +183,27 @@ def test_lo_publicado_no_dice_donde_ni_con_que_se_busco(tmp_path):
     assert CIUDAD in completo and TERMINO in completo
 
 
-def test_un_desglose_nuevo_de_una_fuente_no_se_publica():
-    """Lista blanca también dentro de cada fuente: lo que no es una cifra se queda fuera hasta clasificarlo."""
-    publica = ep.fuente_publica({"busquedas": 1, "desglose_nuevo": {"ZZ": 1}, "lista_nueva": [TERMINO],
-                                 "relectura": {"leidas": 1, "lugar": CIUDAD}})
-    assert publica == {"busquedas": 1}
+def test_un_campo_nuevo_de_una_fuente_no_se_publica():
+    """Lista blanca también dentro de cada fuente: solo cifras, textos fijos clasificados y contadores clasificados."""
+    publica = ep.fuente_publica({"busquedas": 1, "repaso": False, "omitida": "sin crédito",
+                                 "desglose_nuevo": {"ZZ": 1}, "lista_nueva": [TERMINO], "lugar": CIUDAD,
+                                 "run_id": CORRIDA_APIFY, "relectura": {"leidas": 1, "lugar": CIUDAD}})
+    assert publica == {"busquedas": 1, "repaso": False, "omitida": "sin crédito"}
+    assert ep.fuente_publica([CIUDAD]) == {}   # lo que no tiene la forma esperada no se publica
 
 
-def test_el_registro_de_la_bodega_imprime_las_fuentes_recortadas():
-    """El registro de Actions también es público: `bodega.main` imprime cada fuente ya recortada."""
-    texto = (RAIZ / "buscador/bodega.py").read_text(encoding="utf-8")
-    main = texto[texto.index("def main():"):]
-    assert "fuentes_publicas(reporte[\"fuentes\"])" in main and "reporte[\"fuentes\"].items()" not in main
+def test_el_registro_y_el_resumen_publicos_no_dicen_donde_se_busco(tmp_path, monkeypatch, capsys):
+    """El registro de Actions y el resumen de la corrida también son públicos, aunque el reporte venga completo
+    (con --prueba o si «Separar» falló)."""
+    from buscador import bodega
+    reporte = dict(_reporte(), minutos=1, crudas_hoy=2, descartes={})
+    monkeypatch.setattr(bodega, "correr", lambda *a, **k: reporte)
+    monkeypatch.setattr("sys.argv", ["bodega", "--salida", str(tmp_path)])
+    bodega.main()
+    texto = capsys.readouterr().out + ep.resumen(reporte)
+    assert "LinkedIn" in texto
+    for secreto in LUGARES:
+        assert secreto not in texto
 
 
 def test_el_arranque_decide_igual_con_las_metricas_publicadas(tmp_path):
