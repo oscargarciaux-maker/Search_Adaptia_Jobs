@@ -776,7 +776,8 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
     """Reconstruible desde la selección confirmada, incluso tras perder el proceso anterior.
     Contrato v43: asigna con la versión confirmada más nueva (aunque la búsqueda empezara con otra); una vacante del
     lote llega también a perfiles de otros cargos que la aceptan; Comunidad recibe después de los clientes reales,
-    prefiere lo que ellos no recibieron y se corta en su meta diaria."""
+    prefiere lo que ellos no recibieron y se corta en su meta diaria.
+    Devuelve lo que Apify aportó hoy (`medicion_apify.contar_asignacion`, solo conteos) o None (8.2)."""
     version = vigente(repo, version, fecha)
     ejecucion = iniciar(repo, version, fecha)
     cfg = validar_version(version)
@@ -1032,7 +1033,7 @@ def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPL
                     print(medicion_apify.linea(medicion_apify.anotar_asignacion(trabajo, fecha, aporte_apify)),
                           flush=True)
                 except Exception as e:  # noqa: BLE001 — la medición es una ayuda
-                    registro.aviso("ejecutor:medicion-apify", e)
+                    registro.aviso("ejecutor:medicion-apify-mes", e)
             if modo != "incremental":
                 try:  # borradores de WhatsApp listos para revisar; un fallo aquí nunca tumba la búsqueda
                     from panel import borradores

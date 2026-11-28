@@ -26,8 +26,7 @@ def _dia(n):
 
 def test_config_separa_tope_del_plan_y_ritmo_diario():
     cfg = bodega.config()["apify"]
-    assert cfg["tope_mensual_usd"] == 5          # cuenta gratis: comprar Starter = cambiar a 19
-    assert cfg["ritmo_diario_usd"] == 0.63       # 19/30, ritmo de Starter
+    assert 0 < cfg["ritmo_diario_usd"] <= cfg["tope_mensual_usd"] <= 100
 
 
 def test_al_ritmo_de_starter_los_5_se_gastan_en_8_dias_y_nunca_se_pasa_del_tope():
@@ -83,14 +82,36 @@ def test_credito_agotado_detiene_la_fuente_el_resto_del_mes(error):
                                           control_gasto=control)
     assert crudas == [] and cliente.posts == 1                  # no insiste con las demás búsquedas
     assert stats["credito_agotado"] and "error" not in stats    # aviso, no error de la fuente
-    assert estado["bloqueado"] is True
+    assert estado["bloqueado_tope"] == 5
     # La siguiente corrida (mismo mes, mismo estado guardado) ni siquiera llama a Apify.
     otra = ClienteSinCredito(error)
     _, stats2 = linkedin_apify.buscar(otra, ACTOR, COMBOS, {}, _dia(11), token="token-ficticio",
                                       control_gasto=apify.Presupuesto(estado, _dia(11), diario=0.63))
     assert otra.posts == 0 and stats2["credito_agotado"]
+    # Si se compra Starter a mitad de mes (tope 19), vuelve a reservar sin borrar nada.
+    assert apify.Presupuesto(estado, _dia(12), mensual=19, diario=0.63).reservar(0.025) == 0.025
     # El mes siguiente vuelve a reservar.
     assert apify.Presupuesto(estado, "2027-01-01", diario=0.63).reservar(0.025) == 0.025
+
+
+def test_limit_reached_no_bloquea_el_mes():
+    # Es un tipo genérico de Apify (también para límites pasajeros): no se toma como crédito agotado.
+    estado = {}
+    cliente = ClienteSinCredito({"http": 403, "tipo": "limit-reached", "mensaje": ""})
+    _, stats = linkedin_apify.buscar(cliente, ACTOR, COMBOS[:1], {}, _dia(10), token="t",
+                                     control_gasto=apify.Presupuesto(estado, _dia(10)))
+    assert not stats.get("credito_agotado") and "bloqueado_tope" not in estado
+
+
+def test_si_no_se_puede_anotar_el_bloqueo_se_avisa_y_la_fuente_igual_se_detiene(capsys):
+    class ControlQueFalla(apify.Presupuesto):
+        def marcar_agotado(self):
+            raise RuntimeError("Supabase no respondió")
+    cliente = ClienteSinCredito({"http": 402})
+    crudas, stats = linkedin_apify.buscar(cliente, ACTOR, COMBOS, {}, _dia(10), token="t",
+                                          control_gasto=ControlQueFalla({}, _dia(10)))
+    assert crudas == [] and cliente.posts == 1 and stats["credito_agotado"] and "error" not in stats
+    assert "[aviso] apify:bloqueo" in capsys.readouterr().err
 
 
 def test_la_clave_rechazada_sigue_siendo_un_error_y_no_un_bloqueo():
@@ -106,7 +127,15 @@ def test_posts_sin_credito_tambien_bloquean():
     control = apify.Presupuesto(estado, _dia(10), diario=0.63)
     _, _, stats = publicaciones_apify.buscar_posts(ClienteSinCredito({"http": 402}), "harvestapi/linkedin-post-search",
                                                    ["qa"], {"qa"}, _dia(10), token="t", control_gasto=control)
-    assert stats["credito_agotado"] and estado["bloqueado"] and "error" not in stats
+    assert stats["credito_agotado"] and estado["bloqueado_tope"] == 5 and "error" not in stats
+
+
+def test_publicaciones_del_dia_sin_credito_tambien_bloquean():
+    estado = {}
+    _, stats = publicaciones_apify.buscar(ClienteSinCredito({"http": 402}), "harvestapi/linkedin-post-search", ["qa"],
+                                          {"qa"}, _dia(10), token="t",
+                                          control_gasto=apify.Presupuesto(estado, _dia(10), diario=0.63))
+    assert stats["credito_agotado"] and estado["bloqueado_tope"] == 5 and "error" not in stats
 
 
 def test_credito_agotado_no_es_averia():
@@ -121,7 +150,7 @@ def test_la_bodega_avisa_del_credito_agotado_y_del_80_por_ciento(tmp_path, capsy
     trabajo = tmp_path / "trabajo"
     trabajo.mkdir()
     (trabajo / "apify_presupuesto.json").write_text(json.dumps(
-        {"mes": hoy()[:7], "reservas": {hoy(): 4.1}, "bloqueado": True}), encoding="utf-8")
+        {"mes": hoy()[:7], "reservas": {hoy(): 4.1}, "bloqueado_tope": 5}), encoding="utf-8")
     salud = {"LinkedIn (Apify) rescate": {"avisos": 3, "usd_reservado": 0.4, "usd_reportado": 0.12}}
     medido = bodega._medir_apify(trabajo, hoy(), salud, {"tope_mensual_usd": 5, "ritmo_diario_usd": 0.63})
     err = capsys.readouterr().err
@@ -132,7 +161,8 @@ def test_la_bodega_avisa_del_credito_agotado_y_del_80_por_ciento(tmp_path, capsy
 def test_aviso_del_80_por_ciento():
     assert medicion_apify.avisos_de_gasto({"reservas": {"a": 3.9}}, 5) == []
     assert "80 %" in medicion_apify.avisos_de_gasto({"reservas": {"a": 2.0, "b": 2.1}}, 5)[0]
-    assert "sin crédito" in medicion_apify.avisos_de_gasto({"reservas": {}, "bloqueado": True}, 5)[0]
+    assert "sin crédito" in medicion_apify.avisos_de_gasto({"reservas": {}, "bloqueado_tope": 5}, 5)[0]
+    assert medicion_apify.avisos_de_gasto({"reservas": {}, "bloqueado_tope": 5}, 19) == []  # se compró Starter
 
 
 # ── Presupuesto central (Supabase, SQL 023) ────────────────────────────────────────────────────────────────────────
@@ -161,8 +191,8 @@ def _central(monkeypatch, respuestas):
 
 
 def test_central_reserva_con_ritmo_y_marca_el_mes_agotado(monkeypatch):
-    siguiente = {"mes": hoy()[:7], "reservas": {hoy(): 0.025}, "bloqueado": False}
-    bloqueado = dict(siguiente, bloqueado=True)
+    siguiente = {"mes": hoy()[:7], "reservas": {hoy(): 0.025}, "bloqueado_tope": None}
+    bloqueado = dict(siguiente, bloqueado_tope=5.0)
     c, sesion, espejo = _central(monkeypatch, [{"monto_micro": 25000, "estado": siguiente}, bloqueado])
     control = c.control_apify(hoy(), 5, 3, 0.63)
     assert control.reservar(0.025) == 0.025
@@ -170,18 +200,18 @@ def test_central_reserva_con_ritmo_y_marca_el_mes_agotado(monkeypatch):
     assert url.endswith("/rpc/apify_reservar_ritmo")
     assert op["json"]["p_diario"] == 630000 and op["json"]["p_mensual"] == 5000000
     control.marcar_agotado()
-    assert sesion.llamadas[-1][0].endswith("/rpc/apify_marcar_agotado") and espejo[-1]["bloqueado"] is True
+    url, op = sesion.llamadas[-1]
+    assert url.endswith("/rpc/apify_marcar_agotado") and op["json"]["p_mensual"] == 5000000
+    assert espejo[-1]["bloqueado_tope"] == 5.0
     n = len(sesion.llamadas)
     assert control.reservar(0.025) == 0 and len(sesion.llamadas) == n  # bloqueado: ni se pide
 
 
-def test_la_migracion_023_no_toca_la_003_y_es_privada():
+def test_la_migracion_023_no_redefine_la_reserva_de_la_003():
+    # El comportamiento de la 023 se prueba en PostgreSQL real (pruebas/probar_concurrencia_estado.py, job `sql`).
     from pathlib import Path
-    raiz = Path(__file__).resolve().parents[2]
-    sql = (raiz / "supabase/migraciones/023_apify_ritmo.sql").read_text(encoding="utf-8")
-    assert "public.apify_reservar(" not in sql            # la función vieja queda como estaba
-    assert "enable row level security" in sql and "from public, anon, authenticated, service_role" in sql
-    assert "p_mensual not between 0 and 100000000" in sql  # Starter: hasta USD 100
+    sql = (Path(__file__).resolve().parents[2] / "supabase/migraciones/023_apify_ritmo.sql").read_text(encoding="utf-8")
+    assert "public.apify_reservar(" not in sql
 
 
 # ── Prioridad: primero quien está bajo 5 sin fuente local ─────────────────────────────────────────────────────────
@@ -202,9 +232,19 @@ def test_rescate_va_primero_a_quien_no_tiene_fuente_local():
                                           lambda a, b: a + b, max_busquedas=16)
     lugares = [c[2] for c in llamadas[0]]
     assert stats["perfiles_sin_fuente_local"] == 1
-    primero_co = next(i for i, x in enumerate(lugares) if "CO" in x)
-    assert any("KE" in x for x in lugares[:primero_co])     # Kenia antes que Colombia…
-    assert primero_co < len(lugares)                         # …y Colombia (con déficit) sigue después
+    kenia = [i for i, x in enumerate(lugares) if "KE" in x]
+    colombia = [i for i, x in enumerate(lugares) if "CO" in x]
+    assert kenia and colombia and max(kenia) < min(colombia)  # Kenia primero; Colombia (con déficit) después
+
+
+def test_posts_van_primero_al_cargo_de_quien_no_tiene_fuente_local():
+    cfg = configuracion_demo()   # perfiles 0–2: Product Designer (Colombia/España); 3: Frontend; 4: QA
+    cfg["perfiles"][3].update(vive_en="KE")
+    vistas = []
+    with ejecutor.activar({"configuracion": cfg}, hoy()):
+        refuerzo.rescate_posts([], {}, hoy(), entrega.config(), familias.mapa(),
+                               lambda c, v, e=None: vistas.append(c) or ([], [], {}), lambda a, b: a + b)
+    assert "Frontend" in vistas[0][0]  # sin el cambio iba primero Product Designer (más déficit sumado)
 
 
 # ── Medición agregada, sin datos personales ────────────────────────────────────────────────────────────────────────

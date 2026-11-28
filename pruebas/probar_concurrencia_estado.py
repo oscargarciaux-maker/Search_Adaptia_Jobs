@@ -97,10 +97,12 @@ def main():
         assert reservar_ritmo(mensual=19_000_000) == 25_000  # Starter: tope 19 admitido (la 003 solo admite 5)
         assert reservar_ritmo(mensual=5_000_000, diario=6_000_000, permitir_error=True).returncode != 0
         assert reservar_ritmo(mensual=200_000_000, permitir_error=True).returncode != 0
-        estado = json.loads(sql(f"set role service_role; select public.apify_marcar_agotado('{fecha}');").stdout.strip().splitlines()[-1])
-        assert estado["bloqueado"] is True and reservar_ritmo() == 0
-        assert json.loads(sql("select public.apify_estado();").stdout.strip())["bloqueado"] is True
-        assert sql(f"set role anon; select public.apify_marcar_agotado('{fecha}');", True).returncode != 0
+        assert reservar_ritmo(mensual=2_000_000, diario=630_000) == 25_000  # tope por corrida (3) mayor que el del mes
+        estado = json.loads(sql(f"set role service_role; select public.apify_marcar_agotado('{fecha}',5000000);").stdout.strip().splitlines()[-1])
+        assert estado["bloqueado_tope"] == 5 and reservar_ritmo() == 0 and reservar_ritmo(mensual=2_000_000) == 0
+        assert json.loads(sql("select public.apify_estado();").stdout.strip())["bloqueado_tope"] == 5
+        assert reservar_ritmo(mensual=19_000_000) == 25_000  # se compró Starter: se vuelve a reservar sin borrar nada
+        assert sql(f"set role anon; select public.apify_marcar_agotado('{fecha}',5000000);", True).returncode != 0
         assert sql("set role anon; select count(*) from public.apify_bloqueos;", True).returncode != 0
         sql("delete from public.apify_bloqueos; delete from public.apify_reservas;")
         print("SQL 023 aprobada: ritmo diario, tope del mes, tope de Starter, bloqueo por crédito y permisos.")

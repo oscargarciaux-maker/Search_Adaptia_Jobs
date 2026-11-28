@@ -2,13 +2,13 @@
 from copy import deepcopy
 from decimal import Decimal, ROUND_DOWN
 import json
-import threading
 import time
 from uuid import uuid4
 
 import requests
 
 from buscador import supabase, tiempos
+from buscador.apify import Control
 
 
 INACTIVIDAD = 120  # segundos sin usar la conexión con Supabase tras los que se abre una nueva (contrato v51)
@@ -191,23 +191,16 @@ class Cola:
                 self.valores.pop(k, None)
 
 
-class PresupuestoCentral:
+class PresupuestoCentral(Control):
     """8.2: reserva con `apify_reservar_ritmo` (SQL 023): ritmo diario propio y tope del mes de hasta USD 100."""
 
     def __init__(self, central, hoy, mensual, corrida, diario=None):
-        from buscador.apify import ritmo
-        self.central, self.hoy = central, hoy
-        self.mensual, self.corrida = float(mensual), float(corrida)
-        self.diario = ritmo(self.mensual, diario, hoy)
-        self.reservado = 0.0
-        self.lock = threading.Lock()
+        super().__init__(hoy, mensual, corrida, diario)
+        self.central = central
 
     @property
-    def bloqueado(self):
-        return bool((self.central.presupuesto or {}).get("bloqueado"))
-
-    def usado_mes(self):
-        return round(sum((self.central.presupuesto or {}).get("reservas", {}).values()), 6)
+    def estado(self):
+        return self.central.presupuesto or {}
 
     def _estado(self, estado):
         self.central._validar_presupuesto(estado)
@@ -216,7 +209,7 @@ class PresupuestoCentral:
 
     def marcar_agotado(self):
         with self.lock:
-            self._estado(self.central.rpc("apify_marcar_agotado", {"p_fecha": self.hoy}))
+            self._estado(self.central.rpc("apify_marcar_agotado", {"p_fecha": self.hoy, "p_mensual": micro(self.mensual)}))
 
     def reservar(self, monto):
         with self.lock:

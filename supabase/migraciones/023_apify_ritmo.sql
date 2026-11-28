@@ -5,12 +5,15 @@
 --    un tope del mes de hasta USD 100 (el máximo que Apify deja fijar en Starter). Nunca se pasa del tope del mes, ni
 --    del ritmo del día, ni del tope por corrida, aunque haya reintentos (misma solicitud = misma reserva).
 -- 2. `apify_bloqueos` + `apify_marcar_agotado`: cuando Apify dice que se acabó el crédito del plan, el mes queda
---    bloqueado y ninguna corrida vuelve a reservar hasta el mes siguiente (aviso, no avería).
--- 3. `apify_estado` devuelve además `bloqueado` (true/false) para el espejo local trabajo/apify_presupuesto.json.
+--    bloqueado CON EL TOPE QUE HABÍA (`tope_micro`) y ninguna corrida vuelve a reservar con ese tope o uno menor hasta
+--    el mes siguiente (aviso, no avería). Si se compra un plan mayor y se sube el tope, se vuelve a reservar sin borrar
+--    nada.
+-- 3. `apify_estado` devuelve además `bloqueado_tope` (USD, o null) para el espejo local trabajo/apify_presupuesto.json.
 -- `apify_reservar` (003) sigue existiendo para una corrida con el código anterior.
 begin;
 create table if not exists public.apify_bloqueos (
   mes text primary key check (mes ~ '^\d{4}-\d{2}$'),
+  tope_micro bigint not null check (tope_micro >= 0),
   creado_en timestamptz not null default now()
 );
 alter table public.apify_bloqueos enable row level security;
@@ -24,8 +27,8 @@ language sql stable security definer set search_path = '' as $$
       (select fecha,sum(micro_usd) as total from public.apify_reservas
        where date_trunc('month',fecha::timestamp)=date_trunc('month',now() at time zone 'America/Bogota')
        group by fecha) s),'{}'::jsonb),
-    'bloqueado', exists(select 1 from public.apify_bloqueos
-       where mes=to_char((now() at time zone 'America/Bogota')::date,'YYYY-MM')));
+    'bloqueado_tope', (select b.tope_micro/1000000.0 from public.apify_bloqueos b
+       where b.mes=to_char((now() at time zone 'America/Bogota')::date,'YYYY-MM')));
 $$;
 
 create or replace function public.apify_reservar_ritmo(p_solicitud uuid,p_ejecucion uuid,p_fecha date,
@@ -38,13 +41,13 @@ begin
   if p_solicitud is null or p_ejecucion is null or p_fecha is distinct from (now() at time zone 'America/Bogota')::date
      or p_mensual is null or p_diario is null or p_corrida is null or p_monto is null
      or p_mensual not between 0 and 100000000 or p_diario not between 0 and p_mensual
-     or p_corrida not between 0 and p_mensual or p_monto<0 then
+     or p_corrida not between 0 and 100000000 or p_monto<0 then
     raise exception 'Fecha o límites de presupuesto inválidos'; end if;
   v_mes := to_char(p_fecha,'YYYY-MM');
   perform pg_advisory_xact_lock(hashtextextended('adaptia.apify.'||v_mes,0));
   if exists(select 1 from public.apify_reservas where solicitud=p_solicitud::text) then
     return jsonb_build_object('monto_micro',0,'repetida',true,'estado',public.apify_estado()); end if;
-  if exists(select 1 from public.apify_bloqueos b where b.mes=v_mes) then
+  if exists(select 1 from public.apify_bloqueos b where b.mes=v_mes and p_mensual<=b.tope_micro) then
     return jsonb_build_object('monto_micro',0,'repetida',false,'estado',public.apify_estado()); end if;
   select coalesce(sum(micro_usd),0),coalesce(sum(micro_usd) filter(where fecha=p_fecha),0),
     coalesce(sum(micro_usd) filter(where ejecucion=p_ejecucion),0)
@@ -59,19 +62,22 @@ begin
 end;
 $$;
 
-create or replace function public.apify_marcar_agotado(p_fecha date) returns jsonb
+create or replace function public.apify_marcar_agotado(p_fecha date,p_mensual bigint) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 begin
-  if p_fecha is distinct from (now() at time zone 'America/Bogota')::date then
-    raise exception 'Fecha inválida'; end if;
-  insert into public.apify_bloqueos(mes) values(to_char(p_fecha,'YYYY-MM')) on conflict do nothing;
+  if p_fecha is distinct from (now() at time zone 'America/Bogota')::date
+     or p_mensual is null or p_mensual not between 0 and 100000000 then
+    raise exception 'Fecha o tope inválidos'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('adaptia.apify.'||to_char(p_fecha,'YYYY-MM'),0));
+  insert into public.apify_bloqueos(mes,tope_micro) values(to_char(p_fecha,'YYYY-MM'),p_mensual)
+    on conflict(mes) do update set tope_micro=greatest(public.apify_bloqueos.tope_micro,excluded.tope_micro);
   return public.apify_estado();
 end;
 $$;
 
 revoke all on function public.apify_reservar_ritmo(uuid,uuid,date,bigint,bigint,bigint,bigint),
- public.apify_marcar_agotado(date) from public,anon,authenticated;
+ public.apify_marcar_agotado(date,bigint) from public,anon,authenticated;
 grant execute on function public.apify_reservar_ritmo(uuid,uuid,date,bigint,bigint,bigint,bigint),
- public.apify_marcar_agotado(date) to service_role;
+ public.apify_marcar_agotado(date,bigint) to service_role;
 notify pgrst,'reload schema';
 commit;

@@ -303,8 +303,9 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
   que viven (o aceptan oficina) en un país sin fuente local** (la regla de la 8.1; Indeed cuenta como local), después
   el resto con déficit, el de más déficit primero; con quien solo habla español, primero en español (v11, v44). Una
   clave rechazada detiene la fuente y avisa. **Si Apify dice que el plan no tiene crédito** (HTTP 402 o sus tipos de
-  error de uso agotado) es un **aviso, no una avería**: el mes queda bloqueado y la fuente no vuelve a reservar hasta
-  el mes siguiente. Otro aviso cuando lo reservado del mes pasa del **80 %** del tope. El feed pagado de posts sigue
+  error de uso agotado; no `limit-reached`, que es genérico) es un **aviso, no una avería**: el mes queda bloqueado con
+  el tope que había y la fuente no vuelve a reservar hasta el mes siguiente, salvo que se suba el tope (se compró un
+  plan mayor). El ciclo de crédito de Apify va por fecha de facturación, no por mes calendario. Otro aviso cuando lo reservado del mes pasa del **80 %** del tope. El feed pagado de posts sigue
   desactivado (`publicaciones_por_dia=0`).
 - **Medición de Apify** (8.2): por corrida (`apify` en el reporte) y acumulada en el mes (`trabajo/apify_medicion.json`),
   solo cifras: USD reservados y reportados por Apify, avisos traídos, vacantes de la selección que **solo** trajo

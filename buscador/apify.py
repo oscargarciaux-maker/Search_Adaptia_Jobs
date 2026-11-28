@@ -9,10 +9,12 @@ API = "https://api.apify.com/v2"
 
 
 # 8.2 (28 nov): tipos de error con que la API de Apify rechaza iniciar una ejecución porque el plan no tiene crédito
-# (enumerados en https://docs.apify.com/api/v2/actors-runs-post). En la cuenta gratis Apify BLOQUEA hasta el ciclo
-# siguiente; también cuenta un HTTP 402. No es una avería: se avisa y la fuente queda detenida el resto del mes.
-ERRORES_CREDITO = ("not-enough-usage-to-run-paid-actor", "limit-reached", "monthly-usage-limit-too-low",
+# (enumerados en https://docs.apify.com/api/v2/actors-runs-post), además de un HTTP 402. En la cuenta gratis Apify
+# BLOQUEA hasta el ciclo siguiente. No es una avería: se avisa y la fuente queda detenida el resto del mes. No se
+# incluye «limit-reached»: es genérico (otros límites pasajeros) y bloquearía el mes por un fallo que no es de crédito.
+ERRORES_CREDITO = ("not-enough-usage-to-run-paid-actor", "monthly-usage-limit-too-low",
                    "monthly-usage-hard-limit-exceeded", "x402-payment-required")
+AVISO_SIN_CREDITO = "Apify sin crédito en el plan: la fuente se detiene hasta el mes siguiente"
 AVISO_GASTO = 0.8  # aviso cuando lo reservado en el mes pasa del 80 % del tope
 
 
@@ -30,28 +32,59 @@ def ritmo(mensual, diario, hoy):
     return min(float(diario), float(mensual))
 
 
-class Presupuesto:
-    def __init__(self, estado, hoy, mensual=5, corrida=3, guardar=None, diario=None):
-        self.estado, self.hoy, self.guardar = estado, hoy, guardar
+def bloqueado(estado, mensual):
+    """El mes está bloqueado si Apify dijo «sin crédito» con este tope o uno mayor. Al comprar un plan mayor (subir
+    `tope_mensual_usd`) se vuelve a reservar sin borrar nada (8.2)."""
+    tope = (estado or {}).get("bloqueado_tope")
+    return tope is not None and float(mensual) <= float(tope) + 1e-9
+
+
+def gasto(ejecuciones):
+    """8.2: lo reservado por estas ejecuciones y lo que Apify informó que costaron (`usageTotalUsd`), en USD."""
+    return {"usd_reservado": round(sum(e.get("tope_reservado_usd") or 0 for e in ejecuciones), 6),
+            "usd_reportado": round(sum(e.get("costo_uso_reportado_usd") or 0 for e in ejecuciones), 6)}
+
+
+def detener_por_credito(control):
+    """Apify dijo que el plan no tiene crédito: el mes queda bloqueado para las corridas siguientes. Si no se puede
+    anotar (p. ej. Supabase no responde), se avisa y la fuente se detiene igual en esta corrida; no gasta de más,
+    porque Apify sigue rechazando y la reserva ya quedó contada."""
+    try:
+        control.marcar_agotado()
+    except Exception as e:  # noqa: BLE001 — anotar el bloqueo es una ayuda; nunca tumba la corrida
+        from buscador import registro
+        registro.aviso("apify:bloqueo", e)
+    return {"credito_agotado": True, "aviso": AVISO_SIN_CREDITO}
+
+
+class Control:
+    """Lo común del presupuesto local y del central: topes, ritmo y bloqueo. `estado` = {mes, reservas,
+    bloqueado_tope}."""
+
+    def __init__(self, hoy, mensual=5, corrida=3, diario=None):
+        self.hoy = hoy
         self.mensual, self.corrida = float(mensual), float(corrida)
         self.diario = ritmo(self.mensual, diario, hoy)
         self.reservado = 0.0
         self.lock = threading.Lock()
+
+    @property
+    def bloqueado(self):
+        return bloqueado(self.estado, self.mensual)
+
+
+class Presupuesto(Control):
+    def __init__(self, estado, hoy, mensual=5, corrida=3, guardar=None, diario=None):
+        super().__init__(hoy, mensual, corrida, diario)
+        self.estado, self.guardar = estado, guardar
         if estado.get("mes") != hoy[:7]:
             estado.clear()  # mes nuevo: reservas y bloqueo empiezan de cero
             estado.update(mes=hoy[:7], reservas={})
 
-    @property
-    def bloqueado(self):
-        return bool(self.estado.get("bloqueado"))
-
-    def usado_mes(self):
-        return round(sum(self.estado.get("reservas", {}).values()), 6)
-
     def marcar_agotado(self):
-        """Apify dijo que el plan no tiene crédito: nada más se reserva este mes (también en las corridas siguientes)."""
+        """Nada más se reserva este mes con este tope (también en las corridas siguientes)."""
         with self.lock:
-            self.estado["bloqueado"] = True
+            self.estado["bloqueado_tope"] = max(self.mensual, float(self.estado.get("bloqueado_tope") or 0))
             if self.guardar:
                 self.guardar(self.estado)
 
@@ -88,8 +121,7 @@ def ejecutar(cliente, actor, entrada, token, max_usd, max_items=20, build=None, 
         if detalle:
             stats["detalle"] = {k: v.replace(token, "[oculto]") if isinstance(v, str) else v for k, v in detalle.items()}
         if credito_agotado(detalle):
-            return [], dict(stats, credito_agotado=True,
-                            aviso="Apify no tiene crédito en el plan: la fuente se detiene hasta el mes siguiente")
+            return [], dict(stats, credito_agotado=True, aviso=AVISO_SIN_CREDITO)
         if (detalle or {}).get("http") in (401, 403):
             # Clave revocada o rotada (p. ej. incidente de seguridad de Apify, nov 2026): no insistir y avisar.
             return [], dict(stats, clave_invalida=True,

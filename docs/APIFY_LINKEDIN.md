@@ -28,8 +28,11 @@ las reservas de este programa son límites conservadores, no facturas ni estimac
 
 **Prueba de viabilidad (sección 8.2, 28 nov).** Antes de comprar Starter se gastan los USD 5 gratis al ritmo de Starter
 (`ritmo_diario_usd: 0.63` = 19/30): se agotan en unos 8 días. Comprar Starter = cambiar `tope_mensual_usd` a 19 (y en
-Apify fijar el límite de uso del plan). Si Apify dice que el plan no tiene crédito, el mes queda bloqueado (tabla
-`apify_bloqueos`, SQL 023) y la fuente no vuelve a reservar hasta el mes siguiente: es un aviso, no una avería. Cómo leer
+Apify fijar el límite de uso del plan). Si Apify dice que el plan no tiene crédito, el mes queda bloqueado con el tope
+que había (tabla `apify_bloqueos`, SQL 023) y la fuente no vuelve a reservar hasta el mes siguiente: es un aviso, no una
+avería. Si se compra Starter a mitad de mes, al subir el tope a 19 vuelve a reservar sin borrar nada. El ciclo de
+crédito de Apify va por fecha de facturación: si no coincide con el día 1, puede haber unos días bloqueados de más (o un
+aviso más de crédito agotado), nunca gasto de más. Cómo leer
 la medición: `trabajo/apify_medicion.json` en la rama `publicado` (por día y acumulado) y la línea «Apify en el mes…» del
 registro de cada Bodega. Regla para decidir: comprar Starter si los USD 5 llevaron a 5 a perfiles que si no se quedaban
 cortos (`perfiles_a_5`), a un costo por vacante útil (`usd_por_vacante_util`) que Oscar acepte.

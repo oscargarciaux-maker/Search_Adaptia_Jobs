@@ -12,6 +12,8 @@ CAMPOS_PUBLICOS = ["id", "titulo", "empresa", "ubicacion", "familias", "paises",
                    "paises_mundo", "alcance_mundial", "zona_utc"]
 
 
+FUENTE_POST = "LinkedIn (post)"  # contrato v11: los posts de LinkedIn (solo los trae Apify)
+
 def huella(empresa, titulo, enlace=""):
     from buscador.contrato import url_limpia
     clave = normalizar.empresa(empresa) + "|" + (url_limpia(enlace) if enlace else normalizar.texto(titulo))
@@ -97,7 +99,7 @@ def crear_post(titulo, empresa, enlace, ubicacion="", texto="", fecha="", remoto
         "nivel": normalizar.nivel(titulo), "anos_min": etiquetas.anos_min(texto), "salario": etiquetas.salario(texto),
         "herramientas": [], "fecha_publicacion": (fecha or "")[:10], "fecha_estimada": not fecha,
         "publicada_en": tiempos.instante(fecha), "detectada_en": capturada, "vista_en": capturada,
-        "visto_primera_vez": hoy, "visto_ultima_vez": hoy, "fuente": "LinkedIn (post)", "fuentes": ["LinkedIn (post)"],
+        "visto_primera_vez": hoy, "visto_ultima_vez": hoy, "fuente": FUENTE_POST, "fuentes": [FUENTE_POST],
         "enlace": principal, "enlace_directo": "", "tipo_enlace": "post",
         "resumen": " ".join(texto.split())[:300], "_descripcion": texto[:15000],
         # Apify acaba de leer el post completo: esa lectura es la comprobación de que existe (contrato v11).

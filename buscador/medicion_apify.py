@@ -17,11 +17,16 @@ y los registros de Actions solo muestran estos totales.
 import json
 from pathlib import Path
 
+from buscador import vacante
+from buscador.fuentes import linkedin_apify, publicaciones_apify
+
 ARCHIVO = "apify_medicion.json"
-# Fuentes de la salud de la corrida que gastan crédito de Apify.
-SALUD_APIFY = ("LinkedIn (Apify)", "Publicaciones LinkedIn (Apify)", "LinkedIn (Apify) rescate", "LinkedIn (Apify) posts")
+# Claves de la salud de la corrida que gastan crédito de Apify (las mismas que usa `bodega.correr`).
+SALUD_FUENTE, SALUD_PUBLICACIONES = linkedin_apify.NOMBRE, "Publicaciones LinkedIn (Apify)"
+SALUD_RESCATE, SALUD_POSTS = linkedin_apify.NOMBRE + " rescate", linkedin_apify.NOMBRE + " posts"
+SALUD_APIFY = (SALUD_FUENTE, SALUD_PUBLICACIONES, SALUD_RESCATE, SALUD_POSTS)
 # Una vacante cuenta como «de Apify» si todas sus fuentes son de Apify (formales, ofertas desde el feed o posts).
-FUENTES_APIFY = {"LinkedIn (Apify)", "LinkedIn (oferta desde feed)", "LinkedIn (publicación)", "LinkedIn (post)"}
+FUENTES_APIFY = {linkedin_apify.NOMBRE, publicaciones_apify.NOMBRE, publicaciones_apify.NOMBRE_FEED, vacante.FUENTE_POST}
 DE_CORRIDA = ("usd_reservado", "usd_reportado", "avisos", "corridas")
 DE_ASIGNACION = ("seleccion", "utiles", "perfiles_a_5")
 
@@ -39,7 +44,7 @@ def de_corrida(salud):
         s = (salud or {}).get(nombre) or {}
         total["usd_reservado"] += float(s.get("usd_reservado") or 0)
         total["usd_reportado"] += float(s.get("usd_reportado") or 0)
-        total["avisos"] += int(s.get("avisos") or 0) + int(s.get("fichas_formales") or 0) + int(s.get("posts") or 0)
+        total["avisos"] += sum(int(s.get(k) or 0) for k in ("avisos", "vacantes", "fichas_formales", "posts"))
         agotado = agotado or bool(s.get("credito_agotado"))
     total["usd_reservado"] = round(total["usd_reservado"], 6)
     total["usd_reportado"] = round(total["usd_reportado"], 6)
@@ -94,38 +99,35 @@ def del_mes(datos):
     return total
 
 
-def contar_asignacion(filas, snapshot_de, perfiles, de_comunidad, minimo, ya_hoy=None, vacante_de=None):
-    """Conteos agregados de una pasada de `panel.ejecutor.registrar`. `filas`: asignaciones de esta pasada;
-    `snapshot_de`: {vacante_id: vacante} de la selección del día; `perfiles`: los activos; `ya_hoy`: {perfil_id: [ids]}
-    de pasadas anteriores de hoy; `vacante_de(id)`: la vacante de la bodega, para saber de qué fuente es."""
-    vacante_de = vacante_de or snapshot_de.get
-    # Los posts de LinkedIn los trae solo Apify; su fila lo dice en la explicación y no están en la bodega.
-    es_apify = {f["vacante_id"]: True for f in filas
-                if any(isinstance(e, dict) and e.get("tipo") == "post" for e in f.get("explicacion") or [])}
-
-    def apify(vid):
-        if vid not in es_apify:
-            es_apify[vid] = solo_apify(snapshot_de.get(vid) or vacante_de(vid))
-        return es_apify[vid]
-
+def contar_asignacion(filas, seleccion, perfiles, de_comunidad, minimo, ya_hoy=None, en_bodega=None):
+    """Conteos agregados de una pasada de `panel.ejecutor.registrar`.
+    `filas`: asignaciones de esta pasada · `seleccion`: {vacante_id: vacante} de la selección del día · `perfiles`: los
+    activos · `ya_hoy`: {perfil_id: [vacante_id]} de pasadas anteriores de hoy · `en_bodega(id)`: la vacante de la
+    bodega (para saber la fuente de las que no están en la selección, como las reutilizadas o rescatadas).
+    Límite: un post asignado en una pasada anterior no está en la selección ni en la bodega y no cuenta como de Apify."""
+    en_bodega = en_bodega or (lambda _: None)
     por_perfil = {}
     for f in filas:
         por_perfil.setdefault(f["perfil_id"], set()).add(f["vacante_id"])
     for pid, ids in (ya_hoy or {}).items():
         por_perfil.setdefault(str(pid), set()).update(ids)
+    # Las de Apify: las que solo trajo Apify (selección o bodega) y los posts (su fila dice «tipo: post»).
+    todas = {vid for ids in por_perfil.values() for vid in ids} | set(seleccion)
+    de_apify = {vid for vid in todas if solo_apify(seleccion.get(vid) or en_bodega(vid))}
+    de_apify |= {f["vacante_id"] for f in filas
+                 if any(isinstance(e, dict) and e.get("tipo") == "post" for e in f.get("explicacion") or [])}
     reales = {str(p.id) for p in perfiles if not de_comunidad(p)}
-    utiles = {vid for pid, ids in por_perfil.items() if pid in reales for vid in ids if apify(vid)}
-    a_5 = sum(1 for pid, ids in por_perfil.items() if pid in reales and len(ids) >= minimo
-              and len([v for v in ids if not apify(v)]) < minimo)
-    return {"seleccion": sum(1 for vid in snapshot_de if apify(vid)), "utiles": len(utiles), "perfiles_a_5": a_5}
+    de_clientes = {pid: ids for pid, ids in por_perfil.items() if pid in reales}
+    # «Gracias a Apify»: llega al mínimo, pero sin las vacantes de Apify se quedaría corto.
+    a_5 = sum(1 for ids in de_clientes.values() if len(ids) >= minimo and len(ids - de_apify) < minimo)
+    return {"seleccion": len(set(seleccion) & de_apify),
+            "utiles": len({vid for ids in de_clientes.values() for vid in ids} & de_apify), "perfiles_a_5": a_5}
 
 
 def avisos_de_gasto(presupuesto, tope_mensual):
     """Avisos (no averías): el crédito se acabó o lo reservado del mes pasó del 80 % del tope."""
-    from buscador.apify import AVISO_GASTO
-    salida = []
-    if (presupuesto or {}).get("bloqueado"):
-        salida.append("Apify sin crédito en el plan: la fuente queda detenida hasta el mes siguiente")
+    from buscador.apify import AVISO_GASTO, AVISO_SIN_CREDITO, bloqueado
+    salida = [AVISO_SIN_CREDITO] if bloqueado(presupuesto, tope_mensual) else []
     usado = round(sum(((presupuesto or {}).get("reservas") or {}).values()), 6)
     if tope_mensual and usado > AVISO_GASTO * float(tope_mensual):
         salida.append(f"Apify: lo reservado este mes (USD {usado:.2f}) pasa del {AVISO_GASTO * 100:.0f} % del tope "

@@ -10,17 +10,11 @@ import time
 from urllib.parse import urlencode
 
 from buscador import cobertura, enlaces
-from buscador.apify import Presupuesto, ejecutar
+from buscador.apify import AVISO_SIN_CREDITO, Presupuesto, detener_por_credito, ejecutar, gasto
 from buscador.fuentes import linkedin_publico
 
 NOMBRE = "LinkedIn (Apify)"
 API = "https://api.apify.com/v2/acts/{actor}/run-sync-get-dataset-items"
-
-
-def gasto(ejecuciones):
-    """8.2: lo reservado por estas ejecuciones y lo que Apify informó que costaron (`usageTotalUsd`), en USD."""
-    return {"usd_reservado": round(sum(e.get("tope_reservado_usd") or 0 for e in ejecuciones), 6),
-            "usd_reportado": round(sum(e.get("costo_uso_reportado_usd") or 0 for e in ejecuciones), 6)}
 
 
 def url_busqueda(consultas, params, dias):
@@ -93,9 +87,8 @@ def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=20, pres
         return [], {"omitida": "sin APIFY_TOKEN o sin actor en datos/config.yaml"}
     inicio = reloj()
     control_gasto = control_gasto or Presupuesto({}, hoy)
-    if getattr(control_gasto, "bloqueado", False):
-        return [], {"busquedas": 0, "avisos": 0, "credito_agotado": True,
-                    "omitida": "Apify sin crédito en el plan este mes; vuelve el mes siguiente"}
+    if control_gasto.bloqueado:
+        return [], {"busquedas": 0, "avisos": 0, "credito_agotado": True, "omitida": AVISO_SIN_CREDITO}
     # `ordenar=False`: el rescate ya las trae en orden de urgencia (perfiles con más déficit primero).
     pendientes = (cobertura.repartir(combinaciones, estado, hoy, prioritarias) if ordenar else list(combinaciones))[:presupuesto]
     crudas, ejecuciones, descartes = [], [], {}
@@ -125,9 +118,7 @@ def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=20, pres
         if stats.get("clave_invalida"):
             break  # con la clave rechazada, ninguna otra búsqueda puede funcionar
         if stats.get("credito_agotado"):
-            # 8.2: el plan no tiene crédito. Aviso, no avería; nada más se reserva este mes.
-            if hasattr(control_gasto, "marcar_agotado"):
-                control_gasto.marcar_agotado()
+            detener_por_credito(control_gasto)  # 8.2: aviso, no avería; nada más se reserva este mes
             break
         if stats.get("error"):
             continue
@@ -155,8 +146,7 @@ def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=20, pres
                     "tope_mes_usd": control_gasto.mensual, "tope_diario_usd": round(control_gasto.diario, 6),
                     **gasto(ejecuciones)}
     if any(e.get("credito_agotado") for e in ejecuciones):
-        resumen["credito_agotado"] = True
-        resumen["aviso"] = "Apify sin crédito en el plan: la fuente se detiene hasta el mes siguiente"
+        resumen.update(credito_agotado=True, aviso=AVISO_SIN_CREDITO)
     if not ejecuciones:
         resumen["omitida"] = "presupuesto diario/mensual reservado o tiempo agotado"
     elif any(e.get("clave_invalida") for e in ejecuciones):
