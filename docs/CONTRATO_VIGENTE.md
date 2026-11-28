@@ -188,13 +188,23 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
 - **Cómo termina la búsqueda diaria: tres estados** (`buscador/validacion.py`, paso «Comprobar meta y
   sincronización» de `bodega.yml`) (v52):
   - **COMPLETA:** todo bien → corrida en verde y ping de éxito a Healthchecks.
-  - **CORTA:** meta del día incompleta o vacantes de la selección con el enlace sin comprobar (siguen sin compartirse
-    hasta comprobarlas) → corrida en verde con `::warning::` y resumen de qué faltó por cargo (sin datos de clientes);
-    ping de éxito. El déficit **no** hace fallar la corrida.
+  - **CORTA:** meta del día incompleta, vacantes de la selección con el enlace sin comprobar (siguen sin compartirse
+    hasta comprobarlas) o vacantes de la selección de hoy que ya no encajan en ningún perfil del cargo → corrida en
+    verde con `::warning::` y resumen de qué faltó (en lo público solo totales y número de cargos); ping de éxito. El
+    déficit **no** hace fallar la corrida.
+  - **Las que ya no encajan no se comparten** (7.G, decisión de Oscar 27 nov): es un cambio de datos (la vacante, el
+    cargo o el perfil editados después de elegirla), no una avería. El panel evalúa cada vacante de **hoy** con el
+    perfil y el cargo de la versión vigente de la búsqueda del día, además de la copia guardada al asignarla; si ya no
+    encaja, no va a la lista para compartir, ni al WhatsApp, ni a «Copiar», y el operador la ve como «Ya no encaja con
+    el cargo» con el motivo. No se borra: la asignación y el lote se conservan. Una aprobada a mano en «Por confirmar»
+    no se retira por el cargo; el cargo solo se vuelve a mirar si cambió lo que decide el título (nombre y términos);
+    una ampliada sigue si el perfil editado ya la acepta sin ampliar; un perfil o cargo que salió de la configuración
+    no se toca; los días anteriores no cambian. En el panel es el estado `no_encaja` de la vacante. El detalle privado
+    (`seleccion_actual`, campo `motivo_no_encaja`: `vacante` o `configuracion`) dice cuántas cambiaron por la vacante y
+    cuántas por editar el cargo o el perfil. Rige desde que una pasada o «Buscar ahora» toma la versión editada.
   - **AVERÍA:** sincronización con Supabase o catálogo sin confirmar, reconciliación sin confirmar (incluido el 57014),
-    selección no registrada, operaciones centrales pendientes, sin catálogo válido o vacantes de hoy que ya no encajan
-    en el perfil → corrida en rojo y aviso `/fail`. **Solo una avería hace fallar la corrida**; si hay avería y falta a
-    la vez, manda la avería.
+    selección no registrada, operaciones centrales pendientes o sin catálogo válido → corrida en rojo y aviso `/fail`.
+    **Solo una avería hace fallar la corrida**; si hay avería y falta a la vez, manda la avería.
   - La segunda pasada (8:30) y su respaldo completan la meta según `trabajo/metricas_entrega.json`
     (`arranque.falta_completar`), no según el color de la corrida; un día CORTO solo por enlaces sin comprobar (meta
     cumplida) no la pide. En el panel un día corto sigue como «parcial» y «Buscar ahora» ofrece completar (v52).

@@ -562,7 +562,9 @@ class RepositorioSupabase:
                 filas.extend(lote)
                 if len(lote) < 500:
                     break
-        return {"ejecucion": e, "filas": filas, "clientes": cfg["clientes"]}
+        # 7.G: el perfil y el cargo vigentes, para no compartir lo que ya no encaja tras editarlos (servicio.resultados).
+        return {"ejecucion": e, "filas": filas, "clientes": cfg["clientes"],
+                "perfiles": cfg.get("perfiles", []), "cargos": cfg.get("cargos", [])}
 
 
 # Contrato v29: secciones con viñetas para ver la ficha con su formato en la demostración.
