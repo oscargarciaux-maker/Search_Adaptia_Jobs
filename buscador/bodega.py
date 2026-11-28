@@ -17,7 +17,7 @@ from pathlib import Path
 
 import yaml
 
-from buscador import calidad, contrato, cobertura, enlaces, familias, medicion, normalizar, paises, tiempos, vacante
+from buscador import calidad, contrato, cobertura, enlaces, familias, medicion, medicion_apify, normalizar, paises, tiempos, vacante
 from buscador.fuentes import (ats, computrabajo, elempleo, getonbrd, infojobs, jobint, sitemaps_empleo, tecnoempleo, tableros_latam, indeed, linkedin_apify, linkedin_publico, open_seat,
                               publicaciones_apify, remotos)
 from buscador.http import Cliente
@@ -127,6 +127,20 @@ MOTIVO_FALTANTES = "búsqueda para quien falta: no hace falta releerla (contrato
 OMITIDAS_FALTANTES = {"Tableros remotos", "Portales de empresas"}
 
 
+def _topes_apify(cfg):
+    """(tope del mes, tope por corrida, ritmo diario) de `datos/config.yaml` (8.2)."""
+    a = cfg["apify"]
+    return a.get("tope_mensual_usd", 5), a.get("tope_por_corrida_usd", 3), a.get("ritmo_diario_usd")
+
+
+def _presupuesto_local(cfg, trabajo, hoy):
+    """Reservas de Apify en trabajo/apify_presupuesto.json, cuando no hay estado central en Supabase."""
+    from buscador.apify import Presupuesto
+    mensual, corrida, diario = _topes_apify(cfg)
+    return Presupuesto(_leer_json(trabajo / "apify_presupuesto.json", {}), hoy, mensual=mensual, corrida=corrida,
+                       diario=diario, guardar=lambda datos: _guardar_json(trabajo / "apify_presupuesto.json", datos))
+
+
 def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previas=None):
     """Corre las fuentes en paralelo (cada una con su cliente y su parte del estado). Devuelve
     (crudas, empresas para probar, enlaces de portales leídos, empresas cuyos portales se leyeron, salud)."""
@@ -137,11 +151,7 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
     from buscador import entrega
     cfg_entrega = entrega.config()
     prioritarias = {f for r in cfg_entrega["roles"] for f in r["familias"]}
-    from buscador.apify import Presupuesto
-    control_apify = control_apify or Presupuesto(
-        _leer_json(trabajo / "apify_presupuesto.json", {}), hoy,
-        mensual=cfg["apify"].get("tope_mensual_usd", 5), corrida=cfg["apify"].get("tope_por_corrida_usd", 3),
-        guardar=lambda datos: _guardar_json(trabajo / "apify_presupuesto.json", datos))
+    control_apify = control_apify or _presupuesto_local(cfg, trabajo, hoy)
     salud = {}
     # Contrato v47: «Buscar ahora» para quien falta. Sin los pasos fijos que no le sirven a esas personas: los portales
     # de empresas ya se leyeron hoy (cuentan 24 h, v42), y las listas de empresas, los tableros remotos y los sitemaps
@@ -339,7 +349,7 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
 
     fuentes = [("LinkedIn", f_linkedin), ("Indeed", f_indeed), ("LinkedIn (Apify)", f_apify),
                ("Tableros remotos", f_remotos), ("Get on Board", f_getonbrd), ("Portales de empresas", f_ats),
-               ("Publicaciones LinkedIn (Apify)", f_publicaciones), ("Computrabajo", f_computrabajo),
+               (medicion_apify.SALUD_PUBLICACIONES, f_publicaciones), ("Computrabajo", f_computrabajo),
                ("Elempleo", f_elempleo), (jobint.NOMBRE, f_jobint), (infojobs.NOMBRE, f_infojobs),
                (tecnoempleo.NOMBRE, f_tecnoempleo),
                *[(n, f_sitemap(n)) for n in sitemaps_empleo.SITIOS]]
@@ -519,8 +529,7 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
         _guardar_json(trabajo / "lote_entrega.json", datos)
         if central:
             central.guardar_lote(datos)
-    control_central = central.control_apify(hoy, cfg["apify"].get("tope_mensual_usd", 5),
-        cfg["apify"].get("tope_por_corrida_usd", 3)) if central else None
+    control_central = central.control_apify(hoy, *_topes_apify(cfg)) if central else None
     argumentos_central = {"control_apify": control_central} if central else {}
     # Contrato v43: una pasada horaria arma lote solo si el panel lo pide (configuración confirmada hoy después del
     # lote); entonces lee también lo entregado hoy en Supabase, como la diaria, para no repetir nada.
@@ -673,12 +682,8 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
                                                  cfg["refuerzo"], cfg["dias_maximos"]), incorporar,
             iniciales=lote_previo.get("elegidas", {}) if lote_previo.get("fecha") == hoy else None)
         if cfg.get("control_dirigido") and os.environ.get("APIFY_TOKEN"):
-            from buscador.apify import Presupuesto
             from buscador.fuentes import linkedin_apify
-            control = control_central or Presupuesto(
-                _leer_json(trabajo / "apify_presupuesto.json", {}), hoy,
-                mensual=cfg["apify"].get("tope_mensual_usd", 5), corrida=cfg["apify"].get("tope_por_corrida_usd", 3),
-                guardar=lambda datos: _guardar_json(trabajo / "apify_presupuesto.json", datos))
+            control = control_central or _presupuesto_local(cfg, trabajo, hoy)
 
             def buscar_apify(combinaciones):
                 return linkedin_apify.buscar(Cliente(), cfg["apify"]["actor_linkedin"], combinaciones, {}, hoy,
@@ -687,12 +692,12 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
                                              tope_consulta_usd=cfg["apify"].get("tope_consulta_usd", 0.025),
                                              build=cfg["apify"].get("build_linkedin", "0.0.61"), ordenar=False)
             try:
-                vacantes, salud["LinkedIn (Apify) rescate"] = refuerzo.rescate_apify(
+                vacantes, salud[medicion_apify.SALUD_RESCATE] = refuerzo.rescate_apify(
                     vacantes, entregadas, hoy, entrega.config(), familias.mapa(), buscar_apify, incorporar,
                     iniciales=lote_previo.get("elegidas", {}) if lote_previo.get("fecha") == hoy else None,
                     max_busquedas=cfg["apify"].get("rescate_busquedas", 4))
             except Exception as e:  # noqa: BLE001 — el rescate nunca tumba la noche
-                salud["LinkedIn (Apify) rescate"] = {"error": f"{type(e).__name__}: {e}"[:300]}
+                salud[medicion_apify.SALUD_RESCATE] = {"error": f"{type(e).__name__}: {e}"[:300]}
             # Contrato v11: posts de LinkedIn para quien sigue bajo el mínimo, con lo que quede del día de Apify.
             maximo_posts = cfg["apify"].get("posts_rescate", 0)
             if maximo_posts > 0 and not prueba:
@@ -702,11 +707,11 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
                                                             control_gasto=control, max_dias=cfg["dias_maximos"],
                                                             empresas_pais=empresas_pais)
                 try:  # los posts traen el perfil o correo de quien publicó: solo van a Supabase, nunca a `trabajo/`
-                    vacantes, salud["LinkedIn (Apify) posts"], posts_nuevos = refuerzo.rescate_posts(
+                    vacantes, salud[medicion_apify.SALUD_POSTS], posts_nuevos = refuerzo.rescate_posts(
                         vacantes, entregadas, hoy, entrega.config(), familias.mapa(), buscar_posts, incorporar,
                         iniciales=lote_previo.get("elegidas", {}) if lote_previo.get("fecha") == hoy else None)
                 except Exception as e:  # noqa: BLE001
-                    salud["LinkedIn (Apify) posts"] = {"error": f"{type(e).__name__}: {e}"[:300]}
+                    salud[medicion_apify.SALUD_POSTS] = {"error": f"{type(e).__name__}: {e}"[:300]}
     if not prueba and not consulta and not vacantes and not retiradas:
         raise RuntimeError("La búsqueda no produjo un catálogo válido; se conserva el estado anterior.")
     _guardar_json(trabajo / "bodega.json.gz", vacantes, comprimido=True)
@@ -817,6 +822,9 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
                 entrada["motivo_no_encaja"] = motivo_no_encaja(original, rol, roles_actuales)
             entradas.append(entrada)
         seleccion_actual["roles"][rol["id"]] = {"nombre": rol["nombre"], "meta": entrega.meta_de(rol, config_entrega), "vacantes": entradas}
+    apify_medido = None
+    if not prueba and not consulta and modo != "incremental":
+        apify_medido = _medir_apify(trabajo, hoy, salud, cfg["apify"])
     reporte = {
         "fecha": hoy, "hora_utc": datetime.now(timezone.utc).strftime("%H:%M"), "modo": modo,
         "codigo_commit": os.environ.get("GITHUB_SHA", ""), "ejecucion_id": os.environ.get("GITHUB_RUN_ID", ""),
@@ -843,9 +851,31 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
             "catalogo": len(pendientes_catalogo), "ofertas": len(pendientes_v1), "registro": len(pendientes_registro)},
             "lotes_pendientes": len(central.lote.valores) if central else None, "reintentos": reintentos_centrales},
     }
+    if apify_medido:
+        reporte["apify"] = apify_medido
     from buscador import publicar
     publicar.publicar(salida, vacantes, reporte, sin_familia)
     return reporte
+
+
+def _medir_apify(trabajo, hoy, salud, cfg_apify):
+    """8.2: gasto y avisos de Apify de esta corrida, acumulados en el mes (solo cifras), y los avisos de crédito
+    agotado o del 80 % del tope. Un fallo aquí nunca tumba la corrida."""
+    from buscador import registro
+    try:
+        corrida = medicion_apify.de_corrida(salud)
+        datos = medicion_apify.anotar_corrida(trabajo, hoy, corrida)
+        avisos = medicion_apify.avisos_de_gasto(_leer_json(trabajo / "apify_presupuesto.json", {}),
+                                                cfg_apify.get("tope_mensual_usd", 5))
+        for texto in avisos:
+            registro.aviso("apify", RuntimeError(texto))
+        print(medicion_apify.linea(datos), flush=True)
+        return {"corrida": corrida, "mes": medicion_apify.del_mes(datos), "avisos": avisos,
+                "tope_mensual_usd": cfg_apify.get("tope_mensual_usd", 5),
+                "ritmo_diario_usd": cfg_apify.get("ritmo_diario_usd")}
+    except Exception as e:  # noqa: BLE001 — la medición es una ayuda
+        registro.aviso("apify:medicion", e)
+        return None
 
 
 def main():

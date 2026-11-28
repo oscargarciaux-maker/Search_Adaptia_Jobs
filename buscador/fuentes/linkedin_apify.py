@@ -10,7 +10,7 @@ import time
 from urllib.parse import urlencode
 
 from buscador import cobertura, enlaces
-from buscador.apify import Presupuesto, ejecutar
+from buscador.apify import AVISO_SIN_CREDITO, Presupuesto, detener_por_credito, ejecutar, gasto
 from buscador.fuentes import linkedin_publico
 
 NOMBRE = "LinkedIn (Apify)"
@@ -87,6 +87,8 @@ def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=20, pres
         return [], {"omitida": "sin APIFY_TOKEN o sin actor en datos/config.yaml"}
     inicio = reloj()
     control_gasto = control_gasto or Presupuesto({}, hoy)
+    if control_gasto.bloqueado:
+        return [], {"busquedas": 0, "avisos": 0, "credito_agotado": True, "omitida": AVISO_SIN_CREDITO}
     # `ordenar=False`: el rescate ya las trae en orden de urgencia (perfiles con más déficit primero).
     pendientes = (cobertura.repartir(combinaciones, estado, hoy, prioritarias) if ordenar else list(combinaciones))[:presupuesto]
     crudas, ejecuciones, descartes = [], [], {}
@@ -115,6 +117,9 @@ def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=20, pres
         por_lugar[lugar] = por_lugar.get(lugar, 0) + 1
         if stats.get("clave_invalida"):
             break  # con la clave rechazada, ninguna otra búsqueda puede funcionar
+        if stats.get("credito_agotado"):
+            detener_por_credito(control_gasto)  # 8.2: aviso, no avería; nada más se reserva este mes
+            break
         if stats.get("error"):
             continue
         for item in items:
@@ -138,12 +143,15 @@ def buscar(cliente, actor, combinaciones, estado, hoy, max_por_busqueda=20, pres
     resumen = {"busquedas": len(ejecuciones), "avisos": len(crudas), "descartadas": descartes,
                     "por_familia": por_familia, "por_lugar": por_lugar, "ejecuciones": ejecuciones,
                     "reserva_corrida_usd": control_gasto.reservado,
-                    "tope_mes_usd": control_gasto.mensual, "tope_diario_usd": round(control_gasto.diario, 6)}
+                    "tope_mes_usd": control_gasto.mensual, "tope_diario_usd": round(control_gasto.diario, 6),
+                    **gasto(ejecuciones)}
+    if any(e.get("credito_agotado") for e in ejecuciones):
+        resumen.update(credito_agotado=True, aviso=AVISO_SIN_CREDITO)
     if not ejecuciones:
         resumen["omitida"] = "presupuesto diario/mensual reservado o tiempo agotado"
     elif any(e.get("clave_invalida") for e in ejecuciones):
         resumen["clave_invalida"] = True
         resumen["error"] = "Apify rechazó la clave (APIFY_TOKEN): reemplazarla por la vigente en los secretos de GitHub"
-    elif any(e.get("error") for e in ejecuciones) and not crudas:
+    elif any(e.get("error") for e in ejecuciones if not e.get("credito_agotado")) and not crudas:
         resumen["error"] = "Apify no produjo ofertas: revisar sus ejecuciones y crédito disponible"
     return crudas, resumen

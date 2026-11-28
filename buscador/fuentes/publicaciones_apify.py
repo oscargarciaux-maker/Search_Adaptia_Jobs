@@ -15,10 +15,11 @@ import re
 import time
 
 from buscador import enlaces, familias, ficha, normalizar, paises
-from buscador.apify import Presupuesto, ejecutar
+from buscador.apify import Presupuesto, detener_por_credito, ejecutar, gasto
 from buscador.fuentes import linkedin_publico
 
 NOMBRE = "LinkedIn (publicación)"
+NOMBRE_FEED = "LinkedIn (oferta desde feed)"  # ficha formal enlazada desde un post
 API = "https://api.apify.com/v2/acts/{actor}/run-sync-get-dataset-items"
 CONTRATA = re.compile(r"\b(hiring|we.?re hiring|we are hiring|now hiring|join our team|join us|looking for an?|"
                       r"is looking for|open (?:role|position)|job opening|apply now|vacante|vacantes|estamos contratando|"
@@ -259,8 +260,17 @@ def resolver_oferta(cliente, item, familias_validas):
             continue
         return {"titulo": titulo, "empresa": empresa, "descripcion": desc, "ubicacion": lugar,
                 "enlace": f"https://www.linkedin.com/jobs/view/{jid.group(1)}/", "fecha": "",
-                "fuente": "LinkedIn (oferta desde feed)", "remoto": None}
+                "fuente": NOMBRE_FEED, "remoto": None}
     return None
+
+
+def _sin_reserva(control_gasto):
+    return {"credito_agotado": True} if control_gasto.bloqueado else {}
+
+
+def _sin_credito(control_gasto, ejecucion):
+    """8.2: Apify dijo que el plan no tiene crédito: aviso (no avería) y nada más se reserva este mes."""
+    return {**detener_por_credito(control_gasto), **gasto([ejecucion])}
 
 
 def buscar(cliente, actor, consultas, familias_validas, hoy, maximo=60, token=None, reloj=time.monotonic,
@@ -277,10 +287,12 @@ def buscar(cliente, actor, consultas, familias_validas, hoy, maximo=60, token=No
     control_gasto = control_gasto or Presupuesto({}, hoy)
     cargo = control_gasto.reservar(0.025)
     if not cargo:
-        return [], {"omitida": "presupuesto de Apify agotado"}
+        return [], {"omitida": "presupuesto de Apify agotado", **_sin_reserva(control_gasto)}
     por_consulta = max(1, maximo // len(consultas))
     items, ejecucion = ejecutar(cliente, actor, entrada(actor, consultas, por_consulta, hoy), token,
                                 cargo, max_items=maximo, limite_segundos=180)
+    if ejecucion.get("credito_agotado"):
+        return [], _sin_credito(control_gasto, ejecucion)
     if ejecucion.get("error"):
         return [], ejecucion
     crudas, motivos, revision = [], {}, []
@@ -304,7 +316,7 @@ def buscar(cliente, actor, consultas, familias_validas, hoy, maximo=60, token=No
     return crudas, {"consultas": len(consultas), "publicaciones": len(items) if isinstance(items, list) else 0,
                     "vacantes": len(crudas), "pendientes_revision": len(revision), "muestras_revision": revision[:10],
                     "ejecucion": ejecucion,
-                    "descartadas": motivos}
+                    "descartadas": motivos, **gasto([ejecucion])}
 
 
 def consultas_post(terminos, maximo=2, lugares=()):
@@ -360,9 +372,11 @@ def buscar_posts(cliente, actor, consultas, familias_validas, hoy, maximo=30, to
     control_gasto = control_gasto or Presupuesto({}, hoy)
     cargo = control_gasto.reservar(round(maximo * 0.002 + 0.01, 3))  # ≈ USD 2 por 1.000 posts
     if not cargo:
-        return [], [], {"omitida": "presupuesto de Apify agotado"}
+        return [], [], {"omitida": "presupuesto de Apify agotado", **_sin_reserva(control_gasto)}
     items, ejecucion = ejecutar(cliente, actor, entrada(actor, consultas, max(1, maximo // len(consultas)), hoy), token,
                                 cargo, max_items=maximo, limite_segundos=180)
+    if ejecucion.get("credito_agotado"):
+        return [], [], _sin_credito(control_gasto, ejecucion)
     if ejecucion.get("error"):
         return [], [], {k: ejecucion[k] for k in ("error", "clave_invalida") if k in ejecucion}
     formales, posts, motivos, vistos = [], [], {}, set()
@@ -406,4 +420,4 @@ def buscar_posts(cliente, actor, consultas, familias_validas, hoy, maximo=30, to
                              "fichas_formales": len(formales), "posts": len(posts), "descartadas": motivos,
                              "ubicacion_deducida": deducidas,
                              "ubicacion_sin_confirmar": sum(1 for p in posts if p.get("ubicacion_sin_confirmar")),
-                             "gasto_reservado_usd": cargo}
+                             "gasto_reservado_usd": cargo, **gasto([ejecucion])}

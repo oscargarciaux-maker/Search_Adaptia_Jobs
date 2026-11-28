@@ -38,7 +38,7 @@ Una confirmación de la 41 no puede borrar la 42. Esa revisión funciona como un
 ## 2. Qué cambia al activarlo
 
 1. Antes de buscar, se comprueban Supabase y el catálogo, se importan las reservas antiguas y se recuperan las colas.
-2. Cada actor Apify necesita una reserva confirmada en la base. Se mantienen USD 5/mes, reparto diario y límite por corrida.
+2. Cada actor Apify necesita una reserva confirmada en la base. Se mantienen el tope del mes (`tope_mensual_usd`), el ritmo diario (`ritmo_diario_usd`, SQL 023) y el límite por corrida.
 3. La selección se guarda antes de enviar sus filas. Si falta su cola por un corte, se reconstruye desde ese snapshot,
    también para días anteriores, manteniendo fecha e identidades originales.
 4. El proceso confirma y retira únicamente las tareas terminadas. La vacante y su selección histórica permanecen.

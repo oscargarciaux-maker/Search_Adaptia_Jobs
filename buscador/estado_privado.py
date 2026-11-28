@@ -132,7 +132,8 @@ CAMPOS_REPORTE = {
     **{k: _IGUAL for k in ("fecha", "hora_utc", "modo", "codigo_commit", "ejecucion_id", "pais", "minutos",
                            "vacantes_en_bodega", "crudas_hoy", "nuevas_hoy", "fuentes", "descartes", "por_familia",
                            "por_pais", "por_fuente", "por_modalidad", "ubicacion_por_confirmar", "catalogo",
-                           "capturada_en", "frescura", "embudo_idioma", "verificacion_enlaces", "estado_operativo")},
+                           "capturada_en", "frescura", "embudo_idioma", "verificacion_enlaces", "estado_operativo",
+                           "apify")},  # 8.2: gasto y rendimiento de Apify, solo cifras del día y del mes
     "consulta": lambda v: "(privada)" if v else "",   # texto de una búsqueda profunda: puede ser el nombre de un cargo
     "entrega": lambda v: _sin_cargos(entrega_publica(v)),
     "seleccion_actual": seleccion_publica,
@@ -173,6 +174,9 @@ def resumen(salud):
                f"cargos · meta total {t.get('meta', 0)}, faltan {t.get('faltan', 0)} · Supabase: {e.get('supabase')}",
                f"Por idioma: {e.get('por_idioma', {})} · por fuente: {e.get('por_fuente', {})}",
                f"Verificación de enlaces: {salud.get('verificacion_enlaces', {})}", ""]
+    if (salud.get("apify") or {}).get("mes"):
+        from buscador import medicion_apify
+        lineas += [medicion_apify.linea(totales=salud["apify"]["mes"]), ""]
     return "\n".join(lineas) + "\n"
 
 

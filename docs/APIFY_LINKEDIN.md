@@ -22,11 +22,22 @@ las reservas de este programa son límites conservadores, no facturas ni estimac
 
 ## Cómo se limita el crédito
 
-`datos/config.yaml`: máximo USD 5 por mes calendario, USD 3 por corrida, USD 0,025 por consulta y 10 resultados por consulta.
-El mensual se reparte entre los días del mes: aproximadamente USD 0,16–0,18 diarios. El límite diario normalmente es el
-que restringe primero; con la tarifa consultada representa del orden de 60–80 ofertas brutas al día, no 60–80 entregables.
+`datos/config.yaml`: `tope_mensual_usd` (el crédito del plan: 5 en la cuenta gratis, 19 con Starter), `ritmo_diario_usd`
+(lo que se puede reservar por día), USD 3 por corrida, USD 0,025 por consulta y 10 resultados por consulta. Sin
+`ritmo_diario_usd`, el mensual se reparte entre los días del mes (USD 0,16–0,18 diarios con 5).
 
-Con preparación automática confirmada (o SQL 003 y variable manual), antes de iniciar se confirma una reserva en `apify_reservas` de Supabase,
+**Prueba de viabilidad (sección 8.2, 28 nov).** Antes de comprar Starter se gastan los USD 5 gratis al ritmo de Starter
+(`ritmo_diario_usd: 0.63` = 19/30): se agotan en unos 8 días. Comprar Starter = cambiar `tope_mensual_usd` a 19 (y en
+Apify fijar el límite de uso del plan). Si Apify dice que el plan no tiene crédito, el mes queda bloqueado con el tope
+que había (tabla `apify_bloqueos`, SQL 023) y la fuente no vuelve a reservar hasta el mes siguiente: es un aviso, no una
+avería. Si se compra Starter a mitad de mes, al subir el tope a 19 vuelve a reservar sin borrar nada. El ciclo de
+crédito de Apify va por fecha de facturación: si no coincide con el día 1, puede haber unos días bloqueados de más (o un
+aviso más de crédito agotado), nunca gasto de más. Cómo leer
+la medición: `trabajo/apify_medicion.json` en la rama `publicado` (por día y acumulado) y la línea «Apify en el mes…» del
+registro de cada Bodega. Regla para decidir: comprar Starter si los USD 5 llevaron a 5 a perfiles que si no se quedaban
+cortos (`perfiles_a_5`), a un costo por vacante útil (`usd_por_vacante_util`) que Oscar acepte.
+
+Con preparación automática confirmada (o SQL 003 y 023 y variable manual), antes de iniciar se confirma una reserva en `apify_reservas` de Supabase,
 con bloqueo por mes entre procesos y control diario/mensual/por corrida. El archivo pasa a ser copia auxiliar.
 La importación del contador antiguo preserva el mayor total conocido, sin sumar de nuevo reservas centrales reflejadas.
 Un fallo no habilita un contador local alternativo. Activación: [ACTIVAR_ESTADO_OPERATIVO.md](ACTIVAR_ESTADO_OPERATIVO.md).
