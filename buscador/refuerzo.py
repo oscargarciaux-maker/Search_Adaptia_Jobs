@@ -43,12 +43,18 @@ def buscar(mapa, activos, estado, hoy, ronda, cfg, dias_maximos=30):
     return crudas, salud
 
 
-def completar(vacantes, entregadas, hoy, cfg_entrega, cfg_refuerzo, mapa, recoger, incorporar, iniciales=None):
-    """Reevalúa después de cada ronda; nunca marca entregadas ni cambia restricciones para cumplir una cifra."""
+def completar(vacantes, entregadas, hoy, cfg_entrega, cfg_refuerzo, mapa, recoger, incorporar, iniciales=None,
+              medir=None):
+    """Reevalúa después de cada ronda; nunca marca entregadas ni cambia restricciones para cumplir una cifra.
+    `medir(texto)` (P-12.3, opcional) es un administrador de contexto que mide cuánto tarda cada reevaluación: solo
+    recibe texto fijo con el número de ronda."""
+    from contextlib import nullcontext
     from buscador import entrega
+    medir = medir or (lambda texto: nullcontext({}))
     rondas = []
     for numero in range(1, cfg_refuerzo.get("rondas", 2) + 1):
-        _, evaluacion = entrega.elegir(vacantes, entregadas, hoy, cfg_entrega, iniciales=iniciales)
+        with medir(f"Refuerzo, ronda {numero}: evaluar faltantes"):
+            _, evaluacion = entrega.elegir(vacantes, entregadas, hoy, cfg_entrega, iniciales=iniciales)
         # Contrato v11: también refuerza un cargo con cupo cubierto si alguno de sus perfiles no llega al umbral del
         # rescate (`cobertura.rescate_bajo`; P-11.3).
         faltantes = {rid: r["faltan"] or r.get("faltan_para_minimo", 0) for rid, r in evaluacion["roles"].items()

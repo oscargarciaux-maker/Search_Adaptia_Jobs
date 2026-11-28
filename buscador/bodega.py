@@ -11,6 +11,7 @@ import json
 import os
 import time
 from collections import Counter
+from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -34,6 +35,22 @@ def etapa(texto):
     corrida diaria se cortó a los 95 minutos sin dejar rastro). Solo nombres de etapas y conteos: nunca datos de
     clientes."""
     print(f"[{datetime.now(timezone.utc):%H:%M:%S}] {texto}", flush=True)
+
+
+@contextmanager
+def tramo(texto, **cifras):
+    """P-12.3: hora de inicio y segundos de un subpaso, para ver en el registro de Actions dónde se va el tiempo.
+    Es un registro PÚBLICO: `texto` es siempre fijo (como mucho lleva un número de ronda o de llamada) y lo único
+    variable son las cifras enteras que el subpaso deje en el diccionario que entrega (cualquier otra cosa se
+    ignora: nunca lugares, términos, cargos ni perfiles). Una excepción también deja su línea de fin."""
+    etapa(f"Inicio: {texto}")
+    t0 = time.monotonic()
+    try:
+        yield cifras
+    finally:
+        datos = "".join(f", {k} {v}" for k, v in cifras.items()
+                        if isinstance(v, int) and not isinstance(v, bool))
+        etapa(f"Fin: {texto} en {round(time.monotonic() - t0)} s{datos}")
 
 def afinidad_vigente(original, actual, rol, roles, inventario):
     """¿La vacante elegida hoy para `rol` le sigue sirviendo? Sale de la validación final (13 nov).
@@ -614,14 +631,23 @@ def _correr(salida, modo, consulta, pais, hoy, prueba):
     roles_actuales = config_entrega["roles"]
     # Contrato v48: en «Buscar ahora» la primera comprobación deja estos segundos a lo que traigan refuerzo y rescate.
     reserva = cfg_revision.pop("reserva_segundos", 0)
+    fase = {"motivo": "diaria"}  # P-12.3: de dónde viene cada llamada, solo para el registro (texto fijo)
 
     def comprobar_destinos(lista):
+        with tramo(f"Comprobar enlaces, llamada {revision_corrida['llamadas'] + 1} ({fase['motivo']})") as cifras:
+            salida = _comprobar_destinos(lista, cifras)
+        return salida
+
+    def _comprobar_destinos(lista, cifras):
         nonlocal resumen_revision, reserva
         t0 = time.monotonic()
         usar = dict(cfg_revision, **{clave_s: max(0, cfg_revision[clave_s] - reserva)}) if reserva else cfg_revision
         reserva = 0
         resumen_revision = verificar_enlaces.preparar(lista, entregadas_revision, hoy, cache_enlaces,
-            lote=lote_previo, incremental=modo == "incremental", cfg=usar)
+            lote=lote_previo, incremental=modo == "incremental", cfg=usar, medir=tramo)
+        cifras["vacantes"] = len(lista)
+        cifras["comprobadas"] = resumen_revision["candidatas_programadas"]
+        cifras["por_necesidad"] = resumen_revision.get("por_necesidad", 0)
         cfg_revision[clave_n] = max(0, cfg_revision[clave_n] - resumen_revision["candidatas_programadas"])
         revision_corrida["llamadas"] += 1
         revision_corrida["programadas"] += resumen_revision["candidatas_programadas"]
@@ -667,7 +693,6 @@ def _correr(salida, modo, consulta, pais, hoy, prueba):
             salud["Ubicación desde la ficha"] = {"error": f"{type(e).__name__}"}
         limite = (date.fromisoformat(hoy) - timedelta(days=confirmar_ubicacion.VIGENCIA_DIAS * 2)).isoformat()
         _guardar_json(trabajo / "ubicacion_fichas.json", {u: d for u, d in memoria_fichas.items() if d.get("fecha", "") >= limite})
-    etapa(f"Comprobar enlaces ({len(vacantes)} vacantes)")
     vacantes = comprobar_destinos(vacantes)
     refuerzos = []
     posts_nuevos = []
@@ -677,45 +702,65 @@ def _correr(salida, modo, consulta, pais, hoy, prueba):
         entregadas = _leer_json(trabajo / "entregadas.json", {})
         entregadas.update(memoria_db)
         def incorporar(anteriores, nuevas):
-            resultado, sin_mapa, razones = limpiar(anteriores, nuevas, hoy, cfg["dias_maximos"], set(), set(),
-                                                  retiradas=retiradas)
-            sin_familia.update(sin_mapa)
-            descartes.update(razones)
+            with tramo(f"Incorporar ({fase['motivo']})", nuevas=len(nuevas)):
+                resultado, sin_mapa, razones = limpiar(anteriores, nuevas, hoy, cfg["dias_maximos"], set(), set(),
+                                                      retiradas=retiradas)
+                sin_familia.update(sin_mapa)
+                descartes.update(razones)
             return comprobar_destinos(resultado)
+
+        def buscar_ronda(mapa, ronda):
+            fase["motivo"] = f"refuerzo, ronda {ronda}"
+            with tramo(f"Refuerzo, ronda {ronda}: buscar en las fuentes") as cifras:
+                crudas, salud_ronda = refuerzo.buscar(mapa, _paises_activos(cfg), estado, hoy, ronda,
+                                                      cfg["refuerzo"], cfg["dias_maximos"])
+                cifras["avisos"] = len(crudas)
+            return crudas, salud_ronda
         vacantes, refuerzos = refuerzo.completar(
             vacantes, entregadas, hoy, entrega.config(), cfg["refuerzo"], familias.mapa(),
-            lambda mapa, ronda: refuerzo.buscar(mapa, _paises_activos(cfg), estado, hoy, ronda,
-                                                 cfg["refuerzo"], cfg["dias_maximos"]), incorporar,
-            iniciales=lote_previo.get("elegidas", {}) if lote_previo.get("fecha") == hoy else None)
+            buscar_ronda, incorporar,
+            iniciales=lote_previo.get("elegidas", {}) if lote_previo.get("fecha") == hoy else None, medir=tramo)
         if cfg.get("control_dirigido") and os.environ.get("APIFY_TOKEN"):
             from buscador.fuentes import linkedin_apify
             control = control_central or _presupuesto_local(cfg, trabajo, hoy)
 
             def buscar_apify(combinaciones):
+                with tramo("Rescate con Apify: buscar", busquedas=len(combinaciones)):
+                    return _buscar_apify(combinaciones)
+
+            def _buscar_apify(combinaciones):
                 return linkedin_apify.buscar(Cliente(), cfg["apify"]["actor_linkedin"], combinaciones, {}, hoy,
                                              presupuesto=len(combinaciones), max_dias=cfg["dias_maximos"],
                                              limite_segundos=600, control_gasto=control, max_por_busqueda=10,
                                              tope_consulta_usd=cfg["apify"].get("tope_consulta_usd", 0.025),
                                              build=cfg["apify"].get("build_linkedin", "0.0.61"), ordenar=False)
             try:
-                vacantes, salud[medicion_apify.SALUD_RESCATE] = refuerzo.rescate_apify(
-                    vacantes, entregadas, hoy, entrega.config(), familias.mapa(), buscar_apify, incorporar,
-                    iniciales=lote_previo.get("elegidas", {}) if lote_previo.get("fecha") == hoy else None,
-                    max_busquedas=cfg["apify"].get("rescate_busquedas", 4))
+                fase["motivo"] = "rescate Apify"
+                with tramo("Rescate con Apify"):
+                    vacantes, salud[medicion_apify.SALUD_RESCATE] = refuerzo.rescate_apify(
+                        vacantes, entregadas, hoy, entrega.config(), familias.mapa(), buscar_apify, incorporar,
+                        iniciales=lote_previo.get("elegidas", {}) if lote_previo.get("fecha") == hoy else None,
+                        max_busquedas=cfg["apify"].get("rescate_busquedas", 4))
             except Exception as e:  # noqa: BLE001 — el rescate nunca tumba la noche
                 salud[medicion_apify.SALUD_RESCATE] = {"error": f"{type(e).__name__}: {e}"[:300]}
             # Contrato v11: posts de LinkedIn para quien sigue bajo el mínimo, con lo que quede del día de Apify.
             maximo_posts = cfg["apify"].get("posts_rescate", 0)
             if maximo_posts > 0 and not prueba:
                 def buscar_posts(consultas, validas, empresas_pais=None):
+                    with tramo("Posts de LinkedIn: buscar", consultas=len(consultas)):
+                        return _buscar_posts(consultas, validas, empresas_pais)
+
+                def _buscar_posts(consultas, validas, empresas_pais=None):
                     return publicaciones_apify.buscar_posts(Cliente(), cfg["apify"].get("actor_publicaciones", ""),
                                                             consultas, validas, hoy, maximo=maximo_posts,
                                                             control_gasto=control, max_dias=cfg["dias_maximos"],
                                                             empresas_pais=empresas_pais)
                 try:  # los posts traen el perfil o correo de quien publicó: solo van a Supabase, nunca a `trabajo/`
-                    vacantes, salud[medicion_apify.SALUD_POSTS], posts_nuevos = refuerzo.rescate_posts(
-                        vacantes, entregadas, hoy, entrega.config(), familias.mapa(), buscar_posts, incorporar,
-                        iniciales=lote_previo.get("elegidas", {}) if lote_previo.get("fecha") == hoy else None)
+                    fase["motivo"] = "posts"
+                    with tramo("Posts de LinkedIn"):
+                        vacantes, salud[medicion_apify.SALUD_POSTS], posts_nuevos = refuerzo.rescate_posts(
+                            vacantes, entregadas, hoy, entrega.config(), familias.mapa(), buscar_posts, incorporar,
+                            iniciales=lote_previo.get("elegidas", {}) if lote_previo.get("fecha") == hoy else None)
                 except Exception as e:  # noqa: BLE001
                     salud[medicion_apify.SALUD_POSTS] = {"error": f"{type(e).__name__}: {e}"[:300]}
     if not prueba and not consulta and not vacantes and not retiradas:
