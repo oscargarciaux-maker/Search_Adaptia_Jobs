@@ -17,6 +17,14 @@ VACANTE = "vacficticia00001"
 HUELLA = "huellaficticia01"
 HOY = "2026-11-27"
 SECRETOS = (NOMBRE, UUID, VACANTE, HUELLA)
+# 9.6: dónde y con qué se buscó (forma real: ciudad + idioma, país + idioma + remoto, términos de un cargo).
+CIUDAD = "CIUDAD_VILLAFICTICIA:ES"
+LUGAR = "ZZ:EN:REMOTO"
+TERMINO = "termino ficticio omega"
+CORRIDA_APIFY = "corridaficticia01"
+LUGARES = (CIUDAD, LUGAR, TERMINO, CORRIDA_APIFY, "VILLAFICTICIA")
+CAMPOS_POR_LUGAR = ("por_lugar", "respondidas", "por_pais", "motivos_por_pais", "portales_caidos", "reintentados",
+                    "ejecuciones", "detalle")
 
 
 def _json(ruta, datos):
@@ -29,7 +37,13 @@ def _reporte():
            "fuentes": {"LinkedIn": 2}, "paises": {"CO": 2}}
     return {
         "fecha": HOY, "modo": "diario", "consulta": "", "vacantes_en_bodega": 3, "nuevas_hoy": 1,
-        "fuentes": {"LinkedIn (Apify)": {"busquedas": 1, "por_familia": {CARGO: 1, "qa": 2}},
+        "fuentes": {"LinkedIn (Apify)": {"busquedas": 1, "por_familia": {CARGO: 1, "qa": 2}, "por_lugar": {CIUDAD: 1},
+                                         "ejecuciones": [{"run_id": CORRIDA_APIFY}], "descartadas": {"sin descripción": 1},
+                                         "omitida": "sin crédito"},
+                    "LinkedIn": {"busquedas": 3, "fallidas": 1, "por_lugar": {CIUDAD: 2, LUGAR: 1},
+                                 "relectura": {"leidas": 2, "con_descripcion": 1}},
+                    "Bumeran y portales hermanos": {"busquedas": 2, "por_pais": {"ZZ": 2}, "portales_caidos": ["ZZ"],
+                                                    "motivos_por_pais": {"ZZ": {"http": 1}}, "reintentados": ["ZZ"]},
                     "Indeed": {"error": f"HTTPError: 403 para https://indeed.example/?q={NOMBRE}"}},
         "campo_nuevo_sin_clasificar": {"nombre": NOMBRE},
         "por_familia": {CARGO: 1, "qa": 2},
@@ -39,7 +53,10 @@ def _reporte():
                     "embudo": {CARGO: {"nuevas": 4}}},
         "seleccion_actual": {"fecha": HOY, "roles": {CARGO: {"nombre": NOMBRE, "meta": 3, "vacantes": [
             {"id": VACANTE, "catalog_status": "active", "afinidad_vigente": True, "verificacion": {"estado": "verificada"}}]}}},
-        "refuerzos": [{"ronda": 1, "faltantes_antes": {CARGO: 1}, "crudas": 5, "fuentes": {}}],
+        "refuerzos": [{"ronda": 1, "faltantes_antes": {CARGO: 1}, "crudas": 5, "fuentes": {
+            "LinkedIn": {"busquedas": 2, "avisos": 4, "por_lugar": {CIUDAD: 1, LUGAR: 1}, "por_familia": {CARGO: 2}},
+            "Indeed": {"busquedas": 1, "fallidas": 1, "por_lugar": {LUGAR: 1}, "por_familia": {"qa": 1}},
+            "Get on Board": {"busquedas": 1, "avisos": 0, "fallidas": 0, "respondidas": [TERMINO]}}}],
         "historico_entregas": [{"fecha": HOY, "meta_cumplida": False, "roles": {CARGO: {"entregadas": 2}}}],
         "catalogo": {"filas": 3, "enviadas": 3, "errores": [], "pendientes": 0},
         "verificacion_enlaces": {"seleccion_del_dia": {"vacantes": 1, "estados": {"verificada": 1}}},
@@ -131,7 +148,62 @@ def test_lo_publicado_conserva_cifras_agregadas(tmp_path):
     assert s["refuerzos"][0]["faltantes_antes"] == 1
     assert s["por_familia"] == {"qa": 2} and s["vacantes_en_bodega"] == 3
     assert s["resultado"] == "CORTA"   # meta incompleta: COMPLETA/CORTA/AVERÍA (contrato v52)
-    assert s["fuentes"]["LinkedIn (Apify)"]["por_familia"] == {"qa": 2}
+    assert s["fuentes"]["LinkedIn (Apify)"] == {"busquedas": 1, "descartadas": {"sin descripción": 1},
+                                               "omitida": "sin crédito"}
+    assert s["fuentes"]["LinkedIn"] == {"busquedas": 3, "fallidas": 1, "relectura": {"leidas": 2, "con_descripcion": 1}}
+    ronda = s["refuerzos"][0]
+    assert ronda == {"ronda": 1, "crudas": 5, "faltantes_antes": 1, "fuentes": {
+        "LinkedIn": {"busquedas": 2, "avisos": 4}, "Indeed": {"busquedas": 1, "fallidas": 1},
+        "Get on Board": {"busquedas": 1, "avisos": 0, "fallidas": 0}}}
+
+
+def _claves(valor):
+    if isinstance(valor, dict):
+        for k, v in valor.items():
+            yield k
+            yield from _claves(v)
+    elif isinstance(valor, list):
+        for v in valor:
+            yield from _claves(v)
+
+
+def test_lo_publicado_no_dice_donde_ni_con_que_se_busco(tmp_path):
+    """9.6: ni claves de ciudad o lugar, ni términos de búsqueda, ni desgloses por lugar, en fuentes y refuerzos."""
+    salida = _salida(tmp_path)
+    ep.separar(salida, tmp_path / "copia")
+    texto = _texto_publico(salida, con_bodega=True)
+    for secreto in LUGARES:
+        assert secreto not in texto
+    for rel in ("datos/salud.json", "datos/salud_bodega.json"):
+        s = json.loads((salida / rel).read_text(encoding="utf-8"))
+        assert not set(_claves(s["fuentes"])) & set(CAMPOS_POR_LUGAR + ("por_familia",))
+        assert not set(_claves(s["refuerzos"])) & set(CAMPOS_POR_LUGAR + ("por_familia",))
+    # Se mueve, no se borra: la copia privada (y Supabase) conserva el detalle para quien opera.
+    completo = (tmp_path / "copia/datos/salud.json").read_text(encoding="utf-8")
+    assert CIUDAD in completo and TERMINO in completo
+
+
+def test_un_campo_nuevo_de_una_fuente_no_se_publica():
+    """Lista blanca también dentro de cada fuente: solo cifras, textos fijos clasificados y contadores clasificados."""
+    publica = ep.fuente_publica({"busquedas": 1, "repaso": False, "omitida": "sin crédito",
+                                 "desglose_nuevo": {"ZZ": 1}, "lista_nueva": [TERMINO], "lugar": CIUDAD,
+                                 "run_id": CORRIDA_APIFY, "relectura": {"leidas": 1, "lugar": CIUDAD}})
+    assert publica == {"busquedas": 1, "repaso": False, "omitida": "sin crédito"}
+    assert ep.fuente_publica([CIUDAD]) == {}   # lo que no tiene la forma esperada no se publica
+
+
+def test_el_registro_y_el_resumen_publicos_no_dicen_donde_se_busco(tmp_path, monkeypatch, capsys):
+    """El registro de Actions y el resumen de la corrida también son públicos, aunque el reporte venga completo
+    (con --prueba o si «Separar» falló)."""
+    from buscador import bodega
+    reporte = dict(_reporte(), minutos=1, crudas_hoy=2, descartes={})
+    monkeypatch.setattr(bodega, "correr", lambda *a, **k: reporte)
+    monkeypatch.setattr("sys.argv", ["bodega", "--salida", str(tmp_path)])
+    bodega.main()
+    texto = capsys.readouterr().out + ep.resumen(reporte)
+    assert "LinkedIn" in texto
+    for secreto in LUGARES:
+        assert secreto not in texto
 
 
 def test_el_arranque_decide_igual_con_las_metricas_publicadas(tmp_path):

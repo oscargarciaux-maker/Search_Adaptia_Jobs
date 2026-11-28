@@ -500,7 +500,10 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
   mismo trabajo que necesitan el detalle (la validación) leen la copia completa de `privado/estado_trabajo/`, que no
   se publica. El resumen y los avisos de cada corrida de Actions, también públicos, solo muestran totales; el detalle
   por cargo está en el panel. El reporte público es una lista blanca (`CAMPOS_REPORTE`): un campo nuevo no se publica
-  hasta clasificarlo. La bodega publicada sigue trayendo todas las vacantes, sin decir a qué cargo va cada una.
+  hasta clasificarlo. Dentro de cada fuente (`fuentes` y cada ronda de `refuerzos`) también hay lista blanca (28 nov,
+  9.6): solo cifras y mensajes fijos del código; nada que diga dónde o con qué se buscó (lugares con ciudad o país e
+  idioma, términos de los cargos, países consultados, familias buscadas, ejecuciones de Apify). Ese detalle queda en
+  `estado_trabajo`. Lo mismo vale para lo que la bodega imprime en el registro de Actions. La bodega publicada sigue trayendo todas las vacantes, sin decir a qué cargo va cada una.
   Todo se guarda en una sola escritura con su manifiesto; un estado incompleto o de dos corridas no se usa.
 - Despliegue del panel: Docker y guía sin proveedor obligatorio (`docs/PANEL_CONTROL.md`).
 

@@ -17,7 +17,7 @@ from pathlib import Path
 
 import yaml
 
-from buscador import calidad, contrato, cobertura, enlaces, familias, medicion, medicion_apify, normalizar, paises, tiempos, vacante
+from buscador import calidad, contrato, cobertura, enlaces, estado_privado, familias, medicion, medicion_apify, normalizar, paises, tiempos, vacante
 from buscador.fuentes import (ats, computrabajo, elempleo, getonbrd, infojobs, jobint, sitemaps_empleo, tecnoempleo, tableros_latam, indeed, linkedin_apify, linkedin_publico, open_seat,
                               publicaciones_apify, remotos)
 from buscador.http import Cliente
@@ -889,7 +889,7 @@ def main():
     reporte = correr(a.salida, a.modo, a.consulta or None, a.pais or None, prueba=a.prueba)
     print(json.dumps({k: reporte[k] for k in ("fecha", "minutos", "vacantes_en_bodega", "nuevas_hoy", "crudas_hoy",
                                               "descartes")}, ensure_ascii=False, indent=1))
-    for n, s in reporte["fuentes"].items():
+    for n, s in estado_privado.fuentes_publicas(reporte["fuentes"]).items():  # registro público: sin lugares ni términos (9.6)
         print(f"  {n}: {s}")
     print("Verificación de enlaces:", json.dumps(reporte["verificacion_enlaces"], ensure_ascii=False))
     e = reporte.get("entrega") or {}
