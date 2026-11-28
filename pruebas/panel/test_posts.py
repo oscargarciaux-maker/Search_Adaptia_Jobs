@@ -160,7 +160,8 @@ def test_rescate_de_posts_solo_si_falta_y_con_el_cargo(cfg):
                                                  lambda a, b: a + b)
     assert stats["perfiles_con_deficit"] >= 1 and posts == []
     consultas, validas = llamadas[0]
-    assert len(consultas) <= 8 and all(q.startswith("(hiring OR contratando") for q in consultas)
+    # P-16.2: hasta 12 consultas, con las palabras de contratación del idioma del perfil.
+    assert len(consultas) <= 12 and all(q.startswith(tuple(pa.CONTRATA_POST.values())) for q in consultas)
     assert any("Product Designer".lower() in q.lower() for q in consultas)
 
 

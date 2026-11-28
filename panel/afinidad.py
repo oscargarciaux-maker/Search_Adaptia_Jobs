@@ -89,10 +89,24 @@ def post_ubicacion(v):
     return "deducida" if v.get("ubicacion_deducida") else ""
 
 
+def _tolerables(v, p):
+    """Lo que se le perdona a un post deducido o sin confirmar. P-16.2: a uno «sin confirmar», la modalidad solo si
+    el post no la dice y la persona acepta remoto; si el perfil no acepta remoto, no le llega (y si el post dice
+    remoto, presencial o híbrido, la modalidad se compara como en cualquier vacante)."""
+    if post_ubicacion(v) != "sin_confirmar":
+        return POST_UBICACION_TOLERADA
+    acepta_remoto = any("remoto" in fila.modalidades for fila in p.filas)
+    if not v.get("modalidad") and acepta_remoto:
+        return POST_UBICACION_TOLERADA
+    return POST_UBICACION_TOLERADA - {"modalidad diferente"}
+
+
 def evaluar_post(v, perfil, hoy=None):
-    """Como `evaluar`, pero un post deducido o sin confirmar que solo falla por país o modalidad se admite."""
-    r = evaluar(v, perfil, hoy)
-    if not r["compatible"] and post_ubicacion(v) and set(r["motivos"]) <= POST_UBICACION_TOLERADA:
+    """Como `evaluar`, pero un post deducido o sin confirmar que solo falla por país (o por la modalidad, ver
+    `_tolerables`) se admite."""
+    p = perfil if isinstance(perfil, Perfil) else Perfil.model_validate(perfil)
+    r = evaluar(v, p, hoy)
+    if not r["compatible"] and post_ubicacion(v) and set(r["motivos"]) <= _tolerables(v, p):
         r = dict(r, compatible=True, motivos=[], pruebas=[*r["pruebas"], ETIQUETA_POST_UBICACION[post_ubicacion(v)]])
         tolerada = True
     else:

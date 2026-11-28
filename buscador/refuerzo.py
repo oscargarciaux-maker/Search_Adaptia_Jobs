@@ -1,8 +1,8 @@
 """Búsquedas gratuitas adicionales para roles bajo meta, con límites y sin repetir entregas."""
 from concurrent.futures import ThreadPoolExecutor
 
-from buscador import cobertura
-from buscador.fuentes import getonbrd, indeed, linkedin_publico
+from buscador import cobertura, normalizar
+from buscador.fuentes import getonbrd, indeed, linkedin_publico, publicaciones_apify
 from buscador.http import Cliente
 
 
@@ -85,10 +85,14 @@ def sin_fuente_local(roles, deficit):
 
 
 def rescate_apify(vacantes, entregadas, hoy, cfg_entrega, mapa, buscar_apify, incorporar, iniciales=None,
-                  max_busquedas=4):
+                  max_busquedas=0):
     """Contrato v11: Apify solo donde falta. Para cada perfil por debajo del mínimo (los de más déficit primero) busca
     con los términos de su cargo —incluidos los cercanos— en su país y en las remotas abiertas a él, en vez de rotar
     combinaciones a ciegas. `buscar_apify(combinaciones)` devuelve (crudas, estadísticas)."""
+    if max_busquedas <= 0:
+        # P-16.2: apagado por defecto (`apify.rescate_busquedas: 0`): traía las mismas fichas que LinkedIn gratis (147
+        # de 154 ya recibidas el 28 nov) y el crédito va entero a los posts.
+        return vacantes, {"omitida": "rescate formal apagado (apify.rescate_busquedas = 0): el crédito va a los posts"}
     from buscador import entrega
     from panel.ejecutor import lugares_perfil
     from panel.modelos import Perfil
@@ -124,46 +128,96 @@ def rescate_apify(vacantes, entregadas, hoy, cfg_entrega, mapa, buscar_apify, in
                       **{k: stats[k] for k in CAMPOS_GASTO if k in stats}}
 
 
+def terminos_post(familia, idioma):
+    """P-16.2: nombres del cargo para buscar posts en `idioma`, sin los cercanos (otro oficio) y solo de dos palabras o
+    más si los hay (un post solo cuenta si nombra el cargo con una frase del mapa: `cargo_de`; «QA» a secas trae de
+    todo). En español se alternan los títulos en español y los demás (un post en español suele nombrar el cargo en
+    inglés: «Buscamos Product Designer»); en inglés, sin los títulos en español. Los términos ampliados de la P-14.2
+    llegan solos: entran en `consultas` y `consultas_es` del cargo."""
+    en_es = list(familia.get("consultas_es") or [])
+    generales = [t for campo in ("consultas", "exactos", "similares") for t in familia.get(campo) or []]
+    if idioma == "en":
+        claves_es = {normalizar.titulo_base(t) for t in en_es}
+        candidatos = [t for t in generales if normalizar.titulo_base(t) not in claves_es]
+    else:
+        candidatos = _intercalar([en_es, generales])
+    salida, vistas = [], set()
+    for t in candidatos:
+        clave = normalizar.titulo_base(t)
+        if clave and clave not in vistas:
+            vistas.add(clave)
+            salida.append(t)
+    frases = [t for t in salida if len(normalizar.titulo_base(t).split()) > 1]
+    return frases or salida
+
+
+def consultas_de_perfil(familia, perfil, hoy):
+    """P-16.2: consultas de posts para una persona, de la más útil a la menos, alternando sus idiomas: los nombres
+    principales del cargo (en español, el título en español y el general) y uno más que rota cada día (así, en unos
+    días, se prueban todos). Quien acepta remoto busca con una forma de decirlo en su idioma («remoto», «teletrabajo»,
+    «trabajo desde casa»; «remote», «work from home») que rota por día y por consulta, sin sumar consultas; quien
+    acepta además oficina, también sin modalidad. Solo cargo, idioma y modalidad: nunca su país, su ciudad ni nada
+    suyo."""
+    idiomas = [i for i in ("es", "en") if i in (perfil.get("idiomas") or ("es", "en"))]
+    modalidades = set(perfil.get("modalidades") or ())
+    con_remoto = "remoto" in modalidades
+    sin_modalidad = not modalidades or bool(modalidades - {"remoto"})  # acepta oficina (o no lo dice)
+    modos = [True] * con_remoto + [False] * sin_modalidad
+    por_idioma = []
+    for idioma in idiomas:
+        terminos = terminos_post(familia, idioma)
+        fijos = 2 if idioma == "es" else 1
+        elegidos = terminos[:fijos] + cobertura.rotar(terminos[fijos:], hoy, 1)
+        formas = publicaciones_apify.REMOTO_POST[idioma]
+        por_idioma.append([publicaciones_apify.consulta_post(
+            t, idioma, cobertura.rotar(formas, hoy, 1, desfase=k)[0] if remoto else False)
+            for k, t in enumerate(elegidos) for remoto in modos])
+    return _intercalar(por_idioma)
+
+
+def _intercalar(listas):
+    """Una de cada lista por vuelta, sin repetir."""
+    salida = []
+    for i in range(max((len(x) for x in listas), default=0)):
+        for lista in listas:
+            if i < len(lista) and lista[i] not in salida:
+                salida.append(lista[i])
+    return salida
+
+
 def rescate_posts(vacantes, entregadas, hoy, cfg_entrega, mapa, buscar_posts, incorporar, iniciales=None,
-                  max_consultas=8):
-    """Contrato v11 (segunda parte): para los perfiles que siguen bajo el mínimo tras el rescate formal, busca posts de
-    LinkedIn que anuncian su cargo. Una ficha formal enlazada entra como vacante normal; un post sin ficha queda en la
-    lista de posts (nunca en el inventario, el cupo ni `ofertas`). `buscar_posts(consultas, familias)` devuelve
-    (formales, posts, estadísticas). Devuelve (vacantes, estadísticas solo con conteos, posts aptos)."""
+                  max_consultas=12):
+    """Contrato v11 (segunda parte) y P-16.2: el crédito de Apify va a los posts de LinkedIn (el mercado oculto) para
+    los perfiles bajo el umbral del rescate. Primero quien hoy va en 0; después quien vive en un país sin fuente local;
+    después el de más déficit. Cada persona aporta sus consultas (`consultas_de_perfil`) y se toman por turnos, una de
+    cada una por vuelta, hasta `max_consultas`. Una ficha formal enlazada entra como vacante normal; un post sin ficha
+    queda en la lista de posts (nunca en el inventario, el cupo ni `ofertas`). `buscar_posts(consultas, familias,
+    empresas_pais)` devuelve (formales, posts, estadísticas). Devuelve (vacantes, estadísticas solo con conteos, posts
+    aptos)."""
     from buscador import contrato, entrega
-    from buscador import paises
-    from buscador.fuentes.publicaciones_apify import consultas_post, paises_por_empresa
+    from panel.afinidad import RESCATE_BAJO
     elegidas, _ = entrega.elegir(vacantes, entregadas, hoy, cfg_entrega, iniciales=iniciales)
     deficit = entrega.deficit_por_perfil(elegidas, cfg_entrega["roles"], hoy)
     if not deficit:
         return vacantes, {"perfiles_con_deficit": 0, "omitida": "todos los perfiles llegan al mínimo"}, []
     por_id = {f["id"]: f for f in mapa}
-    # 8.2: primero los cargos con alguien bajo el umbral del rescate (`rescate_bajo`) sin fuente local; dentro, el de
-    # más déficit (como antes).
     sin_local = sin_fuente_local(cfg_entrega["roles"], deficit)
-    roles = sorted((r for r in cfg_entrega["roles"] if any(p["id"] in deficit for p in r.get("_perfiles") or [])),
-                   key=lambda r: (not any(p["id"] in sin_local for p in r.get("_perfiles") or []),
-                                  -sum(deficit.get(p["id"], 0) for p in r.get("_perfiles") or [])))
-    consultas, validas = [], set()
-    nombres = {p["codigo"]: p["nombre"] for p in paises.datos()["paises"]}
-    for rol in roles:
-        # Contrato v28: también posts que nombran dónde vive quien va corto (o «remoto»), así llegan con ubicación.
-        lugares = []
-        for p in sorted(rol.get("_perfiles") or [], key=lambda p: p["id"] not in sin_local):
-            if p["id"] in deficit:
-                lugares += [nombres.get(p.get("vive_en"), "")] + (["remoto"] if "remoto" in (p.get("modalidades") or []) else [])
-        lugares = [x for x in dict.fromkeys(lugares) if x][:2]
-        for fid in rol["familias"]:
-            if fid in por_id:
-                validas.add(fid)
-                consultas += consultas_post(cobertura.consultas(por_id[fid]), lugares=lugares)
-    consultas = list(dict.fromkeys(consultas))[:max_consultas]
-    formales, posts, stats = buscar_posts(consultas, validas, paises_por_empresa(vacantes))
+    en_cero = {pid for pid, n in deficit.items() if n >= RESCATE_BAJO}  # hoy no tiene ninguna
+    pedidos = sorted([((p["id"] not in en_cero, p["id"] not in sin_local, -deficit[p["id"]]), rol, p)
+                      for rol in cfg_entrega["roles"] for p in rol.get("_perfiles") or [] if p["id"] in deficit],
+                     key=lambda x: x[0])
+    por_perfil, validas = [], set()
+    for _, rol, p in pedidos:
+        familia = por_id.get(next(iter(rol.get("familias") or []), None))  # en modo panel, un cargo = una familia
+        if familia:
+            validas.add(familia["id"])
+            por_perfil.append(consultas_de_perfil(familia, p, hoy))
+    consultas = _intercalar(por_perfil)[:max_consultas]
+    formales, posts, stats = buscar_posts(consultas, validas, publicaciones_apify.paises_por_empresa(vacantes))
     if formales:
         vacantes = incorporar(vacantes, formales)
     posts = [p for p in posts if not contrato.entregable_post(p)]
-    return vacantes, {"perfiles_con_deficit": len(deficit), "consultas": len(consultas),
+    return vacantes, {"perfiles_con_deficit": len(deficit), "perfiles_en_cero": len(en_cero), "consultas": len(consultas),
                       **{k: v for k, v in stats.items() if k in ("publicaciones", "fichas_formales", "posts", "descartadas",
                                                                   "ubicacion_deducida", "ubicacion_sin_confirmar",
-                                                                  *CAMPOS_GASTO)}}, \
-        posts
+                                                                  *CAMPOS_GASTO)}}, posts

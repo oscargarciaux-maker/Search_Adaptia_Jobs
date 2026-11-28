@@ -26,9 +26,13 @@ las reservas de este programa son límites conservadores, no facturas ni estimac
 (lo que se puede reservar por día), USD 3 por corrida, USD 0,025 por consulta y 10 resultados por consulta. Sin
 `ritmo_diario_usd`, el mensual se reparte entre los días del mes (USD 0,16–0,18 diarios con 5).
 
-**Prueba de viabilidad (sección 8.2, 28 nov).** Antes de comprar Starter se gastan los USD 5 gratis al ritmo de Starter
-(`ritmo_diario_usd: 0.63` = 19/30): se agotan en unos 8 días. Comprar Starter = cambiar `tope_mensual_usd` a 19 (y en
-Apify fijar el límite de uso del plan). Si Apify dice que el plan no tiene crédito, el mes queda bloqueado con el tope
+**Desde la P-16.2 (28 nov), el crédito va a posts, no a fichas formales.** El rescate formal de este actor quedó
+apagado (`apify.rescate_busquedas: 0`): traía lo mismo que la búsqueda pública gratis. Todo el crédito va a posts de
+LinkedIn para quien va corto (`docs/CONTRATO_VIGENTE.md` §10), al ritmo de la cuenta gratis (`ritmo_diario_usd: 0.16`
+= 5/31, unos 75 posts al día). Para volver a usar este actor, subir `rescate_busquedas` (cada búsqueda reserva
+`tope_consulta_usd` y deja menos para los posts ese día). Comprar Starter = cambiar `tope_mensual_usd` a 19 y
+`ritmo_diario_usd` a 0.61 (y en Apify fijar el límite de uso del plan). Si Apify dice que el plan no tiene crédito, el
+mes queda bloqueado con el tope
 que había (tabla `apify_bloqueos`, SQL 023) y la fuente no vuelve a reservar hasta el mes siguiente: es un aviso, no una
 avería. Si se compra Starter a mitad de mes, al subir el tope a 19 vuelve a reservar sin borrar nada. El ciclo de
 crédito de Apify va por fecha de facturación: si no coincide con el día 1, puede haber unos días bloqueados de más (o un

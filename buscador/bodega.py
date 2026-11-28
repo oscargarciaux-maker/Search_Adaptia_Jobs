@@ -228,7 +228,7 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
     def f_publicaciones():
         maximo = 6 if p.get("minutos_por_fuente", 50) <= 3 else cfg["apify"].get("publicaciones_por_dia", 72)
         if cfg["apify"].get("publicaciones_por_dia", 0) <= 0:
-            return [], {"omitida": "crédito de Apify reservado a ofertas formales de LinkedIn"}
+            return [], {"omitida": "feed general apagado (publicaciones_por_dia = 0): el crédito va a los posts de quien va corto"}
         return publicaciones_apify.buscar(Cliente(), cfg["apify"].get("actor_publicaciones", ""),
                                           cfg_entrega.get("consultas_publicaciones", []), prioritarias, hoy,
                                           maximo=maximo, control_gasto=control_apify)
@@ -740,10 +740,10 @@ def _correr(salida, modo, consulta, pais, hoy, prueba):
                     vacantes, salud[medicion_apify.SALUD_RESCATE] = refuerzo.rescate_apify(
                         vacantes, entregadas, hoy, entrega.config(), familias.mapa(), buscar_apify, incorporar,
                         iniciales=lote_previo.get("elegidas", {}) if lote_previo.get("fecha") == hoy else None,
-                        max_busquedas=cfg["apify"].get("rescate_busquedas", 4))
+                        max_busquedas=cfg["apify"].get("rescate_busquedas", 0))  # P-16.2: 0 = apagado
             except Exception as e:  # noqa: BLE001 — el rescate nunca tumba la noche
                 salud[medicion_apify.SALUD_RESCATE] = {"error": f"{type(e).__name__}: {e}"[:300]}
-            # Contrato v11: posts de LinkedIn para quien sigue bajo el mínimo, con lo que quede del día de Apify.
+            # Contrato v11 y P-16.2: posts de LinkedIn para quien sigue bajo el mínimo, con el crédito del día de Apify.
             maximo_posts = cfg["apify"].get("posts_rescate", 0)
             if maximo_posts > 0 and not prueba:
                 def buscar_posts(consultas, validas, empresas_pais=None):
@@ -760,7 +760,8 @@ def _correr(salida, modo, consulta, pais, hoy, prueba):
                     with tramo("Posts de LinkedIn"):
                         vacantes, salud[medicion_apify.SALUD_POSTS], posts_nuevos = refuerzo.rescate_posts(
                             vacantes, entregadas, hoy, entrega.config(), familias.mapa(), buscar_posts, incorporar,
-                            iniciales=lote_previo.get("elegidas", {}) if lote_previo.get("fecha") == hoy else None)
+                            iniciales=lote_previo.get("elegidas", {}) if lote_previo.get("fecha") == hoy else None,
+                            max_consultas=cfg["apify"].get("posts_consultas", 12))
                 except Exception as e:  # noqa: BLE001
                     salud[medicion_apify.SALUD_POSTS] = {"error": f"{type(e).__name__}: {e}"[:300]}
     if not prueba and not consulta and not vacantes and not retiradas:

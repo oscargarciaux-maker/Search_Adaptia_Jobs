@@ -1,7 +1,8 @@
 """Prueba de viabilidad de Apify (sección 8.2, decisión de Oscar del 28 nov): ¿vale la pena comprar Starter?
 
-La cuenta gratis da USD 5 al mes y Apify la BLOQUEA al agotarlos. Se gastan al ritmo de Starter (`ritmo_diario_usd`
-en datos/config.yaml, 19/30 ≈ 0,63 al día) y se mide, por día y acumulado en el mes, en `trabajo/apify_medicion.json`:
+La cuenta gratis da USD 5 al mes y Apify la BLOQUEA al agotarlos. Desde la P-16.2 se reparten en el mes entero
+(`ritmo_diario_usd` en datos/config.yaml, 0,16 = 5/31 al día) y van a posts de quien va corto; se mide, por día y
+acumulado en el mes, en `trabajo/apify_medicion.json`:
 
 - `usd_reservado`: lo que se apartó del crédito antes de llamar a Apify (conservador: es lo que cuenta para el tope).
 - `usd_reportado`: lo que Apify informó que costó cada ejecución (`usageTotalUsd`).

@@ -24,8 +24,8 @@ def credito_agotado(detalle):
 
 
 def ritmo(mensual, diario, hoy):
-    """Lo que se puede reservar por día: `diario` (8.2: 0,63 = ritmo de Starter) o, sin él, el tope del mes repartido
-    entre sus días (lo de antes). Nunca más que el tope del mes."""
+    """Lo que se puede reservar por día: `diario` (P-16.2: 0,16 = 5/31 con la cuenta gratis; 0,61 con Starter) o, sin
+    él, el tope del mes repartido entre sus días (lo de antes). Nunca más que el tope del mes."""
     if diario is None:
         dia = date.fromisoformat(hoy)
         return float(mensual) / calendar.monthrange(dia.year, dia.month)[1]

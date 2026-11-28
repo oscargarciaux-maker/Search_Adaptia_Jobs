@@ -102,6 +102,24 @@ def pistas_ubicacion(texto, item=None, empresa="", empresas_pais=None):
     return [], ""
 
 
+# P-16.2: regiones que acotan un remoto (si el post nombra una, no es «sin región») y palabras de oficina.
+_REGION = re.compile(r"\b(europe|european|europa|eu|eea|emea|uk|united kingdom|apac|asia|africa|"
+                     r"oceania|americas|north america|norteamerica|latam|latin america|latinoamerica|america latina|"
+                     r"(?:time ?zones?|zonas? horarias?|husos? horarios?|utc|gmt|cet|est|pst))\b")
+_OFICINA = re.compile(r"\b(presencial|hibrid[oa]|hybrid|semipresencial|on ?site|in office|en (?:la|nuestra|nuestras) "
+                      r"oficinas?|desde (?:la|nuestra|nuestras) oficinas?)\b")
+
+
+def remoto_sin_region(t):
+    """P-16.2: True si el post (texto normalizado) dice que es remoto, sin negarlo, sin hablar de oficina ni de
+    presencialidad, y no nombra ningún país, región, zona horaria ni restricción de residencia. Solo entonces un
+    remoto queda «ubicación sin confirmar» (v28) en vez de descartarse (antes, 8 de 23 el 28 nov): las pistas de dónde
+    está la empresa no dicen a quién contrata en remoto, así que para él no se deduce nada. Ante cualquier duda, no."""
+    afirmado = any(not paises._NO_REMOTO.search(t[max(0, m.start() - 25):m.start()]) for m in paises._REMOTO.finditer(t))
+    return (afirmado and not _OFICINA.search(t) and not _REGION.search(t) and not paises._RESTRINGE.search(t)
+            and not paises.paises_en_texto(t))
+
+
 def paises_por_empresa(vacantes):
     """{empresa normalizada: país} cuando todas sus vacantes con país confirmado están en un solo país."""
     vistos = {}
@@ -212,6 +230,11 @@ def a_vacante(item, familias_validas, hoy=None, max_dias=30, empresas_pais=None)
         if not nombrados:
             nombrados, deducida = pistas_ubicacion(texto, item, empresa, empresas_pais)
         sin_confirmar = not nombrados
+    elif not nombrados:
+        # P-16.2: un post remoto que nombra un país de fuera («remote (USA)», «Remote - United Kingdom») tiene esa
+        # ubicación y se evalúa con ella, como cualquier otro.
+        nombrados = sorted(paises.paises_en_texto(t))[:3]
+        sin_confirmar = not nombrados and remoto_sin_region(t)
     if not ACCION.search(t) and not re.search(r"https?://", texto):
         return None, "no pide postular ni escribir"
     fecha = str(_campo(item, "postedAt.date", "postedAt", "publishedAt", "date"))[:10]
@@ -283,7 +306,7 @@ def buscar(cliente, actor, consultas, familias_validas, hoy, maximo=60, token=No
     if not consultas:
         return [], {"omitida": "sin consultas_publicaciones en datos/entrega.yaml"}
     if maximo <= 0:
-        return [], {"omitida": "presupuesto reservado a ofertas formales"}
+        return [], {"omitida": "feed general apagado: el crédito va a los posts de quien va corto"}
     control_gasto = control_gasto or Presupuesto({}, hoy)
     cargo = control_gasto.reservar(0.025)
     if not cargo:
@@ -319,15 +342,39 @@ def buscar(cliente, actor, consultas, familias_validas, hoy, maximo=60, token=No
                     "descartadas": motivos, **gasto([ejecucion])}
 
 
-def consultas_post(terminos, maximo=2, lugares=()):
-    """Consultas del buscador de posts para un cargo: contratación + el término exacto (máx. 5 operadores). Contrato
-    v28: con `lugares` (países de los perfiles con déficit o «remoto»), una consulta más por lugar con el primer
-    término, para traer posts que sí nombran dónde es."""
-    terminos = list(dict.fromkeys(terminos))
-    salida = [f'(hiring OR contratando OR vacante OR buscamos) "{t}"' for t in terminos[:maximo]]
-    if terminos:
-        salida += [f'(hiring OR contratando OR buscamos) "{terminos[0]}" {lugar}' for lugar in lugares]
-    return salida
+# P-16.2: precio del actor de posts (harvestapi/linkedin-post-search, pago por post: «USD 2 por 1.000» en su página;
+# el 28 nov Apify informó USD 0,049 por 23 posts) y un margen fijo por corrida. Solo sirve para reservar: Apify nunca
+# cobra más que lo reservado (`maxTotalChargeUsd`).
+USD_POR_POST, USD_POR_CORRIDA = 0.002, 0.01
+
+
+def costo_posts(n):
+    """Lo que se reserva para pedir `n` posts."""
+    return round(n * USD_POR_POST + USD_POR_CORRIDA, 3)
+
+
+def posts_que_caben(reservado, maximo):
+    """Posts que se pueden pedir con lo reservado, sin pasar de `maximo` (al menos 1: Apify corta en lo reservado)."""
+    return max(1, min(int(maximo), int((float(reservado) - USD_POR_CORRIDA) / USD_POR_POST + 1e-9)))
+
+
+# P-16.2: palabras de contratación en el idioma del perfil, para que el post venga en ese idioma (un post en español
+# suele nombrar el cargo en inglés: «Buscamos Product Designer»), y la modalidad en ese idioma. Nunca un país ni una
+# ciudad: remoto = de todo el mundo con los demás requisitos (decisión de Oscar, 28 nov), y así la consulta no lleva
+# datos de nadie (solo cargo, idioma y modalidad).
+CONTRATA_POST = {"es": '(contratando OR vacante OR buscamos OR "estamos buscando")',
+                 "en": '(hiring OR "we are hiring" OR "join our team")'}
+# Formas de decir «remoto» en cada idioma: cada consulta usa una y rotan por día y por consulta (no suman consultas).
+REMOTO_POST = {"es": ("remoto", "teletrabajo", '"trabajo desde casa"'), "en": ("remote", '"work from home"')}
+
+
+def consulta_post(termino, idioma="en", remoto=False):
+    """Una consulta del buscador de posts: contratación en `idioma` + el término exacto + la modalidad. `remoto`:
+    False (sin modalidad), True (la primera forma de `REMOTO_POST`) o la forma que se quiera usar."""
+    salida = f'{CONTRATA_POST.get(idioma, CONTRATA_POST["en"])} "{termino}"'
+    if remoto is True:
+        remoto = REMOTO_POST.get(idioma, REMOTO_POST["en"])[0]
+    return f"{salida} {remoto}" if remoto else salida
 
 
 # Lectura acotada compartida con la ficha del panel (contrato v29): mismos límites que en el contrato v28.
@@ -370,9 +417,12 @@ def buscar_posts(cliente, actor, consultas, familias_validas, hoy, maximo=30, to
     if not consultas or maximo <= 0:
         return [], [], {"omitida": "sin consultas o sin posts en el presupuesto"}
     control_gasto = control_gasto or Presupuesto({}, hoy)
-    cargo = control_gasto.reservar(round(maximo * 0.002 + 0.01, 3))  # ≈ USD 2 por 1.000 posts
+    cargo = control_gasto.reservar(costo_posts(maximo))
     if not cargo:
         return [], [], {"omitida": "presupuesto de Apify agotado", **_sin_reserva(control_gasto)}
+    # P-16.2: `maximo` es un tope; lo que se pide es lo que cabe en lo reservado (el ritmo del día). Así el mismo
+    # `posts_rescate` sirve con la cuenta gratis y con Starter, sin tocarlo. Apify nunca cobra más que `cargo`.
+    maximo = posts_que_caben(cargo, maximo)
     items, ejecucion = ejecutar(cliente, actor, entrada(actor, consultas, max(1, maximo // len(consultas)), hoy), token,
                                 cargo, max_items=maximo, limite_segundos=180)
     if ejecucion.get("credito_agotado"):
