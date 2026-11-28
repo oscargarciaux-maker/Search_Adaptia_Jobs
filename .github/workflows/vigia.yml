@@ -24,7 +24,7 @@ jobs:
   vigia:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
@@ -54,10 +54,24 @@ jobs:
           if git fetch -q --depth 1 origin publicado; then
             git ls-tree -r -l FETCH_HEAD | awk '{print $4}' > "$datos/publicado.txt"
           fi
+      - name: Traer la firma de los avisos anteriores
+        # Solo un sha256 corto de qué avisos había (sin textos ni cifras): si cambian, el aviso nuevo se reenvía aunque
+        # el check de Healthchecks ya estuviera en rojo (Healthchecks solo manda correo cuando cambia de estado).
+        uses: actions/cache/restore@v4
+        with:
+          path: vigia-firma.txt
+          key: vigia-firma-${{ github.run_id }}
+          restore-keys: vigia-firma-
       - name: Revisar y avisar
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           AVISO_ATENCION_URL: ${{ secrets.AVISO_ATENCION_URL }}
-        run: python -m buscador.vigia --datos "$RUNNER_TEMP/vigia"
+        run: python -m buscador.vigia --datos "$RUNNER_TEMP/vigia" --firma vigia-firma.txt
+      - name: Guardar la firma de hoy
+        if: hashFiles('vigia-firma.txt') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: vigia-firma.txt
+          key: vigia-firma-${{ github.run_id }}

@@ -25,7 +25,7 @@ on:
     - cron: "53 * * * *" # respaldo: reanuda la cadena cuando GitHub dispare un horario
 
 permissions:
-  actions: write # solo para pedir reloj.yml, incremental.yml y bodega.yml con workflow_dispatch
+  actions: write # solo para pedir reloj.yml, incremental.yml, bodega.yml y vigia.yml con workflow_dispatch
   contents: read
 
 jobs:
@@ -110,7 +110,7 @@ jobs:
         run: |
           lista="$RUNNER_TEMP/vigias.json"
           gh run list --workflow vigia.yml --limit 20 --json databaseId,status,conclusion,createdAt,event,headBranch > "$lista" || exit 0
-          if python3 -m buscador.arranque --avisos "$lista" --rama "$RAMA" | grep -qx 'vigia=true'; then
+          if python3 -m buscador.arranque --avisos "$lista" --rama "$RAMA" | grep -qx 'avisos=true'; then
             gh workflow run vigia.yml --ref "$RAMA" || echo "::warning::No se pudo pedir el Vigía de avisos."
           fi
       - name: Avisar si falta el temporizador

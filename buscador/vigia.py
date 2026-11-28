@@ -26,39 +26,56 @@ nunca: `texto_seguro` comprueba cada línea contra la lista blanca y, si una no 
 Uso (vigia.yml): `python -m buscador.vigia --datos CARPETA`, con los JSON de `gh` que reúne el flujo.
 """
 import argparse
-from datetime import date, datetime, timezone
-import json
+from datetime import date, datetime, timedelta, timezone
+import hashlib
 import os
 from pathlib import Path
 import re
 import sys
 import time
+from typing import NamedTuple
 
 import requests
 import yaml
 
-from buscador.arranque import BOGOTA, _instante
+from buscador import almacen_respaldos, inventario, migraciones, supabase
+from buscador.arranque import BOGOTA, _instante, _leer_json
 
 RAIZ = Path(__file__).resolve().parent.parent
 CADUCIDADES = RAIZ / "datos" / "caducidades.yaml"
 
 AVISO, URGENTE = 0.80, 0.95
-LIMITE_BASE = 500 * 1_048_576            # plan gratuito de Supabase (inventario.LIMITE_GRATIS_MB)
+LIMITE_BASE = inventario.LIMITE_GRATIS_MB * 1_048_576
 LIMITE_PUBLICADO = 100 * 1_048_576       # GitHub rechaza el push de un archivo de más de 100 MiB
 DIAS_SIN_COMMIT, DIAS_URGENTE_COMMIT = 30, 50  # GitHub apaga los horarios a los 60
 ANTELACION = {"soporte": 180, "clave": 30}
+URGENTE_DIAS = 30                        # una caducidad a 30 días o menos es urgente
 FALLO = {"failure", "timed_out", "startup_failure"}
+VENTANA_ROJO = 24                        # horas: un rojo de la Bodega que no tapó una búsqueda real posterior
+ESPERA_STORAGE = 30                      # segundos por petición a Storage (el job tiene 15 minutos)
 
 SOPORTE = "Reenvía este correo a soporte técnico."
 PRO = "Entra en Supabase → Organization → Billing y cambia el plan a Pro (o pide a soporte técnico el traspaso a la cuenta Pro del cliente)."
-# clave → archivo, nombre visible en GitHub, horas sin terminar bien antes de avisar, fallos seguidos para avisar, paso.
+
+
+class Flujo(NamedTuple):
+    archivo: str
+    nombre: str           # el que se ve en GitHub → Actions
+    horas: int            # sin terminar bien más de esto: «parado»
+    seguidos: int         # rojos seguidos para avisar
+    urgente: bool         # su rojo o su parada es urgente
+    paso: str
+    tapable: bool = False  # hay corridas que terminan en verde sin trabajar (respaldos de la Bodega)
+
+
 FLUJOS = {
-    "bodega": ("bodega.yml", "Bodega nocturna", 30, 1,
-               "Entra en el panel y pulsa «Buscar ahora»; si vuelve a salir en rojo, reenvía este correo a soporte técnico."),
-    "captura": ("incremental.yml", "Captura horaria", 6, 2, SOPORTE),
-    "reloj": ("reloj.yml", "Reloj", 3, 3, "Entra en GitHub → Actions → Reloj y pulsa «Run workflow»."),
-    "respaldo": ("respaldo.yml", "Copia de seguridad semanal", 8 * 24, 1,
-                 "Entra en GitHub → Actions → Copia de seguridad semanal y pulsa «Run workflow»."),
+    "bodega": Flujo("bodega.yml", "Bodega nocturna", 30, 1, True,
+                    "Entra en el panel y pulsa «Buscar ahora»; si vuelve a salir en rojo, reenvía este correo a "
+                    "soporte técnico.", tapable=True),
+    "captura": Flujo("incremental.yml", "Captura horaria", 6, 2, False, SOPORTE),
+    "reloj": Flujo("reloj.yml", "Reloj", 3, 3, False, "Entra en GitHub → Actions → Reloj y pulsa «Run workflow»."),
+    "respaldo": Flujo("respaldo.yml", "Copia de seguridad semanal", 8 * 24, 1, True,
+                      "Entra en GitHub → Actions → Copia de seguridad semanal y pulsa «Run workflow»."),
 }
 NO_MEDIDO = {"corridas": "el estado de las corridas", "flujos": "si los flujos están activos",
              "base": "el tamaño de la base", "storage": "el espacio de las copias",
@@ -66,10 +83,11 @@ NO_MEDIDO = {"corridas": "el estado de las corridas", "flujos": "si los flujos e
              "caducidades": "la lista de caducidades"}
 
 # Lista blanca: lo único que puede salir. {n}/{pct}/{dias} = cifra entera, {fecha} = AAAA-MM-DD, {flujo} = nombre de
-# FLUJOS, {que} = valor de NO_MEDIDO, {nombre}/{paso} = texto de caducidades.yaml que cumple TEXTO_LIBRE.
+# FLUJOS, {paso_flujo} = su paso, {que} = valor de NO_MEDIDO, {nombre}/{paso} = texto de caducidades.yaml que cumple
+# TEXTO_LIBRE.
 PLANTILLAS = {
-    "flujo_rojo": ("«{flujo}» terminó en rojo.", None),
-    "flujo_parado": ("«{flujo}» lleva más de {n} horas sin terminar bien.", None),
+    "flujo_rojo": ("«{flujo}» terminó en rojo.", "{paso_flujo}"),
+    "flujo_parado": ("«{flujo}» lleva más de {n} horas sin terminar bien.", "{paso_flujo}"),
     "flujo_desactivado": ("«{flujo}» está desactivado en GitHub.",
                           "Entra en GitHub → Actions → {flujo} y pulsa «Enable workflow»."),
     "base": ("La base de Supabase ocupa el {pct} % de sus 500 MB.", PRO),
@@ -88,6 +106,7 @@ GENERICO = "AVISO: el Vigía encontró algo que no sabe describir. Paso: " + SOP
 
 
 class Aviso:
+    """Un aviso: su código de PLANTILLAS, si es urgente y los valores que la plantilla rellena."""
     __slots__ = ("codigo", "urgente", "valores")
 
     def __init__(self, codigo, urgente=False, **valores):
@@ -98,43 +117,50 @@ class Aviso:
 
 
 # ---------------------------------------------------------------- comprobaciones (puras)
-def _nivel(fraccion):
-    """None bajo el 80 %, False (aviso) desde el 80 % y True (urgente) desde el 95 %."""
-    return None if fraccion < AVISO else fraccion >= URGENTE
-
-
 def por_uso(codigo, usado, limite):
-    nivel = _nivel(usado / limite)
-    return [] if nivel is None else [Aviso(codigo, nivel, pct=int(100 * usado / limite))]
+    """Aviso desde el 80 % del límite; urgente desde el 95 %."""
+    fraccion = usado / limite
+    if fraccion < AVISO:
+        return []
+    return [Aviso(codigo, fraccion >= URGENTE, pct=int(100 * fraccion))]
 
 
 def de_corridas(clave, corridas, rama, ahora):
-    """Avisos de un flujo a partir de `gh run list --json …` (solo estados y fechas)."""
-    _, nombre, horas, seguidos, _ = FLUJOS[clave]
+    """Avisos de un flujo a partir de `gh run list --json …` (solo estados y fechas).
+    En la Bodega (`tapable`) los horarios de respaldo terminan en verde sin trabajar cuando la de la mañana ya publicó,
+    aunque esa haya terminado en rojo: un rojo de las últimas 24 horas solo lo tapa una corrida pedida
+    (`workflow_dispatch`: «Buscar ahora» o el Reloj, que siempre trabajan) que terminó bien después."""
+    f = FLUJOS[clave]
     lista = [c for c in corridas if isinstance(c, dict) and c.get("headBranch") == rama]
     terminadas = sorted((c for c in lista if c.get("status") == "completed"
                          and c.get("conclusion") not in ("cancelled", "skipped")),
                         key=lambda c: c.get("createdAt") or "", reverse=True)
-    salida = []
-    ultimas = terminadas[:seguidos]
-    if len(ultimas) == seguidos and all(c.get("conclusion") in FALLO for c in ultimas):
-        salida.append(Aviso("flujo_rojo", clave in ("bodega", "respaldo"), flujo=clave))
+    if f.tapable:
+        rojas = [c for c in terminadas if c.get("conclusion") in FALLO
+                 and (_instante(c.get("createdAt")) or ahora) > ahora - timedelta(hours=VENTANA_ROJO)]
+        rojo = bool(rojas) and not any(c.get("conclusion") == "success" and c.get("event") == "workflow_dispatch"
+                                       and (c.get("createdAt") or "") > (rojas[0].get("createdAt") or "")
+                                       for c in terminadas)
+    else:
+        ultimas = terminadas[:f.seguidos]
+        rojo = len(ultimas) == f.seguidos and all(c.get("conclusion") in FALLO for c in ultimas)
+    if rojo:
+        return [Aviso("flujo_rojo", f.urgente, flujo=clave)]  # si ya está en rojo, un solo aviso basta
     buenas = [i for i in (_instante(c.get("createdAt")) for c in terminadas if c.get("conclusion") == "success") if i]
-    if not buenas or (ahora - max(buenas)).total_seconds() > horas * 3600:
-        if not salida:  # si ya está en rojo, un solo aviso basta
-            salida.append(Aviso("flujo_parado", clave == "bodega", flujo=clave, n=horas))
-    return salida
+    if not buenas or (ahora - max(buenas)).total_seconds() > f.horas * 3600:
+        return [Aviso("flujo_parado", f.urgente, flujo=clave, n=f.horas)]
+    return []
 
 
 def de_flujos(flujos):
     """`gh workflow list --all --json path,state`: los flujos clave que no están activos (p. ej. `disabled_inactivity`)."""
     estados = {Path(str(f.get("path", ""))).name: f.get("state") for f in flujos if isinstance(f, dict)}
-    return [Aviso("flujo_desactivado", True, flujo=clave) for clave, (archivo, *_r) in FLUJOS.items()
-            if archivo in estados and estados[archivo] != "active"]
+    return [Aviso("flujo_desactivado", True, flujo=clave) for clave, f in FLUJOS.items()
+            if f.archivo in estados and estados[f.archivo] != "active"]
 
 
 def de_commit(fecha, ahora):
-    instante = _instante(fecha)
+    instante = _instante(fecha) if fecha else None
     if instante is None:
         return [Aviso("no_medido", que="commit")]
     dias = (ahora - instante).days
@@ -146,6 +172,9 @@ def de_publicado(tamanos):
 
 
 def _fecha(valor):
+    """Una fecha de YAML (también si alguien le puso hora) o un texto AAAA-MM-DD."""
+    if isinstance(valor, datetime):
+        return valor.date()
     if isinstance(valor, date):
         return valor
     return date.fromisoformat(str(valor))
@@ -158,19 +187,19 @@ def de_caducidades(datos, hoy):
     for e in (datos or {}).get("caducidades") or []:
         try:
             nombre, paso, tipo = str(e["nombre"]), str(e["paso"]), str(e["tipo"])
-            fecha = _fecha(e["fecha"])
+            faltan = (_fecha(e["fecha"]) - hoy).days
+            fecha = _fecha(e["fecha"]).isoformat()
             antelacion = int(e.get("aviso_dias", ANTELACION[tipo]))
-        except (KeyError, TypeError, ValueError):
+        except (KeyError, TypeError, ValueError, AttributeError):
             rota = True
             continue
         if not (re.fullmatch(TEXTO_LIBRE, nombre) and re.fullmatch(TEXTO_LIBRE, paso)):
             rota = True
             continue
-        faltan = (fecha - hoy).days
         if faltan < 0:
-            salida.append(Aviso("caducado", True, nombre=nombre, fecha=fecha.isoformat(), paso=paso))
+            salida.append(Aviso("caducado", True, nombre=nombre, fecha=fecha, paso=paso))
         elif faltan <= antelacion:
-            salida.append(Aviso("caduca", faltan <= 30, nombre=nombre, fecha=fecha.isoformat(), dias=faltan, paso=paso))
+            salida.append(Aviso("caduca", faltan <= URGENTE_DIAS, nombre=nombre, fecha=fecha, dias=faltan, paso=paso))
     if rota:
         salida.append(Aviso("no_medido", que="caducidades"))
     return salida
@@ -178,7 +207,8 @@ def de_caducidades(datos, hoy):
 
 # ---------------------------------------------------------------- texto (lista blanca)
 _TIPOS = {"n": r"\d+", "pct": r"\d+", "dias": r"\d+", "fecha": r"\d{4}-\d{2}-\d{2}",
-          "flujo": "|".join(re.escape(f[1]) for f in FLUJOS.values()),
+          "flujo": "|".join(re.escape(f.nombre) for f in FLUJOS.values()),
+          "paso_flujo": "|".join(re.escape(f.paso) for f in FLUJOS.values()),
           "que": "|".join(re.escape(v) for v in NO_MEDIDO.values()),
           "nombre": TEXTO_LIBRE, "paso": TEXTO_LIBRE}
 
@@ -188,16 +218,10 @@ def _patron(plantilla):
     return "".join(re.escape(t) if i % 2 == 0 else f"(?:{_TIPOS[t]})" for i, t in enumerate(trozos))
 
 
-def _patrones():
-    salida = [r"Adaptia · Vigía \d{4}-\d{2}-\d{2}: (?:todo en orden|\d+ avisos?)\."]
-    for codigo, (que, paso) in PLANTILLAS.items():
-        pasos = [_patron(paso)] if paso else [re.escape(f[4]) for f in FLUJOS.values()]
-        salida += [f"(?:AVISO|URGENTE): {_patron(que)} Paso: (?:{p})" for p in pasos]
-    salida.append(re.escape(GENERICO))
-    return [re.compile(p) for p in salida]
-
-
-PATRONES = _patrones()
+PATRONES = [re.compile(p) for p in (
+    [r"Adaptia · Vigía \d{4}-\d{2}-\d{2}: (?:todo en orden|\d+ avisos?)\."]
+    + [f"(?:AVISO|URGENTE): {_patron(que)} Paso: {_patron(paso)}" for que, paso in PLANTILLAS.values()]
+    + [re.escape(GENERICO)])]
 
 
 def _valores(aviso):
@@ -209,7 +233,7 @@ def _valores(aviso):
                 raise ValueError(clave)
             salida[clave] = str(valor)
         elif clave == "flujo":
-            salida[clave] = FLUJOS[valor][1]
+            salida[clave], salida["paso_flujo"] = FLUJOS[valor].nombre, FLUJOS[valor].paso
         elif clave == "que":
             salida[clave] = NO_MEDIDO[valor]
         elif clave in ("fecha", "nombre", "paso"):
@@ -223,7 +247,6 @@ def linea(aviso):
     try:
         que, paso = PLANTILLAS[aviso.codigo]
         valores = _valores(aviso)
-        paso = paso or FLUJOS[aviso.valores["flujo"]][4]
         return f"{'URGENTE' if aviso.urgente else 'AVISO'}: {que.format(**valores)} Paso: {paso.format(**valores)}"
     except (KeyError, ValueError, IndexError):
         return GENERICO
@@ -231,7 +254,7 @@ def linea(aviso):
 
 def texto_seguro(lineas):
     """Cada línea debe encajar entera en un patrón de la lista blanca; si no, se cambia por la genérica."""
-    return [l if any(p.fullmatch(l) for p in PATRONES) else GENERICO for l in lineas]
+    return [t if any(p.fullmatch(t) for p in PATRONES) else GENERICO for t in lineas]
 
 
 def componer(avisos, hoy):
@@ -241,25 +264,42 @@ def componer(avisos, hoy):
     return "\n".join(texto_seguro([cabecera] + [linea(a) for a in avisos]))
 
 
+def firma(avisos):
+    """Qué avisos hay (sin las cifras, que cambian cada día): vacía si no hay ninguno. Solo un sha256 corto."""
+    if not avisos:
+        return ""
+    claves = sorted(f"{a.codigo}:{a.urgente}:{a.valores.get('flujo') or a.valores.get('que') or a.valores.get('nombre') or ''}"
+                    for a in avisos)
+    return hashlib.sha256("\n".join(claves).encode("utf-8")).hexdigest()[:16]
+
+
 # ---------------------------------------------------------------- mediciones con servicios
 def tamano_base(conn):
-    """Bytes de la base, en una transacción de solo lectura (la misma consulta de inventario.py)."""
-    from buscador.inventario import CONSULTAS
+    """Bytes de la base, en una transacción de solo lectura. La consulta es la de inventario.py; no se llama a
+    `inventario.consultar` porque lanza todas las demás (tablas, índices, permisos) y el Vigía solo necesita esta."""
     with conn.transaction():
         conn.execute("set transaction read only")
         conn.execute("set local statement_timeout = '30s'")
-        return int(conn.execute(CONSULTAS["tamano"]).fetchone()[0])
+        return int(conn.execute(inventario.CONSULTAS["tamano"]).fetchone()[0])
 
 
 def medir_base():
-    from buscador import migraciones, supabase
-    with migraciones.conexion(os.environ.get("SUPABASE_DB_URL", ""), supabase.base(os.environ.get("SUPABASE_URL", ""))) as conn:
+    url = supabase.base(os.environ.get("SUPABASE_URL", ""))
+    with migraciones.conexion(os.environ.get("SUPABASE_DB_URL", ""), url) as conn:
         return tamano_base(conn)
 
 
+class _SesionCorta(requests.Session):
+    """`almacen_respaldos` espera hasta 600 s por petición (subidas de 40 MiB). Para listar basta mucho menos: así un
+    Storage colgado no agota el tope del job y el ping del día sale igual (con «no se pudo comprobar»)."""
+
+    def request(self, *a, **k):
+        k["timeout"] = min(k.get("timeout") or ESPERA_STORAGE, ESPERA_STORAGE)
+        return super().request(*a, **k)
+
+
 def medir_storage(almacen=None):
-    from buscador import almacen_respaldos
-    return almacen_respaldos.ocupado(almacen or almacen_respaldos.Almacen())
+    return almacen_respaldos.ocupado(almacen or almacen_respaldos.Almacen(sesion=_SesionCorta(), pausa=2))
 
 
 def _medir(codigo, funcion, limite, avisos):
@@ -271,21 +311,11 @@ def _medir(codigo, funcion, limite, avisos):
 
 
 # ---------------------------------------------------------------- envío
-def enviar(url, texto, hay_avisos, sesion=None, pausa=5):
-    """POST al check de Healthchecks: la URL sola si todo va bien y `/fail` si hay avisos. Devuelve True si llegó.
-    Nunca imprime la URL (es un secreto) ni falla la corrida: si el ping no llega, Healthchecks avisa por su cuenta."""
-    url = (url or "").strip().rstrip("/")
-    if not url:
-        print("::warning::Falta el secreto AVISO_ATENCION_URL: el Vigía revisó todo, pero no avisa a nadie. "
-              "Ver docs/OPERACION_Y_RECUPERACION.md §1.", file=sys.stderr)
-        return False
-    if not url.startswith("https://"):
-        print("::warning::AVISO_ATENCION_URL no empieza por https://: no se envía nada.", file=sys.stderr)
-        return False
-    sesion = sesion or requests
+def _ping(sesion, url, texto, pausa):
+    causa = ""
     for intento in range(3):
         try:
-            r = sesion.post(url + ("/fail" if hay_avisos else ""), data=texto.encode("utf-8"), timeout=10,
+            r = sesion.post(url, data=texto.encode("utf-8"), timeout=10,
                             headers={"Content-Type": "text/plain; charset=utf-8"})
             if 200 <= r.status_code < 300:
                 return True
@@ -298,14 +328,28 @@ def enviar(url, texto, hay_avisos, sesion=None, pausa=5):
     return False
 
 
+def enviar(url, texto, hay_avisos, sesion=None, pausa=5, reavisar=False):
+    """POST al check de Healthchecks: la URL sola si todo va bien y `/fail` si hay avisos. Devuelve True si llegó.
+    Healthchecks solo manda correo cuando el check cambia de estado: si ya estaba en rojo por otro aviso (`reavisar`),
+    primero se pone en verde y luego en rojo, para que el aviso nuevo llegue también por correo.
+    Nunca imprime la URL (es un secreto) ni falla la corrida: si el ping no llega, Healthchecks avisa por su cuenta."""
+    url = (url or "").strip().rstrip("/")
+    if not url:
+        print("::warning::Falta el secreto AVISO_ATENCION_URL: el Vigía revisó todo, pero no avisa a nadie. "
+              "Ver docs/OPERACION_Y_RECUPERACION.md §1.", file=sys.stderr)
+        return False
+    if not url.startswith("https://"):
+        print("::warning::AVISO_ATENCION_URL no empieza por https://: no se envía nada.", file=sys.stderr)
+        return False
+    sesion = sesion or requests
+    if not hay_avisos:
+        return _ping(sesion, url, texto, pausa)
+    if reavisar:
+        _ping(sesion, url, texto, pausa)
+    return _ping(sesion, url + "/fail", texto, pausa)
+
+
 # ---------------------------------------------------------------- línea de órdenes
-def _json(ruta):
-    try:
-        return json.loads(Path(ruta).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-
-
 def _texto(ruta):
     try:
         return Path(ruta).read_text(encoding="utf-8").strip()
@@ -313,55 +357,55 @@ def _texto(ruta):
         return None
 
 
-def revisar(carpeta, ahora=None, medir_base=medir_base, medir_storage=medir_storage, caducidades=CADUCIDADES):
-    """Todos los avisos de hoy. `carpeta` trae lo que reúne vigia.yml con `gh` (ver el flujo)."""
+def revisar(carpeta, ahora=None, base=medir_base, storage=medir_storage, caducidades=CADUCIDADES):
+    """Todos los avisos de hoy. `carpeta` trae lo que reúne vigia.yml con `gh` (ver el flujo); `base` y `storage`
+    miden en bytes (en las pruebas, funciones falsas)."""
     ahora = ahora or datetime.now(timezone.utc)
     hoy = ahora.astimezone(BOGOTA).date()
     carpeta, avisos = Path(carpeta), []
     rama = _texto(carpeta / "rama.txt") or "main"
-    corridas = {clave: _json(carpeta / f"corridas_{clave}.json") for clave in FLUJOS}
+    corridas = {clave: _leer_json(carpeta / f"corridas_{clave}.json") for clave in FLUJOS}
     if any(not isinstance(v, list) for v in corridas.values()):
         avisos.append(Aviso("no_medido", que="corridas"))
     for clave, lista in corridas.items():
         if isinstance(lista, list):
             avisos += de_corridas(clave, lista, rama, ahora)
-    flujos = _json(carpeta / "flujos.json")
-    if isinstance(flujos, list):
-        avisos += de_flujos(flujos)
-    else:
-        avisos.append(Aviso("no_medido", que="flujos"))
+    flujos = _leer_json(carpeta / "flujos.json")
+    avisos += de_flujos(flujos) if isinstance(flujos, list) else [Aviso("no_medido", que="flujos")]
     avisos += de_commit(_texto(carpeta / "commit.txt"), ahora)
     publicado = _texto(carpeta / "publicado.txt")
     if publicado is None:
         avisos.append(Aviso("no_medido", que="publicado"))
     else:
         avisos += de_publicado([int(x) for x in publicado.split() if x.isdigit()])
-    _medir("base", medir_base, LIMITE_BASE, avisos)
-    from buscador.almacen_respaldos import CUOTA_GRATUITA
-    _medir("storage", medir_storage, CUOTA_GRATUITA, avisos)
+    _medir("base", base, LIMITE_BASE, avisos)
+    _medir("storage", storage, almacen_respaldos.CUOTA_GRATUITA, avisos)
     try:
         datos = yaml.safe_load(Path(caducidades).read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
         datos = None
-    if isinstance(datos, dict):
-        avisos += de_caducidades(datos, hoy)
-    else:
-        avisos.append(Aviso("no_medido", que="caducidades"))
+    avisos += de_caducidades(datos, hoy) if isinstance(datos, dict) else [Aviso("no_medido", que="caducidades")]
     return avisos, hoy
 
 
-def main(argv=None, ahora=None, sesion=None, **medidores):
+def main(argv=None, ahora=None, sesion=None, base=medir_base, storage=medir_storage, caducidades=CADUCIDADES):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--datos", required=True, help="Carpeta con lo que reúne vigia.yml (gh run list, etc.)")
+    ap.add_argument("--firma", help="Archivo con la firma de los avisos de la corrida anterior; se reescribe con la de "
+                    "hoy (vigia.yml lo guarda en la caché de Actions). Sin él, un cambio de avisos se reenvía siempre.")
     args = ap.parse_args(argv)
-    avisos, hoy = revisar(args.datos, ahora, **medidores)
+    avisos, hoy = revisar(args.datos, ahora, base=base, storage=storage, caducidades=caducidades)
     texto = componer(avisos, hoy)
     print(texto)
     destino = os.environ.get("GITHUB_STEP_SUMMARY")
     if destino:
         with open(destino, "a", encoding="utf-8") as f:
             f.write("## Vigía de avisos\n\n" + texto.replace("\n", "\n\n") + "\n")
-    enviar(os.environ.get("AVISO_ATENCION_URL"), texto, bool(avisos), sesion=sesion)
+    nueva = firma(avisos)
+    anterior = _texto(args.firma) if args.firma else None  # None = no se sabe cómo quedó el check
+    reavisar = anterior != "" and anterior != nueva
+    if enviar(os.environ.get("AVISO_ATENCION_URL"), texto, bool(avisos), sesion=sesion, reavisar=reavisar) and args.firma:
+        Path(args.firma).write_text(nueva, encoding="utf-8")
 
 
 if __name__ == "__main__":

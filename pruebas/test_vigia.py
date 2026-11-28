@@ -31,7 +31,7 @@ def _carpeta(tmp_path, corridas=None, flujos=None, commit=None, publicado="1000\
     for clave, lista in {**SANAS, **(corridas or {})}.items():
         if lista is not None:
             (tmp_path / f"corridas_{clave}.json").write_text(json.dumps(lista), encoding="utf-8")
-    estado = flujos if flujos is not None else [{"path": f".github/workflows/{f[0]}", "state": "active"}
+    estado = flujos if flujos is not None else [{"path": f".github/workflows/{f.archivo}", "state": "active"}
                                                 for f in vigia.FLUJOS.values()]
     (tmp_path / "flujos.json").write_text(json.dumps(estado), encoding="utf-8")
     (tmp_path / "commit.txt").write_text(commit or (AHORA - timedelta(days=2)).isoformat(), encoding="utf-8")
@@ -50,7 +50,7 @@ def _caducidades(tmp_path, entradas=()):
 def _revisar(tmp_path, base=100 * MB, storage=200_000_000, entradas=(), **carpeta):
     (tmp_path / "datos").mkdir(parents=True)
     datos = _carpeta(tmp_path / "datos", **carpeta)
-    return vigia.revisar(datos, AHORA, medir_base=lambda: base, medir_storage=lambda: storage,
+    return vigia.revisar(datos, AHORA, base=lambda: base, storage=lambda: storage,
                          caducidades=_caducidades(tmp_path, entradas))[0]
 
 
@@ -106,6 +106,12 @@ def test_caducidades_con_su_antelacion(tipo, faltan, esperado):
     assert _codigos(vigia.de_caducidades({"caducidades": [entrada]}, hoy)) == esperado
 
 
+def test_una_fecha_con_hora_no_tumba_el_vigia():
+    hoy = date(2026, 11, 28)
+    entrada = {"nombre": "Token", "tipo": "clave", "fecha": datetime(2026, 12, 5, 10, 0), "paso": "Genera otro."}
+    assert _codigos(vigia.de_caducidades({"caducidades": [entrada]}, hoy)) == [("caduca", True)]
+
+
 def test_una_caducidad_con_texto_raro_no_sale_y_se_avisa_que_no_se_pudo_comprobar():
     hoy = date(2026, 11, 28)
     malas = [{"nombre": "x", "tipo": "clave", "fecha": hoy, "paso": "Escribe a alguien" + "@" + "ejemplo.com"},
@@ -119,6 +125,18 @@ def test_una_caducidad_con_texto_raro_no_sale_y_se_avisa_que_no_se_pudo_comproba
 def test_bodega_en_rojo_avisa_urgente_y_un_solo_aviso(tmp_path):
     avisos = _revisar(tmp_path, corridas={"bodega": [_corrida(2, "failure"), _corrida(30)]})
     assert [(a.codigo, a.urgente, a.valores["flujo"]) for a in avisos] == [("flujo_rojo", True, "bodega")]
+
+
+def test_un_respaldo_de_la_bodega_que_no_trabajo_no_tapa_el_rojo(tmp_path):
+    # La de la mañana publica y termina en AVERÍA; los horarios de respaldo terminan en verde sin trabajar.
+    corridas = [_corrida(1, evento="schedule"), _corrida(2, evento="schedule"), _corrida(3, "failure")]
+    assert _codigos(_revisar(tmp_path, corridas={"bodega": corridas})) == [("flujo_rojo", True)]
+    # «Buscar ahora» (o el Reloj) después del rojo sí trabaja: lo tapa.
+    corridas = [_corrida(1), _corrida(3, "failure", evento="schedule")]
+    assert _revisar(tmp_path / "b", corridas={"bodega": corridas}) == []
+    # Un rojo de hace más de 24 h ya no cuenta si después hubo verdes.
+    corridas = [_corrida(2, evento="schedule"), _corrida(25, "failure")]
+    assert _revisar(tmp_path / "c", corridas={"bodega": corridas}) == []
 
 
 def test_bodega_que_no_termina_bien_en_30_horas_avisa_aunque_no_haya_rojo(tmp_path):
@@ -150,7 +168,7 @@ def test_lo_que_no_se_pudo_leer_se_avisa_como_no_comprobado(tmp_path):
     datos = _carpeta(tmp_path, corridas={"reloj": None}, publicado=None)
     (datos / "commit.txt").unlink()
     (datos / "flujos.json").write_text("no es json", encoding="utf-8")
-    avisos, hoy = vigia.revisar(datos, AHORA, medir_base=falla, medir_storage=falla,
+    avisos, hoy = vigia.revisar(datos, AHORA, base=falla, storage=falla,
                                 caducidades=tmp_path / "no-existe.yaml")
     assert sorted(a.valores["que"] for a in avisos) == sorted(vigia.NO_MEDIDO)
     texto = vigia.componer(avisos, hoy)
@@ -285,7 +303,7 @@ def test_reintenta_y_nunca_imprime_la_url(capsys):
 
 def test_de_punta_a_punta_sin_secreto_pasa_y_con_secreto_envia(tmp_path, monkeypatch, capsys):
     datos = _carpeta(tmp_path, corridas={"bodega": [_corrida(2, "failure")]})
-    medidores = {"medir_base": lambda: 490 * MB, "medir_storage": lambda: 10, "caducidades": _caducidades(tmp_path)}
+    medidores = {"base": lambda: 490 * MB, "storage": lambda: 10, "caducidades": _caducidades(tmp_path)}
     monkeypatch.delenv("AVISO_ATENCION_URL", raising=False)
     monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(tmp_path / "resumen.md"))
     vigia.main(["--datos", str(datos)], ahora=AHORA, **medidores)  # no lanza
@@ -295,8 +313,35 @@ def test_de_punta_a_punta_sin_secreto_pasa_y_con_secreto_envia(tmp_path, monkeyp
     monkeypatch.setenv("AVISO_ATENCION_URL", URL)
     sesion = Sesion()
     vigia.main(["--datos", str(datos)], ahora=AHORA, sesion=sesion, **medidores)
-    url, cuerpo = sesion.llamadas[0]
+    url, cuerpo = sesion.llamadas[-1]  # sin --firma no se sabe cómo quedó el check: antes va un ping de verde
     assert url == URL + "/fail" and "Bodega nocturna" in cuerpo.decode() and "Buscar ahora" in cuerpo.decode()
+
+
+def test_un_aviso_nuevo_con_el_check_ya_en_rojo_se_reenvia(tmp_path, monkeypatch):
+    # Healthchecks solo manda correo al cambiar de estado: con otro aviso ya en rojo, el nuevo pasa por verde primero.
+    monkeypatch.setenv("AVISO_ATENCION_URL", URL)
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    firma = tmp_path / "firma.txt"
+    cad = _caducidades(tmp_path)
+    vueltas = iter(range(100))
+
+    def correr(base, corridas=None):
+        sesion = Sesion()
+        carpeta = tmp_path / f"d{next(vueltas)}"
+        carpeta.mkdir()
+        datos = _carpeta(carpeta, corridas=corridas)
+        vigia.main(["--datos", str(datos), "--firma", str(firma)], ahora=AHORA, sesion=sesion, base=lambda: base,
+                   storage=lambda: 10, caducidades=cad)
+        return [u.rsplit("/", 1)[-1] for u, _ in sesion.llamadas]
+
+    firma.write_text("", encoding="utf-8")                         # ayer todo en orden
+    assert correr(100 * MB) == ["ficticio"] and firma.read_text(encoding="utf-8") == ""
+    assert correr(420 * MB) == ["fail"]                            # pasa a rojo: un correo
+    assert correr(430 * MB) == ["fail"]                            # mismo aviso, otra cifra: no se repite
+    assert correr(430 * MB, corridas={"bodega": [_corrida(2, "failure")]}) == ["ficticio", "fail"]  # uno nuevo
+    assert correr(100 * MB) == ["ficticio"] and firma.read_text(encoding="utf-8") == ""
+    firma.unlink()                                                 # sin firma anterior: se reenvía por si acaso
+    assert correr(420 * MB) == ["ficticio", "fail"]
 
 
 # ── El Reloj lo pide una vez al día ────────────────────────────────────────────────────────────────────────────────
@@ -307,6 +352,7 @@ def test_de_punta_a_punta_sin_secreto_pasa_y_con_secreto_envia(tmp_path, monkeyp
     (16, [_corrida(0.1, estado="queued")], False),           # en marcha
     (16, [_corrida(1, "cancelled")], True),                  # GitHub lo canceló: se vuelve a pedir
     (16, [_corrida(1, "cancelled")] * 3, False),             # pero no más de 3 veces
+    (16, [{**_corrida(1, "cancelled"), "empezo": True}], False),  # cortada a medias: ya corrió
     (16, [_corrida(1, rama="otra")], True),                  # una prueba en otra rama no cuenta
     (16, [_corrida(20)], True),                              # el de ayer no cuenta
     (16, None, False),                                       # sin lista: nada a ciegas
@@ -319,9 +365,9 @@ def test_toca_vigia(hora, vigias, esperado):
 def test_linea_de_comandos_del_reloj_para_el_vigia(tmp_path, capsys):
     (tmp_path / "v.json").write_text("[]", encoding="utf-8")
     arranque.main(["--avisos", str(tmp_path / "v.json"), "--rama", "main"], ahora=AHORA)
-    assert capsys.readouterr().out == "vigia=true\n"
+    assert capsys.readouterr().out == "avisos=true\n"
     arranque.main(["--avisos", str(tmp_path / "no.json"), "--rama", "main"], ahora=AHORA)
-    assert capsys.readouterr().out == "vigia=false\n"
+    assert capsys.readouterr().out == "avisos=false\n"
 
 
 # ── Flujos ─────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -334,11 +380,11 @@ def test_el_flujo_del_vigia_solo_lee_y_no_pega_valores_en_los_guiones():
     assert flujo["permissions"] == {"actions": "read", "contents": "read"}
     assert flujo[True]["schedule"] and "workflow_dispatch" in flujo[True]
     trabajo = flujo["jobs"]["vigia"]
-    assert trabajo["if"] == "github.ref == 'refs/heads/main'" and trabajo["timeout-minutes"] <= 10
+    assert trabajo["if"] == "github.ref == 'refs/heads/main'" and trabajo["timeout-minutes"] <= 15
     pasos = {p.get("name"): p for p in trabajo["steps"]}
     reunir = pasos["Reunir el estado de GitHub"]["run"]
-    for clave, (archivo, *_r) in vigia.FLUJOS.items():
-        assert f"{clave}:{archivo}" in reunir
+    for clave, f in vigia.FLUJOS.items():
+        assert f"{clave}:{f.archivo}" in reunir
     assert "awk '{print $4}'" in reunir  # de `publicado` solo los tamaños, sin nombres de archivo
     revisar = pasos["Revisar y avisar"]
     assert revisar["env"]["AVISO_ATENCION_URL"] == "${{ secrets.AVISO_ATENCION_URL }}"

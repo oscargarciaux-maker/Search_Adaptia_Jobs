@@ -48,9 +48,18 @@ claves. El mismo texto queda en el resumen de la corrida (Actions → Vigía de 
 6. En Healthchecks → **Integrations**, comprueba que el correo está activo y pulsa **Test** para ver que llega.
 
 Cómo se comporta: Healthchecks manda un correo cuando el check pasa a rojo (hay avisos, o el Vigía no corrió en
-36 horas) y otro cuando vuelve a verde. Mientras sigue en rojo no repite el correo: el texto del día está en el check
-(**Events**) y en el resumen de la corrida. Sin el secreto el Vigía corre igual y lo dice en el registro, pero no avisa
-a nadie. Entra en Healthchecks al menos una vez al año: según su FAQ, las cuentas inactivas se pueden borrar.
+36 horas) y otro cuando vuelve a verde. Si los mismos avisos siguen al día siguiente (aunque cambie la cifra) no se
+repite el correo; si aparece uno **nuevo** mientras el check ya estaba en rojo, el Vigía lo pone un instante en verde y
+otra vez en rojo para que llegue otro correo (guarda solo una huella de qué avisos había, en la caché de Actions). Por
+eso pueden llegar dos correos seguidos («up» y «down»): el que importa es el último, con la lista completa. El texto del
+día está también en el check (**Events**) y en el resumen de la corrida. Sin el secreto el Vigía corre igual y lo dice
+en el registro, pero no avisa a nadie. Entra en Healthchecks al menos una vez al año: según su FAQ, las cuentas
+inactivas se pueden borrar.
+
+Requisitos para que no avise en falso: el Reloj activado (`docs/ACTIVAR_RELOJ.md`) y la copia semanal funcionando
+(`SUPABASE_BACKUP_KEY`); si no, el Vigía avisará de que llevan días sin terminar bien, que es cierto. En la Bodega, los
+horarios de respaldo terminan en verde sin trabajar cuando la de la mañana ya publicó: por eso un rojo de las últimas
+24 horas solo se da por resuelto con una búsqueda pedida que terminó bien después («Buscar ahora» o la del Reloj).
 
 Para añadir una fecha que caduca (otra clave, otra versión) se edita `datos/caducidades.yaml` (solo nombre, fecha y
 un paso; nunca el valor de una clave). Para quitar el aviso de los días sin commits basta un commit en `main`: el
