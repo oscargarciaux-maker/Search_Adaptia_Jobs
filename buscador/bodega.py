@@ -228,7 +228,7 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
     def f_publicaciones():
         maximo = 6 if p.get("minutos_por_fuente", 50) <= 3 else cfg["apify"].get("publicaciones_por_dia", 72)
         if cfg["apify"].get("publicaciones_por_dia", 0) <= 0:
-            return [], {"omitida": "crédito de Apify reservado a ofertas formales de LinkedIn"}
+            return [], {"omitida": "feed general apagado (publicaciones_por_dia = 0): el crédito va a los posts de quien va corto"}
         return publicaciones_apify.buscar(Cliente(), cfg["apify"].get("actor_publicaciones", ""),
                                           cfg_entrega.get("consultas_publicaciones", []), prioritarias, hoy,
                                           maximo=maximo, control_gasto=control_apify)

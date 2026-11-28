@@ -173,7 +173,8 @@ def test_sin_deficit_no_gasta_apify(cfg):
         for v in ofertas:
             v["familias"] = familias.clasificar(v["titulo"], v["_descripcion"])
         _, stats = refuerzo.rescate_apify(ofertas, {}, hoy(), entrega.config(), familias.mapa(),
-                                          lambda c: llamadas.append(c) or ([], {}), lambda a, b: a + b)
+                                          lambda c: llamadas.append(c) or ([], {}), lambda a, b: a + b,
+                                          max_busquedas=4)
     assert not llamadas and stats["perfiles_con_deficit"] == 0
 
 

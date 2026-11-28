@@ -2,7 +2,7 @@
 from concurrent.futures import ThreadPoolExecutor
 
 from buscador import cobertura, normalizar
-from buscador.fuentes import getonbrd, indeed, linkedin_publico
+from buscador.fuentes import getonbrd, indeed, linkedin_publico, publicaciones_apify
 from buscador.http import Cliente
 
 
@@ -85,7 +85,7 @@ def sin_fuente_local(roles, deficit):
 
 
 def rescate_apify(vacantes, entregadas, hoy, cfg_entrega, mapa, buscar_apify, incorporar, iniciales=None,
-                  max_busquedas=4):
+                  max_busquedas=0):
     """Contrato v11: Apify solo donde falta. Para cada perfil por debajo del mínimo (los de más déficit primero) busca
     con los términos de su cargo —incluidos los cercanos— en su país y en las remotas abiertas a él, en vez de rotar
     combinaciones a ciegas. `buscar_apify(combinaciones)` devuelve (crudas, estadísticas)."""
@@ -156,16 +156,17 @@ def consultas_de_perfil(familia, perfil, hoy):
     principales del cargo (en español, el título en español y el general) y uno más que rota cada día (así, en unos
     días, se prueban todos). Quien acepta remoto busca con «remoto»/«remote»; quien acepta además oficina, también sin
     modalidad. Solo cargo, idioma y modalidad: nunca su país, su ciudad ni nada suyo."""
-    from buscador.fuentes.publicaciones_apify import consulta_post
     idiomas = [i for i in ("es", "en") if i in (perfil.get("idiomas") or ("es", "en"))]
     modalidades = set(perfil.get("modalidades") or ())
-    modos = ([True] if "remoto" in modalidades else []) + ([False] if modalidades - {"remoto"} or not modalidades else [])
+    con_remoto = "remoto" in modalidades
+    sin_modalidad = not modalidades or bool(modalidades - {"remoto"})  # acepta oficina (o no lo dice)
+    modos = [True] * con_remoto + [False] * sin_modalidad
     por_idioma = []
     for idioma in idiomas:
         terminos = terminos_post(familia, idioma)
         fijos = 2 if idioma == "es" else 1
         elegidos = terminos[:fijos] + cobertura.rotar(terminos[fijos:], hoy, 1)
-        por_idioma.append([consulta_post(t, idioma, remoto) for t in elegidos for remoto in modos])
+        por_idioma.append([publicaciones_apify.consulta_post(t, idioma, remoto) for t in elegidos for remoto in modos])
     return _intercalar(por_idioma)
 
 
@@ -189,7 +190,6 @@ def rescate_posts(vacantes, entregadas, hoy, cfg_entrega, mapa, buscar_posts, in
     empresas_pais)` devuelve (formales, posts, estadísticas). Devuelve (vacantes, estadísticas solo con conteos, posts
     aptos)."""
     from buscador import contrato, entrega
-    from buscador.fuentes.publicaciones_apify import paises_por_empresa
     from panel.afinidad import RESCATE_BAJO
     elegidas, _ = entrega.elegir(vacantes, entregadas, hoy, cfg_entrega, iniciales=iniciales)
     deficit = entrega.deficit_por_perfil(elegidas, cfg_entrega["roles"], hoy)
@@ -197,22 +197,22 @@ def rescate_posts(vacantes, entregadas, hoy, cfg_entrega, mapa, buscar_posts, in
         return vacantes, {"perfiles_con_deficit": 0, "omitida": "todos los perfiles llegan al mínimo"}, []
     por_id = {f["id"]: f for f in mapa}
     sin_local = sin_fuente_local(cfg_entrega["roles"], deficit)
-    pedidos = sorted([((deficit[p["id"]] < RESCATE_BAJO, p["id"] not in sin_local, -deficit[p["id"]]), rol, p)
+    en_cero = {pid for pid, n in deficit.items() if n >= RESCATE_BAJO}  # hoy no tiene ninguna
+    pedidos = sorted([((p["id"] not in en_cero, p["id"] not in sin_local, -deficit[p["id"]]), rol, p)
                       for rol in cfg_entrega["roles"] for p in rol.get("_perfiles") or [] if p["id"] in deficit],
                      key=lambda x: x[0])
     por_perfil, validas = [], set()
     for _, rol, p in pedidos:
-        familias_rol = [por_id[f] for f in rol["familias"] if f in por_id]
-        if familias_rol:
-            validas.update(f["id"] for f in familias_rol)
-            por_perfil.append(consultas_de_perfil(familias_rol[0], p, hoy))
+        familia = por_id.get(next(iter(rol.get("familias") or []), None))  # en modo panel, un cargo = una familia
+        if familia:
+            validas.add(familia["id"])
+            por_perfil.append(consultas_de_perfil(familia, p, hoy))
     consultas = _intercalar(por_perfil)[:max_consultas]
-    formales, posts, stats = buscar_posts(consultas, validas, paises_por_empresa(vacantes))
+    formales, posts, stats = buscar_posts(consultas, validas, publicaciones_apify.paises_por_empresa(vacantes))
     if formales:
         vacantes = incorporar(vacantes, formales)
     posts = [p for p in posts if not contrato.entregable_post(p)]
-    en_cero = sum(1 for n in deficit.values() if n >= RESCATE_BAJO)
-    return vacantes, {"perfiles_con_deficit": len(deficit), "perfiles_en_cero": en_cero, "consultas": len(consultas),
+    return vacantes, {"perfiles_con_deficit": len(deficit), "perfiles_en_cero": len(en_cero), "consultas": len(consultas),
                       **{k: v for k, v in stats.items() if k in ("publicaciones", "fichas_formales", "posts", "descartadas",
                                                                   "ubicacion_deducida", "ubicacion_sin_confirmar",
                                                                   *CAMPOS_GASTO)}}, posts

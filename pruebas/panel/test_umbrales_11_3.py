@@ -64,7 +64,7 @@ def _rescate(cfg, ofertas):
     with ejecutor.activar({"configuracion": cfg}, hoy()):
         _, resumen = entrega.elegir(ofertas, {}, hoy())
         refuerzo.rescate_apify(ofertas, {}, hoy(), entrega.config(), familias.mapa(),
-                               lambda c: apify.append(c) or ([], {}), lambda a, b: a + b)
+                               lambda c: apify.append(c) or ([], {}), lambda a, b: a + b, max_busquedas=4)
         refuerzo.rescate_posts(ofertas, {}, hoy(), entrega.config(), familias.mapa(),
                                lambda c, f, e: posts.append(c) or ([], [], {}), lambda a, b: a + b)
     return sum(r.get("perfiles_bajo_minimo", 0) for r in resumen["roles"].values()), apify, posts

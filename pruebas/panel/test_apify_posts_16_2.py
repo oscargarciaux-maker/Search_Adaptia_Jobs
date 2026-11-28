@@ -124,11 +124,14 @@ def test_terminos_de_una_palabra_no_se_usan_si_hay_frases():
     assert refuerzo.terminos_post({"consultas": ["QA"]}, "en") == ["QA"]
 
 
-def test_quien_va_en_cero_va_primero(cfg, monkeypatch):
+def test_quien_va_en_cero_va_antes_que_quien_no_tiene_fuente_local(cfg, monkeypatch):
     from panel.afinidad import RESCATE_BAJO
-    # QA (perfil 4) en 0; Product Designer (perfil 0) con 2 faltantes: QA va primero aunque falte menos en total.
-    consultas, stats = _consultas(cfg, {0: 2, 4: RESCATE_BAJO}, monkeypatch)
+    # Frontend (perfil 3) vive en Kenia (sin fuente local) y le faltan 2; QA (perfil 4) vive en Colombia y va en 0.
+    # Antes iba primero quien no tiene fuente local; ahora, quien hoy no tiene ninguna.
+    cfg["perfiles"][3].update(vive_en="KE")
+    consultas, stats = _consultas(cfg, {3: 2, 4: RESCATE_BAJO}, monkeypatch)
     assert "qa" in consultas[0].lower() or "pruebas" in consultas[0].lower()
+    assert any("front" in q.lower() for q in consultas)
     assert stats["perfiles_en_cero"] == 1 and stats["perfiles_con_deficit"] == 2
 
 
@@ -151,3 +154,18 @@ def test_post_remoto_sin_region_queda_sin_confirmar_y_no_se_descarta():
 def test_post_remoto_que_nombra_su_region_no_queda_sin_confirmar():
     v, _ = pa.a_vacante(_post(REMOTO_SIN_REGION.replace("100% remoto", "100% remoto desde Colombia")), VALIDAS, hoy())
     assert v["ubicacion_sin_confirmar"] is False and "Colombia" in v["ubicacion"]
+
+
+@pytest.mark.parametrize("texto", [
+    "We are hiring a Product Designer, remote (USA). Apply here or DM me.",
+    "We are hiring a Product Designer, remote UK. Apply here or DM me.",
+    "We are hiring a Product Designer, remote within Europe. Apply here or DM me.",
+    "We are hiring a Product Designer, remote, EMEA timezones. Apply here or DM me.",
+    "We are hiring a Product Designer, remote, must be based in Canada. Apply here or DM me.",
+    "¡Estamos contratando! Buscamos Product Designer presencial, no es remoto. Envíame tu CV por DM.",
+    "¡Estamos contratando! Buscamos Product Designer híbrido con home office 2 días. Envíame tu CV por DM.",
+])
+def test_remoto_con_region_negado_o_con_oficina_no_queda_sin_confirmar(texto):
+    # Lo que dice la región (aunque sea fuera de LATAM), lo niega o habla de oficina no se perdona como «sin región».
+    v, motivo = pa.a_vacante(_post(texto), VALIDAS, hoy())
+    assert motivo == "" and v["ubicacion_sin_confirmar"] is False

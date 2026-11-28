@@ -102,6 +102,24 @@ def pistas_ubicacion(texto, item=None, empresa="", empresas_pais=None):
     return [], ""
 
 
+# P-16.2: regiones que acotan un remoto (si el post nombra una, no es «sin región») y palabras de oficina.
+_REGION = re.compile(r"\b(europe|european|europa|eu|eea|emea|uk|united kingdom|apac|asia|africa|"
+                     r"oceania|americas|north america|norteamerica|latam|latin america|latinoamerica|america latina|"
+                     r"(?:time ?zones?|zonas? horarias?|husos? horarios?|utc|gmt|cet|est|pst))\b")
+_OFICINA = re.compile(r"\b(presencial|hibrid[oa]|hybrid|semipresencial|on ?site|in office|en (?:la|nuestra|nuestras) "
+                      r"oficinas?|desde (?:la|nuestra|nuestras) oficinas?)\b")
+
+
+def remoto_sin_region(t):
+    """P-16.2: True si el post (texto normalizado) dice que es remoto, sin negarlo, sin hablar de oficina ni de
+    presencialidad, y no nombra ningún país, región, zona horaria ni restricción de residencia. Solo entonces un
+    remoto queda «ubicación sin confirmar» (v28) en vez de descartarse (antes, 8 de 23 el 28 nov): las pistas de dónde
+    está la empresa no dicen a quién contrata en remoto, así que para él no se deduce nada. Ante cualquier duda, no."""
+    afirmado = any(not paises._NO_REMOTO.search(t[max(0, m.start() - 25):m.start()]) for m in paises._REMOTO.finditer(t))
+    return (afirmado and not _OFICINA.search(t) and not _REGION.search(t) and not paises._RESTRINGE.search(t)
+            and not paises.paises_en_texto(t))
+
+
 def paises_por_empresa(vacantes):
     """{empresa normalizada: país} cuando todas sus vacantes con país confirmado están en un solo país."""
     vistos = {}
@@ -213,11 +231,10 @@ def a_vacante(item, familias_validas, hoy=None, max_dias=30, empresas_pais=None)
             nombrados, deducida = pistas_ubicacion(texto, item, empresa, empresas_pais)
         sin_confirmar = not nombrados
     elif not nombrados:
-        # P-16.2: «remoto» sin decir para qué países. Antes se descartaba siempre («elegibilidad regional por
-        # confirmar»: 8 de 23 el 28 nov). Las pistas de dónde está la empresa no dicen a quién contrata en remoto, así
-        # que no se deduce nada: queda «ubicación sin confirmar» (v28), marcada y con el tope de 2 por perfil y día. Si
-        # el texto o la ficha enlazada sí dicen la región, manda eso.
-        sin_confirmar = True
+        # P-16.2: un post remoto que nombra un país de fuera («remote (USA)», «Remote - United Kingdom») tiene esa
+        # ubicación y se evalúa con ella, como cualquier otro.
+        nombrados = sorted(paises.paises_en_texto(t))[:3]
+        sin_confirmar = not nombrados and remoto_sin_region(t)
     if not ACCION.search(t) and not re.search(r"https?://", texto):
         return None, "no pide postular ni escribir"
     fecha = str(_campo(item, "postedAt.date", "postedAt", "publishedAt", "date"))[:10]
@@ -289,7 +306,7 @@ def buscar(cliente, actor, consultas, familias_validas, hoy, maximo=60, token=No
     if not consultas:
         return [], {"omitida": "sin consultas_publicaciones en datos/entrega.yaml"}
     if maximo <= 0:
-        return [], {"omitida": "presupuesto reservado a ofertas formales"}
+        return [], {"omitida": "feed general apagado: el crédito va a los posts de quien va corto"}
     control_gasto = control_gasto or Presupuesto({}, hoy)
     cargo = control_gasto.reservar(0.025)
     if not cargo:

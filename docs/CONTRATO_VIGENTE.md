@@ -355,10 +355,11 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
   legible, se entrega esa ficha (v11).
 - Ubicación de posts por pistas (autor, prefijo, moneda, dominio, empresa, ficha enlazada). Un post sin pistas puede
   completar el mínimo con «ubicación sin confirmar»; máximo 2 posts con país o modalidad perdonados por perfil al día
-  (v28, v49). **Un post «remoto» que no dice para qué países** también queda «ubicación sin confirmar» (antes se
-  descartaba como «elegibilidad regional por confirmar»: 8 de 23 el 28 nov); las pistas de dónde está la empresa no se
-  usan para él (no dicen a quién contrata en remoto) y, si el texto o la ficha enlazada dicen la región, manda eso
-  (P-16.2).
+  (v28, v49). **Un post «remoto» sin región** también queda «ubicación sin confirmar» (antes se descartaba como
+  «elegibilidad regional por confirmar»: 8 de 23 el 28 nov), pero solo si dice remoto sin negarlo y no nombra ningún
+  país (de cualquier parte), región, zona horaria, restricción de residencia, oficina ni presencialidad: ante cualquier
+  duda, no. Si nombra un país, se evalúa con él como cualquier post. Las pistas de dónde está la empresa no se usan para
+  él (no dicen a quién contrata en remoto) y, si la ficha enlazada dice la región, manda eso (P-16.2).
 
 ## 11. «Por confirmar» y aprendizaje
 

@@ -93,7 +93,8 @@ def test_lectura_acotada_corta_descargas_grandes_y_dominios_desconocidos():
 
 def test_consultas_sin_pais_y_con_la_modalidad_en_el_idioma():
     # P-16.2 (reemplaza la consulta con el país de quien va corto del v28): solo cargo, idioma y modalidad.
-    assert pa.consulta_post("Product Designer", "en", remoto=True) ==         '(hiring OR "we are hiring" OR "join our team") "Product Designer" remote'
+    assert pa.consulta_post("Product Designer", "en", remoto=True) == (
+        '(hiring OR "we are hiring" OR "join our team") "Product Designer" remote')
     assert pa.consulta_post("Diseñador UX", "es") == '(contratando OR vacante OR buscamos OR "estamos buscando") "Diseñador UX"'
 
 

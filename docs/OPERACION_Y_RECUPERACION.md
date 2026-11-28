@@ -140,7 +140,7 @@ pendientes, retrasar o perder horarios; no se utiliza como una cola con conserva
 | Muchos 403/429/CAPTCHA de un portal | Salud de esa fuente, otros orígenes y frecuencia | Dejarlos pendientes; no declararlos cerrados, aumentar agresividad ni pedir una cookie personal |
 | Se detectó cobro o página general | URL y destino final, motivo y hora | Apartar, revisar original y documentar; no pagar para comprobar ni enviar formularios |
 | Apify aparece omitido | Cuota reservada, token, actor y crédito real | Si es por límite, esperar el período o usar fuentes gratuitas; no borrar reservas |
-| Dice «Publicaciones LinkedIn omitida» pero formal funciona | `publicaciones_por_dia=0` y bloque LinkedIn Apify | Es lo esperado: presupuesto reservado a fichas formales |
+| Dice «Publicaciones LinkedIn omitida» pero formal funciona | `publicaciones_por_dia=0` y bloque LinkedIn Apify | Es lo esperado: el feed general está apagado y el crédito va a los posts de quien va corto (P-16.2) |
 | Capacidad Supabase o minutos Actions agotados | Uso/tamaño real y plan | Respaldar, acordar capacidad/frecuencia; archivar no libera automáticamente espacio |
 
 Para soporte guardar: enlace/ID de ejecución, commit, fecha/hora Colombia, rol afectado, URL problemática, último paso,
