@@ -12,23 +12,16 @@ from dataclasses import dataclass, field
 
 from buscador import paises
 from panel.contenido import familia_del_mapa
-from panel.ejecutor import FUENTES_GENERICAS, fuentes_en, lugares_perfil
+from panel.ejecutor import fuentes_en, fuentes_locales, lugares_perfil
+from panel.servicio import CAUSA_OTRO_PAIS, CAUSA_POCAS_EN_FUENTES
 
 OFICINA = {"hibrido", "presencial"}
 MODOS = ("remoto", "hibrido", "presencial")
 NOMBRE_MODO = {"remoto": "remoto", "hibrido": "híbrido", "presencial": "presencial"}
 
-# Causas de `servicio.cobertura` que significan «faltan vacantes en las fuentes». Si cambian allí, la prueba
-# `test_las_causas_que_se_leen_existen_en_cobertura` avisa.
-CAUSA_POCAS_VACANTES = "Pocas vacantes nuevas en las fuentes revisadas"
-# Todas las vacantes del cargo son de otro país: no hay ninguna donde trabajaría (falta una fuente de ese país).
-MOTIVO_OTRO_PAIS = "«oficina en otro país»"
-
-
-def fuentes_locales(pais):
-    """Decisión de la 8.1: «sin fuente local» = solo la buscan LinkedIn, Portales de empresas y Get on Board. Indeed
-    cuenta como local (aunque el reparto de turnos de v40, `_con_fuentes_propias`, no la cuente)."""
-    return [f for f in fuentes_en(pais) if f not in FUENTES_GENERICAS]
+# Códigos de causa de `servicio.cobertura` que significan «faltan vacantes en las fuentes»: pocas vacantes en las fuentes
+# revisadas, o todas las del cargo son de otro país (no hay ninguna donde trabajaría: falta una fuente de ese país).
+CAUSAS_HUECO = {CAUSA_POCAS_EN_FUENTES, CAUSA_OTRO_PAIS}
 
 
 def paises_del_perfil(p):
@@ -83,8 +76,7 @@ def es_hueco_por_fuentes(fila, minimo):
     """Un perfil de `cobertura()` que quedó bajo el mínimo en una búsqueda medida porque faltan vacantes en las fuentes."""
     if fila["hoy"] >= minimo or not fila["dias_medidos"] or fila["listas"] or fila["por_comprobar"]:
         return False
-    causa = fila.get("causa") or ""
-    return causa.startswith(CAUSA_POCAS_VACANTES) or MOTIVO_OTRO_PAIS in causa
+    return fila.get("causa_codigo") in CAUSAS_HUECO
 
 
 def pedido(nombre_pais, idiomas, familias, modalidades):

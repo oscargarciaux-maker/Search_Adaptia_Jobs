@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 
 from buscador import entrega, normalizar, paises, vacante
 from buscador import registro
-from panel.afinidad import MINIMO_POR_PERFIL, evaluar
+from panel.afinidad import MINIMO_POR_PERFIL, MOTIVO_OTRO_PAIS, evaluar
 from panel.contenido import MOTIVO_OTRO_OFICIO
 from panel.repositorio import nombres as nombres_de, numeros
 from panel.terminos import grado
@@ -80,7 +80,7 @@ OTRO_OFICIO = MOTIVO_OTRO_OFICIO
 DUDAS_DE_CARGO = (FUNCIONES, OTRO_OFICIO)  # la duda es el cargo, no el país: no piden país ni tocan el catálogo
 NO_SIRVE_AL_CARGO = "no sirve para ese cargo"
 # Lo único que una confirmación de país puede resolver; cualquier otro motivo deja fuera la vacante para ese perfil.
-MOTIVOS_PAIS = {"país sin elegibilidad confirmada", "no admite postular desde su país", "oficina en otro país"}
+MOTIVOS_PAIS = {"país sin elegibilidad confirmada", "no admite postular desde su país", MOTIVO_OTRO_PAIS}
 DECISIONES = ("sirve", "otro_pais", "no_sirve", "saltar")
 _GENERICAS = re.compile(r"\b(remote|remoto|remota|remotely|hybrid|hibrido|hibrida|onsite|on site|presencial|job|jobs|"
                         r"trabajo|anywhere|n a|na|tbd|multiple locations|varias ubicaciones|location|locations|"

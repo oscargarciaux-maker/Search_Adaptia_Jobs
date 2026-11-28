@@ -67,8 +67,9 @@ CAMPOS_GASTO = ("error", "clave_invalida", "omitida", "credito_agotado", "aviso"
 
 def sin_fuente_local(p):
     """8.2: el perfil vive (o acepta oficina) en un país que solo buscan LinkedIn, los portales de empresas y Get on
-    Board (la misma regla de la 8.1, `panel.huecos`; Indeed cuenta como local). Su gasto de Apify va primero."""
-    from panel.huecos import fuentes_locales, paises_del_perfil
+    Board (la misma regla de la 8.1/8.1b; Indeed cuenta como local). Su gasto de Apify va primero."""
+    from panel.ejecutor import fuentes_locales
+    from panel.huecos import paises_del_perfil
     from panel.modelos import Perfil
     return any(not fuentes_locales(c) for c in paises_del_perfil(Perfil.model_validate(p)))
 

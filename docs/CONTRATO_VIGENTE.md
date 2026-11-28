@@ -402,11 +402,16 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
   porcentajes ni días de gracia; (3) la fuente nueva se añade el mismo día, semiautomática (skill `nueva-fuente` + PR
   revisado, nunca se activa sola); (4) el cliente no ve avisos de cobertura, solo el operador. Al guardar, un país
   nuevo de un perfil (donde vive, o donde acepta híbrido/presencial; la remota no crea país) sin fuente local —solo
-  LinkedIn, portales de empresas y Get on Board— avisa «riesgo» sin bloquear. Tras la búsqueda, un perfil bajo 5
-  cuya causa medida es la falta de vacantes en las fuentes (no su cargo, enlaces por comprobar, listas sin recibir ni
-  un ajuste del perfil) marca «hueco». El «Copiar pedido de fuente nueva» lleva solo país, idiomas, familias y
-  modalidades. Nada de esto va a mensajes, logs de Actions, `publicado` ni `reportes/`: solo panel y su API
-  autenticada. Guía: `docs/PANEL_CONTROL.md` §3b.
+  LinkedIn, portales de empresas y Get on Board— avisa «riesgo» sin bloquear. **Indeed cuenta como fuente local**
+  (decisión del 28 nov), con una sola definición para la tabla y para «Cobertura limitada» en la fila de la persona: un
+  país con Indeed no sale en riesgo ni dice «Cobertura limitada». El reparto de turnos de v40 no cambia (ahí Indeed no
+  cuenta como fuente propia). Tras la búsqueda, un perfil bajo 5 cuya causa medida es la falta de vacantes en las
+  fuentes (no su cargo, enlaces por comprobar, listas sin recibir ni un ajuste del perfil) marca «hueco». La tabla
+  decide con el código estable `causa_codigo` de `cobertura()`, nunca con el texto que lee el operador: es hueco con
+  `pocas_en_fuentes` u `otro_pais` (todas las del cargo son de oficina en otro país); no con `sin_vacantes_cargo`,
+  `listas_sin_recibir`, `por_comprobar` ni `ajuste_perfil`. El «Copiar pedido de fuente nueva» lleva solo país,
+  idiomas, familias y modalidades. Nada de esto va a mensajes, logs de Actions, `publicado` ni `reportes/`: solo panel
+  y su API autenticada. Guía: `docs/PANEL_CONTROL.md` §3b.
 - Ficha de la vacante con la descripción en bloques, nunca como HTML; la descripción que falta se trae una vez de la
   ficha original solo de dominios de la lista fija (1 MB, 12 s) (v29). `**negritas**` de LinkedIn se pintan como texto
   (v34).
