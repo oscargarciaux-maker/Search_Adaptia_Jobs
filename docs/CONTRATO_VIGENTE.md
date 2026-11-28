@@ -254,8 +254,9 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
 - LinkedIn se comprueba con su ficha pública, de una en una, con pausa, en su propia fila; tras 3 bloqueos descansa la
   ronda. Los demás sitios van en paralelo. Primero lo de quien va corto (`cola_por_necesidad`) (v39, v41, v49, v50).
   «Quien va corto» = quien tiene menos candidatas con el enlace ya comprobado; el tope de 2 por plaza de su meta cuenta
-  las ya comprobadas y salta las rechazadas, y lo que sobre del presupuesto va a sus demás candidatas por abrir, en el
-  mismo orden (P-11.1, 28 nov).
+  las ya comprobadas, salta las rechazadas y las que solo valen por verse hoy (Indeed), y detrás va el resto de sus
+  candidatas por abrir en la misma fase: así los demás sitios avanzan en paralelo mientras LinkedIn va de una en una
+  (P-11.1, 28 nov).
 - **«Postular» con la cuenta del mismo portal** (decisión de Oscar, 28 nov, P-11.1): si la ficha ya cumple (título,
   descripción, sin cierre) y su paso «Postular» lleva al inicio de sesión del **mismo** sitio (Get on Board pide su
   cuenta), la ficha comprueba la vacante y el login no se abre. Un login en otro sitio sigue sin comprobar.

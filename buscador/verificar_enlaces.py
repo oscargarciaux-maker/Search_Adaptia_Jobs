@@ -223,6 +223,12 @@ def contenido(html, url, titulo, ahora):
     return "verificada", "ficha específica accesible", aplicar
 
 
+def _login_del_portal(destino, sitio_ficha, ruta=False):
+    """El paso «Postular» de una ficha ya aprobada sigue en el mismo sitio (y, con `ruta`, su dirección es de login)."""
+    return bool(sitio_ficha) and enlaces.host(destino) == sitio_ficha and (
+        not ruta or bool(_RUTA_LOGIN.search(urlparse(destino).path)))
+
+
 def comprobar(url, titulo, *, sesion=None, validar_url=publica, ahora=None, plazo=None, max_saltos=5, max_bytes=1_000_000):
     ahora = ahora or datetime.now(timezone.utc)
     propia = sesion is None
@@ -264,7 +270,7 @@ def comprobar(url, titulo, *, sesion=None, validar_url=publica, ahora=None, plaz
             return resultado(estado, motivo)
         sitio_ficha = ""  # el sitio de la ficha ya aprobada, cuando se sigue su paso de aplicación
         while True:
-            if sitio_ficha and enlaces.host(destino) == sitio_ficha and _RUTA_LOGIN.search(urlparse(destino).path):
+            if _login_del_portal(destino, sitio_ficha, ruta=True):
                 # P-11.1 (decisión de Oscar del 28 nov): «Postular» lleva al inicio de sesión del mismo portal (Get on
                 # Board pide su cuenta): la ficha ya abierta comprueba la vacante. En otro sitio, el login no cuenta.
                 return resultado("verificada", POSTULAR_CON_CUENTA)
@@ -314,7 +320,7 @@ def comprobar(url, titulo, *, sesion=None, validar_url=publica, ahora=None, plaz
                 sitio_ficha = enlaces.host(destino)
                 destino = siguiente
                 continue
-            if sitio_ficha and motivo == "requiere iniciar sesión" and enlaces.host(destino) == sitio_ficha:
+            if _login_del_portal(destino, sitio_ficha) and motivo == "requiere iniciar sesión":
                 return resultado("verificada", POSTULAR_CON_CUENTA)
             return resultado(estado, motivo)
     except (requests.RequestException, ValueError, OSError):
@@ -474,16 +480,11 @@ def cola_de_seleccion(vacantes, entregadas, hoy, cache, iniciales, maximo, ahora
 
 def cola_por_necesidad(vacantes, hoy):
     """Contrato v49 (solo modo panel): las candidatas de cada persona, por turnos y primero quien tiene menos
-    (`entrega.candidatas_por_persona`). Antes la cola salía solo de lo que elegiría el lote: de 21 remotas en español
-    abiertas a Colombia para un cargo, 1 tenía el enlace comprobado, y sin enlace comprobado no se completa a nadie."""
+    candidatas con el enlace comprobado (P-11.1), hasta `entrega.POR_PLAZA` por plaza de su meta. Antes la cola salía
+    solo de lo que elegiría el lote: de 21 remotas en español abiertas a Colombia para un cargo, 1 tenía el enlace
+    comprobado, y sin enlace comprobado no se completa a nadie."""
     from buscador import entrega
-    return entrega.candidatas_por_persona(vacantes, hoy)
-
-
-def colas_por_necesidad(vacantes, hoy):
-    """(cola con tope, cola sin tope) de `entrega.colas_por_persona`: la segunda usa lo que sobre del presupuesto."""
-    from buscador import entrega
-    return entrega.colas_por_persona(vacantes, hoy)
+    return entrega.colas_por_persona(vacantes, hoy)[0]
 
 
 def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, cfg=None):
@@ -512,11 +513,15 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
                                segundos=max(0, plazo - time.monotonic()), vigencia=VIGENCIA_COMPARTIR)
     revisadas = set()
     por_necesidad = 0
-    resto_necesidad = []
     # Contrato v49: primero las candidatas de cada persona, con la mitad del presupuesto que queda. Contrato v50: esa
     # mitad es para los sitios en paralelo; las de LinkedIn van aparte, hasta donde alcance su parte del tiempo.
+    # P-11.1 (28 nov): detrás del tope de cada persona va el resto de sus candidatas por abrir. LinkedIn, de una en una,
+    # se come todo el tiempo de cada fase y los demás sitios solo avanzan con lo que esté en la misma fase: la Bodega
+    # del 27 abrió 213 enlaces con cupo de 800 y 600 s, y Computrabajo, Bumeran, Laborum o Magneto casi nunca.
     try:
-        necesidad, resto_necesidad = colas_por_necesidad(vacantes, hoy)
+        from buscador import entrega
+        con_tope, resto = entrega.colas_por_persona(vacantes, hoy)
+        necesidad = con_tope + resto
         if necesidad and revisadas_n < maximo:
             parte = 3 if incremental else 2
             cupo = max(1, (maximo - revisadas_n) // parte)
@@ -551,13 +556,6 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
         revisadas.update(v["id"] for v in grupo if all(vigente(cache.get(u, {}), v["titulo"], datetime.now(timezone.utc)) for u in urls(v)))
         if incremental or n == 0:
             break
-    # P-11.1 (28 nov): lo que sobre del presupuesto va a las demás candidatas de cada persona, por turnos y primero
-    # quien va corta. Antes las dos colas de arriba se acababan pronto (la Bodega del 27 abrió 213 enlaces con cupo de
-    # 800 y 600 s) y las de Computrabajo, Bumeran, Laborum o Magneto casi nunca llegaban a abrirse.
-    if resto_necesidad and revisadas_n < maximo and time.monotonic() < plazo:
-        n = auditar(resto_necesidad, cache, maximo=maximo - revisadas_n, segundos=max(0, plazo - time.monotonic()))
-        revisadas_n += n
-        por_necesidad += n
     for v in vacantes:
         anotar(v, cache)
     actuales = [dict(por_id.get(v["id"], v)) for lista in iniciales.values() for v, _ in lista]

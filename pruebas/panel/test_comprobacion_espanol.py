@@ -59,7 +59,7 @@ def test_primero_la_de_espanol_de_quien_va_corta_que_la_de_ingles_de_quien_ya_ti
     assert r["por_necesidad"] >= 1
 
 
-def test_las_ya_comprobadas_no_ocupan_el_tope_de_quien_va_corta(cfg, monkeypatch):
+def test_las_ya_comprobadas_no_ocupan_el_tope_de_quien_va_corta(cfg):
     # Meta 5 → tope de 10 candidatas. Las 9 más recientes de la persona en español ya están comprobadas: antes solo
     # quedaba 1 por abrir en su turno; ahora el tope cuenta las comprobadas y la cola trae lo que falta por abrir.
     with ejecutor.activar({"revision": 1, "configuracion": cfg}, hoy()):
@@ -77,7 +77,7 @@ def test_lo_que_sobra_del_presupuesto_comprueba_las_demas_candidatas(cfg, monkey
     # tope aunque sobrara presupuesto.
     with ejecutor.activar({"revision": 1, "configuracion": cfg}, hoy()):
         espanol = [_vacante(n, verificada=False) for n in range(1, 31)]
-        r, comprobadas = _correr(monkeypatch, espanol, {"vacantes_por_corrida": 100, "segundos_corrida": 30})
+        _, comprobadas = _correr(monkeypatch, espanol, {"vacantes_por_corrida": 100, "segundos_corrida": 30})
     assert set(comprobadas) == {v["enlace"] for v in espanol}
     assert all(v["verificacion"]["estado"] == "verificada" for v in espanol)
 

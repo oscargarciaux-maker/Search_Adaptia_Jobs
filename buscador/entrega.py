@@ -277,17 +277,18 @@ def _por_turnos(listas):
 def colas_por_persona(vacantes, hoy, cfg=None):
     """Contrato v49 (solo modo panel): las candidatas de cada persona —las de su cargo que cumplen SU idioma y SU
     ubicación, aunque otro cliente ya las haya recibido—, por turnos. Sirve para decidir qué enlaces se comprueban
-    primero. Devuelve (con tope, sin tope); sin panel, ([], []).
+    primero. Devuelve (con tope, resto); sin panel, ([], []).
 
     P-11.1 (28 nov): va primero quien tiene menos candidatas con el enlace ya comprobado (antes: menos candidatas en
     total, y quien tenía muchas en español sin comprobar quedaba al final), y el tope de `POR_PLAZA` por vacante de su
     meta cuenta las ya comprobadas y salta las rechazadas: antes las más recientes ya comprobadas (Indeed, portales de
-    empresas) ocupaban el tope y casi no quedaban enlaces por abrir. La cola sin tope trae todas las que faltan por
-    comprobar, para usar lo que sobre del presupuesto."""
+    empresas) ocupaban el tope y casi no quedaban enlaces por abrir. El resto trae las demás que faltan por abrir, para
+    lo que sobre del presupuesto. Las que solo se pueden dar por buenas por verse hoy (Indeed) no entran."""
     cfg = cfg or config()
     roles = [r for r in cfg["roles"] if r.get("_perfiles")]
     if not roles:
         return [], []
+    from buscador.verificar_enlaces import sin_comprobacion_directa
     from panel.afinidad import MINIMO_POR_PERFIL, evaluar
     from panel.modelos import Perfil
     idiomas = tuple(cfg.get("idiomas", ["es", "en"]))
@@ -303,17 +304,16 @@ def colas_por_persona(vacantes, hoy, cfg=None):
             cuantas = max(MINIMO_POR_PERFIL, int(p.meta_diaria or 0)) * POR_PLAZA
             suyas = [v for v in del_rol if evaluar(v, p, hoy)["compatible"]]
             estados = [(v.get("verificacion") or {}).get("estado") for v in suyas]
-            listas = estados.count("verificada")
-            por_abrir = [v for v, e in zip(suyas, estados) if e not in ("verificada", "rechazada")]
+            comprobadas = estados.count("verificada")
+            # Solo las que se pueden abrir: Indeed (y InfoJobs sin clave) valen por verse hoy, no por comprobarlas.
+            por_abrir = [v for v, e in zip(suyas, estados) if e not in ("verificada", "rechazada")
+                         and not all(sin_comprobacion_directa(u) for u in (v.get("enlace"), v.get("enlace_directo")) if u)]
             if por_abrir:
-                por_persona.append(((listas, len(suyas)), por_abrir[:max(0, cuantas - listas)], por_abrir))
-    por_persona.sort(key=lambda x: x[0])
-    return _por_turnos([con_tope for _, con_tope, _ in por_persona]), _por_turnos([todas for _, _, todas in por_persona])
-
-
-def candidatas_por_persona(vacantes, hoy, cfg=None):
-    """La cola con tope de `colas_por_persona` (primero quien va corta, hasta `POR_PLAZA` por plaza de su meta)."""
-    return colas_por_persona(vacantes, hoy, cfg)[0]
+                tope = max(0, cuantas - comprobadas)
+                por_persona.append(((comprobadas, len(suyas)), por_abrir[:tope], por_abrir[tope:]))
+    por_persona.sort(key=lambda fila: fila[0])
+    return (_por_turnos([con_tope for _, con_tope, _ in por_persona]),
+            _por_turnos([resto for _, _, resto in por_persona]))
 
 
 def sobrante_para_comunidad(salida, por_rol, roles, cfg, hoy):
