@@ -451,6 +451,17 @@ def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None, todas=None,
     # Contrato v34: las filas con resumen (guardado de noche, SQL 018) se muestran tal cual; solo las que no lo tienen
     # leen el catálogo con su descripción y se calculan aquí, como antes.
     pendientes = [dict(r) for r in pendientes]  # la copia en memoria no se modifica
+    originales = {r["vacante_id"]: r for r in todas}
+    # P-12.11: la lista ligera ya no trae el resumen; se pide solo el de esta página (1 viaje) y queda en la copia en
+    # memoria, para que volver a la misma página no lo pida otra vez.
+    sin_leer = [r["vacante_id"] for r in pendientes if "resumen" not in r]
+    if sin_leer and getattr(repo, "con_resumen", lambda: False)():
+        guardados = repo.resumenes(sin_leer)
+        for r in pendientes:
+            if r["vacante_id"] in guardados and "resumen" not in r:
+                r["resumen"] = guardados[r["vacante_id"]]
+                if r["resumen"] and r["vacante_id"] in originales:
+                    originales[r["vacante_id"]]["resumen"] = r["resumen"]
     sin_resumen = [r for r in pendientes if not r.get("resumen")]
     faltan = [r["vacante_id"] for r in sin_resumen if "description_full" not in (r.get("catalogo_vacantes") or {})]
     filas = repo.filas_catalogo(faltan) if faltan else {}
@@ -464,7 +475,6 @@ def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None, todas=None,
         if not es_generica(r.get("ubicacion")):
             por_ubicacion[r["ubicacion"]] = por_ubicacion.get(r["ubicacion"], 0) + 1
     salida, calculados = [], {}
-    originales = {r["vacante_id"]: r for r in todas}
     for r in pendientes:
         res = r.get("resumen")
         if not res:
@@ -604,14 +614,16 @@ def _asignar(repo, rev, codigos, fecha, por, comprobar):
     cargos = {str(c.id): c for c in cfg.cargos}
     ids = [p["perfil_id"] for p in rev.get("perfiles") or [] if p["perfil_id"] in perfiles]
     conteo = repo.conteo_asignaciones(ejecucion["id"], ids)
-    recibidas = repo.recibidas(ids)
+    # P-12.11: solo «¿alguno ya recibió ESTA vacante?» (1 consulta acotada), no todo su historial, que crece cada día.
+    # Si la lectura falla, la decisión falla: nunca se asigna sin saberlo.
+    ya_la_tienen = repo.ya_recibieron(ids, rev["vacante_id"]) if ids else set()
     nuevas = []
     for info in rev.get("perfiles") or []:
         p, cargo = perfiles.get(info["perfil_id"]), cargos.get(info.get("cargo_id"))
         # Contrato v49: hasta la meta diaria del perfil (antes, solo hasta el mínimo de 5).
         if not p or not cargo or conteo.get(str(p.id), 0) >= max(MINIMO_POR_PERFIL, int(p.meta_diaria or 0)):
             continue
-        if rev["vacante_id"] in recibidas.get(str(p.id), set()):
+        if str(p.id) in ya_la_tienen:
             continue
         match = evaluar(datos, p, fecha)
         afinidad, evidencia = grado(datos.get("titulo", ""), cargo.model_dump(mode="json"))

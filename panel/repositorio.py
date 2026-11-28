@@ -73,6 +73,23 @@ def recibidas_de(pedir, perfil_ids, tamano=1000):
     return salida
 
 
+def ya_recibieron_de(pedir, perfil_ids, vacante_id, tanda=50, tope=1000):
+    """P-12.11: las personas de `perfil_ids` que ya recibieron `vacante_id`, con una consulta acotada por esa vacante
+    (índice de SQL 024) en vez de leer todo su historial: el costo no crece con los días. Si la respuesta llega al
+    `tope` de filas (podría venir cortada), se lee por páginas: nunca se decide con una lectura a medias."""
+    salida = set()
+    ids = list(dict.fromkeys(str(i) for i in perfil_ids))
+    for inicio in range(0, len(ids), tanda):
+        filtro = {"perfil_id": "in.(" + ",".join(ids[inicio:inicio + tanda]) + ")", "vacante_id": "eq." + vacante_id}
+        filas = pedir("GET", "panel_asignaciones", params={**filtro, "select": "perfil_id", "limit": tope})
+        if not isinstance(filas, list) or len(filas) > tope:
+            raise ErrorRepositorio("Lectura de lo ya recibido con una respuesta inesperada.")
+        if len(filas) == tope:
+            filas = list(paginar(pedir, "panel_asignaciones", "id", {**filtro, "select": "id,perfil_id"}, tope))
+        salida.update(f["perfil_id"] for f in filas)
+    return salida
+
+
 # Mensajes de las funciones SQL del panel. Los de SQL 009 (exigen 120 exactos) indican que la base aún no tiene
 # SQL 015 (contrato v21, metas por perfil): se explica cómo instalarla en lugar de un error genérico.
 _SIN_015 = ("Reparte exactamente 120 vacantes", "Los cupos superan 120")
@@ -346,6 +363,9 @@ class RepositorioSupabase:
     def recibidas(self, perfil_ids):
         return recibidas_de(self.pedir, perfil_ids)
 
+    def ya_recibieron(self, perfil_ids, vacante_id):
+        return ya_recibieron_de(self.pedir, perfil_ids, vacante_id)
+
     def con_resumen(self):
         """Contrato v34: si la bandeja ya tiene la columna `resumen` (SQL 018). Se pregunta una vez por instancia."""
         # 18 nov: una respuesta negativa se vuelve a preguntar a los 5 min; antes un fallo pasajero dejaba la bandeja en
@@ -372,18 +392,31 @@ class RepositorioSupabase:
         # `ligera` (contrato v29): sin la descripción completa, para ordenar y contar todas las pendientes; la
         # descripción se pide después solo para la página que se muestra. Contrato v34: con la columna `resumen`
         # (SQL 018) la lista ligera ni siquiera lee el catálogo; las filas sin resumen se completan después.
+        # P-12.11: la lista ligera tampoco trae el `resumen` (0,7 kB de 1,3 por fila): `revision.listar` lo pide solo
+        # para la página (`resumenes`). Sin textos largos, va de 1.000 en 1.000 (con 3.000 pendientes, 19 → 4 viajes).
         descripcion = "" if ligera or sin_descripcion else "description_full,"
         params = {"select": f"*,catalogo_vacantes(id,datos,{descripcion}status,reason)"}
         if ligera and self.con_resumen():
             params = {"select": "vacante_id,estado,motivo,pista,ubicacion,sugerencia,paises,perfiles,prioridad,"
-                                "creada_en,resumen"}
+                                "creada_en"}
         if estado:
             params["estado"] = "eq." + estado
         if vacante_id:
             return self.pedir("GET", "panel_revisiones", params={**params, "vacante_id": "eq." + vacante_id}) or []
         # Por páginas: la depuración completa puede guardar miles (contrato v17).
-        filas = list(self._paginas("panel_revisiones", "vacante_id", params, 200))
+        filas = list(self._paginas("panel_revisiones", "vacante_id", params, 1000 if ligera else 200))
         return sorted(filas, key=lambda r: -(r.get("prioridad") or 0))
+
+    def resumenes(self, vacante_ids):
+        """P-12.11: {vacante: resumen guardado (o None)} de esas filas de la bandeja, por grupos de 100."""
+        salida = {}
+        ids = list(dict.fromkeys(vacante_ids))
+        for inicio in range(0, len(ids), 100):
+            for r in self.pedir("GET", "panel_revisiones", params={
+                    "vacante_id": "in.(" + ",".join(ids[inicio:inicio + 100]) + ")",
+                    "select": "vacante_id,resumen"}) or []:
+                salida[r["vacante_id"]] = r.get("resumen")
+        return salida
 
     def guardar_revisiones(self, filas):
         ahora = datetime.now(timezone.utc).isoformat()
@@ -792,6 +825,11 @@ class RepositorioDemo:
     def con_resumen(self):
         return True
 
+    def resumenes(self, vacante_ids):
+        ids = set(vacante_ids)
+        with self.lock:
+            return {r["vacante_id"]: deepcopy(r.get("resumen")) for r in self._revisiones() if r["vacante_id"] in ids}
+
     def resumir_revisiones(self, resumenes):
         for vid, resumen in resumenes.items():
             self.actualizar_revision(vid, {"resumen": resumen})
@@ -844,6 +882,12 @@ class RepositorioDemo:
             for a in self.estado.get("asignaciones_extra", []):
                 salida.setdefault(a["perfil_id"], set()).add(a["vacante_id"])
             return salida
+
+    def ya_recibieron(self, perfil_ids, vacante_id):
+        ids = {str(i) for i in perfil_ids}
+        with self.lock:
+            return {a["perfil_id"] for a in self.estado.get("asignaciones_extra", [])
+                    if a["vacante_id"] == vacante_id and a["perfil_id"] in ids}
 
     def conteo_asignaciones(self, ejecucion_id, perfil_ids):
         return Counter()
