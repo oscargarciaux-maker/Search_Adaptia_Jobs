@@ -79,9 +79,9 @@ def identidades(conn):
 # 021 solo reemplaza la reconciliación por lotes cortos y añade un índice parcial; sin tablas ni datos nuevos.
 # 022 solo crea la tabla privada `estado_trabajo` (detalle por cargo fuera de la rama pública); sin tocar otras.
 # 023 solo añade la tabla privada `apify_bloqueos` y las funciones de reserva con ritmo diario (8.2); reemplaza
-# `apify_estado` con un campo más. No toca datos.
+# `apify_estado` con un campo más. No toca datos. 024 solo añade un índice a `panel_asignaciones` (P-12.1).
 ENSAYABLES = {"006", "007", "008", "009", "010", "011", "012", "013", "014", "015", "016", "017", "018", "019", "020",
-              "021", "022", "023"}
+              "021", "022", "023", "024"}
 
 
 def ensayar(conn):

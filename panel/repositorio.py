@@ -30,6 +30,38 @@ class ErrorRepositorio(Exception):
         super().__init__(mensaje)
 
 
+def paginar(pedir, ruta, clave, params, tamano=500):
+    """Lee TODAS las filas por páginas ordenadas por `clave` (única), pidiendo cada una desde la última leída (keyset),
+    sin tope. P-12.1: antes el ejecutor paginaba con OFFSET, sin orden y se detenía en 5.000 filas sin avisar.
+    Nunca devuelve una lectura a medias en silencio: una respuesta que no es una lista, más larga de lo pedido o que
+    no avanza es un error. La página corta marca el final: `tamano` no debe pasar del máximo de filas de PostgREST
+    (Supabase: 1.000)."""
+    seleccion = params.get("select")
+    if seleccion and not seleccion.startswith("*") and clave not in seleccion.split(","):  # la clave hace falta para seguir
+        params = {**params, "select": seleccion + "," + clave}
+    ultimo = None
+    while True:
+        lote = pedir("GET", ruta, params={**params, "order": clave, "limit": tamano,
+                                          **({clave: "gt." + str(ultimo)} if ultimo is not None else {})})
+        if not isinstance(lote, list) or len(lote) > tamano:
+            raise ErrorRepositorio("Lectura por páginas con una respuesta inesperada.")
+        yield from lote
+        if len(lote) < tamano:
+            return
+        if lote[-1][clave] == ultimo:
+            raise ErrorRepositorio("Lectura por páginas que no avanza.")
+        ultimo = lote[-1][clave]
+
+
+def por_ids(pedir, ruta, campo, ids, select, tamano=500, tanda=50):
+    """Filas cuyo `campo` está en `ids`, por tandas de 50 (la dirección de la petición no crece con los clientes) y
+    con `paginar` ordenado por `id`."""
+    ids = list(dict.fromkeys(str(i) for i in ids))
+    for inicio in range(0, len(ids), tanda):
+        yield from paginar(pedir, ruta, "id", {campo: "in.(" + ",".join(ids[inicio:inicio + tanda]) + ")",
+                                              "select": select}, tamano)
+
+
 # Mensajes de las funciones SQL del panel. Los de SQL 009 (exigen 120 exactos) indican que la base aún no tiene
 # SQL 015 (contrato v21, metas por perfil): se explica cómo instalarla en lugar de un error genérico.
 _SIN_015 = ("Reparte exactamente 120 vacantes", "Los cupos superan 120")
@@ -302,12 +334,8 @@ class RepositorioSupabase:
 
     def recibidas(self, perfil_ids):
         salida = {}
-        for inicio in range(0, len(perfil_ids), 50):
-            ids = ",".join(perfil_ids[inicio:inicio + 50])
-            if ids:
-                for r in self._paginas("panel_asignaciones", "id", {"perfil_id": f"in.({ids})",
-                                                                     "select": "id,perfil_id,vacante_id"}, 1000):
-                    salida.setdefault(r["perfil_id"], set()).add(r["vacante_id"])
+        for r in por_ids(self.pedir, "panel_asignaciones", "perfil_id", perfil_ids, "id,perfil_id,vacante_id", 1000):
+            salida.setdefault(r["perfil_id"], set()).add(r["vacante_id"])
         return salida
 
     def con_resumen(self):
@@ -472,14 +500,7 @@ class RepositorioSupabase:
         return self.pedir("GET", "panel_ejecuciones", params={"order": "fecha.desc", "limit": 30})
 
     def _paginas(self, ruta, clave, params, tamano=500):
-        ultimo = ""
-        while True:
-            lote = self.pedir("GET", ruta, params={**params, "order": clave, "limit": tamano,
-                                                    **({clave: "gt." + str(ultimo)} if ultimo else {})})
-            yield from lote
-            if len(lote) < tamano:
-                return
-            ultimo = lote[-1][clave]
+        return paginar(self.pedir, ruta, clave, params, tamano)
 
     # Solo los campos que usan los filtros, leídos dentro de `datos`: ~1 MB en vez de descargar descripciones completas.
     CAMPOS_ESTIMACION = ("id,titulo:datos->>titulo,paises:datos->paises,confianza_pais:datos->>confianza_pais,"
