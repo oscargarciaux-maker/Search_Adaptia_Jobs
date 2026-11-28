@@ -19,8 +19,8 @@ def _asignacion(perfil_id, vacante_id, ejecucion_id="ayer"):
             "perfil_id": perfil_id, "vacante_id": vacante_id}
 
 
-def _del_lote(cfg, v, cargo=0):
-    return {"vacante_id": v["id"], "delivery_date": hoy(), "role_id": "cargo:" + cfg["cargos"][cargo]["id"],
+def _del_lote(config, v, cargo=0):
+    return {"vacante_id": v["id"], "delivery_date": hoy(), "role_id": "cargo:" + config["cargos"][cargo]["id"],
             "match_grade": "exact", "snapshot": v}
 
 
@@ -38,7 +38,7 @@ def _de(repo, perfil_id):
     return [a["vacante_id"] for a in repo.asignadas if a["perfil_id"] == perfil_id]
 
 
-def test_rescatada_ayer_no_vuelve_en_el_lote_de_hoy(cfg, registrar):
+def test_rescatada_ayer_no_vuelve_en_el_lote_de_hoy(cfg, registrar):  # noqa: F811 (fixtures de test_recibidas_sin_tope)
     p = cfg["perfiles"][0]
     rescatada, nueva = _vacante(1), _vacante(2)
     repo = ConPasadas({"panel_asignaciones": [_asignacion(p["id"], rescatada["id"])],
@@ -48,7 +48,7 @@ def test_rescatada_ayer_no_vuelve_en_el_lote_de_hoy(cfg, registrar):
     assert repo.ejecucion["resumen"]["lote_ya_recibidas"] == 1
 
 
-def test_tampoco_si_el_lote_la_trae_fusionada_con_otro_id(cfg, registrar):
+def test_tampoco_si_el_lote_la_trae_fusionada_con_otro_id(cfg, registrar):  # noqa: F811 (fixtures de test_recibidas_sin_tope)
     """La misma oferta de otro portal puede entrar al lote con otro id y la recibida entre sus `_ids_fusionados`."""
     p = cfg["perfiles"][0]
     recibida, fusionada = _vacante(1), _vacante(3)
@@ -59,7 +59,7 @@ def test_tampoco_si_el_lote_la_trae_fusionada_con_otro_id(cfg, registrar):
     assert _de(repo, p["id"]) == []
 
 
-def test_otra_persona_si_la_recibe_en_el_lote(cfg, registrar):
+def test_otra_persona_si_la_recibe_en_el_lote(cfg, registrar):  # noqa: F811 (fixtures de test_recibidas_sin_tope)
     """Se mira por persona: que otro cliente ya la tuviera no le quita el lote a quien nunca la recibió."""
     cfg["perfiles"][1].update(cfg["perfiles"][0], id=cfg["perfiles"][1]["id"], cliente_id=cfg["perfiles"][1]["cliente_id"],
                               activo=True)
@@ -71,7 +71,7 @@ def test_otra_persona_si_la_recibe_en_el_lote(cfg, registrar):
     assert _de(repo, p["id"]) == [] and _de(repo, otro["id"]) == [rescatada["id"]]
 
 
-def test_lo_de_las_pasadas_anteriores_de_hoy_se_vuelve_a_registrar(cfg, registrar):
+def test_lo_de_las_pasadas_anteriores_de_hoy_se_vuelve_a_registrar(cfg, registrar):  # noqa: F811 (fixtures de test_recibidas_sin_tope)
     """En la misma ejecución del día no es una repetición (la fila ya existe y la base ignora la copia): la vacante del
     lote se vuelve a registrar como siempre y sigue contando para la meta, el techo y Comunidad."""
     p = cfg["perfiles"][0]
@@ -83,7 +83,7 @@ def test_lo_de_las_pasadas_anteriores_de_hoy_se_vuelve_a_registrar(cfg, registra
     assert repo.ejecucion["resumen"]["lote_ya_recibidas"] == 0
 
 
-def test_sin_las_pasadas_de_hoy_no_se_arriesga_a_repetir(cfg, registrar):
+def test_sin_las_pasadas_de_hoy_no_se_arriesga_a_repetir(cfg, registrar):  # noqa: F811 (fixtures de test_recibidas_sin_tope)
     """Si no se pudo leer lo de hoy, todo lo ya recibido queda fuera del lote: puede faltar volver a registrar una
     copia, pero nunca se repite una vacante de otro día."""
     p = cfg["perfiles"][0]
@@ -98,7 +98,7 @@ def test_sin_las_pasadas_de_hoy_no_se_arriesga_a_repetir(cfg, registrar):
     assert _de(repo, p["id"]) == []
 
 
-def test_sin_las_pasadas_de_hoy_no_se_completa_de_mas(cfg, registrar):
+def test_sin_las_pasadas_de_hoy_no_se_completa_de_mas(cfg, registrar):  # noqa: F811 (fixtures de test_recibidas_sin_tope)
     """Lo saltado sin saber si era de hoy cuenta para la meta: no se le dan otras tantas nuevas (antes, al volver a
     registrarse, contaba igual)."""
     p = cfg["perfiles"][0]
@@ -115,7 +115,7 @@ def test_sin_las_pasadas_de_hoy_no_se_completa_de_mas(cfg, registrar):
     assert _de(repo, p["id"]) == [] and repo.ejecucion["resumen"]["rescatadas"] == 0
 
 
-def test_la_misma_oferta_fusionada_hoy_no_llega_dos_veces(cfg, registrar):
+def test_la_misma_oferta_fusionada_hoy_no_llega_dos_veces(cfg, registrar):  # noqa: F811 (fixtures de test_recibidas_sin_tope)
     """Si una pasada anterior de hoy le dio X y el lote trae Y con X entre sus fusionadas, Y no se asigna."""
     p = cfg["perfiles"][0]
     x, y = _vacante(1), _vacante(3)
@@ -126,7 +126,7 @@ def test_la_misma_oferta_fusionada_hoy_no_llega_dos_veces(cfg, registrar):
     assert _de(repo, p["id"]) == []
 
 
-def test_una_sola_lectura_tambien_para_por_confirmar(cfg, registrar, monkeypatch):
+def test_una_sola_lectura_tambien_para_por_confirmar(cfg, registrar, monkeypatch):  # noqa: F811 (fixtures de test_recibidas_sin_tope)
     """La bandeja «Por confirmar» usa la misma lectura de lo recibido (antes hacía una segunda en cada corrida)."""
     p = cfg["perfiles"][0]
     rescatada = _vacante(1)
