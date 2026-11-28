@@ -117,3 +117,4 @@ presupuestos:
   remotos_paginas: 250         # páginas de tableros remotos que se abren para encontrar el original
   empresas_por_probar: 80      # empresas nuevas que se prueban en los sistemas de postulación
   getonbrd_busquedas: 60
+  getonbrd_paginas: 30         # P-17.2: peticiones al catálogo por categorías (~25 bastan); el refuerzo no lo repite

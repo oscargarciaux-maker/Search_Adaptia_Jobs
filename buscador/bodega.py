@@ -253,7 +253,12 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
             b = cobertura.siguiente_busqueda(lista, hoy, 1, f"{familia}@{lugar}", vistos, paginada=False)
             if b is not None:
                 busquedas.append(b)
-        crudas, stats = getonbrd.buscar(Cliente(pausa=(0.3, 0.8)), [b.terminos[0] for b in busquedas])
+        cliente = Cliente(pausa=(0.3, 0.8))
+        crudas, stats = getonbrd.buscar(cliente, [b.terminos[0] for b in busquedas])
+        # P-17.2: el catálogo completo por categorías (remotas abiertas a varios países), deduplicado con lo anterior.
+        extra, stats_catalogo = getonbrd.catalogo(cliente, p.get("getonbrd_paginas", 0), {v["enlace"] for v in crudas})
+        crudas = crudas + extra
+        stats = {**stats, **stats_catalogo, "avisos": len(crudas)}
         respondidas = set(stats.pop("respondidas", None) or [])
         for b in busquedas:
             if b.terminos[0] in respondidas:  # una consulta que falló no queda como buscada
@@ -493,7 +498,7 @@ def limpiar(previas, crudas, hoy, dias_maximos, enlaces_ats, empresas_leidas, co
 
 PRUEBA = {"minutos_por_fuente": 3, "linkedin_busquedas": 6, "linkedin_fichas": 8, "indeed_busquedas": 2,
           "apify_busquedas": 2, "remotos_paginas": 8, "empresas_por_probar": 5,
-          "getonbrd_busquedas": 3, "hireline_fichas": 4, "magneto_fichas": 4, "jobint_busquedas": 6,
+          "getonbrd_busquedas": 3, "getonbrd_paginas": 4, "hireline_fichas": 4, "magneto_fichas": 4, "jobint_busquedas": 6,
           "infojobs_busquedas": 2, "tecnoempleo_busquedas": 2, "tecnoempleo_fichas": 4,
           "infojobs_api_busquedas": 2, "infojobs_api_fichas": 4}
 
