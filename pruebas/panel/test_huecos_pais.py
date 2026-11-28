@@ -9,7 +9,7 @@ from panel.api import crear_app
 from panel.modelos import Configuracion
 from panel.repositorio import RepositorioDemo, configuracion_demo
 
-MINIMO = servicio.MINIMO_POR_PERFIL
+MINIMO = servicio.AVISO_BAJO  # P-11.3: los huecos se miden con la meta (10), no con el rescate (5)
 
 
 def _id(n):
@@ -26,9 +26,9 @@ def _cfg(perfiles):
 
 PERFILES = {
     "co": {"vive_en": "CO"},                               # país con fuentes locales: cubierto
-    "ke": {"vive_en": "KE"},                               # sin fuente local, pero llega a 5: riesgo
-    "gh": {"vive_en": "GH", "idiomas": ["en"]},            # bajo 5 por falta de fuentes: hueco
-    "et": {"vive_en": "ET"},                               # bajo 5 por un cargo sin vacantes en ningún sitio: no es hueco
+    "ke": {"vive_en": "KE"},                               # sin fuente local, pero llega a 10: riesgo
+    "gh": {"vive_en": "GH", "idiomas": ["en"]},            # bajo 10 por falta de fuentes: hueco
+    "et": {"vive_en": "ET"},                               # bajo 10 por un cargo sin vacantes en ningún sitio: no es hueco
     # Vive en Colombia, híbrido en Tanzania y remoto en cualquier parte y en Uganda: Uganda no crea país.
     "mundo": {"vive_en": "CO", "ubicaciones": [
         {"paises": ["CO"], "ciudades": [], "modalidades": ["remoto"]},
@@ -44,10 +44,10 @@ def _fila(n, hoy, codigo="", listas=0, por_comprobar=0, dias=3):
 
 def _cobertura():
     return {"minimo": MINIMO, "perfiles": [
-        _fila("co", 6), _fila("ke", 7),
-        _fila("gh", 2, servicio.CAUSA_POCAS_EN_FUENTES),
+        _fila("co", 12), _fila("ke", 11),
+        _fila("gh", 7, servicio.CAUSA_POCAS_EN_FUENTES),  # 7: sobre el rescate (5) pero bajo la meta (10)
         _fila("et", 0, servicio.CAUSA_SIN_VACANTES_CARGO),
-        _fila("mundo", 5)]}
+        _fila("mundo", 10)]}
 
 
 def _tabla():
@@ -97,7 +97,7 @@ def test_los_codigos_de_hueco_los_produce_cobertura():
 
 
 def _repo_con(cfg):
-    """Demostración con esta configuración y 4 búsquedas medidas en las que nadie recibió nada (todos bajo 5). Las
+    """Demostración con esta configuración y 4 búsquedas medidas en las que nadie recibió nada (todos bajo 10). Las
     vacantes de la demo no admiten postular desde DE ni GH: la causa es un ajuste del perfil."""
     repo = RepositorioDemo()
     repo.operativa = lambda fecha: {"revision": 1, "configuracion": cfg}
@@ -141,10 +141,10 @@ def test_aviso_al_guardar_solo_por_paises_nuevos_sin_fuente_local():
     assert huecos.aviso_al_guardar(antes, antes) == []  # nada nuevo: no repite el aviso
     despues = _cfg({"co": {"vive_en": "CO"}, "ke": {"vive_en": "KE"}, "gh": {"vive_en": "GH"},
                     "de": {"vive_en": "DE"}})
-    assert huecos.aviso_al_guardar(antes, despues) == ["Ghana: sin fuente local; riesgo de quedar bajo 5."]
-    assert huecos.aviso_al_guardar(None, antes) == ["Kenia: sin fuente local; riesgo de quedar bajo 5."]
+    assert huecos.aviso_al_guardar(antes, despues) == ["Ghana: sin fuente local; riesgo de quedar bajo 10."]
+    assert huecos.aviso_al_guardar(None, antes) == ["Kenia: sin fuente local; riesgo de quedar bajo 10."]
     remoto = _cfg({"mundo": PERFILES["mundo"]})
-    assert huecos.aviso_al_guardar(None, remoto) == ["Tanzania: sin fuente local; riesgo de quedar bajo 5."]
+    assert huecos.aviso_al_guardar(None, remoto) == ["Tanzania: sin fuente local; riesgo de quedar bajo 10."]
     archivado = _cfg({"gh": {"vive_en": "GH", "activo": False}})
     assert huecos.aviso_al_guardar(None, archivado) == []
     cliente_archivado = _cfg({"gh": {"vive_en": "GH"}})
@@ -161,7 +161,7 @@ def test_api_avisa_al_guardar_sin_bloquear():
     r = api.put("/api/config", json={"revision": estado["revision"], "configuracion": cfg},
                 headers={"Origin": "http://testserver"})
     assert r.status_code == 200, r.text
-    assert r.json()["avisos_cobertura"] == ["Ghana: sin fuente local; riesgo de quedar bajo 5."]
+    assert r.json()["avisos_cobertura"] == ["Ghana: sin fuente local; riesgo de quedar bajo 10."]
     assert api.get("/api/config").json()["borrador"]["perfiles"][0]["vive_en"] == "GH"  # se guardó
 
 

@@ -9,7 +9,8 @@ import time
 
 from buscador import contrato, enlaces, paises, registro, vacante
 from buscador.normalizar import titulo_base
-from panel.afinidad import (AMPLIACIONES, ETIQUETAS_AMPLIACION, MINIMO_POR_PERFIL, MOTIVO_OTRO_PAIS, encaja_asignada,
+from panel.afinidad import (AMPLIACIONES, AVISO_BAJO, ETIQUETAS_AMPLIACION, MINIMO_POR_PERFIL, MOTIVO_OTRO_PAIS,
+                            encaja_asignada,
                             enlace_utilizable,
                             evaluar, evaluar_ampliada, evaluar_asignada, post_ubicacion,
                             titulo_del_cargo)
@@ -642,7 +643,8 @@ CAUSA_POCAS_EN_FUENTES = "pocas_en_fuentes"        # pocas vacantes nuevas en la
 
 
 def cobertura(repo, fecha=None):
-    """Por cada perfil activo: si hoy llegó al mínimo, cuántos de sus últimos días lo logró (con su denominador), cuántas
+    """Por cada perfil activo: si hoy llegó al umbral de aviso (`AVISO_BAJO`, `cobertura.aviso_bajo` = 10, la meta;
+    P-11.3), cuántos de sus últimos días lo logró (con su denominador), cuántas
     vacantes tiene listas para mañana (comprobadas y que nunca recibió) y cuántas esperan comprobación, por qué le
     faltan y totales por cargo, país e idioma. Solo cuenta lo medido: nunca reparte el inventario en días."""
     from panel.ejecutor import validar_version
@@ -669,7 +671,7 @@ def cobertura(repo, fecha=None):
     for cargo, p in perfiles:
         pid = str(p.id)
         dias = [e for e in ejecuciones if pid in presentes.get(e.get("revision"), set())]
-        con_minimo = sum(1 for e in dias if conteo.get((str(e["id"]), pid), 0) >= MINIMO_POR_PERFIL)
+        con_minimo = sum(1 for e in dias if conteo.get((str(e["id"]), pid), 0) >= AVISO_BAJO)
         hoy_n = conteo.get((str(ejecuciones[0]["id"]), pid), 0) if ejecuciones else 0
         raw = cargo.model_dump(mode="json")
         if not raw["terminos_exactos"]:
@@ -693,7 +695,7 @@ def cobertura(repo, fecha=None):
                 listas += 1
             else:
                 pendientes += 1
-        if hoy_n >= MINIMO_POR_PERFIL:
+        if hoy_n >= AVISO_BAJO:
             estado = "cubierto"
         elif len(dias) < DIAS_PARA_MEDIR:
             estado = "sin_datos"
@@ -703,7 +705,7 @@ def cobertura(repo, fecha=None):
         from panel.ejecutor import fuentes_locales, lugares_perfil, paises_de_lugares
         # 8.1b: «Cobertura limitada» con la misma definición de fuente local que la tabla de huecos (Indeed cuenta).
         pocas_fuentes = not any(fuentes_locales(c) for c in (paises_de_lugares(lugares_perfil(p)) or [p.vive_en]))
-        if estado != "cubierto" and hoy_n < MINIMO_POR_PERFIL:
+        if estado != "cubierto" and hoy_n < AVISO_BAJO:
             if not del_cargo:
                 codigo = CAUSA_SIN_VACANTES_CARGO
                 causa = "Aún no hay vacantes de este cargo en lo buscado: la próxima búsqueda lo incluye."
@@ -728,7 +730,7 @@ def cobertura(repo, fecha=None):
                           "todo remotas abiertas a su país. Tiene el doble de turnos en la búsqueda.")
         seguidos = 0
         for e in dias:
-            if conteo.get((str(e["id"]), pid), 0) >= MINIMO_POR_PERFIL:
+            if conteo.get((str(e["id"]), pid), 0) >= AVISO_BAJO:
                 break
             seguidos += 1
         # Contrato v44: qué hacer, con cifras, para quien no llega a su meta.
@@ -763,8 +765,8 @@ def cobertura(repo, fecha=None):
     largos = [f for f in filas if f["dias_seguidos_bajo"] >= 3]
     if largos:
         alertas.append(f"{len(largos)} {'persona lleva' if len(largos) == 1 else 'personas llevan'} 3 o más días "
-                       "seguidos con menos de 5: revisa su cargo y su ubicación.")
-    return {"fecha": fecha, "minimo": MINIMO_POR_PERFIL, "dias_ventana": DIAS_COBERTURA, "perfiles": filas,
+                       f"seguidos con menos de {AVISO_BAJO}: revisa su cargo y su ubicación.")
+    return {"fecha": fecha, "minimo": AVISO_BAJO, "dias_ventana": DIAS_COBERTURA, "perfiles": filas,
             "grupos": {"cargo": agrupar("cargo"), "pais": agrupar("vive_en"), "idioma": agrupar("idiomas")},
             "alertas": alertas,
             "nota": "Cuenta solo lo medido en las búsquedas de cada día. «Listas» son vacantes guardadas, con enlace "

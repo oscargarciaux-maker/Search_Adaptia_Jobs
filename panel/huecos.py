@@ -2,7 +2,7 @@
 
 - Riesgo (aviso temprano): un perfil activo cuyo país —donde vive, o donde acepta híbrido/presencial— no tiene fuente
   local: solo lo buscan LinkedIn, los portales de empresas y Get on Board. La remota mundial no crea país.
-- Hueco (medido): tras una búsqueda, un perfil bajo el mínimo de 5 cuya causa es la falta de vacantes en las fuentes, no
+- Hueco (medido): tras una búsqueda, un perfil bajo el umbral de aviso (`cobertura.aviso_bajo`, 10) cuya causa es la falta de vacantes en las fuentes, no
   su cargo (sin vacantes en ningún sitio), ni enlaces por comprobar, ni listas que aún no recibió, ni un ajuste del perfil.
 - El pedido para un chat de Claude Code lleva SOLO país, idiomas, familias de cargo y modalidades: un país con un solo
   perfil delataría a un cliente, así que nada de esto sale del panel privado (ni mensajes, ni logs, ni `publicado`).
@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 
 from buscador import paises
 from panel.contenido import familia_del_mapa
+from panel.afinidad import AVISO_BAJO
 from panel.ejecutor import fuentes_en, fuentes_locales, lugares_perfil
 from panel.servicio import CAUSA_OTRO_PAIS, CAUSA_POCAS_EN_FUENTES
 
@@ -47,7 +48,7 @@ def _familia(nombre_cargo):
 
 def aviso_al_guardar(anterior, nueva):
     """Contrato §15 (8.1): al guardar, por cada país NUEVO de un perfil activo (perfil nuevo, reactivado o con otro país)
-    que no tiene fuente local: «<país>: sin fuente local; riesgo de quedar bajo 5». No bloquea el guardado. `anterior` y
+    que no tiene fuente local: «<país>: sin fuente local; riesgo de quedar bajo <AVISO_BAJO>». No bloquea el guardado. `anterior` y
     `nueva` son configuraciones crudas (dict); lo que no valida no se mira."""
     from panel.modelos import Perfil
 
@@ -69,7 +70,7 @@ def aviso_al_guardar(anterior, nueva):
     nombres = _nombres()
     nuevos = sorted({c for pid, cs in ahora.items() for c in cs - antes.get(pid, set()) if not fuentes_locales(c)},
                     key=lambda c: nombres.get(c, c))
-    return [f"{nombres.get(c, c)}: sin fuente local; riesgo de quedar bajo 5." for c in nuevos]
+    return [f"{nombres.get(c, c)}: sin fuente local; riesgo de quedar bajo {AVISO_BAJO}." for c in nuevos]
 
 
 def es_hueco_por_fuentes(fila, minimo):
