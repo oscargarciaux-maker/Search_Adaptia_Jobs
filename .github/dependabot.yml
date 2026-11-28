@@ -11,6 +11,16 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+    # P-5b (28 nov): un solo PR semanal con todas las librerías de Python (antes llegaban 5 sueltos, #144–#148) y las
+    # de seguridad aparte, para que un aviso de seguridad no espere a la revisión semanal. Un grupo por nombre; si una
+    # librería encaja en dos, va al primero. Las versiones mayores siguen ignoradas.
+    groups:
+      python-seguridad:
+        applies-to: security-updates
+        patterns: ["*"]
+      python-semanal:
+        applies-to: version-updates
+        patterns: ["*"]
   - package-ecosystem: npm
     directory: /web
     schedule: { interval: weekly, day: monday }
