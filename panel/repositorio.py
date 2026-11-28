@@ -53,15 +53,15 @@ def paginar(pedir, ruta, clave, params, tamano=500):
         ultimo = lote[-1][clave]
 
 
-def por_ids(pedir, ruta, campo, ids, select, tamano=500, tanda=50):
-    """Filas cuyo `campo` está en `ids`, por tandas de 50 (la dirección de la petición no crece con los clientes) y
-    con `paginar` ordenado por `id`."""
+def por_ids(pedir, ruta, campo, ids, select, tamano=500, tanda=50, filtro=None):
+    """Filas cuyo `campo` está en `ids` (y que cumplen `filtro`, si se da), por tandas de 50 (la dirección de la
+    petición no crece con los clientes) y con `paginar` ordenado por `id`."""
     if campo == "id":  # desde la segunda página, `id=gt.…` reemplazaría el filtro `id=in.(…)`
         raise ValueError("por_ids no filtra por la misma clave con que pagina")
     ids = list(dict.fromkeys(str(i) for i in ids))
     for inicio in range(0, len(ids), tanda):
-        yield from paginar(pedir, ruta, "id", {campo: "in.(" + ",".join(ids[inicio:inicio + tanda]) + ")",
-                                              "select": select}, tamano)
+        yield from paginar(pedir, ruta, "id", {**(filtro or {}), "select": select,
+                                              campo: "in.(" + ",".join(ids[inicio:inicio + tanda]) + ")"}, tamano)
 
 
 def recibidas_de(pedir, perfil_ids, tamano=1000):
@@ -73,21 +73,12 @@ def recibidas_de(pedir, perfil_ids, tamano=1000):
     return salida
 
 
-def ya_recibieron_de(pedir, perfil_ids, vacante_id, tanda=50, tope=1000):
-    """P-12.11: las personas de `perfil_ids` que ya recibieron `vacante_id`, con una consulta acotada por esa vacante
-    (índice de SQL 024) en vez de leer todo su historial: el costo no crece con los días. Si la respuesta llega al
-    `tope` de filas (podría venir cortada), se lee por páginas: nunca se decide con una lectura a medias."""
-    salida = set()
-    ids = list(dict.fromkeys(str(i) for i in perfil_ids))
-    for inicio in range(0, len(ids), tanda):
-        filtro = {"perfil_id": "in.(" + ",".join(ids[inicio:inicio + tanda]) + ")", "vacante_id": "eq." + vacante_id}
-        filas = pedir("GET", "panel_asignaciones", params={**filtro, "select": "perfil_id", "limit": tope})
-        if not isinstance(filas, list) or len(filas) > tope:
-            raise ErrorRepositorio("Lectura de lo ya recibido con una respuesta inesperada.")
-        if len(filas) == tope:
-            filas = list(paginar(pedir, "panel_asignaciones", "id", {**filtro, "select": "id,perfil_id"}, tope))
-        salida.update(f["perfil_id"] for f in filas)
-    return salida
+def ya_recibieron_de(pedir, perfil_ids, vacante_id):
+    """P-12.11: las personas de `perfil_ids` que ya recibieron `vacante_id`. Pregunta solo por esa vacante (índice de
+    SQL 024) en vez de leer todo su historial, así que el costo no crece con los días: 1 viaje si nadie la tiene y 2 si
+    alguien la tiene (la página vacía que cierra la lectura, como en toda lectura de `paginar`)."""
+    return {f["perfil_id"] for f in por_ids(pedir, "panel_asignaciones", "perfil_id", perfil_ids, "id,perfil_id",
+                                             1000, filtro={"vacante_id": "eq." + vacante_id})}
 
 
 # Mensajes de las funciones SQL del panel. Los de SQL 009 (exigen 120 exactos) indican que la base aún no tiene
@@ -393,21 +384,22 @@ class RepositorioSupabase:
         # descripción se pide después solo para la página que se muestra. Contrato v34: con la columna `resumen`
         # (SQL 018) la lista ligera ni siquiera lee el catálogo; las filas sin resumen se completan después.
         # P-12.11: la lista ligera tampoco trae el `resumen` (0,7 kB de 1,3 por fila): `revision.listar` lo pide solo
-        # para la página (`resumenes`). Sin textos largos, va de 1.000 en 1.000 (con 3.000 pendientes, 19 → 4 viajes).
+        # para la página (`leer_resumenes`). Sin textos largos, va de 1.000 en 1.000 (con 3.000 pendientes, 16 → 4
+        # páginas).
         descripcion = "" if ligera or sin_descripcion else "description_full,"
-        params = {"select": f"*,catalogo_vacantes(id,datos,{descripcion}status,reason)"}
+        params, tamano = {"select": f"*,catalogo_vacantes(id,datos,{descripcion}status,reason)"}, 200
         if ligera and self.con_resumen():
-            params = {"select": "vacante_id,estado,motivo,pista,ubicacion,sugerencia,paises,perfiles,prioridad,"
-                                "creada_en"}
+            params, tamano = {"select": "vacante_id,estado,motivo,pista,ubicacion,sugerencia,paises,perfiles,"
+                                        "prioridad,creada_en"}, 1000
         if estado:
             params["estado"] = "eq." + estado
         if vacante_id:
             return self.pedir("GET", "panel_revisiones", params={**params, "vacante_id": "eq." + vacante_id}) or []
         # Por páginas: la depuración completa puede guardar miles (contrato v17).
-        filas = list(self._paginas("panel_revisiones", "vacante_id", params, 1000 if ligera else 200))
+        filas = list(self._paginas("panel_revisiones", "vacante_id", params, tamano))
         return sorted(filas, key=lambda r: -(r.get("prioridad") or 0))
 
-    def resumenes(self, vacante_ids):
+    def leer_resumenes(self, vacante_ids):
         """P-12.11: {vacante: resumen guardado (o None)} de esas filas de la bandeja, por grupos de 100."""
         salida = {}
         ids = list(dict.fromkeys(vacante_ids))
@@ -825,7 +817,7 @@ class RepositorioDemo:
     def con_resumen(self):
         return True
 
-    def resumenes(self, vacante_ids):
+    def leer_resumenes(self, vacante_ids):
         ids = set(vacante_ids)
         with self.lock:
             return {r["vacante_id"]: deepcopy(r.get("resumen")) for r in self._revisiones() if r["vacante_id"] in ids}

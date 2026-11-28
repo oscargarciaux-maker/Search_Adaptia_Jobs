@@ -454,14 +454,12 @@ def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None, todas=None,
     originales = {r["vacante_id"]: r for r in todas}
     # P-12.11: la lista ligera ya no trae el resumen; se pide solo el de esta página (1 viaje) y queda en la copia en
     # memoria, para que volver a la misma página no lo pida otra vez.
-    sin_leer = [r["vacante_id"] for r in pendientes if "resumen" not in r]
-    if sin_leer and getattr(repo, "con_resumen", lambda: False)():
-        guardados = repo.resumenes(sin_leer)
-        for r in pendientes:
-            if r["vacante_id"] in guardados and "resumen" not in r:
-                r["resumen"] = guardados[r["vacante_id"]]
-                if r["resumen"] and r["vacante_id"] in originales:
-                    originales[r["vacante_id"]]["resumen"] = r["resumen"]
+    con_resumen = getattr(repo, "con_resumen", lambda: False)()
+    sin_leer = [r for r in pendientes if "resumen" not in r]
+    if sin_leer and con_resumen:
+        guardados = repo.leer_resumenes([r["vacante_id"] for r in sin_leer])
+        for r in sin_leer:
+            r["resumen"] = guardados.get(r["vacante_id"])
     sin_resumen = [r for r in pendientes if not r.get("resumen")]
     faltan = [r["vacante_id"] for r in sin_resumen if "description_full" not in (r.get("catalogo_vacantes") or {})]
     filas = repo.filas_catalogo(faltan) if faltan else {}
@@ -480,8 +478,8 @@ def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None, todas=None,
         if not res:
             res = resumen_de(_datos(r.get("catalogo_vacantes")), r.get("motivo", ""))
             calculados[r["vacante_id"]] = res
-            if r["vacante_id"] in originales:
-                originales[r["vacante_id"]]["resumen"] = res  # la copia en memoria ya no lo vuelve a calcular
+        if r["vacante_id"] in originales:
+            originales[r["vacante_id"]]["resumen"] = res  # la copia en memoria ya no lo vuelve a leer ni a calcular
         frase = r.get("pista", "") if r.get("motivo") in DUDAS_DE_CARGO else res.get("frase", "")
         # P-7.F: el resumen guardado de noche trae el texto del portal; se corrige al mostrar, no al guardar.
         lugar, lugar_portal = paises.ubicacion_a_mostrar(res.get("ubicacion"))
@@ -504,7 +502,7 @@ def listar(repo, fecha, pagina=None, por_pagina=25, cliente_id=None, todas=None,
     por_id = numeros(repo, [s["vacante_id"] for s in salida])  # contrato v48: «ID 1234»
     for s in salida:
         s["numero"] = por_id.get(s["vacante_id"])
-    if calculados and getattr(repo, "con_resumen", lambda: False)():
+    if calculados and con_resumen:
         _guardar_resumenes(repo, calculados)
     if pagina is None:
         return {"pendientes": salida, "total": len(salida), "en_espera": len(todas),

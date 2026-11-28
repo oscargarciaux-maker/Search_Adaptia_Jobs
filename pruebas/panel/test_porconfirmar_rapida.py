@@ -101,7 +101,8 @@ def test_listar_da_la_misma_salida_que_con_el_resumen_en_la_lista(pagina, client
     assert _lecturas(pg, "panel_revisiones") == []
 
 
-def test_la_demostracion_sigue_igual():
+def test_la_demostracion_lee_el_resumen_de_la_pagina_igual():
+    """El repositorio de demostración también responde `leer_resumenes` (aquí su lista ligera lo omite)."""
     tablas, version = _bandeja(60)
 
     class Demo(Repo):
@@ -126,19 +127,21 @@ def test_ya_recibieron_es_una_consulta_acotada_que_no_crece_con_el_historial():
     vista, otra = "ya-la-vio", "nunca-la-vio"
     for total in (10, 12_000):
         pg = PostgREST({"panel_asignaciones": _historial("p1", [vista], total) + _historial("p2", [], total)})
-        assert ya_recibieron_de(pg.pedir, ["p1", "p2"], vista) == {"p1"}
         assert ya_recibieron_de(pg.pedir, ["p1", "p2"], otra) == set()
-        assert len(pg.lecturas) == 2  # una por pregunta, con 10 o con 12.000 previas
+        assert len(pg.lecturas) == 1  # nadie la tiene: 1 viaje, con 10 o con 12.000 previas
+        assert ya_recibieron_de(pg.pedir, ["p1", "p2"], vista) == {"p1"}
+        assert len(pg.lecturas) == 3  # alguien la tiene: 2 viajes (el segundo, vacío, cierra la lectura)
         for _, params in pg.lecturas:
             assert params["perfil_id"] == "in.(p1,p2)" and params["vacante_id"].startswith("eq.")
-            assert params["select"] == "perfil_id" and params["limit"] == 1000
+            assert params["select"] == "id,perfil_id" and params["order"] == "id" and params["limit"] == 1000
 
 
-def test_ya_recibieron_lee_por_paginas_si_la_respuesta_puede_venir_cortada():
+def test_ya_recibieron_no_se_corta_si_supabase_da_menos_filas_de_las_pedidas():
+    """Como en P-12.1: una respuesta corta (el `max-rows` de Supabase) no es el final; solo una página vacía."""
     filas = [{"id": f"a{n}", "perfil_id": "p1", "vacante_id": "x"} for n in range(3)]
     filas.append({"id": "a9", "perfil_id": "p2", "vacante_id": "x"})
-    pg = PostgREST({"panel_asignaciones": filas})
-    assert ya_recibieron_de(pg.pedir, ["p1", "p2"], "x", tope=2) == {"p1", "p2"}  # la primera respuesta traía solo p1
+    pg = PostgREST({"panel_asignaciones": filas}, max_filas=2)
+    assert ya_recibieron_de(pg.pedir, ["p1", "p2"], "x") == {"p1", "p2"}  # la primera respuesta traía solo p1
 
 
 def test_ya_recibieron_con_una_respuesta_rara_es_un_error():
@@ -167,27 +170,33 @@ def _pendiente(perfiles_previos=None):
     previos = perfiles_previos(ids) if perfiles_previos else []
     r.pg = PostgREST({"panel_asignaciones": [a for i in ids
                                              for a in _historial(i, [rev["vacante_id"]] if i in previos else [])]})
-    return r, rev["vacante_id"], ids, previos
+    return r, rev["vacante_id"], previos
 
 
-def test_sirve_con_doce_mil_previas_no_repite_y_hace_una_sola_consulta():
-    r, vid, ids, previos = _pendiente(lambda ids: ids[:1])
+def test_sirve_con_doce_mil_previas_no_repite_y_no_lee_el_historial():
+    r, vid, previos = _pendiente(lambda ids: ids[:1])
     resultado = revision.decidir(r, vid, "sirve", ["CO"], regenerar=False)
     nuevas = {a["perfil_id"] for a in r.estado.get("asignaciones_extra", []) if a["vacante_id"] == vid}
     assert previos and not nuevas & set(previos)  # quien ya la tenía no la recibe otra vez
     assert resultado["asignadas"] == len(nuevas)
     lecturas = [p for t, p in r.pg.lecturas if t == "panel_asignaciones"]
-    assert len(lecturas) == 1 and lecturas[0]["vacante_id"] == "eq." + vid
+    assert len(lecturas) == 2 and all(p["vacante_id"] == "eq." + vid for p in lecturas)
 
 
 def test_sirve_asigna_a_quien_no_la_tenia():
-    r, vid, ids, _ = _pendiente()
-    assert revision.decidir(r, vid, "sirve", ["CO"], regenerar=False)["asignadas"] >= 1
+    r, vid, _ = _pendiente()
+    asignadas = revision.decidir(r, vid, "sirve", ["CO"], regenerar=False)["asignadas"]
+    nuevas = [a["perfil_id"] for a in r.estado.get("asignaciones_extra", []) if a["vacante_id"] == vid]
+    assert asignadas >= 1 and asignadas == len(nuevas) == len(set(nuevas))
+    assert len([p for t, p in r.pg.lecturas if t == "panel_asignaciones"]) == 1
 
 
 def test_si_no_se_puede_saber_quien_la_tiene_no_se_asigna():
-    r, vid, _, _ = _pendiente()
-    r.pg.fallar = lambda ruta, params: (lambda: (_ for _ in ()).throw(ErrorRepositorio()))
+    r, vid, _ = _pendiente()
+
+    def error():
+        raise ErrorRepositorio()
+    r.pg.fallar = lambda ruta, params: error
     with pytest.raises(ErrorRepositorio):
         revision.decidir(r, vid, "sirve", ["CO"], regenerar=False)
     assert not r.estado.get("asignaciones_extra")
