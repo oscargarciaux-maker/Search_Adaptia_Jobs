@@ -35,10 +35,7 @@ def paginar(pedir, ruta, clave, params, tamano=500):
     sin tope. P-12.1: antes el ejecutor paginaba con OFFSET, sin orden y se detenía en 5.000 filas sin avisar.
     Nunca devuelve una lectura a medias en silencio: una respuesta que no es una lista, más larga de lo pedido o que
     no avanza es un error. La página corta marca el final: `tamano` no debe pasar del máximo de filas de PostgREST
-    (Supabase: 1.000)."""
-    seleccion = params.get("select")
-    if seleccion and not seleccion.startswith("*") and clave not in seleccion.split(","):  # la clave hace falta para seguir
-        params = {**params, "select": seleccion + "," + clave}
+    (Supabase: 1.000). El `select` debe traer la clave."""
     ultimo = None
     while True:
         lote = pedir("GET", ruta, params={**params, "order": clave, "limit": tamano,
@@ -56,10 +53,21 @@ def paginar(pedir, ruta, clave, params, tamano=500):
 def por_ids(pedir, ruta, campo, ids, select, tamano=500, tanda=50):
     """Filas cuyo `campo` está en `ids`, por tandas de 50 (la dirección de la petición no crece con los clientes) y
     con `paginar` ordenado por `id`."""
+    if campo == "id":  # desde la segunda página, `id=gt.…` reemplazaría el filtro `id=in.(…)`
+        raise ValueError("por_ids no filtra por la misma clave con que pagina")
     ids = list(dict.fromkeys(str(i) for i in ids))
     for inicio in range(0, len(ids), tanda):
         yield from paginar(pedir, ruta, "id", {campo: "in.(" + ",".join(ids[inicio:inicio + tanda]) + ")",
                                               "select": select}, tamano)
+
+
+def recibidas_de(pedir, perfil_ids, tamano=1000):
+    """{persona: vacantes que ya recibió} de todo `panel_asignaciones`, con una entrada por cada persona pedida (aunque
+    no tenga historial)."""
+    salida = {str(i): set() for i in perfil_ids}
+    for r in por_ids(pedir, "panel_asignaciones", "perfil_id", perfil_ids, "id,perfil_id,vacante_id", tamano):
+        salida.setdefault(r["perfil_id"], set()).add(r["vacante_id"])
+    return salida
 
 
 # Mensajes de las funciones SQL del panel. Los de SQL 009 (exigen 120 exactos) indican que la base aún no tiene
@@ -333,10 +341,7 @@ class RepositorioSupabase:
                    headers={"Prefer": "return=minimal"}, json={"status": "archived", "reason": razon})
 
     def recibidas(self, perfil_ids):
-        salida = {}
-        for r in por_ids(self.pedir, "panel_asignaciones", "perfil_id", perfil_ids, "id,perfil_id,vacante_id", 1000):
-            salida.setdefault(r["perfil_id"], set()).add(r["vacante_id"])
-        return salida
+        return recibidas_de(self.pedir, perfil_ids)
 
     def con_resumen(self):
         """Contrato v34: si la bandeja ya tiene la columna `resumen` (SQL 018). Se pregunta una vez por instancia."""

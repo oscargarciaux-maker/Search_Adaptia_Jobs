@@ -10,7 +10,7 @@ import pytest
 
 from buscador import familias, vacante
 from panel import ejecutor
-from panel.repositorio import ErrorRepositorio, configuracion_demo, hoy, paginar
+from panel.repositorio import ErrorRepositorio, configuracion_demo, hoy, paginar, por_ids
 
 TEXTO = ("We are hiring a Product Designer for our product team. You will run user research, design flows in Figma "
          "and work with engineering every day. ") * 3
@@ -85,33 +85,30 @@ def _historial(perfil_id, ya_recibidas, total=12_000):
             for n, v in enumerate(relleno + list(ya_recibidas))]
 
 
-def _registrar(repo, cfg, bodega):
-    original = ejecutor._rescatar
-
-    def rescatar(*a, **k):  # sin red: todas las de la bodega ya tienen el enlace comprobado hoy
-        return original(*a, **{**k, "comprobar": lambda *_, **__: None, "subir": lambda filas: None})
-    ejecutor._rescatar = rescatar
-    try:
-        ejecutor.registrar(repo, {"revision": 1, "configuracion": cfg}, hoy(), vacantes=bodega, cache_enlaces={})
-    finally:
-        ejecutor._rescatar = original
+@pytest.fixture
+def registrar(monkeypatch):
+    original = ejecutor._rescatar  # sin red: todas las de la bodega ya tienen el enlace comprobado hoy
+    monkeypatch.setattr(ejecutor, "_rescatar", lambda *a, **k: original(
+        *a, **{**k, "comprobar": lambda *_, **__: None, "subir": lambda filas: None}))
+    return lambda repo, cfg, bodega: ejecutor.registrar(repo, {"revision": 1, "configuracion": cfg}, hoy(),
+                                                        vacantes=bodega, cache_enlaces={})
 
 
-def test_doce_mil_asignaciones_anteriores_no_repiten_ninguna(cfg):
+def test_doce_mil_asignaciones_anteriores_no_repiten_ninguna(cfg, registrar):
     p = cfg["perfiles"][0]
     bodega = [_vacante(n) for n in range(6)]
     nueva = _vacante(99)  # la única que nunca recibió
     repo = PostgREST({"panel_asignaciones": _historial(p["id"], [v["id"] for v in bodega])})
-    _registrar(repo, cfg, bodega + [nueva])
+    registrar(repo, cfg, bodega + [nueva])
     ids = [a["vacante_id"] for a in repo.asignadas if a["perfil_id"] == p["id"]]
     assert ids == [nueva["id"]]  # con el tope de 5.000, las 6 de la bodega volvían a llegarle
     assert repo.ejecucion["resumen"]["rescatadas"] == 1
 
 
-def test_recibidas_se_pide_una_sola_vez_por_corrida(cfg):
+def test_recibidas_se_pide_una_sola_vez_por_corrida(cfg, registrar):
     p = cfg["perfiles"][0]
     repo = PostgREST({"panel_asignaciones": _historial(p["id"], [], total=3)})
-    _registrar(repo, cfg, [_vacante(n) for n in range(3)])
+    registrar(repo, cfg, [_vacante(n) for n in range(3)])
     lecturas = [params for ruta, params in repo.lecturas if ruta == "panel_asignaciones" and "perfil_id" in params]
     assert len(lecturas) == 1  # antes: una en reutilizar, otra en el rescate y otra en los posts
     assert lecturas[0]["order"] == "id" and "id" in lecturas[0]["select"].split(",")
@@ -119,7 +116,7 @@ def test_recibidas_se_pide_una_sola_vez_por_corrida(cfg):
 
 
 @pytest.mark.parametrize("fallo", ["nula", "error"])
-def test_una_lectura_que_falla_a_mitad_no_deja_completar(cfg, capsys, fallo):
+def test_una_lectura_que_falla_a_mitad_no_deja_completar(cfg, capsys, fallo, registrar):
     p = cfg["perfiles"][0]
     bodega = [_vacante(n) for n in range(6)]
     hoy_rows = [{"vacante_id": "h000000000000001", "delivery_date": hoy(), "role_id": "cargo:" + cfg["cargos"][0]["id"],
@@ -136,13 +133,13 @@ def test_una_lectura_que_falla_a_mitad_no_deja_completar(cfg, capsys, fallo):
         return None
     repo = PostgREST({"panel_asignaciones": _historial(p["id"], [v["id"] for v in bodega]),
                       "entregas_diarias": hoy_rows}, fallar=segunda_pagina)
-    _registrar(repo, cfg, bodega)
+    registrar(repo, cfg, bodega)
     ids = [a["vacante_id"] for a in repo.asignadas if a["perfil_id"] == p["id"]]
     assert ids == ["h000000000000001"]  # lo del día se registra; nada se completa con un historial a medias
     resumen = repo.ejecucion["resumen"]
     assert resumen["rescatadas"] == resumen["reutilizadas"] == resumen["posts"] == 0
     err = capsys.readouterr().err
-    assert "[aviso] ejecutor:recibidas" in err and "hoy no se completa a nadie" in err
+    assert "[aviso] ejecutor:recibidas" in err and "en esta corrida no se completa a nadie" in err
     assert p["id"] not in err and p["cliente_id"] not in err  # el aviso no lleva datos de clientes
 
 
@@ -166,10 +163,9 @@ def test_paginar_lee_todo_en_orden_de_clave():
     assert len(repo.lecturas) == 13 and all("offset" not in params for _, params in repo.lecturas)
 
 
-def test_paginar_agrega_la_clave_a_la_seleccion():
-    repo = PostgREST({"t": [{"id": "1", "x": 1}]})
-    list(paginar(repo.pedir, "t", "id", {"select": "x"}))
-    assert repo.lecturas[0][1]["select"] == "x,id"
+def test_por_ids_no_filtra_por_la_clave_con_que_pagina():
+    with pytest.raises(ValueError):
+        list(por_ids(lambda *a, **k: [], "t", "id", ["1"], "id"))
 
 
 @pytest.mark.parametrize("respuesta", [None, {"mensaje": "no es una lista"}, [{"id": "1"}] * 3])

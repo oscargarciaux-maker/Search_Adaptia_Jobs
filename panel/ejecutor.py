@@ -16,7 +16,7 @@ from panel.acciones import CLAVE_PEDIDA, ENFOQUE_COMPLETO, ENFOQUE_FALTANTES, EN
 from panel import contenido
 from panel.modelos import Configuracion
 from pydantic import ValidationError
-from panel.repositorio import RepositorioSupabase, hoy, paginar, por_ids
+from panel.repositorio import RepositorioSupabase, hoy, paginar, por_ids, recibidas_de
 from panel.terminos import en_espanol, grado, hermanos_del_cargo
 
 
@@ -502,30 +502,19 @@ def cargos_operativos(repo, cfg):
                                                  huellas.get(str(c.id))) for c in cfg.cargos}
 
 
-def _paginas(repo, ruta, clave, params):
-    """P-12.1: todas las filas, ordenadas por `clave` (única) y sin tope (antes: OFFSET, sin orden y corte silencioso
-    en 5.000)."""
-    return list(paginar(repo.pedir, ruta, clave, params))
-
-
 def leer_recibidas(repo, perfil_ids):
     """P-12.1: lo que cada persona ya recibió (`panel_asignaciones`, todo el historial), leído UNA vez por corrida para
     los tres pasos que completan (reutilizar, rescatar y posts; antes eran tres lecturas). Trae una entrada por cada
     persona pedida, aunque no tenga historial. Si la lectura falla devuelve None con un aviso sin datos de clientes, y
-    ese día no se completa a nadie: con un historial a medias podría repetirse una vacante."""
-    ids = list(dict.fromkeys(perfil_ids))
-    if not ids:
-        return {}
-    salida = {i: set() for i in ids}
+    en esta corrida no se completa a nadie (la siguiente vuelve a intentarlo): con un historial a medias podría
+    repetirse una vacante. Páginas de 500, la mitad del máximo de filas de Supabase."""
     try:
-        for r in por_ids(repo.pedir, "panel_asignaciones", "perfil_id", ids, "id,perfil_id,vacante_id"):
-            salida.setdefault(r["perfil_id"], set()).add(r["vacante_id"])
+        return recibidas_de(repo.pedir, perfil_ids, tamano=500)
     except Exception as e:  # noqa: BLE001 — sin el historial completo no se completa a nadie (regla de no repetir)
         registro.aviso("ejecutor:recibidas", RuntimeError(
-            f"{type(e).__name__}: no se pudo leer completo lo que ya recibió cada persona; hoy no se completa a nadie "
-            "con días anteriores, la bodega ni posts"))
+            f"{type(e).__name__}: no se pudo leer completo lo que ya recibió cada persona; en esta corrida no se "
+            "completa a nadie con días anteriores, la bodega ni posts"))
         return None
-    return salida
 
 
 def _vistas(recibidas, filas, bajos):
@@ -548,7 +537,8 @@ def _reutilizar(repo, cfg, fecha, completar, filas, fila, operativos, recibidas)
     if not bajos:
         return 0
     desde = (datetime.fromisoformat(fecha) - timedelta(days=DIAS_REUTILIZAR)).date().isoformat()
-    previas = _paginas(repo, "entregas_diarias", "vacante_id", {"delivery_date": f"gte.{desde}", "select": "*"})
+    previas = list(paginar(repo.pedir, "entregas_diarias", "vacante_id",
+                           {"delivery_date": f"gte.{desde}", "select": "*"}))
     # Las más recientes primero (y, el mismo día, por vacante), como antes pedía `order`.
     previas = sorted((r for r in previas if r.get("delivery_date", "") < fecha), key=lambda r: r["delivery_date"],
                      reverse=True)
@@ -733,9 +723,9 @@ def _posts(repo, cfg, fecha, estrictas, filas, fila, operativos, recibidas):
     if not bajos:
         return 0
     desde = (datetime.fromisoformat(fecha) - timedelta(days=DIAS_POSTS)).date().isoformat()
-    posts = _paginas(repo, "catalogo_vacantes", "id", {"status": "eq.active", "datos->>tipo": "eq.post",
-                                                       "observed_at": f"gte.{desde}",
-                                                       "select": "id,datos,description_full,observed_at"})
+    posts = list(paginar(repo.pedir, "catalogo_vacantes", "id", {"status": "eq.active", "datos->>tipo": "eq.post",
+                                                                 "observed_at": f"gte.{desde}",
+                                                                 "select": "id,datos,description_full,observed_at"}))
     # Los más recientes primero, como antes pedía `order` (antes además se cortaba en 1.000 sin avisar).
     posts.sort(key=lambda r: r.get("observed_at") or "", reverse=True)
     candidatos = []
@@ -802,7 +792,8 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
     operativos = cargos_operativos(repo, cfg)
     cargos_json = {str(c.id): operativos[str(c.id)] for c in cfg.cargos if c.activo}
     # P-12.1: todo el lote del día (antes se cortaba en 500 sin avisar, con un techo de hasta 600).
-    seleccionadas = _paginas(repo, "entregas_diarias", "vacante_id", {"delivery_date": "eq." + fecha, "select": "*"})
+    seleccionadas = list(paginar(repo.pedir, "entregas_diarias", "vacante_id",
+                                 {"delivery_date": "eq." + fecha, "select": "*"}))
     filas, conteos, estrictas, ampliables = [], {}, {}, []
     def fila(row, p, cargo_id, pruebas, extra=()):
         # Contrato v49: el cargo operativo (el mismo con que se clasificó), la coincidencia del cargo que la RECIBE
@@ -876,7 +867,7 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
     if ya_hoy is None:
         completar.metas = dict.fromkeys(completar.metas, MINIMO_POR_PERFIL)
     # P-12.1: una sola lectura de lo que ya recibió cada persona que va corta (los posts solo miran a quien va bajo 5,
-    # que ya está entre ellas). Si falla, hoy solo se registra lo del día: nada se completa con datos a medias.
+    # que ya está entre ellas). Si falla, esta corrida solo registra el lote: nada se completa con datos a medias.
     recibidas = leer_recibidas(repo, [str(p.id) for _, p in completar.bajos(cfg)])
     if recibidas is not None:
         try:
