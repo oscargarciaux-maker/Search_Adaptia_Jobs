@@ -487,11 +487,13 @@ def cola_por_necesidad(vacantes, hoy):
     return entrega.colas_por_persona(vacantes, hoy)[0]
 
 
-def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, cfg=None):
+def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, cfg=None, medir=None):
     """Comprueba candidatas antes de la selección; lo no revisado nunca se da por aprobado.
     Orden: el lote ya registrado hoy (plazo para compartir), las que elegiría la selección en su orden y, en las
     capturas horarias, lo reciente con el presupuesto que sobre."""
     cfg = cfg or {}
+    from contextlib import nullcontext
+    medir = medir or (lambda texto, **cifras: nullcontext(cifras))  # P-12.3: solo para medir, texto fijo y cifras
     maximo = cfg.get("vacantes_por_captura", 40) if incremental else cfg.get("vacantes_por_corrida", 300)
     segundos = cfg.get("segundos_captura", 90) if incremental else cfg.get("segundos_corrida", 240)
     plazo = time.monotonic() + segundos
@@ -509,8 +511,11 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
         historicas = historicas[inicio:] + historicas[:inicio]
     revisadas_n = 0
     if historicas:
-        revisadas_n += auditar(historicas, cache, maximo=maximo // 3 if incremental else maximo,
-                               segundos=max(0, plazo - time.monotonic()), vigencia=VIGENCIA_COMPARTIR)
+        with medir("Comprobar enlaces: lote del día", candidatas=len(historicas)) as cifras:
+            n_lote = auditar(historicas, cache, maximo=maximo // 3 if incremental else maximo,
+                             segundos=max(0, plazo - time.monotonic()), vigencia=VIGENCIA_COMPARTIR)
+            cifras["abiertas"] = n_lote
+        revisadas_n += n_lote
     revisadas = set()
     por_necesidad = 0
     # Contrato v49: primero las candidatas de cada persona, con la mitad del presupuesto que queda. Contrato v50: esa
@@ -525,37 +530,42 @@ def preparar(vacantes, entregadas, hoy, cache, *, lote=None, incremental=False, 
         if necesidad and revisadas_n < maximo:
             parte = 3 if incremental else 2
             cupo = max(1, (maximo - revisadas_n) // parte)
-            por_necesidad = auditar(necesidad, cache, maximo=cupo, segundos=max(0, plazo - time.monotonic()) / parte,
-                                    linkedin_aparte=True)
+            with medir("Comprobar enlaces: por necesidad de cada persona", candidatas=len(necesidad)) as cifras:
+                por_necesidad = auditar(necesidad, cache, maximo=cupo,
+                                        segundos=max(0, plazo - time.monotonic()) / parte, linkedin_aparte=True)
+                cifras["abiertas"] = por_necesidad
             revisadas_n += min(por_necesidad, cupo)  # las de LinkedIn, que van aparte, no le quitan cupo al lote
     except Exception as e:  # noqa: BLE001 — sin esta cola, la comprobación sigue con la del lote, como antes
         from buscador import registro
         registro.aviso("verificar_enlaces:necesidad", e)
-    for _ronda in range(4):
-        if revisadas_n >= maximo or time.monotonic() >= plazo:
-            break
-        disponibles = [v for v in vacantes if v["id"] not in revisadas or v["verificacion"]["estado"] == "verificada"]
-        t0 = time.monotonic()
-        # Con `contar_orden`, ordenar usa como mucho la mitad de lo que queda: la otra mitad es para abrir enlaces.
-        limite = t0 + max(0, plazo - t0) / 2 if contar_orden else None
-        candidatas = cola_de_seleccion(disponibles, entregadas, hoy, cache, iniciales, maximo - revisadas_n,
-                                       limite=limite)
-        if not contar_orden:
-            plazo += time.monotonic() - t0  # el presupuesto de segundos es para comprobar enlaces, no para ordenar
-        if incremental:
-            recientes = sorted(vacantes, key=lambda v: v.get("publicada_en") or v.get("visto_primera_vez", ""), reverse=True)
-            inicio = hora * maximo % len(recientes) if recientes else 0
-            candidatas += recientes[:maximo // 2] + recientes[inicio:] + recientes[:inicio]
-        grupo = list({v["id"]: v for v in candidatas if v["id"] not in revisadas}.values())
-        from buscador import cobertura  # contrato v41: primero lo que le sirve a quien va corto (o es nuevo)
-        grupo.sort(key=lambda v: not cobertura.sirve_a_corta(v))
-        if not grupo:
-            break
-        n = auditar(grupo, cache, maximo=maximo - revisadas_n, segundos=max(0, plazo - time.monotonic()))
-        revisadas_n += n
-        revisadas.update(v["id"] for v in grupo if all(vigente(cache.get(u, {}), v["titulo"], datetime.now(timezone.utc)) for u in urls(v)))
-        if incremental or n == 0:
-            break
+    antes = revisadas_n
+    with medir("Comprobar enlaces: selección del día y resto", candidatas=len(vacantes)) as cifras:
+        for _ronda in range(4):
+            if revisadas_n >= maximo or time.monotonic() >= plazo:
+                break
+            disponibles = [v for v in vacantes if v["id"] not in revisadas or v["verificacion"]["estado"] == "verificada"]
+            t0 = time.monotonic()
+            # Con `contar_orden`, ordenar usa como mucho la mitad de lo que queda: la otra mitad es para abrir enlaces.
+            limite = t0 + max(0, plazo - t0) / 2 if contar_orden else None
+            candidatas = cola_de_seleccion(disponibles, entregadas, hoy, cache, iniciales, maximo - revisadas_n,
+                                           limite=limite)
+            if not contar_orden:
+                plazo += time.monotonic() - t0  # el presupuesto de segundos es para comprobar enlaces, no para ordenar
+            if incremental:
+                recientes = sorted(vacantes, key=lambda v: v.get("publicada_en") or v.get("visto_primera_vez", ""), reverse=True)
+                inicio = hora * maximo % len(recientes) if recientes else 0
+                candidatas += recientes[:maximo // 2] + recientes[inicio:] + recientes[:inicio]
+            grupo = list({v["id"]: v for v in candidatas if v["id"] not in revisadas}.values())
+            from buscador import cobertura  # contrato v41: primero lo que le sirve a quien va corto (o es nuevo)
+            grupo.sort(key=lambda v: not cobertura.sirve_a_corta(v))
+            if not grupo:
+                break
+            n = auditar(grupo, cache, maximo=maximo - revisadas_n, segundos=max(0, plazo - time.monotonic()))
+            revisadas_n += n
+            revisadas.update(v["id"] for v in grupo if all(vigente(cache.get(u, {}), v["titulo"], datetime.now(timezone.utc)) for u in urls(v)))
+            if incremental or n == 0:
+                break
+        cifras["abiertas"] = revisadas_n - antes
     for v in vacantes:
         anotar(v, cache)
     actuales = [dict(por_id.get(v["id"], v)) for lista in iniciales.values() for v, _ in lista]
