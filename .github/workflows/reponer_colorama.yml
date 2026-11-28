@@ -1,0 +1,53 @@
+name: Reponer piezas de Windows en Dependabot
+
+# P-5c (28 nov). Dependabot recompila los locks con pip-compile en Linux, que quita las piezas con marcador de otra
+# plataforma (colorama, sys_platform=="win32"), y pruebas/test_dependencias.py falla. pip-compile no tiene opción para
+# resolver «para otra plataforma» (su README manda compilar en cada entorno), así que, solo en las ramas
+# dependabot/pip/**, se copian desde main los bloques que faltan (misma versión del .in, mismo marcador, mismas huellas).
+# Un push con GITHUB_TOKEN no lanza otras ejecuciones, por eso al final se pide «Pruebas» a mano (workflow_dispatch).
+# Seguridad: pull_request_target corre el flujo de main; de la rama de Dependabot solo se LEEN/ESCRIBEN textos, no se
+# ejecuta nada de ella.
+on:
+  pull_request_target:
+    branches: [main]
+    paths: ['requirements*.txt', 'requirements*.in']
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: reponer-colorama-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  reponer:
+    if: github.actor == 'dependabot[bot]' && startsWith(github.head_ref, 'dependabot/pip/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: base
+          persist-credentials: false
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref }}
+          path: rama
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Copiar desde main las piezas que faltan
+        run: python base/.github/workflows/reponer_colorama.py base rama
+      - name: Subir el arreglo y pedir las pruebas
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RAMA: ${{ github.head_ref }}
+        working-directory: rama
+        run: |
+          if git diff --quiet; then echo "Nada que reponer"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "deps: restaurar colorama (solo Windows) en los locks tras Dependabot"
+          git push origin "HEAD:${RAMA}"
+          gh workflow run pruebas.yml --ref "${RAMA}"
