@@ -50,6 +50,45 @@ def _ciudades_por_pais():
     return {c: limpias(v)[:40] for c, v in salida.items()}
 
 
+# P-12.10 (velocidad): POST que solo calculan o consultan y no guardan nada. No vacían las copias del servidor (antes
+# `vista-previa`, que el formulario manda solo al editar Cargos y metas, obligaba a recalcular Vacantes y la bandeja).
+SOLO_LECTURA = frozenset({"/api/vista-previa", "/api/estimacion-en-vivo", "/api/cargos/expandir", "/api/cargos/funciones",
+                          "/api/clientes/importar/previa", "/api/auth/login", "/api/auth/logout"})
+VIGENCIA_PENDIENTES = 300  # s; la búsqueda escribe la bandeja en otro proceso y 5 min bastan para verla
+ESPERA_BORRADORES = 60     # s sin decisiones nuevas antes de rehacer los mensajes tras «Sirve»
+# Escrituras del repositorio que una decisión de la bandeja hace sin cambiar «Vacantes» (la bandeja y sus reglas).
+_SIN_EFECTO_EN_VACANTES = frozenset({"actualizar_revision", "guardar_regla"})
+_ESCRITURAS = ("guardar", "actualizar", "crear", "archivar", "borrar", "publicar", "resumir", "vencer", "registrar")
+
+
+class _DecisionAnotada:
+    """P-12.10: el repositorio tal cual, anotando qué cambia una decisión de la bandeja para renovar solo las copias de
+    los clientes afectados: los que reciben asignaciones nuevas y los que ya tienen esa vacante (su ficha del catálogo
+    cambió). Cualquier otra escritura (p. ej. los títulos aprendidos, que miran todos los cargos) las renueva todas."""
+
+    def __init__(self, repo):
+        self._repo, self.clientes, self.vacantes, self.todas = repo, set(), set(), False
+
+    def __getattr__(self, nombre):
+        if nombre.startswith(_ESCRITURAS) and nombre not in _SIN_EFECTO_EN_VACANTES:
+            self.todas = True
+        return getattr(self._repo, nombre)
+
+    def crear_asignaciones(self, filas):
+        filas = list(filas)
+        self.clientes |= {str(f.get("cliente_id") or "") for f in filas}
+        self.vacantes |= {str(f.get("vacante_id") or "") for f in filas}
+        return self._repo.crear_asignaciones(filas)
+
+    def actualizar_catalogo_datos(self, vacante_id, datos):
+        self.vacantes.add(str(vacante_id))
+        return self._repo.actualizar_catalogo_datos(vacante_id, datos)
+
+    def archivar_catalogo(self, vacante_id, razon):
+        self.vacantes.add(str(vacante_id))
+        return self._repo.archivar_catalogo(vacante_id, razon)
+
+
 PREFIJOS_MOSTRAR = {"1": "US", "44": "GB", "49": "DE", "33": "FR", "39": "IT", "351": "PT", "55": "BR", "31": "NL",
                     "41": "CH", "353": "IE", "61": "AU", "1809": "DO", "1829": "DO", "1849": "DO", "1787": "PR"}
 
@@ -88,10 +127,14 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
     app.state.repo, app.state.demo = repo, demo
     # «Buscar ahora»: la conexión con GitHub (o None, sin botón). Por defecto se lee del alojamiento.
     app.state.acciones = acciones if acciones is not None else conexion_github(demo)
-    # Contrato v29: copias cortas en memoria. Cualquier escritura del panel (POST/PUT/PATCH/DELETE) sube el sello e
-    # invalida los resultados guardados; la búsqueda nocturna corre en otro proceso y la cubre la vigencia de 2 min.
+    # Contrato v29: copias cortas en memoria. Cualquier escritura del panel (POST/PUT/PATCH/DELETE, salvo los POST de
+    # `SOLO_LECTURA`) sube el sello e invalida los resultados guardados; la búsqueda nocturna corre en otro proceso y la
+    # cubre la vigencia de 2 min.
     sello = [0]
     copias_resultados, copias_fichas = {}, {}
+    # P-12.10: los resultados tienen su propio sello. Una decisión de la bandeja no lo sube: deja viejas solo las copias
+    # de los clientes afectados (`marcas_cliente`); las demás escrituras las dejan viejas todas, como antes.
+    sello_resultados, marcas_cliente = [0], {}
     # 18 nov (velocidad): copias cortas de lo que se lee en cada pantalla. `sello` cambia con cualquier escritura;
     # `sello_bandeja` con las escrituras que no son una decisión de la bandeja (una decisión retira su fila de la copia
     # de pendientes en vez de obligar a leerlas todas otra vez).
@@ -120,9 +163,9 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         return valor
 
     def _pendientes():
-        """Pendientes de la bandeja, ligeras y ordenadas, en una copia de 60 s."""
+        """Pendientes de la bandeja, ligeras y ordenadas, en una copia de 5 min (P-12.10; antes 60 s)."""
         c = pendientes_copia
-        if c and c["sello"] == sello_bandeja[0] and time.monotonic() - c["t"] < 60:
+        if c and c["sello"] == sello_bandeja[0] and time.monotonic() - c["t"] < VIGENCIA_PENDIENTES:
             return c["filas"]
         actual = sello_bandeja[0]
         filas = sorted(repo.revisiones(estado="pendiente", ligera=True), key=lambda r: -(r.get("prioridad") or 0))
@@ -143,38 +186,68 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         vigencia = 600 if fecha and fecha < hoy() else 120
         clave = (cliente_id or "", fecha or "")
         guardado = copias_resultados.get(clave)
-        if guardado and guardado[0] == sello[0] and time.monotonic() - guardado[1] < vigencia:
+        if guardado and guardado[0] == _marca_resultados(clave[0]) and time.monotonic() - guardado[1] < vigencia:
             return guardado[2]
-        actual = sello[0]
+        actual = _marca_resultados(clave[0])  # antes de calcular: lo que cambie mientras tanto la deja vieja
         valor = servicio.resultados(repo, cliente_id, fecha)
         if len(copias_resultados) > 200:
             copias_resultados.clear()
         copias_resultados[clave] = (actual, time.monotonic(), valor)
         return valor
 
+    def _marca_resultados(cliente):
+        return sello_resultados[0], marcas_cliente.get(cliente, 0)
+
+    def _renovar_resultados(anotada):
+        """Tras una decisión: deja viejas solo las copias de los clientes afectados (y la de «sin cliente», que muestra
+        el primero). Si la decisión cambió algo que mira a todos, las deja viejas todas."""
+        if anotada.todas:
+            sello_resultados[0] += 1
+            return
+        afectados = {"", *anotada.clientes}
+        if anotada.vacantes:
+            for (cliente, _), (_, _, valor) in list(copias_resultados.items()):
+                if any(v.get("id") in anotada.vacantes for v in valor.get("vacantes") or []):
+                    afectados.add(cliente)
+        for cliente in afectados:
+            marcas_cliente[cliente] = marcas_cliente.get(cliente, 0) + 1
+
     # Los borradores de WhatsApp se rehacen en segundo plano después de confirmar en la bandeja: la decisión responde
-    # al momento. Un solo hilo; si llegan varias decisiones seguidas, se rehace una vez al final.
+    # al momento. P-12.10: se espera `ESPERA_BORRADORES` sin decisiones nuevas y se rehacen una vez, solo los de los
+    # clientes que recibieron asignaciones y en un hilo (antes los de todos, de a cuatro, compitiendo con las
+    # pantallas). Empieza después de dejar viejas sus copias (`_renovar_resultados`), así no lee resultados de antes.
     import threading
-    regenerar = {"pendiente": False, "corriendo": False}
+    regenerar = {"clientes": set(), "hasta": 0.0, "corriendo": False}
     cerrojo_regenerar = threading.Lock()
+    # Las pruebas pueden cambiar la espera, el reloj y la forma de esperar.
+    app.state.espera_borradores, app.state.reloj, app.state.dormir = ESPERA_BORRADORES, time.monotonic, time.sleep
 
     def _rehacer_borradores():
         from panel import borradores as b
         while True:
             with cerrojo_regenerar:
-                if not regenerar["pendiente"]:
-                    regenerar["corriendo"] = False
-                    return
-                regenerar["pendiente"] = False
+                falta = regenerar["hasta"] - app.state.reloj()
+                if falta <= 0:
+                    clientes, regenerar["clientes"] = regenerar["clientes"], set()
+                    if not clientes:
+                        regenerar["corriendo"] = False
+                        return
+            if falta > 0:
+                app.state.dormir(falta)
+                continue
             try:
-                b.generar(repo, resultados=_resultados)
+                b.generar(repo, resultados=_resultados, clientes=clientes, hilos=1)
             except Exception as e:  # noqa: BLE001 — la decisión ya quedó guardada; el borrador se rehace la próxima vez
                 registro.aviso("api:borradores", e)
             sello_mensajes[0] += 1
 
-    def pedir_borradores():
+    def pedir_borradores(clientes):
+        clientes = {str(c) for c in clientes if c}
+        if not clientes:
+            return
         with cerrojo_regenerar:
-            regenerar["pendiente"] = True
+            regenerar["clientes"] |= clientes
+            regenerar["hasta"] = app.state.reloj() + app.state.espera_borradores
             if regenerar["corriendo"]:
                 return
             regenerar["corriendo"] = True
@@ -244,7 +317,8 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
                         return JSONResponse({"detail": texto}, status_code=401)
             except (requests.RequestException, ValueError):
                 return JSONResponse({"detail": "No se pudo verificar la sesión."}, status_code=503)
-        escribe = request.url.path.startswith("/api/") and request.method not in {"GET", "HEAD", "OPTIONS"}
+        escribe = request.url.path.startswith("/api/") and request.method not in {"GET", "HEAD", "OPTIONS"} \
+            and request.url.path not in SOLO_LECTURA
         # Una decisión de la bandeja no obliga a releer todas las pendientes: retira sus filas de la copia (abajo).
         decision = escribe and request.url.path.startswith("/api/revisiones/") and request.url.path.count("/") == 3 \
             and request.url.path not in {"/api/revisiones/cargar", "/api/revisiones/csv"}
@@ -253,12 +327,14 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         sello[0] += general
         sello_mensajes[0] += mensajes
         sello_bandeja[0] += general and not decision
+        sello_resultados[0] += general and not decision  # una decisión renueva solo sus clientes (decidir_revision)
         inicio = time.monotonic()
         response = await siguiente(request)
         duracion = (time.monotonic() - inicio) * 1000
         sello[0] += general
         sello_mensajes[0] += mensajes
         sello_bandeja[0] += general and not decision
+        sello_resultados[0] += general and not decision
         if request.url.path.startswith("/api/"):
             response.headers["Server-Timing"] = f"app;dur={duracion:.0f}"
             if duracion > 3000:  # solo la ruta y el tiempo: nunca datos de clientes
@@ -641,13 +717,17 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         from panel import revision
         if not 3 <= len(vacante_id) <= 80:
             raise HTTPException(422, "Vacante no reconocida.")
-        resultado = revision.decidir(repo, vacante_id, body.decision, body.paises, body.aplicar_a_iguales,
-                                     comprobar=_comprobador(), regenerar=False)
+        anotada = _DecisionAnotada(repo)
+        try:
+            resultado = revision.decidir(anotada, vacante_id, body.decision, body.paises, body.aplicar_a_iguales,
+                                         comprobar=_comprobador(), regenerar=False)
+        finally:  # también si falló a mitad: lo que alcanzó a guardar ya cuenta
+            _renovar_resultados(anotada)
         decididas = set(resultado.get("decididas") or [vacante_id])
         if pendientes_copia.get("filas") is not None:  # la copia sigue valiendo sin las filas ya decididas
             pendientes_copia["filas"] = [r for r in pendientes_copia["filas"] if r["vacante_id"] not in decididas]
         if body.decision == "sirve" and resultado.get("asignadas"):
-            pedir_borradores()
+            pedir_borradores(anotada.clientes)
         return resultado
 
     @app.get("/api/busqueda")

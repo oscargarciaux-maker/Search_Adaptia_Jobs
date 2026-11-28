@@ -1,5 +1,7 @@
 // Las vacantes de un cliente y un día en «Vacantes»: se piden solo en esa sección, la
 // respuesta vieja no pisa a la nueva y, al llegar desde «Tomar vacantes», el foco va a «Copiar WhatsApp».
+// P-12.10: al volver a la sección con el mismo cliente y día se sigue viendo la lista anterior hasta que llega la
+// nueva (antes se borraba y quedaba «Consultando vacantes…» mientras el servidor calculaba).
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import type { Resultados, Sesion } from "./types";
@@ -12,18 +14,22 @@ export function useResultados(
   notify: (s: string, error?: boolean) => void,
 ) {
   const [results, setResults] = useState<Resultados | null>(null);
+  // De qué cliente y día es la lista que se ve: solo esa se deja a la vista mientras llega la nueva.
+  const [deResultados, setDeResultados] = useState("");
   const peticionResultados = useRef(0);
   // Contrato v48: al llegar desde «Tomar vacantes» del detalle, el foco queda en «Copiar WhatsApp».
   const enfocarWhatsApp = useRef(false);
   const botonWhatsApp = useRef<HTMLButtonElement>(null);
   const [focoWhatsApp, setFocoWhatsApp] = useState(0);
-  const [loadingResults, setLoadingResults] = useState(false);
+  const [consultando, setConsultando] = useState(false);
   const [errorResultados, setErrorResultados] = useState(false);
+  const clave = selectedClient + "|" + resultDate;
   async function cargarResultados() {
     const turno = ++peticionResultados.current;
     if (!sesion?.sesion) return;
-    setLoadingResults(true);
-    setResults(null);
+    setConsultando(true);
+    // Otro cliente u otro día: la lista anterior no es de ellos y no se muestra.
+    if (clave !== deResultados) setResults(null);
     setErrorResultados(false);
     try {
       const r = await api<Resultados>(
@@ -35,6 +41,7 @@ export function useResultados(
       );
       if (turno === peticionResultados.current) {
         setResults(r);
+        setDeResultados(clave);
         // Contrato v48: al llegar desde «Tomar vacantes», el foco va a «Copiar WhatsApp» con los datos de ese día.
         if (enfocarWhatsApp.current) setFocoWhatsApp((n) => n + 1);
       }
@@ -45,7 +52,7 @@ export function useResultados(
       }
     } finally {
       if (turno === peticionResultados.current) {
-        setLoadingResults(false);
+        setConsultando(false);
         enfocarWhatsApp.current = false;
       }
     }
@@ -58,6 +65,8 @@ export function useResultados(
   useEffect(() => {
     if (focoWhatsApp) botonWhatsApp.current?.focus();
   }, [focoWhatsApp]);
+  // «Consultando vacantes…» solo cuando no hay una lista de ese cliente y día que mostrar mientras tanto.
+  const loadingResults = consultando && (!results || clave !== deResultados);
   // Contrato v48: el servidor dice si es de un día anterior y cuántas se pueden copiar.
   const diaResultados = (results?.ejecucion?.fecha || "").slice(0, 10);
   const diaAnterior = Boolean(results?.dia_anterior);

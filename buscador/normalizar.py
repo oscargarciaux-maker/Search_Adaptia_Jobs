@@ -1,5 +1,6 @@
 """Normalización de textos, títulos y empresas (sin IA)."""
 import re
+import threading
 import unicodedata
 from contextlib import contextmanager
 from functools import lru_cache
@@ -53,6 +54,10 @@ _RUIDO = re.compile(r"\b(remote|remoto|remota|hybrid|hibrido|hibrida|presencial|
 # tiene además su propia caché de `texto` para los títulos, que no depende de esta.
 MAX_CACHE = 2000
 _memoria_activa = False
+# P-12.10: el servidor del panel también la abre en cada carga de «Vacantes», y atiende varias peticiones a la vez. Se
+# cuenta cuántos bloques siguen abiertos (en cualquier hilo): la memoria se apaga y se vacía cuando cierra el último.
+_abiertos = 0
+_cerrojo = threading.Lock()
 
 
 def _quitar_tildes(texto):
@@ -88,16 +93,20 @@ def vaciar_cache():
 
 @contextmanager
 def con_memoria():
-    """Activa la memoria de `sin_tildes` y `texto` durante el bloque y la vacía al salir, pase lo que pase. Anidado, solo
-    la vacía el bloque de fuera."""
-    global _memoria_activa
-    anterior, _memoria_activa = _memoria_activa, True
+    """Activa la memoria de `sin_tildes` y `texto` durante el bloque y la vacía al salir, pase lo que pase. Anidado (o
+    con bloques abiertos a la vez en otros hilos), solo la vacía el último que cierra."""
+    global _memoria_activa, _abiertos
+    with _cerrojo:
+        _abiertos += 1
+        _memoria_activa = True
     try:
         yield
     finally:
-        _memoria_activa = anterior
-        if not anterior:
-            vaciar_cache()
+        with _cerrojo:
+            _abiertos -= 1
+            if not _abiertos:
+                _memoria_activa = False
+                vaciar_cache()
 
 
 def nivel(titulo):
