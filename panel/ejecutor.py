@@ -518,9 +518,11 @@ def leer_recibidas(repo, perfil_ids):
         return None
 
 
-def _ids_de(row):
-    """Los ids con que una fila del lote pudo llegarle antes a alguien: el suyo y los de las copias fusionadas."""
-    return {row["vacante_id"], *((row.get("snapshot") or {}).get("_ids_fusionados") or ())}
+def _ya_la_tuvo(row, recibidas, antes):
+    """P-12.15: si la persona ya tuvo esta vacante del lote. Su propio id cuenta si lo recibió en otra ejecución (`antes`);
+    el de una copia fusionada (`_ids_fusionados`) cuenta siempre, también hoy: sería la misma oferta dos veces."""
+    otros = set((row.get("snapshot") or {}).get("_ids_fusionados") or ()) - {row["vacante_id"]}
+    return row["vacante_id"] in antes or bool(otros & recibidas)
 
 
 def _antes_de_esta_ejecucion(recibidas, ya_hoy):
@@ -849,11 +851,17 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
                     contenido.evidencia(row["snapshot"].get("titulo"), row["snapshot"].get("_descripcion"), cargo)):
                 candidatos += [(p, otro) for p in cfg.perfiles_activos(otro)]
         for p, cid in candidatos:
-            # P-12.15: nunca otra vez a quien ya la recibió en otra ejecución (rescate, posts, «Sirve», otro día).
-            if antes.get(str(p.id)) and _ids_de(row) & antes[str(p.id)]:
-                lote_ya_recibidas += 1
-                continue
             match = evaluar(row["snapshot"], p, fecha)
+            # P-12.15: nunca otra vez a quien ya la recibió en otra ejecución (rescate, posts, «Sirve», otro día). Se
+            # cuenta solo si se le habría ofrecido (la cumple o es ampliable para ella).
+            if recibidas is not None and _ya_la_tuvo(row, recibidas.get(str(p.id), set()), antes.get(str(p.id), set())):
+                lote_ya_recibidas += bool(match["compatible"] or (
+                    cid == cargo_id and row["snapshot"].get("_ampliacion") in AMPLIACIONES))
+                if ya_hoy is None and match["compatible"]:
+                    # Sin lo de hoy, pudo ser de una pasada anterior de hoy: cuenta para su meta como antes (se
+                    # completa de menos, nunca de más).
+                    estrictas[p.id] = estrictas.get(p.id, 0) + 1
+                continue
             if match["compatible"]:
                 if de_comunidad(p):  # después de los clientes reales (abajo)
                     comunidad.append((row, p, cid, match["pruebas"]))
@@ -947,7 +955,7 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
                           "asignaciones": len(filas),
                           "ampliadas": sum(any(isinstance(e, dict) and e.get("ampliacion") for e in f["explicacion"]) for f in filas),
                           "reutilizadas": reutilizadas, "rescatadas": rescatadas, "posts": posts, **por_confirmar,
-                          "lote_ya_recibidas": lote_ya_recibidas,  # P-12.15: del lote, no repetidas a quien ya las tuvo
+                          "lote_ya_recibidas": lote_ya_recibidas,  # P-12.15: repeticiones del lote evitadas
                           **({"apify": aporte_apify} if aporte_apify else {}),
                           **({"busquedas_por_perfil": b} if (b := _sumar_busquedas(
                               (ejecucion.get("resumen") or {}).get("busquedas_por_perfil"),
