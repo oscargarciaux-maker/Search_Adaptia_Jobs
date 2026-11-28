@@ -1,0 +1,17 @@
+{
+ "formato": 1,
+ "ejecucion": "46173651440",
+ "archivos": [
+  "datos/salud.json",
+  "datos/salud_bodega.json",
+  "trabajo/cargos_bodega.json",
+  "trabajo/entregadas.json",
+  "trabajo/estado.json",
+  "trabajo/lote_entrega.json",
+  "trabajo/metricas_entrega.json",
+  "trabajo/pendientes_catalogo.json",
+  "trabajo/pendientes_registro.json",
+  "trabajo/pendientes_supabase.json"
+ ],
+ "donde": "Supabase, tabla estado_trabajo (privada)"
+}

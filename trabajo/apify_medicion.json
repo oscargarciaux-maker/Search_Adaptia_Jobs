@@ -1,0 +1,19 @@
+{
+ "mes": "2026-11",
+ "por_dia": {
+  "2026-11-27": {
+   "perfiles_a_5": 0,
+   "seleccion": 0,
+   "utiles": 0
+  },
+  "2026-11-28": {
+   "avisos": 145,
+   "corridas": 1,
+   "perfiles_a_5": 1,
+   "seleccion": 0,
+   "usd_reportado": 0.20585,
+   "usd_reservado": 0.51,
+   "utiles": 1
+  }
+ }
+}

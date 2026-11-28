@@ -1,0 +1,480 @@
+{
+ "fecha": "2026-11-28",
+ "hora_utc": "18:15",
+ "modo": "incremental",
+ "codigo_commit": "3fd2774fa1a509510903fc9c4e50119331149f6b",
+ "ejecucion_id": "46173651440",
+ "pais": "",
+ "minutos": 12.6,
+ "vacantes_en_bodega": 13051,
+ "crudas_hoy": 1743,
+ "nuevas_hoy": 531,
+ "descartes": {
+  "sin familia en el mapa": 1556,
+  "no se puede aplicar desde LATAM": 67,
+  "más de 30 días": 25,
+  "enlace roto": 2,
+  "vacante cerrada": 1
+ },
+ "por_familia": {},
+ "por_pais": {
+  "MX": 2206,
+  "CO": 1977,
+  "ES": 1933,
+  "CL": 1541,
+  "AR": 1452,
+  "PE": 1296,
+  "CR": 1023,
+  "GT": 957,
+  "UY": 957,
+  "SV": 938,
+  "VE": 916,
+  "EC": 912,
+  "BO": 912,
+  "HN": 911,
+  "PR": 893,
+  "PY": 890,
+  "NI": 887,
+  "PA": 872,
+  "DO": 853,
+  "CU": 838
+ },
+ "por_fuente": {
+  "LinkedIn": 5711,
+  "Indeed": 3949,
+  "Computrabajo": 696,
+  "Portales de empresas (greenhouse)": 688,
+  "Portales de empresas (ashby)": 586,
+  "Portales de empresas (smartrecruiters)": 439,
+  "Portales de empresas (lever)": 326,
+  "Portales de empresas (workable)": 267,
+  "LinkedIn (Apify)": 249,
+  "Get on Board": 196,
+  "Elempleo": 76,
+  "Bumeran": 43,
+  "Laborum": 34,
+  "InfoJobs": 27,
+  "Magneto": 22,
+  "Tecnoempleo": 20,
+  "Portales de empresas (recruitee)": 15,
+  "Hireline": 9,
+  "Working Nomads": 3,
+  "Remotive": 1,
+  "Konzerta": 1
+ },
+ "por_modalidad": {
+  "hibrido": 2779,
+  "presencial": 4177,
+  "remoto": 6095
+ },
+ "ubicacion_por_confirmar": 176,
+ "catalogo": {
+  "filas": 2630,
+  "enviadas": 2630,
+  "errores": [],
+  "pendientes": 0,
+  "activas_elegibles": 9930,
+  "sin_cambios": 10468,
+  "identidad": {
+   "archivadas": 6,
+   "filas_unicas": 2601,
+   "sin_identificar": 4,
+   "lotes": 7
+  }
+ },
+ "capturada_en": "2026-11-28T18:15:47Z",
+ "frescura": {
+  "con_hora_publicacion": 2039,
+  "sin_hora_publicacion": 11012,
+  "publicadas_24h_confirmadas": 2,
+  "observadas_2h": 118,
+  "muestras_retardo": 2017,
+  "retardo_publicacion_deteccion_p90_min": 22115.7
+ },
+ "embudo_idioma": {
+  "es": {
+   "con_cargo": 1721,
+   "comprobadas": 558,
+   "fuentes": {
+    "Indeed": {
+     "con_cargo": 480,
+     "comprobadas": 268
+    },
+    "LinkedIn": {
+     "con_cargo": 697,
+     "comprobadas": 203
+    },
+    "Get on Board": {
+     "con_cargo": 36,
+     "comprobadas": 3
+    },
+    "Portales de empresas": {
+     "con_cargo": 8,
+     "comprobadas": 8
+    },
+    "Computrabajo": {
+     "con_cargo": 311,
+     "comprobadas": 26
+    },
+    "Elempleo": {
+     "con_cargo": 49,
+     "comprobadas": 34
+    },
+    "Hireline": {
+     "con_cargo": 7,
+     "comprobadas": 0
+    },
+    "Bumeran": {
+     "con_cargo": 41,
+     "comprobadas": 3
+    },
+    "Konzerta": {
+     "con_cargo": 1,
+     "comprobadas": 0
+    },
+    "InfoJobs": {
+     "con_cargo": 25,
+     "comprobadas": 2
+    },
+    "Tecnoempleo": {
+     "con_cargo": 10,
+     "comprobadas": 1
+    },
+    "Magneto": {
+     "con_cargo": 22,
+     "comprobadas": 10
+    },
+    "Laborum": {
+     "con_cargo": 34,
+     "comprobadas": 0
+    }
+   }
+  },
+  "en": {
+   "con_cargo": 5543,
+   "comprobadas": 2926,
+   "fuentes": {
+    "LinkedIn": {
+     "con_cargo": 2455,
+     "comprobadas": 723
+    },
+    "Indeed": {
+     "con_cargo": 2073,
+     "comprobadas": 1343
+    },
+    "Portales de empresas": {
+     "con_cargo": 977,
+     "comprobadas": 848
+    },
+    "Get on Board": {
+     "con_cargo": 12,
+     "comprobadas": 10
+    },
+    "Computrabajo": {
+     "con_cargo": 10,
+     "comprobadas": 1
+    },
+    "Working Nomads": {
+     "con_cargo": 2,
+     "comprobadas": 0
+    },
+    "InfoJobs": {
+     "con_cargo": 2,
+     "comprobadas": 1
+    },
+    "Tecnoempleo": {
+     "con_cargo": 10,
+     "comprobadas": 0
+    },
+    "Bumeran": {
+     "con_cargo": 2,
+     "comprobadas": 0
+    }
+   }
+  },
+  "sin_descripcion": {
+   "con_cargo": 857,
+   "comprobadas": 367,
+   "fuentes": {
+    "LinkedIn": {
+     "con_cargo": 502,
+     "comprobadas": 50
+    },
+    "Portales de empresas": {
+     "con_cargo": 354,
+     "comprobadas": 317
+    },
+    "Computrabajo": {
+     "con_cargo": 1,
+     "comprobadas": 0
+    }
+   }
+  },
+  "otro": {
+   "con_cargo": 627,
+   "comprobadas": 284,
+   "fuentes": {
+    "LinkedIn": {
+     "con_cargo": 168,
+     "comprobadas": 7
+    },
+    "Portales de empresas": {
+     "con_cargo": 13,
+     "comprobadas": 12
+    },
+    "Indeed": {
+     "con_cargo": 446,
+     "comprobadas": 265
+    }
+   }
+  }
+ },
+ "verificacion_enlaces": {
+  "vacantes": 13054,
+  "estados": {
+   "pendiente": 8132,
+   "verificada": 4919,
+   "rechazada": 3
+  },
+  "motivos": {
+   "sin comprobación vigente": 8044,
+   "acceso bloqueado o fallo temporal": 42,
+   "ficha específica sin confirmar": 23,
+   "contenido insuficiente": 16,
+   "enlace roto": 2,
+   "respuesta no comprobable": 6,
+   "página demasiado grande": 1,
+   "vacante cerrada": 1
+  },
+  "candidatas_programadas": 120,
+  "por_necesidad": 67,
+  "seleccion_del_dia": {
+   "vacantes": 89,
+   "estados": {
+    "verificada": 84,
+    "pendiente": 4,
+    "rechazada": 1
+   },
+   "motivos": {
+    "acceso bloqueado o fallo temporal": 4,
+    "vacante cerrada": 1
+   }
+  },
+  "rechazos_en_corrida": {
+   "enlace roto": 2,
+   "vacante cerrada": 1
+  },
+  "fichas_linkedin_incorporadas": 7,
+  "vistas_indeed_incorporadas": 0,
+  "vistas_infojobs_incorporadas": 0,
+  "vistas_portales_incorporadas": 42,
+  "en_la_corrida": {
+   "llamadas": 1,
+   "programadas": 120,
+   "comprobados": 162,
+   "vistas_en_busqueda": 42,
+   "por_sitio": {
+    "LinkedIn": {
+     "pendiente": 42,
+     "verificada": 41,
+     "rechazada": 1
+    },
+    "Otros sitios": {
+     "pendiente": 37,
+     "verificada": 11,
+     "rechazada": 2
+    },
+    "Workable": {
+     "pendiente": 16
+    },
+    "Computrabajo": {
+     "pendiente": 8
+    },
+    "Ashby": {
+     "verificada": 4
+    }
+   }
+  }
+ },
+ "estado_operativo": {
+  "activo": true,
+  "pendientes": {
+   "catalogo": 0,
+   "ofertas": 0,
+   "registro": 0
+  },
+  "lotes_pendientes": 0,
+  "reintentos": {
+   "ofertas": {
+    "filas": 0,
+    "enviadas": 0,
+    "errores": [],
+    "pendientes": 0
+   },
+   "registro": {
+    "filas": 0,
+    "enviadas": 0,
+    "errores": [],
+    "pendientes": 0
+   }
+  }
+ },
+ "consulta": "",
+ "fuentes": {
+  "LinkedIn": {
+   "busquedas": 14,
+   "fallidas": 1,
+   "avisos": 103,
+   "con_descripcion": 10,
+   "del_cargo": 80,
+   "fichas_del_cargo": 10,
+   "cerradas": 0,
+   "combinaciones_revisadas": 57,
+   "combinaciones_total": 159,
+   "relectura": {
+    "pendientes": 1411,
+    "peticiones": 0,
+    "con_descripcion": 0,
+    "cerradas": 0,
+    "bloqueos_seguidos": 0
+   }
+  },
+  "Indeed": {
+   "busquedas": 6,
+   "fallidas": 0,
+   "avisos": 3,
+   "repaso": false,
+   "combinaciones_total": 184
+  },
+  "Portales de empresas": {
+   "tableros": 15,
+   "fallidos": 0,
+   "avisos": 1637,
+   "detalles_consultados": 20,
+   "descripciones_completadas": 20
+  },
+  "Decisiones del operador": {
+   "aplicadas": 21
+  }
+ },
+ "entrega": {
+  "fecha": "2026-11-28",
+  "vacantes": 89,
+  "vacantes_unicas": 89,
+  "copias_en_lote": 0,
+  "enlaces_comprobados": true,
+  "filas": 89,
+  "archivos": false,
+  "meta_cumplida": false,
+  "supabase": {
+   "filas": 89,
+   "enviadas": 89,
+   "errores": [],
+   "pendientes": 0
+  },
+  "registro_seleccion": {
+   "filas": 89,
+   "enviadas": 89,
+   "errores": [],
+   "pendientes": 0
+  },
+  "descartadas": {
+   "ya entregada": 1367,
+   "enlaces sin comprobar o rechazados": 368
+  },
+  "cargos": 9,
+  "totales": {
+   "candidatas": 725,
+   "entregadas": 89,
+   "unicas": 89,
+   "duplicadas": 0,
+   "faltan": 64,
+   "faltan_para_minimo": 37,
+   "remotas": 83,
+   "remotas_amplias": 14,
+   "perfiles_bajo_minimo": 12,
+   "reserva_sin_entregar": 637,
+   "meta": 130
+  },
+  "por_idioma": {
+   "en": 72,
+   "es": 17
+  },
+  "por_fuente": {
+   "Indeed": 19,
+   "LinkedIn": 53,
+   "Get on Board": 8,
+   "Computrabajo": 2,
+   "Portales de empresas (lever)": 4,
+   "Elempleo": 1,
+   "Portales de empresas (ashby)": 2
+  }
+ },
+ "seleccion_actual": {
+  "fecha": "2026-11-28",
+  "cargos": 9,
+  "vacantes": 89
+ },
+ "refuerzos": [],
+ "historico_entregas": [
+  {
+   "pasadas": 2,
+   "fecha": "2026-11-22",
+   "meta_cumplida": false,
+   "pendientes_supabase": 0,
+   "registro_confirmado": true,
+   "enlaces_comprobados": true
+  },
+  {
+   "pasadas": 2,
+   "fecha": "2026-11-23",
+   "meta_cumplida": false,
+   "pendientes_supabase": 0,
+   "registro_confirmado": true,
+   "enlaces_comprobados": true
+  },
+  {
+   "pasadas": 2,
+   "fecha": "2026-11-24",
+   "meta_cumplida": false,
+   "pendientes_supabase": 0,
+   "registro_confirmado": true,
+   "enlaces_comprobados": true
+  },
+  {
+   "pasadas": 1,
+   "fecha": "2026-11-25",
+   "meta_cumplida": false,
+   "pendientes_supabase": 0,
+   "registro_confirmado": true,
+   "enlaces_comprobados": true
+  },
+  {
+   "pasadas": 2,
+   "fecha": "2026-11-26",
+   "meta_cumplida": false,
+   "pendientes_supabase": 0,
+   "registro_confirmado": true,
+   "enlaces_comprobados": true
+  },
+  {
+   "pasadas": 2,
+   "fecha": "2026-11-27",
+   "meta_cumplida": false,
+   "pendientes_supabase": 0,
+   "registro_confirmado": true,
+   "enlaces_comprobados": true
+  },
+  {
+   "pasadas": 1,
+   "fecha": "2026-11-28",
+   "meta_cumplida": false,
+   "pendientes_supabase": 0,
+   "registro_confirmado": true,
+   "enlaces_comprobados": true
+  }
+ ],
+ "resultado": "",
+ "detalle_por_cargo": "privado: Supabase, tabla estado_trabajo",
+ "campos_no_publicados": []
+}
