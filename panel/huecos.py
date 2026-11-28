@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 
 from buscador import paises
 from panel.contenido import familia_del_mapa
-from panel.ejecutor import FUENTES_GENERICAS, fuentes_en, fuentes_locales, lugares_perfil  # noqa: F401 (reexporta)
+from panel.ejecutor import fuentes_en, fuentes_locales, lugares_perfil
 from panel.servicio import CAUSA_OTRO_PAIS, CAUSA_POCAS_EN_FUENTES
 
 OFICINA = {"hibrido", "presencial"}

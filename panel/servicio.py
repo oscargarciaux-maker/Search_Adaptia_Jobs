@@ -9,7 +9,8 @@ import time
 
 from buscador import contrato, enlaces, paises, registro, vacante
 from buscador.normalizar import titulo_base
-from panel.afinidad import (AMPLIACIONES, ETIQUETAS_AMPLIACION, MINIMO_POR_PERFIL, encaja_asignada, enlace_utilizable,
+from panel.afinidad import (AMPLIACIONES, ETIQUETAS_AMPLIACION, MINIMO_POR_PERFIL, MOTIVO_OTRO_PAIS, encaja_asignada,
+                            enlace_utilizable,
                             evaluar, evaluar_ampliada, evaluar_asignada, post_ubicacion,
                             titulo_del_cargo)
 from panel.modelos import Perfil
@@ -20,7 +21,7 @@ from panel.terminos import grado, sugerir
 # Desde v27 solo descartan la ubicación, el idioma y las reglas del sistema: años, inglés y restricciones solo ordenan.
 SUGERENCIAS = {
     "publicación fuera del plazo": "Ampliar la antigüedad de publicación",
-    "oficina en otro país": "Añadir una ubicación donde trabajaría",
+    MOTIVO_OTRO_PAIS: "Añadir una ubicación donde trabajaría",
     "oficina en otra ciudad": "Añadir la ciudad a sus ubicaciones",
     # Contrato v49 (decisión de Oscar): sin ciudad no llegan presenciales ni híbridas.
     "falta la ciudad en el perfil": "Escribir la ciudad donde trabajaría (sin ciudad no llegan presenciales ni híbridas)",
@@ -638,9 +639,6 @@ CAUSA_AJUSTE_PERFIL = "ajuste_perfil"              # las del cargo no le sirven 
 CAUSA_OTRO_PAIS = "otro_pais"                      # las del cargo no le sirven por «oficina en otro país»
 CAUSA_POR_COMPROBAR = "por_comprobar"              # le servirían, pero falta comprobar el enlace
 CAUSA_POCAS_EN_FUENTES = "pocas_en_fuentes"        # pocas vacantes nuevas en las fuentes revisadas
-CAUSAS = (CAUSA_SIN_VACANTES_CARGO, CAUSA_LISTAS_SIN_RECIBIR, CAUSA_AJUSTE_PERFIL, CAUSA_OTRO_PAIS,
-          CAUSA_POR_COMPROBAR, CAUSA_POCAS_EN_FUENTES)
-MOTIVO_OTRO_PAIS = "oficina en otro país"  # motivo de `afinidad.evaluar`
 
 
 def cobertura(repo, fecha=None):

@@ -1,5 +1,4 @@
 """8.1 (decisiones del cliente, 27 nov): huecos por país, solo para el operador. Perfiles ficticios."""
-import inspect
 import uuid
 from collections import Counter
 
@@ -61,7 +60,7 @@ def test_estado_por_pais_distingue_cubierto_riesgo_y_hueco():
     assert t["CO"]["estado"] == "cubierto" and t["CO"]["pedido"] == "" and t["CO"]["fuentes_locales"] > 0
     assert t["KE"]["estado"] == "riesgo" and t["KE"]["bajo_minimo"] == 0
     assert t["GH"]["estado"] == "hueco" and t["GH"]["bajo_minimo"] == 1
-    assert t["GH"]["fuentes"] == list(huecos.FUENTES_GENERICAS)
+    assert t["GH"]["fuentes"] == list(ejecutor.FUENTES_GENERICAS)
     # El cargo que no tiene vacantes en ningún sitio no es un hueco del país: queda solo en riesgo.
     assert t["ET"]["estado"] == "riesgo" and t["ET"]["bajo_minimo"] == 1
     # Híbrido en Tanzania crea país; la remota en Uganda (y en cualquier parte) no.
@@ -91,14 +90,21 @@ def test_huecos_decide_por_codigo_y_no_por_el_texto():
                                             "causa": "Pocas vacantes nuevas en las fuentes revisadas"}, MINIMO)
 
 
-def test_codigos_de_causa_estables():
-    """Los códigos son parte de la API del panel: si cambian, cambia `huecos.py`. El motivo «oficina en otro país» es
-    el que da `afinidad.evaluar` y tiene sugerencia."""
-    assert servicio.CAUSAS == ("sin_vacantes_cargo", "listas_sin_recibir", "ajuste_perfil", "otro_pais",
-                               "por_comprobar", "pocas_en_fuentes")
-    assert huecos.CAUSAS_HUECO == {"pocas_en_fuentes", "otro_pais"}
-    assert servicio.MOTIVO_OTRO_PAIS in servicio.SUGERENCIAS
-    assert f'"{servicio.MOTIVO_OTRO_PAIS}"' in inspect.getsource(afinidad)
+def test_los_codigos_de_hueco_los_produce_cobertura():
+    """La tabla solo reconoce códigos que `cobertura()` puede dar (si se renombra uno allí, esto falla)."""
+    assert huecos.CAUSAS_HUECO == {servicio.CAUSA_POCAS_EN_FUENTES, servicio.CAUSA_OTRO_PAIS}
+    assert afinidad.MOTIVO_OTRO_PAIS in servicio.SUGERENCIAS
+
+
+def _repo_con(cfg):
+    """Demostración con esta configuración y 4 búsquedas medidas en las que nadie recibió nada (todos bajo 5). Las
+    vacantes de la demo no admiten postular desde DE ni GH: la causa es un ajuste del perfil."""
+    repo = RepositorioDemo()
+    repo.operativa = lambda fecha: {"revision": 1, "configuracion": cfg}
+    repo.versiones = lambda revisiones: {int(r): cfg for r in revisiones}
+    repo.ejecuciones = lambda: [{"id": f"e{i}", "fecha": "2026-11-1" + str(7 - i), "revision": 1} for i in range(4)]
+    repo.asignaciones_por_perfil = lambda ids: Counter()
+    return repo
 
 
 def test_indeed_cuenta_como_fuente_local_en_la_tabla_y_en_la_fila():
@@ -106,19 +112,15 @@ def test_indeed_cuenta_como_fuente_local_en_la_tabla_y_en_la_fila():
     assert "Indeed" in ejecutor.fuentes_en("DE") and huecos.fuentes_locales("DE") == ["Indeed"]
     assert huecos.fuentes_locales("GH") == []
     cfg = _cfg({"de": {"vive_en": "DE", "idiomas": ["en"]}, "gh": {"vive_en": "GH", "idiomas": ["en"]}})
-    repo = RepositorioDemo()
-    repo.operativa = lambda fecha: {"revision": 1, "configuracion": cfg}
-    repo.versiones = lambda revisiones: {int(r): cfg for r in revisiones}
-    repo.ejecuciones = lambda: [{"id": f"e{i}", "fecha": "2026-11-1" + str(7 - i), "revision": 1} for i in range(4)]
-    repo.asignaciones_por_perfil = lambda ids: Counter()
-    filas = {f["vive_en"]: f for f in servicio.cobertura(repo, "2026-11-17")["perfiles"]}
-    assert filas["DE"]["estado"] == filas["GH"]["estado"] == "pendiente"
-    assert not filas["DE"]["pocas_fuentes"] and "Cobertura limitada" not in filas["DE"]["causa"]
-    assert filas["GH"]["pocas_fuentes"] and "Cobertura limitada" in filas["GH"]["causa"]
-    assert all(f["causa_codigo"] in servicio.CAUSAS for f in filas.values())
-    tabla = {f["pais"]: f["estado"] for f in huecos.por_pais(servicio.cobertura(repo, "2026-11-17"),
-                                                             Configuracion.model_validate(cfg))}
-    assert tabla["DE"] != "riesgo" and tabla["GH"] in {"riesgo", "hueco"}
+    cob = servicio.cobertura(_repo_con(cfg), "2026-11-17")
+    filas = {f["vive_en"]: f for f in cob["perfiles"]}
+    for pais, limitada in (("DE", False), ("GH", True)):
+        f = filas[pais]
+        assert f["estado"] == "pendiente" and f["causa_codigo"] == servicio.CAUSA_AJUSTE_PERFIL, pais
+        assert f["pocas_fuentes"] is limitada and ("Cobertura limitada" in f["causa"]) is limitada, pais
+    tabla = {f["pais"]: f["estado"] for f in huecos.por_pais(cob, Configuracion.model_validate(cfg))}
+    assert tabla == {"DE": "cubierto", "GH": "riesgo"}  # un ajuste del perfil: no es hueco
+
 
 def test_el_pedido_solo_lleva_pais_idiomas_familias_y_modalidades():
     t = _tabla()
