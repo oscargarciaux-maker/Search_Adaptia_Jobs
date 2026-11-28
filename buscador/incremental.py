@@ -20,15 +20,25 @@ def recoger(cfg, estado, hoy, trabajo, previas=None):
         import time
         t0 = time.monotonic()
         cliente = Cliente(pausa=(0.5, 1), espera_429=(5, 10), timeout=15)
+        # Solo si hay avisos de LinkedIn guardados sin descripción: si no, la búsqueda conserva todo su tiempo.
+        relee = bool(opciones.get("linkedin_relectura", 0)) and any(
+            len(v.get("_descripcion") or "") < 200 and "linkedin.com/jobs/view/" in (v.get("enlace") or "")
+            for v in previas or ())
+        # P-17.3: la búsqueda leía fichas hasta agotar los 2 minutos y la relectura recibía 0 s (0 peticiones en todas
+        # las capturas del 28 nov, con 1.400 avisos guardados sin descripción). Se reserva una parte del tiempo de
+        # fichas para releer lo guardado; las páginas de búsqueda conservan su mitad del tiempo y el ritmo no cambia.
+        parte = min(0.5, max(0.0, opciones.get("linkedin_parte_relectura", 0.35))) if relee else 0.0  # ≤ la mitad de fichas
         crudas, stats = linkedin_publico.buscar(cliente, mapa, [],
             estado["linkedin"], opciones.get("linkedin_busquedas", 24), hoy=hoy, max_dias=2,
             max_fichas=opciones.get("linkedin_fichas", 48), max_paginas=1,
-            limite_segundos=limite, prioritarias=prioritarias, desfase_terminos=hora * 4)
-        if previas and opciones.get("linkedin_relectura", 0):
+            limite_segundos=limite, reserva=parte,
+            prioritarias=prioritarias, desfase_terminos=hora * 4)
+        if relee:
             # Lo guardado sin descripción no se puede entregar: aprovechar cada hora para completarlo.
             extra, stats["relectura"] = linkedin_publico.completar_descripciones(
                 cliente, previas, opciones["linkedin_relectura"], hoy=hoy, max_dias=cfg.get("dias_maximos", 21),
-                limite_segundos=max(0, limite - (time.monotonic() - t0)), prioritarias=prioritarias)
+                limite_segundos=max(0, limite - (time.monotonic() - t0)), prioritarias=prioritarias,
+                estado=estado["linkedin"])
             crudas = crudas + extra
         return crudas, stats
 

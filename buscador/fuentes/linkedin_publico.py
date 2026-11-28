@@ -11,7 +11,7 @@ import time
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 
-from buscador import cobertura, enlaces
+from buscador import cobertura, enlaces, paises
 from buscador import ficha as ficha_texto
 
 NOMBRE = "LinkedIn"
@@ -84,6 +84,22 @@ def combinaciones(mapa, paises_activos):
 
 
 POR_PAGINA = 10  # avisos por página de la búsqueda pública
+# P-17.3: avisos de la tanda prioritaria cuya ficha se pidió hoy y no trajo descripción (un aviso borrado responde 200
+# sin texto). Se guarda en el estado de LinkedIn para no pedirlos primero cada hora; mañana vuelven a la tanda.
+RELEIDAS = "~relectura"
+
+
+def abierta_a_pais_hispano(v):
+    """P-17.3 (E-FUE T3): sin alcance mundial, abierta a un país hispano (LATAM o España, los cubiertos de
+    `datos/paises.yaml`), con la misma regla de países que la entrega (`paises.abiertos`). La modalidad la mira quien
+    llama."""
+    abiertos, mundial, _ = paises.abiertos(v)
+    return not mundial and bool(abiertos & set(paises.datos()["codigos"]))
+
+
+def remota_hispana(v):
+    """Una vacante guardada remota y abierta a un país hispano."""
+    return v.get("modalidad") == "remoto" and abierta_a_pais_hispano(v)
 
 
 def consulta_or(consultas, maximo=4):
@@ -94,7 +110,7 @@ def consulta_or(consultas, maximo=4):
 
 def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fichas=250, max_dias=30,
            reloj=time.monotonic, limite_segundos=None, prioritarias=(), desfase_terminos=0, max_paginas=3,
-           fraccion_busqueda=0.5):
+           fraccion_busqueda=0.5, reserva=0.0):
     """Recorre las combinaciones menos recientes hasta gastar el presupuesto de búsquedas.
     estado: dict {clave_combinacion: fecha ISO de la última revisión}; se actualiza aquí.
     Devuelve (vacantes crudas, estadísticas)."""
@@ -103,6 +119,9 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
     # Contrato v37: buscar páginas solo hasta la mitad del tiempo; el resto es para leer fichas (sin descripción no se
     # entrega). El 16 nov se revisaron los 55 lugares pero solo se leyeron 40 fichas de 765 avisos.
     limite_busqueda = None if limite_segundos is None else limite_segundos * fraccion_busqueda
+    # P-17.3: `reserva` es la parte final del tiempo que se deja a quien llama (la relectura de la captura horaria):
+    # las fichas de lo buscado se detienen antes; las páginas de búsqueda conservan su parte.
+    limite_fichas = None if limite_segundos is None else limite_segundos * (1 - reserva)
     todas = combinaciones(mapa, paises_activos)
     todas = cobertura.repartir(todas, estado, hoy, prioritarias)
     vistos, avisos = set(), []
@@ -157,21 +176,29 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
         clave = (a["id"] in del_cargo, a["lugar_busqueda"])
         turno[id(a)] = vistos_lugar[clave]
         vistos_lugar[clave] += 1
+    # P-17.3: después del título, primero las remotas de un país hispano de un cargo de quien solo acepta español (sin
+    # ficha no se sabe el idioma y a esas personas no les llega nada; E-FUE: 365 así en la bodega del 28 nov).
+    solo_es = cobertura.familias_solo_espanol()
+    hispanas = {a["id"] for a in avisos if a["id"] in del_cargo and "REMOTO" in a["lugar_busqueda"]
+                and a["familia"] in solo_es
+                and abierta_a_pais_hispano({**paises.elegibles(a["titulo"], a["ubicacion"], "", True),
+                                            "ubicacion": a["ubicacion"]})}
     # Contrato v37: primero los avisos de los lugares de quien va corto.
-    avisos.sort(key=lambda a: (a["id"] not in del_cargo, a["familia"] not in prioritarias,
+    avisos.sort(key=lambda a: (a["id"] not in del_cargo, a["id"] not in hispanas, a["familia"] not in prioritarias,
                                not cobertura.va_primero(a["familia"], a["lugar_busqueda"]),
                                turno[id(a)], "REMOTO" not in a["lugar_busqueda"],
                                -(int((a["fecha"] or "0000-00-00").replace("-", "")))))
-    crudas, con_ficha, cerradas, fichas_del_cargo = [], 0, 0, 0
+    crudas, con_ficha, cerradas, fichas_del_cargo, fichas_hispanas = [], 0, 0, 0, 0
     for a in avisos:
         descripcion, cerrado, externo, remoto = "", False, "", None
-        if con_ficha < max_fichas and seguidas < 4 and not (limite_segundos is not None and reloj() - inicio >= limite_segundos):
+        if con_ficha < max_fichas and seguidas < 4 and not (limite_fichas is not None and reloj() - inicio >= limite_fichas):
             r = cliente.get(AVISO + a["id"])
             if r is not None and r.status_code == 200:
                 descripcion, cerrado, externo, remoto = ficha(r.text)
                 _anotar_ficha(a["enlace"], a["titulo"], r.text)
                 con_ficha += 1
                 fichas_del_cargo += a["id"] in del_cargo
+                fichas_hispanas += a["id"] in hispanas
                 seguidas = 0
             elif r is not None and r.status_code == 429:
                 seguidas += 1
@@ -188,17 +215,20 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
         })
     stats = {"busquedas": hechas, "fallidas": fallidas, "avisos": len(avisos), "con_descripcion": con_ficha,
              "del_cargo": len(del_cargo), "fichas_del_cargo": fichas_del_cargo,
+             "remotas_hispanas": len(hispanas), "fichas_hispanas": fichas_hispanas,
              "cerradas": cerradas, "combinaciones_revisadas": sum(1 for c in todas if estado.get(f"{c[0]}@{c[2]}") == hoy),
              "combinaciones_total": len(todas), "por_familia": por_familia, "por_lugar": por_lugar}
     return crudas, stats
 
 
 def completar_descripciones(cliente, previas, max_fichas, hoy=None, max_dias=21, reloj=time.monotonic,
-                            limite_segundos=None, prioritarias=()):
+                            limite_segundos=None, prioritarias=(), estado=None):
     """Relee la ficha pública de avisos de LinkedIn ya guardados que se quedaron sin descripción (LinkedIn limita cuántas
     fichas se leen por búsqueda). Sin descripción no se sabe el idioma y la vacante no se puede entregar.
     Por turnos entre las personas (`cobertura.por_necesidad`, v50); dentro de cada una, cargos prioritarios y recientes.
-    Devuelve (crudas con descripción, estadísticas); al unirlas
+    P-17.3: antes que todo, las remotas de un país hispano sin idioma de un cargo de quien solo acepta español (en el
+    mismo orden). `estado` (el de LinkedIn) recuerda las de esa tanda que hoy no trajeron descripción: no vuelven a ir
+    primero hasta mañana. Devuelve (crudas con descripción, estadísticas); al unirlas
     con la copia guardada se conserva la descripción más larga."""
     hoy = hoy or datetime.now(timezone.utc).date().isoformat()
     inicio = reloj()
@@ -211,14 +241,24 @@ def completar_descripciones(cliente, previas, max_fichas, hoy=None, max_dias=21,
     candidatas.sort(key=lambda v: v.get("fecha_publicacion") or v.get("visto_primera_vez") or "", reverse=True)
     candidatas.sort(key=lambda v: not any(f["familia"] in prioritarias for f in v.get("familias", [])))  # estable
     candidatas = cobertura.por_necesidad(candidatas)  # contrato v50: por turnos entre personas, primero quien va corta
-    crudas, leidas, cerradas, seguidas, peticiones = [], 0, 0, 0, 0
+    solo_es = cobertura.familias_solo_espanol()
+    sin_texto = {} if estado is None else {k: f for k, f in (estado.get(RELEIDAS) or {}).items() if f == hoy}
+    if estado is not None:
+        estado[RELEIDAS] = sin_texto
+    primero = {id(v) for v in candidatas if not v.get("idioma") and remota_hispana(v) and aviso_id(v) not in sin_texto
+               and {f.get("familia") for f in v.get("familias") or [] if isinstance(f, dict)} & solo_es}
+    candidatas.sort(key=lambda v: id(v) not in primero)  # estable: dentro de cada tanda, el orden por necesidad
+    crudas, leidas, cerradas, seguidas, peticiones, leidas_primero = [], 0, 0, 0, 0, 0
     for v in candidatas:
         if peticiones >= max_fichas or seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
             break
         r = cliente.get(AVISO + aviso_id(v))
         peticiones += 1
         if r is None or r.status_code != 200:
-            seguidas += 1 if (r is not None and r.status_code == 429) else 0
+            bloqueo = r is not None and r.status_code == 429
+            seguidas += 1 if bloqueo else 0
+            if id(v) in primero and r is not None and not bloqueo:  # un 429 es de LinkedIn, no del aviso
+                sin_texto[aviso_id(v)] = hoy
             continue
         seguidas = 0
         descripcion, cerrado, _, _ = ficha(r.text)
@@ -227,11 +267,15 @@ def completar_descripciones(cliente, previas, max_fichas, hoy=None, max_dias=21,
             cerradas += 1
             continue
         if len(descripcion) < 200:
+            if id(v) in primero:
+                sin_texto[aviso_id(v)] = hoy
             continue
         leidas += 1
+        leidas_primero += id(v) in primero
         crudas.append({"titulo": v["titulo"], "empresa": v["empresa"], "ubicacion": v.get("ubicacion", ""),
                        "descripcion": descripcion, "fecha": v.get("fecha_publicacion", ""), "enlace": v["enlace"],
                        "enlace_directo": "", "remoto": True if v.get("modalidad") == "remoto" else None,
                        "fuente": NOMBRE})
     return crudas, {"pendientes": len(candidatas), "peticiones": peticiones, "con_descripcion": leidas,
-                    "cerradas": cerradas, "bloqueos_seguidos": seguidas}
+                    "cerradas": cerradas, "bloqueos_seguidos": seguidas,
+                    "remotas_hispanas": len(primero), "hispanas_con_descripcion": leidas_primero}

@@ -203,7 +203,8 @@ def recoger(cfg, estado, hoy, trabajo, solo_mapa=None, control_apify=None, previ
         if relee:
             extra, stats["relectura"] = linkedin_publico.completar_descripciones(
                 cliente, previas, p["linkedin_relectura"], hoy=hoy, max_dias=cfg["dias_maximos"],
-                limite_segundos=max(0, limite - (time.monotonic() - t0)), prioritarias=prioritarias)
+                limite_segundos=max(0, limite - (time.monotonic() - t0)), prioritarias=prioritarias,
+                estado=estado["linkedin"])
             crudas = crudas + extra
         return crudas, stats
 
