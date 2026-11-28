@@ -304,12 +304,28 @@ class _ConfiguracionVigente:
     def motivo(self, row, actual, ampliacion, aprobada):
         """El motivo si la vacante ya no encaja con el perfil o el cargo vigentes; "" si encaja o no hay con qué mirar."""
         perfil = self.perfil(str(row.get("perfil_id")))
-        if perfil and perfil != row.get("filtros") and not _evaluar_asignada(actual, perfil, ampliacion)["compatible"]:
+        # Solo si el perfil cambió: sin cambios da lo mismo que la copia y se ahorra evaluar dos veces.
+        # Una ampliada vale también si el perfil editado ya la acepta sin ampliar (p. ej. ahora admite remoto).
+        if perfil and perfil != row.get("filtros") and not _evaluar_asignada(actual, perfil, ampliacion)["compatible"] \
+                and not (ampliacion and _evaluar_asignada(actual, perfil, "")["compatible"]):
             return NO_ENCAJA_PERFIL
         cargo = None if aprobada else self.cargo(str(row.get("cargo_id")))
-        if cargo and not grado(actual["titulo"], cargo, cercanos=True)[0]:
+        if cargo and _cargo_editado(cargo, row.get("cargo_configuracion") or {}) \
+                and not grado(actual["titulo"], cargo, cercanos=True)[0]:
             return NO_ENCAJA_CARGO
         return ""
+
+
+# Lo del cargo que decide si un título le corresponde (`grado`); la huella y las funciones solo ordenan.
+_CAMPOS_DEL_TITULO = ("nombre", "terminos_exactos", "terminos_similares", "terminos_excluidos", "terminos_cercanos",
+                      "excluir_mapa")
+
+
+def _cargo_editado(vigente, guardado):
+    """¿Cambió lo que decide el título entre el cargo operativo de ahora y la copia de la asignación?"""
+    return any(sorted(map(str, vigente.get(k) or [])) != sorted(map(str, guardado.get(k) or []))
+               if isinstance(vigente.get(k), list) else vigente.get(k) != guardado.get(k)
+               for k in _CAMPOS_DEL_TITULO)
 
 
 def resultados(repo, cliente_id=None, fecha=None):

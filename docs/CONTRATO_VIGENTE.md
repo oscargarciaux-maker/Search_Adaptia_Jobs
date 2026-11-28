@@ -197,8 +197,11 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
     perfil y el cargo de la versión vigente de la búsqueda del día, además de la copia guardada al asignarla; si ya no
     encaja, no va a la lista para compartir, ni al WhatsApp, ni a «Copiar», y el operador la ve como «Ya no encaja con
     el cargo» con el motivo. No se borra: la asignación y el lote se conservan. Una aprobada a mano en «Por confirmar»
-    no se retira por el cargo; un perfil o cargo que salió de la configuración no se toca; los días anteriores no
-    cambian. El detalle privado dice cuántas cambiaron por la vacante y cuántas por editar el cargo o el perfil.
+    no se retira por el cargo; el cargo solo se vuelve a mirar si cambió lo que decide el título (nombre y términos);
+    una ampliada sigue si el perfil editado ya la acepta sin ampliar; un perfil o cargo que salió de la configuración
+    no se toca; los días anteriores no cambian. En el panel es el estado `no_encaja` de la vacante. El detalle privado
+    (`seleccion_actual`, campo `motivo_no_encaja`: `vacante` o `configuracion`) dice cuántas cambiaron por la vacante y
+    cuántas por editar el cargo o el perfil. Rige desde que una pasada o «Buscar ahora» toma la versión editada.
   - **AVERÍA:** sincronización con Supabase o catálogo sin confirmar, reconciliación sin confirmar (incluido el 57014),
     selección no registrada, operaciones centrales pendientes o sin catálogo válido → corrida en rojo y aviso `/fail`.
     **Solo una avería hace fallar la corrida**; si hay avería y falta a la vez, manda la avería.

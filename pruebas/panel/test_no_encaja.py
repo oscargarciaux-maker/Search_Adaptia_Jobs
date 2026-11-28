@@ -52,9 +52,13 @@ def test_perfil_editado_despues_no_se_comparte_y_queda_marcada(asignada):
     assert len(asignada.asignaciones) == 1  # no se borra nada: la asignación sigue guardada
 
 
+def _cambiar_cargo(repo):
+    repo.vigente["cargos"][0].update(nombre="QA Engineer", terminos_exactos=["QA Engineer"], terminos_similares=[],
+                                     terminos_cercanos=[])
+
+
 def test_cargo_editado_despues_no_se_comparte_y_queda_marcada(asignada):
-    cargo = asignada.vigente["cargos"][0]
-    cargo.update(nombre="QA Engineer", terminos_exactos=["QA Engineer"], terminos_similares=[], terminos_cercanos=[])
+    _cambiar_cargo(asignada)
     r, v = _ficha(asignada)
     assert v["estado"] == "no_encaja" and v["enlace"] == "" and servicio.NO_ENCAJA_CARGO in v["motivos"]
     assert r["para_copiar"] == 0
@@ -62,8 +66,26 @@ def test_cargo_editado_despues_no_se_comparte_y_queda_marcada(asignada):
 
 def test_aprobada_a_mano_no_se_retira_por_el_cargo(asignada):
     asignada.asignaciones[0]["explicacion"].append({"aprobada_por": "operador"})
-    asignada.vigente["cargos"][0].update(nombre="QA Engineer", terminos_exactos=["QA Engineer"],
-                                         terminos_similares=[], terminos_cercanos=[])
+    _cambiar_cargo(asignada)
+    assert _ficha(asignada)[1]["estado"] == "lista"
+
+
+def test_una_ampliada_sigue_si_el_perfil_editado_ya_la_acepta_sin_ampliar(asignada):
+    """Thermos: un perfil presencial que recibió una remota «remota_cercana» y después pasa a aceptar remoto."""
+    fila = asignada.asignaciones[0]
+    fila["explicacion"].append({"ampliacion": "remota_cercana"})
+    fila["filtros"] = dict(fila["filtros"], modalidades=["presencial"],
+                           ubicaciones=[dict(u, modalidades=["presencial"]) for u in fila["filtros"]["ubicaciones"]])
+    assert _ficha(asignada)[1]["estado"] == "lista"  # el perfil vigente acepta remoto: encaja sin ampliar
+
+
+def test_sin_editar_el_cargo_no_se_vuelve_a_mirar(asignada, monkeypatch):
+    """Thermos: un título aprendido que salió por el tope de 200 no retira lo asignado si nadie editó el cargo."""
+    editado = servicio._cargo_editado
+    assert not editado({"nombre": "QA", "terminos_exactos": ["a", "b"]}, {"nombre": "QA", "terminos_exactos": ["b", "a"]})
+    assert editado({"nombre": "QA", "terminos_exactos": ["a"]}, {"nombre": "QA", "terminos_exactos": ["a", "b"]})
+    monkeypatch.setattr(servicio, "_cargo_editado", lambda vigente, guardado: False)
+    _cambiar_cargo(asignada)
     assert _ficha(asignada)[1]["estado"] == "lista"
 
 

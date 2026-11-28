@@ -13,7 +13,11 @@ Contrato v52 (27 nov, decisión de Oscar): la búsqueda diaria termina en uno de
 import argparse
 import json
 import os
+from collections import Counter
 from pathlib import Path
+
+# 7.G: los motivos que anota `bodega.motivo_no_encaja` (aquí para que bodega los importe sin ciclo).
+MOTIVO_VACANTE, MOTIVO_CONFIGURACION = "vacante", "configuracion"
 
 COMPLETA, CORTA, AVERIA = "completa", "corta", "averia"
 NOMBRE_ESTADO = {COMPLETA: "COMPLETA", CORTA: "CORTA", AVERIA: "AVERÍA"}
@@ -21,14 +25,15 @@ CONFIRMADO = "Meta de selección y sincronización confirmadas. Esto no certific
 
 
 def _por_cargo(roles, mensaje, detalle):
-    """`roles`: [(nombre, n)]. Con `detalle` (el panel, privado) un mensaje por cargo; sin él (registros de Actions,
-    públicos: auditoría de exposición, 27 nov) uno solo con el total y cuántos cargos, sin nombres."""
-    roles = [(nombre, n) for nombre, n in roles if n]
+    """`roles`: [(nombre, n)] o [(nombre, n, extra)]. Con `detalle` (el panel, privado) un mensaje por cargo, con su
+    `extra`; sin él (registros de Actions, públicos: auditoría de exposición, 27 nov) uno solo con el total y cuántos
+    cargos, sin nombres ni `extra`."""
+    roles = [(r[0], r[1], r[2] if len(r) > 2 else "") for r in roles if r[1]]
     if detalle:
-        return [f"{nombre}: {n} {mensaje}" for nombre, n in roles]
+        return [f"{nombre}: {n} {mensaje}{extra}" for nombre, n, extra in roles]
     if not roles:
         return []
-    return [f"{sum(n for _, n in roles)} {mensaje} ({len(roles)} {'cargo' if len(roles) == 1 else 'cargos'})"]
+    return [f"{sum(r[1] for r in roles)} {mensaje} ({len(roles)} {'cargo' if len(roles) == 1 else 'cargos'})"]
 
 
 def errores(reporte, detalle=True):
@@ -49,31 +54,22 @@ def errores(reporte, detalle=True):
     return fallos
 
 
-# 7.G: por qué una vacante de la selección ya no encaja (lo anota `bodega.afinidad_vigente`). Solo en el detalle privado.
-MOTIVOS_NO_ENCAJA = {"vacante": "cambió la vacante", "configuracion": "se editó el cargo o el perfil"}
+# 7.G: por qué una vacante de la selección ya no encaja (lo anota `bodega.motivo_no_encaja`). Solo en el detalle privado.
+MOTIVOS_NO_ENCAJA = {MOTIVO_VACANTE: "cambió la vacante", MOTIVO_CONFIGURACION: "se editó el cargo o el perfil"}
 
 
 def _ya_no_encajan(reporte, detalle):
     """7.G (decisión de Oscar, 27 nov): vacantes de la selección de hoy que ya no encajan = CORTA, no AVERÍA. Es un
     cambio de datos (la vacante, el cargo o el perfil), no algo roto. No se comparten: el panel las evalúa con el perfil
     y el cargo vigentes. En lo público (sin `detalle`) solo el total y cuántos cargos."""
-    roles = (reporte.get("seleccion_actual") or {}).get("roles", {}).values()
-    mensaje = "vacantes de la selección de hoy ya no encajan en ningún perfil del cargo; no se comparten."
-    if not detalle:
-        return _por_cargo([(rol.get("nombre", ""), len(_no_encajan(rol))) for rol in roles], mensaje, False)
-    salida = []
-    for rol in roles:
+    filas = []
+    for rol in (reporte.get("seleccion_actual") or {}).get("roles", {}).values():
         lista = _no_encajan(rol)
-        if not lista:
-            continue
-        motivos = {}
-        for v in lista:
-            motivo = MOTIVOS_NO_ENCAJA.get(v.get("motivo_no_encaja"))
-            if motivo:
-                motivos[motivo] = motivos.get(motivo, 0) + 1
-        extra = f" ({', '.join(f'{n} {m}' for m, n in motivos.items())})" if motivos else ""
-        salida.append(f"{rol.get('nombre', '')}: {len(lista)} {mensaje}{extra}")
-    return salida
+        motivos = Counter(MOTIVOS_NO_ENCAJA[m] for v in lista if (m := v.get("motivo_no_encaja")) in MOTIVOS_NO_ENCAJA)
+        filas.append((rol.get("nombre", ""), len(lista),
+                      f" ({', '.join(f'{n} {m}' for m, n in motivos.items())})" if motivos else ""))
+    return _por_cargo(filas, "vacantes de la selección de hoy ya no encajan en ningún perfil del cargo; no se comparten.",
+                      detalle)
 
 
 def _no_encajan(rol):
@@ -171,7 +167,7 @@ def resumen(reporte, fallos, faltas):
             lineas.append("La segunda pasada (8:30) o «Buscar ahora» completan la meta.")
         if revision.get("vacantes") and (revision.get("estados") or {}).get("pendiente"):
             lineas.append("Las vacantes con el enlace sin comprobar no se comparten hasta comprobarlo.")
-        if _ya_no_encajan(reporte, False):
+        if any(_no_encajan(rol) for rol in (reporte.get("seleccion_actual") or {}).get("roles", {}).values()):
             lineas.append("Las vacantes que ya no encajan no se comparten; el detalle por cargo está en el panel.")
         lineas.append("")
     # Termina en línea en blanco: el paso «Resumen» escribe después en el mismo archivo y no debe pegarse a la tabla.

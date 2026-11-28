@@ -46,8 +46,13 @@ def afinidad_vigente(original, actual, rol, roles, inventario):
         return False
     if original.get("_ampliacion"):
         return True
+    return _empata(actual, rol, roles)
+
+
+def _empata(v, rol, roles):
+    """¿`rol` está entre los cargos que mejor reconocen la vacante?"""
     from buscador import entrega
-    empatados, _ = entrega.roles_de(actual, roles)
+    empatados, _ = entrega.roles_de(v, roles)
     return any(r["id"] == rol["id"] for r in empatados)
 
 
@@ -55,11 +60,10 @@ def motivo_no_encaja(original, rol, roles):
     """7.G: por qué una vacante que sigue en el inventario ya no encaja. Si la copia elegida esta mañana todavía encaja
     con los cargos y perfiles de ahora, lo que cambió es la vacante; si tampoco encaja, se editó el cargo o el perfil.
     Solo para el detalle privado (cifras por cargo, sin datos de nadie)."""
-    from buscador import entrega
+    from buscador.validacion import MOTIVO_CONFIGURACION, MOTIVO_VACANTE
     if not original.get("familias"):
         return ""
-    empatados, _ = entrega.roles_de(original, roles)
-    return "vacante" if any(r["id"] == rol["id"] for r in empatados) else "configuracion"
+    return MOTIVO_VACANTE if _empata(original, rol, roles) else MOTIVO_CONFIGURACION
 
 
 def config():
@@ -787,12 +791,13 @@ def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=Fal
             actual = dict(por_id_vigente.get(original["id"], original))
             revision = verificar_enlaces.anotar(actual, cache_enlaces)
             vigente = afinidad_vigente(original, actual, rol, roles_actuales, por_id_vigente)
-            entradas.append({"id": actual["id"], "catalog_status": estados_catalogo.get(actual["id"], "sin_catalogo"),
-                "afinidad_vigente": vigente,
-                **({"motivo_no_encaja": motivo_no_encaja(original, rol, roles_actuales)}
-                   if not vigente and actual["id"] in por_id_vigente else {}),
-                "enlace": actual.get("enlace", ""), "enlace_directo": actual.get("enlace_directo", ""),
-                "verificacion": revision})
+            entrada = {"id": actual["id"], "catalog_status": estados_catalogo.get(actual["id"], "sin_catalogo"),
+                       "afinidad_vigente": vigente,
+                       "enlace": actual.get("enlace", ""), "enlace_directo": actual.get("enlace_directo", ""),
+                       "verificacion": revision}
+            if not vigente and actual["id"] in por_id_vigente:  # 7.G: sigue en el inventario pero ya no encaja
+                entrada["motivo_no_encaja"] = motivo_no_encaja(original, rol, roles_actuales)
+            entradas.append(entrada)
         seleccion_actual["roles"][rol["id"]] = {"nombre": rol["nombre"], "meta": entrega.meta_de(rol, config_entrega), "vacantes": entradas}
     reporte = {
         "fecha": hoy, "hora_utc": datetime.now(timezone.utc).strftime("%H:%M"), "modo": modo,
