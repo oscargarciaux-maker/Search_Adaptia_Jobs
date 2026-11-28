@@ -6,7 +6,8 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 COMANDO = "pip-compile --allow-unsafe --generate-hashes --strip-extras requirements.in (con Python 3.12)"
 # Lo que solo usa Windows (colorama) va en el .in con su marcador. Si pip-compile en Linux lo deja fuera al regenerar,
-# se copia a mano al .txt con el mismo marcador y sus dos huellas de PyPI (27 nov).
+# se copia al .txt con el mismo marcador y sus dos huellas (27 nov); en ramas de Dependabot lo hace solo
+# .github/workflows/reponer_colorama.yml (P-5c).
 
 
 def _marcador(texto):
