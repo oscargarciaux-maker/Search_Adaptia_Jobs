@@ -23,7 +23,7 @@ y vulnerabilidades. Nada debe escaparse.
   el SQL, qué espera la interfaz (`web/src/types.ts`), qué comprueban las pruebas.
 - **Experiencia de desarrollo:** marca cambios que alteren cómo se corre o se prueba el proyecto: nombres de
   secretos o variables de entorno, flujos de GitHub Actions, pasos nuevos obligatorios, versiones de Node/Python.
-  Añadir dependencias con `requirements.in` + `requirements.txt` con huella (pip-compile) no cuenta.
+  Añadir dependencias con `requirements.in` + `requirements.txt` con huella (uv pip compile) no cuenta.
 - **Funciones a medio activar:** algo que debía quedar detrás de una marca (`CAPTURA_HORARIA_ACTIVA`,
   `ESTADO_SUPABASE_ACTIVO`, modo demostración, `--prueba`) y se filtra al modo real.
 - **Reglas del proyecto (`CLAUDE.md`) — cualquier violación es grave:**

@@ -1,18 +1,25 @@
 """PR 1.5 (16 nov): nada externo cambia sin que lo decidamos. Cada dependencia directa está fijada en `requirements.in` y
-`requirements.txt` (pip-compile) la instala con su huella (sha256), igual que todas las piezas que trae por dentro."""
+`requirements.txt` (uv pip compile) la instala con su huella (sha256), igual que todas las piezas que trae por dentro."""
 import re
 from pathlib import Path
 
+import pytest
+
 RAIZ = Path(__file__).resolve().parent.parent
-COMANDO = "pip-compile --allow-unsafe --generate-hashes --strip-extras requirements.in (con Python 3.12)"
-# Lo que solo usa Windows (colorama) va en el .in con su marcador. Si pip-compile en Linux lo deja fuera al regenerar,
-# se copia al .txt con el mismo marcador y sus dos huellas (27 nov); en ramas de Dependabot lo hace solo
-# .github/workflows/reponer_colorama.yml (P-5c).
+COMANDO = "uv pip compile --universal --generate-hashes --python-version 3.12 -o requirements.txt requirements.in"
+# P-13.2 (28 nov): el lock es universal (vale para Linux, Windows y macOS a la vez), así que lo que solo usa Windows
+# (colorama, `sys_platform == 'win32'`) queda en el .txt con su marcador y sus huellas aunque se compile en Linux.
+# Dependabot (ecosistema `uv`) lee la cabecera del .txt y recompila con las mismas opciones, `--universal` incluida.
+
+
+def _comando(base):
+    """El comando de `COMANDO` para `requirements` o `requirements-auditoria` (es el que queda en la cabecera)."""
+    return COMANDO.replace("requirements", base)
 
 
 def _marcador(texto):
     """Marcador de plataforma sin espacios ni «;» (`; sys_platform == "win32"` → `sys_platform=="win32"`), o vacío."""
-    return re.sub(r"\s+", "", (texto or "").strip().lstrip(";"))
+    return re.sub(r"\s+", "", (texto or "").strip().lstrip(";")).replace("'", '"')
 
 
 def _directas(archivo="requirements.in"):
@@ -37,38 +44,21 @@ def _bloqueadas(archivo="requirements.txt"):
     return salida
 
 
-def _bloque_sugerido(nombre, base):
-    """Bloque exacto para pegar en `{base}.txt`: la línea del .in (con su marcador) y, si la misma versión ya está
-    bloqueada en el otro lock, sus huellas y su comentario `# via`; si no, dice cómo obtenerlas."""
-    linea = next(l.split("#")[0].strip() for l in (RAIZ / (base + ".in")).read_text(encoding="utf-8").splitlines()
-                 if re.match(rf"{re.escape(nombre)}(\[[^\]]+\])?==", l.strip().lower().replace("_", "-")))
-    otro = "requirements-auditoria" if base == "requirements" else "requirements"
-    texto = (RAIZ / (otro + ".txt")).read_text(encoding="utf-8")
-    m = re.search(rf"^{re.escape(linea)} \\\n((?:    --hash=sha256:[0-9a-f]+(?: \\)?\n)+)", texto, re.M)
-    if m:
-        huellas = [h.rstrip(" \\") for h in m.group(1).splitlines()]
-        cuerpo = " \\\n".join([linea, *huellas]).replace(linea + " \\\n", linea + " \\\n", 1)
-        return f"{cuerpo}\n    # via -r {base}.in"
-    return (f"{linea} \\\n    --hash=sha256:<huella 1> \\\n    --hash=sha256:<huella 2>\n    # via -r {base}.in\n"
-            "(las huellas salen de https://pypi.org/pypi/<paquete>/<versión>/json, campo digests.sha256 de cada archivo)")
-
-
-import pytest
-
-
 @pytest.mark.parametrize("base", ["requirements", "requirements-auditoria"])
 def test_lock_coincide_con_requirements_y_todo_lleva_huella(base):
     directas, bloqueadas = _directas(base + ".in"), _bloqueadas(base + ".txt")
     for nombre, (version, marcador) in directas.items():
-        if marcador and nombre not in bloqueadas:
-            raise AssertionError(f"{nombre} ({marcador}) falta en {base}.txt: pip-compile la omite fuera de esa "
-                                 "plataforma; pega este bloque en el .txt, en su sitio alfabético:\n" + _bloque_sugerido(nombre, base))
-        assert nombre in bloqueadas, f"{nombre} falta en el .txt compilado; regenera con: {COMANDO}"
+        assert nombre in bloqueadas, f"{nombre} falta en {base}.txt; regenera con: {_comando(base)}"
         assert bloqueadas[nombre][:2] == (version, marcador), \
-            (f"{nombre} difiere del .txt compilado (versión o marcador); regenera con: {COMANDO}" +
-             (("\nSi es una pieza solo de Windows, deja en el .txt este bloque:\n" + _bloque_sugerido(nombre, base))
-              if directas[nombre][1] else ""))
+            f"{nombre} difiere de {base}.txt (versión o marcador); regenera con: {_comando(base)}"
     assert all(con_huella for *_, con_huella in bloqueadas.values()), "toda pieza del lock lleva su sha256"
+
+
+@pytest.mark.parametrize("base", ["requirements", "requirements-auditoria"])
+def test_lock_universal_compilado_con_uv(base):
+    """Un lock de pip-compile (o de uv sin `--universal`) pierde colorama al compilarse en Linux: la cabecera lo delata."""
+    cabecera = (RAIZ / (base + ".txt")).read_text(encoding="utf-8").splitlines()[1]
+    assert cabecera.strip("# ") == _comando(base), f"{base}.txt no es un lock universal de uv; regenera con: {_comando(base)}"
 
 
 def test_colorama_queda_fijada_para_windows():
