@@ -630,6 +630,18 @@ def que_hacer(p, ampliaciones, del_cargo, compatibles, ya, fecha, nombres_pais, 
 DIAS_COBERTURA = 14
 DIAS_PARA_MEDIR = 3  # con menos búsquedas medidas, «aún sin datos»
 
+# 8.1b: código estable de la causa de `cobertura()` (la lógica decide con él; el texto es solo para el operador y puede
+# cambiar). Vacío cuando no hay causa (llegó al mínimo).
+CAUSA_SIN_VACANTES_CARGO = "sin_vacantes_cargo"    # el cargo no tiene vacantes en nada de lo buscado
+CAUSA_LISTAS_SIN_RECIBIR = "listas_sin_recibir"    # hay vacantes listas que aún no recibió
+CAUSA_AJUSTE_PERFIL = "ajuste_perfil"              # las del cargo no le sirven por un rasgo de su perfil
+CAUSA_OTRO_PAIS = "otro_pais"                      # las del cargo no le sirven por «oficina en otro país»
+CAUSA_POR_COMPROBAR = "por_comprobar"              # le servirían, pero falta comprobar el enlace
+CAUSA_POCAS_EN_FUENTES = "pocas_en_fuentes"        # pocas vacantes nuevas en las fuentes revisadas
+CAUSAS = (CAUSA_SIN_VACANTES_CARGO, CAUSA_LISTAS_SIN_RECIBIR, CAUSA_AJUSTE_PERFIL, CAUSA_OTRO_PAIS,
+          CAUSA_POR_COMPROBAR, CAUSA_POCAS_EN_FUENTES)
+MOTIVO_OTRO_PAIS = "oficina en otro país"  # motivo de `afinidad.evaluar`
+
 
 def cobertura(repo, fecha=None):
     """Por cada perfil activo: si hoy llegó al mínimo, cuántos de sus últimos días lo logró (con su denominador), cuántas
@@ -689,22 +701,28 @@ def cobertura(repo, fecha=None):
             estado = "sin_datos"
         else:
             estado = "pendiente"
-        causa = ""
-        from panel.ejecutor import _con_fuentes_propias, lugares_perfil, paises_de_lugares
-        pocas_fuentes = not set(paises_de_lugares(lugares_perfil(p)) or [p.vive_en]) & _con_fuentes_propias()
+        causa = codigo = ""
+        from panel.ejecutor import fuentes_locales, lugares_perfil, paises_de_lugares
+        # 8.1b: «Cobertura limitada» con la misma definición de fuente local que la tabla de huecos (Indeed cuenta).
+        pocas_fuentes = not any(fuentes_locales(c) for c in (paises_de_lugares(lugares_perfil(p)) or [p.vive_en]))
         if estado != "cubierto" and hoy_n < MINIMO_POR_PERFIL:
             if not del_cargo:
+                codigo = CAUSA_SIN_VACANTES_CARGO
                 causa = "Aún no hay vacantes de este cargo en lo buscado: la próxima búsqueda lo incluye."
             elif listas:
+                codigo = CAUSA_LISTAS_SIN_RECIBIR
                 causa = (f"Hay {listas} {'lista' if listas == 1 else 'listas'} que aún no recibió: la próxima búsqueda "
                          "completa su mínimo con ellas.")
             elif listas + pendientes == 0 and motivos:
                 m, n = motivos.most_common(1)[0]
+                codigo = CAUSA_OTRO_PAIS if m == MOTIVO_OTRO_PAIS else CAUSA_AJUSTE_PERFIL
                 causa = f"{n} vacantes del cargo no le sirven por «{m}»" + (
                     f": {SUGERENCIAS[m].lower()} daría más." if m in SUGERENCIAS else ".")
             elif pendientes:
+                codigo = CAUSA_POR_COMPROBAR
                 causa = f"{pendientes} le servirían pero aún no tienen el enlace comprobado; se comprueban en la próxima búsqueda."
             else:
+                codigo = CAUSA_POCAS_EN_FUENTES
                 causa = "Pocas vacantes nuevas en las fuentes revisadas para su ubicación e idioma."
             if pocas_fuentes and not listas:
                 from panel.ejecutor import fuentes_en
@@ -727,7 +745,7 @@ def cobertura(repo, fecha=None):
                       "cargo": cargo.nombre, "vive_en": p.vive_en, "idiomas": list(p.idiomas), "estado": estado,
                       "hoy": hoy_n, "dias_con_minimo": con_minimo, "dias_medidos": len(dias),
                       "dias_seguidos_bajo": seguidos if len(dias) >= DIAS_PARA_MEDIR else 0,
-                      "listas": listas, "por_comprobar": pendientes, "causa": causa,
+                      "listas": listas, "por_comprobar": pendientes, "causa": causa, "causa_codigo": codigo,
                       # Contrato v40: páginas buscadas para esta persona en la última búsqueda, por fuente.
                       "busquedas_hoy": busquedas_ultima.get(pid, {}), "pocas_fuentes": pocas_fuentes})
     orden = {"pendiente": 0, "sin_datos": 1, "cubierto": 2}

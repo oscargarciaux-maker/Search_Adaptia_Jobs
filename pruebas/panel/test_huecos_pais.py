@@ -1,10 +1,11 @@
 """8.1 (decisiones del cliente, 27 nov): huecos por país, solo para el operador. Perfiles ficticios."""
 import inspect
 import uuid
+from collections import Counter
 
 from fastapi.testclient import TestClient
 
-from panel import huecos, servicio
+from panel import afinidad, ejecutor, huecos, servicio
 from panel.api import crear_app
 from panel.modelos import Configuracion
 from panel.repositorio import RepositorioDemo, configuracion_demo
@@ -37,16 +38,16 @@ PERFILES = {
 }
 
 
-def _fila(n, hoy, causa="", listas=0, por_comprobar=0, dias=3):
+def _fila(n, hoy, codigo="", listas=0, por_comprobar=0, dias=3):
     return {"perfil_id": _id(n), "cargo": "Product Designer", "hoy": hoy, "dias_medidos": dias, "listas": listas,
-            "por_comprobar": por_comprobar, "causa": causa}
+            "por_comprobar": por_comprobar, "causa": "texto para el operador", "causa_codigo": codigo}
 
 
 def _cobertura():
     return {"minimo": MINIMO, "perfiles": [
         _fila("co", 6), _fila("ke", 7),
-        _fila("gh", 2, huecos.CAUSA_POCAS_VACANTES + " para su ubicación e idioma."),
-        _fila("et", 0, "Aún no hay vacantes de este cargo en lo buscado: la próxima búsqueda lo incluye."),
+        _fila("gh", 2, servicio.CAUSA_POCAS_EN_FUENTES),
+        _fila("et", 0, servicio.CAUSA_SIN_VACANTES_CARGO),
         _fila("mundo", 5)]}
 
 
@@ -70,22 +71,54 @@ def test_estado_por_pais_distingue_cubierto_riesgo_y_hueco():
 
 
 def test_otras_causas_no_son_hueco():
-    assert not huecos.es_hueco_por_fuentes(_fila("x", 2, huecos.CAUSA_POCAS_VACANTES, listas=3), MINIMO)
-    assert not huecos.es_hueco_por_fuentes(_fila("x", 2, huecos.CAUSA_POCAS_VACANTES, por_comprobar=4), MINIMO)
-    assert not huecos.es_hueco_por_fuentes(_fila("x", 2, huecos.CAUSA_POCAS_VACANTES, dias=0), MINIMO)  # sin medir
-    assert not huecos.es_hueco_por_fuentes(_fila("x", 2, "4 vacantes del cargo no le sirven por «modalidad diferente»"),
-                                           MINIMO)  # un ajuste del perfil
-    assert huecos.es_hueco_por_fuentes(_fila("x", 2, "4 vacantes del cargo no le sirven por «oficina en otro país»: "
-                                                     "añadir una ubicación donde trabajaría daría más."), MINIMO)
-    assert not huecos.es_hueco_por_fuentes(_fila("x", MINIMO, huecos.CAUSA_POCAS_VACANTES), MINIMO)
+    pocas = servicio.CAUSA_POCAS_EN_FUENTES
+    assert not huecos.es_hueco_por_fuentes(_fila("x", 2, pocas, listas=3), MINIMO)
+    assert not huecos.es_hueco_por_fuentes(_fila("x", 2, pocas, por_comprobar=4), MINIMO)
+    assert not huecos.es_hueco_por_fuentes(_fila("x", 2, pocas, dias=0), MINIMO)  # sin medir
+    assert not huecos.es_hueco_por_fuentes(_fila("x", MINIMO, pocas), MINIMO)
+    for codigo in (servicio.CAUSA_SIN_VACANTES_CARGO, servicio.CAUSA_LISTAS_SIN_RECIBIR, servicio.CAUSA_AJUSTE_PERFIL,
+                   servicio.CAUSA_POR_COMPROBAR, ""):
+        assert not huecos.es_hueco_por_fuentes(_fila("x", 2, codigo), MINIMO), codigo
+    assert huecos.es_hueco_por_fuentes(_fila("x", 2, servicio.CAUSA_OTRO_PAIS), MINIMO)
+    assert huecos.es_hueco_por_fuentes(_fila("x", 2, pocas), MINIMO)
 
 
-def test_las_causas_que_se_leen_existen_en_cobertura():
-    """Si `servicio.cobertura` cambia el texto de sus causas, la tabla dejaría de ver huecos: esto lo avisa."""
-    fuente = inspect.getsource(servicio.cobertura)
-    assert huecos.CAUSA_POCAS_VACANTES in fuente and "oficina en otro país" in servicio.SUGERENCIAS
-    assert "no le sirven por «{m}»" in fuente  # MOTIVO_OTRO_PAIS lee el motivo entre «»
+def test_huecos_decide_por_codigo_y_no_por_el_texto():
+    """8.1b: cambiar la frase para el operador no cambia qué es hueco."""
+    fila = _fila("x", 2, servicio.CAUSA_POCAS_EN_FUENTES)
+    assert huecos.es_hueco_por_fuentes({**fila, "causa": "cualquier otra frase"}, MINIMO)
+    assert not huecos.es_hueco_por_fuentes({**fila, "causa_codigo": servicio.CAUSA_AJUSTE_PERFIL,
+                                            "causa": "Pocas vacantes nuevas en las fuentes revisadas"}, MINIMO)
 
+
+def test_codigos_de_causa_estables():
+    """Los códigos son parte de la API del panel: si cambian, cambia `huecos.py`. El motivo «oficina en otro país» es
+    el que da `afinidad.evaluar` y tiene sugerencia."""
+    assert servicio.CAUSAS == ("sin_vacantes_cargo", "listas_sin_recibir", "ajuste_perfil", "otro_pais",
+                               "por_comprobar", "pocas_en_fuentes")
+    assert huecos.CAUSAS_HUECO == {"pocas_en_fuentes", "otro_pais"}
+    assert servicio.MOTIVO_OTRO_PAIS in servicio.SUGERENCIAS
+    assert f'"{servicio.MOTIVO_OTRO_PAIS}"' in inspect.getsource(afinidad)
+
+
+def test_indeed_cuenta_como_fuente_local_en_la_tabla_y_en_la_fila():
+    """Decisión del 28 nov: un país con Indeed no dice «Cobertura limitada» ni sale en riesgo; uno sin fuente local, sí."""
+    assert "Indeed" in ejecutor.fuentes_en("DE") and huecos.fuentes_locales("DE") == ["Indeed"]
+    assert huecos.fuentes_locales("GH") == []
+    cfg = _cfg({"de": {"vive_en": "DE", "idiomas": ["en"]}, "gh": {"vive_en": "GH", "idiomas": ["en"]}})
+    repo = RepositorioDemo()
+    repo.operativa = lambda fecha: {"revision": 1, "configuracion": cfg}
+    repo.versiones = lambda revisiones: {int(r): cfg for r in revisiones}
+    repo.ejecuciones = lambda: [{"id": f"e{i}", "fecha": "2026-11-1" + str(7 - i), "revision": 1} for i in range(4)]
+    repo.asignaciones_por_perfil = lambda ids: Counter()
+    filas = {f["vive_en"]: f for f in servicio.cobertura(repo, "2026-11-17")["perfiles"]}
+    assert filas["DE"]["estado"] == filas["GH"]["estado"] == "pendiente"
+    assert not filas["DE"]["pocas_fuentes"] and "Cobertura limitada" not in filas["DE"]["causa"]
+    assert filas["GH"]["pocas_fuentes"] and "Cobertura limitada" in filas["GH"]["causa"]
+    assert all(f["causa_codigo"] in servicio.CAUSAS for f in filas.values())
+    tabla = {f["pais"]: f["estado"] for f in huecos.por_pais(servicio.cobertura(repo, "2026-11-17"),
+                                                             Configuracion.model_validate(cfg))}
+    assert tabla["DE"] != "riesgo" and tabla["GH"] in {"riesgo", "hueco"}
 
 def test_el_pedido_solo_lleva_pais_idiomas_familias_y_modalidades():
     t = _tabla()
