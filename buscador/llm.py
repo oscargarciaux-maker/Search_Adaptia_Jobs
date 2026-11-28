@@ -1,15 +1,16 @@
 """IA acotada (P-14.2, 28 nov): un LLM solo PROPONE términos de búsqueda de un cargo; nunca decide qué vacante sirve.
 
-- `pedir_json(prompt, esquema)`: una petición que debe devolver un JSON con ese esquema. Con tiempo máximo, reintento
-  con espera (solo para fallos pasajeros: red, 429, 5xx), tope de llamadas por corrida y validación del JSON. Si algo
-  falla devuelve None y deja un `registro.aviso`: sin LLM todo sigue igual que antes.
+- `Cliente.pedir_json(prompt, esquema)`: una petición que debe devolver un objeto JSON que cumpla `esquema` (una
+  función que dice si el objeto vale). Con tiempo máximo, reintento con espera (solo para fallos pasajeros: red, 429,
+  5xx), tope de llamadas por corrida y validación. Si algo falla devuelve None y deja un `registro.aviso`: sin LLM
+  todo sigue igual que antes.
 - El proveedor va detrás de una interfaz (`Proveedor.completar`). Hoy hay uno: `openai_compatible` (el formato
   `/chat/completions` que ofrecen casi todos los servicios). Cuál se usa, su URL, el modelo y el NOMBRE de la variable
   de entorno con la clave se eligen en `datos/config.yaml` → `llm`; la clave es un secreto, nunca va en el repo.
 - GitHub Models, la opción pensada al principio, se retiró el 30 jul 2026 (docs.github.com/en/github-models): no hay
   proveedor por defecto (`proveedor: ninguno`).
 
-Lo que se envía lo arma quien llama (`panel/terminos.py::prompt_ampliados`): nombre del cargo, sus términos y el
+Lo que se envía lo arma quien llama (`panel/ampliados.py::prompt`): nombre del cargo, sus términos y el
 idioma. Nunca datos de personas. Este módulo no registra el texto enviado ni el recibido, solo cifras y tipos de error.
 """
 import json
@@ -28,6 +29,7 @@ REINTENTOS = 2         # reintentos tras un fallo pasajero (3 intentos en total)
 ESPERA = 2.0           # segundos de la primera espera; se dobla en cada reintento
 ESPERA_MAXIMA = 30.0   # un Retry-After más largo no se espera: se deja para la próxima corrida
 TOPE_POR_CORRIDA = 20  # llamadas por corrida (cada cargo nuevo o cambiado pide una)
+SEGUNDOS_POR_CORRIDA = 300  # tiempo total del LLM por corrida: la búsqueda nocturna no se alarga más que esto
 
 
 class FalloPasajero(Exception):
@@ -43,8 +45,8 @@ class FalloDefinitivo(Exception):
 
 
 class Proveedor:
-    """Interfaz: `completar(mensajes, segundos)` devuelve el texto de la respuesta o lanza Fallo*."""
-    nombre = "abstracto"
+    """Interfaz: `completar(mensajes, segundos)` devuelve el texto de la respuesta o lanza Fallo*; `modelo` se guarda
+    junto a los términos para saber de dónde salieron."""
     modelo = ""
 
     def completar(self, mensajes, segundos):  # pragma: no cover — interfaz
@@ -53,7 +55,6 @@ class Proveedor:
 
 class Compatible(Proveedor):
     """`POST {url}/chat/completions` con `Authorization: Bearer <clave>` (formato de OpenAI)."""
-    nombre = PROVEEDOR_COMPATIBLE
 
     def __init__(self, url, modelo, clave, sesion=None):
         self.url = url.rstrip("/") + "/chat/completions"
@@ -102,61 +103,38 @@ def extraer_json(texto):
         return None
 
 
-_TIPOS = {"object": dict, "array": list, "string": str, "integer": int, "boolean": bool}
-
-
-def errores_esquema(dato, esquema, donde="$"):
-    """Validación mínima (subconjunto de JSON Schema: type, properties, required, additionalProperties: false, items,
-    maxItems, maxLength). Devuelve la lista de errores; vacía = válido. Sin dependencias nuevas."""
-    tipo = esquema.get("type")
-    if tipo and (not isinstance(dato, _TIPOS[tipo]) or (tipo == "integer" and isinstance(dato, bool))):
-        return [f"{donde}: se esperaba {tipo}"]
-    salida = []
-    if tipo == "object":
-        propiedades = esquema.get("properties") or {}
-        salida += [f"{donde}.{k}: falta" for k in esquema.get("required") or [] if k not in dato]
-        if esquema.get("additionalProperties") is False:
-            salida += [f"{donde}.{k}: no permitido" for k in dato if k not in propiedades]
-        for k, sub in propiedades.items():
-            if k in dato:
-                salida += errores_esquema(dato[k], sub, f"{donde}.{k}")
-    elif tipo == "array":
-        if "maxItems" in esquema and len(dato) > esquema["maxItems"]:
-            salida.append(f"{donde}: más de {esquema['maxItems']} elementos")
-        for i, x in enumerate(dato if "items" in esquema else ()):
-            salida += errores_esquema(x, esquema["items"], f"{donde}[{i}]")
-    elif tipo == "string" and "maxLength" in esquema and len(dato) > esquema["maxLength"]:
-        salida.append(f"{donde}: más de {esquema['maxLength']} caracteres")
-    return salida
-
-
 class Cliente:
     """Un proveedor con su tope de llamadas por corrida. `dormir` se cambia en las pruebas."""
 
     def __init__(self, proveedor, tope=TOPE_POR_CORRIDA, segundos=SEGUNDOS, reintentos=REINTENTOS, espera=ESPERA,
-                 dormir=time.sleep):
+                 dormir=time.sleep, total=SEGUNDOS_POR_CORRIDA, reloj=time.monotonic):
         self.proveedor, self.tope, self.segundos = proveedor, int(tope), float(segundos)
         self.reintentos, self.espera, self._dormir = int(reintentos), float(espera), dormir
+        self.total, self._reloj, self._inicio = float(total), reloj, None
         self.llamadas = 0     # peticiones hechas (cada intento cuenta: es lo que limita el proveedor)
         self.fallos = 0       # pedidos que terminaron sin un JSON válido
         self._avisado_tope = False
 
     @property
     def agotado(self):
-        return self.llamadas >= self.tope
+        """Llegó al tope de llamadas o al tiempo total de la corrida (contado desde la primera llamada)."""
+        return self.llamadas >= self.tope or (self._inicio is not None and self._reloj() - self._inicio >= self.total)
 
     def pedir_json(self, prompt, esquema, sistema=None):
-        """El JSON validado, o None (tope, fallo o respuesta inválida). Nunca lanza."""
+        """El objeto JSON si `esquema(objeto)` es verdadero; si no, None (tope, fallo o respuesta inválida). Nunca
+        lanza."""
         mensajes = ([{"role": "system", "content": sistema}] if sistema else []) + [{"role": "user", "content": prompt}]
         espera = self.espera
         for intento in range(self.reintentos + 1):
             if self.agotado:
                 if not self._avisado_tope:
                     self._avisado_tope = True
-                    registro.aviso("llm:tope", RuntimeError(f"tope de {self.tope} llamadas por corrida"))
+                    registro.aviso("llm:tope", RuntimeError(f"tope de {self.tope} llamadas o {self.total:.0f} s"))
                 self.fallos += 1
                 return None
             self.llamadas += 1
+            if self._inicio is None:
+                self._inicio = self._reloj()
             try:
                 texto = self.proveedor.completar(mensajes, self.segundos)
             except FalloPasajero as e:
@@ -173,11 +151,10 @@ class Cliente:
                 registro.aviso("llm:inesperado", e)
                 break
             dato = extraer_json(texto)
-            errores = ["no es JSON"] if dato is None else errores_esquema(dato, esquema)
-            if not errores:
+            if dato is not None and esquema(dato):
                 return dato
             # Una respuesta mal formada no se reintenta: con temperatura 0 saldría igual y gastaría el cupo del día.
-            registro.aviso("llm:json", ValueError(f"{len(errores)} errores de esquema"))
+            registro.aviso("llm:json", ValueError("no es JSON" if dato is None else "no cumple el esquema"))
             break
         self.fallos += 1
         return None
@@ -209,10 +186,4 @@ def cliente(cfg=None, entorno=None, sesion=None, dormir=time.sleep):
     return Cliente(Compatible(str(o["url"]), str(o["modelo"]), clave, sesion),
                    tope=o.get("llamadas_por_corrida", TOPE_POR_CORRIDA),
                    segundos=o.get("segundos_por_llamada", SEGUNDOS), reintentos=o.get("reintentos", REINTENTOS),
-                   dormir=dormir)
-
-
-def pedir_json(prompt, esquema, sistema=None, cfg=None):
-    """Atajo de una sola petición con el cliente de la configuración. None si no hay LLM o falla."""
-    c = cliente(cfg)
-    return c.pedir_json(prompt, esquema, sistema) if c else None
+                   total=o.get("segundos_por_corrida", SEGUNDOS_POR_CORRIDA), dormir=dormir)

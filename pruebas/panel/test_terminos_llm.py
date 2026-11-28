@@ -8,7 +8,7 @@ from buscador import llm
 from panel import ampliados, terminos
 from panel.contenido import cargo_operativo
 
-ESQUEMA = terminos.ESQUEMA_AMPLIADOS
+ESQUEMA = ampliados.es_valida
 ENCENDIDO = {"llm": {"terminos_activo": True}}
 AHORA = datetime(2026, 11, 28, 12, tzinfo=timezone.utc)
 
@@ -123,6 +123,7 @@ def test_cliente_desde_la_configuracion(opciones, entorno, hay):
 def test_la_configuracion_del_repo_viene_apagada():
     assert llm.opciones()["terminos_activo"] is False and llm.cliente() is None
     assert not ampliados.activo()
+    assert ampliados.preparar(Repo({ampliados.CLAVE: {"c1": {"es": ["x y"]}}}), Cfg(DISENO)) == {}
 
 
 class Respuesta:
@@ -181,18 +182,18 @@ DISENO = {"id": "c1", "nombre": "Product Designer", "terminos_exactos": ["UX Des
 
 def test_el_prompt_solo_lleva_el_cargo_y_sus_terminos():
     cargo = {**DISENO, "id": "id-secreto", "cliente": "Ana Pérez", "ciudad": "Medellín", "telefono": "+573000000000"}
-    p = terminos.prompt_ampliados(cargo)
+    p = ampliados.prompt(cargo)
     assert "Product Designer" in p and "UX Designer" in p and "Diseñador UX" in p
     for dato in ("id-secreto", "Ana", "Medellín", "+57", "figma", "motion"):
         assert dato not in p
 
 
 def test_huella_cambia_con_el_nombre_o_los_terminos_y_no_con_lo_demas():
-    h = terminos.huella_ampliados(DISENO)
-    assert h == terminos.huella_ampliados({**DISENO, "funciones": ["sketch"], "cupo": 3, "terminos_excluidos": []})
-    assert h == terminos.huella_ampliados({**DISENO, "nombre": "product  designer"})
-    assert h != terminos.huella_ampliados({**DISENO, "nombre": "UX Researcher"})
-    assert h != terminos.huella_ampliados({**DISENO, "terminos_similares": ["Diseñador UX", "Diseñador UI"]})
+    h = ampliados.huella(DISENO)
+    assert h == ampliados.huella({**DISENO, "funciones": ["sketch"], "cupo": 3, "terminos_excluidos": []})
+    assert h == ampliados.huella({**DISENO, "nombre": "product  designer"})
+    assert h != ampliados.huella({**DISENO, "nombre": "UX Researcher"})
+    assert h != ampliados.huella({**DISENO, "terminos_similares": ["Diseñador UX", "Diseñador UI"]})
 
 
 def test_filtro_de_los_terminos_propuestos():
@@ -252,7 +253,7 @@ OTRO = {**DISENO, "id": "c2", "nombre": "UX Researcher", "terminos_exactos": [],
 
 def test_apagado_no_pide_nada():
     c, _ = cliente(BUENO)
-    assert ampliados.actualizar(Repo(), Cfg(DISENO), cliente=c, opciones={"llm": {"terminos_activo": False}}) \
+    assert ampliados.actualizar(Repo(), Cfg(DISENO), cliente=c, opciones={"llm": {"terminos_activo": False}})[0] \
         == {"pedidos": 0, "nuevos": 0, "fallidos": 0, "pendientes": 0}
     assert c.llamadas == 0
 
@@ -260,27 +261,27 @@ def test_apagado_no_pide_nada():
 def test_una_llamada_por_cargo_y_la_cache_evita_repetir():
     repo, (c, _) = Repo(), cliente(BUENO)
     r = ampliados.actualizar(repo, Cfg(DISENO, OTRO, {**OTRO, "id": "c3", "activo": False}), cliente=c, ahora=AHORA,
-                             opciones=ENCENDIDO)
+                             opciones=ENCENDIDO)[0]
     assert r == {"pedidos": 2, "nuevos": 2, "fallidos": 0, "pendientes": 2} and c.llamadas == 2
     guardado = repo.ajustes[ampliados.CLAVE]["c1"]
-    assert guardado["huella"] == terminos.huella_ampliados(DISENO) and guardado["en"] == ["Interaction Designer"]
+    assert guardado["huella"] == ampliados.huella(DISENO) and guardado["en"] == ["Interaction Designer"]
     assert guardado["modelo"] == "modelo-falso"
     c2, _ = cliente(BUENO)
-    assert ampliados.actualizar(repo, Cfg(DISENO, OTRO), cliente=c2, ahora=AHORA, opciones=ENCENDIDO)["pedidos"] == 0
+    assert ampliados.actualizar(repo, Cfg(DISENO, OTRO), cliente=c2, ahora=AHORA, opciones=ENCENDIDO)[0]["pedidos"] == 0
     assert c2.llamadas == 0 and repo.guardados == 1
     # Un cargo editado se vuelve a pedir; el que no cambió, no.
     c3, _ = cliente(BUENO)
     editado = {**DISENO, "terminos_similares": ["Diseñador UX", "Diseñador UI"]}
-    assert ampliados.actualizar(repo, Cfg(editado, OTRO), cliente=c3, ahora=AHORA, opciones=ENCENDIDO)["pedidos"] == 1
+    assert ampliados.actualizar(repo, Cfg(editado, OTRO), cliente=c3, ahora=AHORA, opciones=ENCENDIDO)[0]["pedidos"] == 1
 
 
 def test_un_fallo_se_reintenta_al_dia_siguiente_y_conserva_lo_anterior():
-    repo = Repo({ampliados.CLAVE: {"c1": {"huella": terminos.huella_ampliados(DISENO), "fecha": AHORA.isoformat(),
+    repo = Repo({ampliados.CLAVE: {"c1": {"huella": ampliados.huella(DISENO), "fecha": AHORA.isoformat(),
                                           "es": [], "en": ["Interaction Designer"], "fallo": True}}})
     c, _ = cliente("roto")
     assert ampliados.actualizar(repo, Cfg(DISENO), cliente=c, ahora=AHORA + timedelta(hours=2),
-                                opciones=ENCENDIDO)["pedidos"] == 0  # aún no
-    r = ampliados.actualizar(repo, Cfg(DISENO), cliente=c, ahora=AHORA + timedelta(hours=25), opciones=ENCENDIDO)
+                                opciones=ENCENDIDO)[0]["pedidos"] == 0  # aún no
+    r = ampliados.actualizar(repo, Cfg(DISENO), cliente=c, ahora=AHORA + timedelta(hours=25), opciones=ENCENDIDO)[0]
     assert r["pedidos"] == 1 and r["fallidos"] == 1
     assert repo.ajustes[ampliados.CLAVE]["c1"]["en"] == ["Interaction Designer"]  # no se pierde por el fallo
 
@@ -289,19 +290,19 @@ def test_un_fallo_de_un_cargo_cambiado_no_hereda_terminos_viejos():
     repo = Repo({ampliados.CLAVE: {"c1": {"huella": "vieja", "fecha": AHORA.isoformat(), "es": [],
                                           "en": ["Graphic Artist"]}}})
     c, _ = cliente(llm.FalloDefinitivo("HTTP 401"))
-    ampliados.actualizar(repo, Cfg(DISENO), cliente=c, ahora=AHORA, opciones=ENCENDIDO)
+    ampliados.actualizar(repo, Cfg(DISENO), cliente=c, ahora=AHORA, opciones=ENCENDIDO)[0]
     assert repo.ajustes[ampliados.CLAVE]["c1"]["en"] == [] and repo.ajustes[ampliados.CLAVE]["c1"]["fallo"]
 
 
 def test_el_tope_corta_y_lo_que_falta_queda_para_la_siguiente():
     repo, (c, _) = Repo(), cliente(BUENO, tope=1)
-    r = ampliados.actualizar(repo, Cfg(DISENO, OTRO), cliente=c, ahora=AHORA, opciones=ENCENDIDO)
+    r = ampliados.actualizar(repo, Cfg(DISENO, OTRO), cliente=c, ahora=AHORA, opciones=ENCENDIDO)[0]
     assert r["pedidos"] == 1 and r["pendientes"] == 2 and list(repo.ajustes[ampliados.CLAVE]) == ["c1"]
 
 
 def test_sin_proveedor_avisa_y_no_guarda(capsys):
     repo = Repo()
-    r = ampliados.actualizar(repo, Cfg(DISENO), ahora=AHORA, opciones=ENCENDIDO)  # sin url ni clave
+    r = ampliados.actualizar(repo, Cfg(DISENO), ahora=AHORA, opciones=ENCENDIDO)[0]  # sin url ni clave
     assert r["pedidos"] == 0 and r["pendientes"] == 1 and repo.guardados == 0
     assert "[aviso] ampliados:sin-proveedor" in capsys.readouterr().err
 
@@ -311,12 +312,12 @@ def test_un_repo_que_falla_no_tumba_la_busqueda(capsys):
         def ajuste(self, clave, defecto=None):
             raise RuntimeError("supabase caído")
     c, _ = cliente(BUENO)
-    assert ampliados.actualizar(Roto(), Cfg(DISENO), cliente=c, opciones=ENCENDIDO)["pedidos"] == 0
+    assert ampliados.actualizar(Roto(), Cfg(DISENO), cliente=c, opciones=ENCENDIDO)[0]["pedidos"] == 0
     assert "[aviso] ampliados:actualizar" in capsys.readouterr().err
 
 
 def test_por_cargo_solo_lo_vigente_y_filtrado(monkeypatch):
-    guardados = {"c1": {"huella": terminos.huella_ampliados(DISENO), "es": ["Diseñador Gráfico"],
+    guardados = {"c1": {"huella": ampliados.huella(DISENO), "es": ["Diseñador Gráfico"],
                         "en": ["Interaction Designer"]},
                  "c2": {"huella": "vieja", "es": [], "en": ["User Research Specialist"]}}
     cargos = {"c1": DISENO, "c2": OTRO}
@@ -333,7 +334,7 @@ def test_ejecutor_y_panel_ven_el_mismo_cargo(monkeypatch):
     from panel import ejecutor, servicio
     monkeypatch.setattr(ampliados, "activo", lambda cfg=None: True)
     repo = Repo({"titulos_aprendidos": {"c1": ["Aprendido Designer"]},
-                 ampliados.CLAVE: {"c1": {"huella": terminos.huella_ampliados(DISENO), "es": [],
+                 ampliados.CLAVE: {"c1": {"huella": ampliados.huella(DISENO), "es": [],
                                           "en": ["Interaction Designer"]}}})
 
     class Cargo(dict):
@@ -341,7 +342,7 @@ def test_ejecutor_y_panel_ven_el_mismo_cargo(monkeypatch):
 
         def model_dump(self, mode=None):
             return dict(self)
-    assert ejecutor.ampliados_de(repo, Cfg(Cargo(DISENO))) == {"c1": ["Interaction Designer"]}
+    assert ejecutor._ampliados(repo, Cfg(Cargo(DISENO))) == {"c1": ["Interaction Designer"]}
     vigente = servicio._ConfiguracionVigente(repo, {"cargos": [DISENO], "perfiles": []}).cargo("c1")
     assert vigente["terminos_ampliados"] == ["Interaction Designer"]
     assert "Aprendido Designer" in vigente["terminos_similares"]
@@ -371,7 +372,9 @@ def test_la_busqueda_usa_los_ampliados_y_sin_ellos_queda_igual():
     nuevos = ["Diseñador de Interacción Digital", "Interaction Designer Fintech"]
     despues, _, _ = ejecutor.preparar({"configuracion": cfg}, hoy(), ampliados={cid: nuevos})
     f = next(x for x in despues if x["id"] == cargo["id"])
-    assert f["consultas"][-2:] == nuevos and f["_control_cargo"]["terminos_ampliados"] == nuevos
+    assert f["_control_cargo"]["terminos_ampliados"] == nuevos
+    # El de inglés rota en todas las fuentes; el de español solo se busca donde se aceptan avisos en español.
+    assert f["consultas"][-1] == "Interaction Designer Fintech" and "Diseñador de Interacción Digital" not in f["consultas"]
     assert "Diseñador de Interacción Digital" in f["consultas_es"] or len(cargo["consultas_es"]) == 12
     assert "Interaction Designer Fintech" not in f["consultas_es"]
     # Sin ampliados, el mapa de la búsqueda es exactamente el de antes.
@@ -391,3 +394,34 @@ def test_evaluacion_sin_conexion_cuenta_lo_nuevo_del_cargo():
     assert fila["terminos_propuestos"] == 2 and fila["terminos_usados"] == 1  # «Graphic Designer» es otro oficio
     assert all(pasos["cargo"] == [1, 2] for pasos in fila["perfiles"].values())
     assert "Cartógrafo Digital" in evaluar_terminos._texto(r)
+
+
+def test_preparar_pide_en_la_del_dia_y_solo_lee_en_la_horaria(capsys):
+    repo, (c, _) = Repo(), cliente('{"es": [], "en": ["Interaction Designer Fintech"]}')
+    assert ampliados.preparar(repo, Cfg(DISENO), pedir=False, cliente=c, opciones=ENCENDIDO) == {}
+    assert c.llamadas == 0  # la captura horaria no pide
+    assert ampliados.preparar(repo, Cfg(DISENO), cliente=c, ahora=AHORA, opciones=ENCENDIDO) == {
+        "c1": ["Interaction Designer Fintech"]}
+    assert ampliados.preparar(repo, Cfg(DISENO), pedir=False, opciones=ENCENDIDO) == {
+        "c1": ["Interaction Designer Fintech"]}
+    salida = capsys.readouterr()
+    linea = next(x for x in (salida.out + salida.err).splitlines() if "Términos ampliados" in x)
+    # En el registro (público) solo cifras: ni el cargo ni los términos.
+    assert "Product Designer" not in linea and "Interaction" not in linea and "1 pedidos" in linea
+
+
+def test_tope_de_tiempo_total_por_corrida():
+    ahora = [0.0]
+    c = llm.Cliente(Falso(BUENO), total=60, dormir=lambda x: None, reloj=lambda: ahora[0])
+    assert c.pedir_json("a", ESQUEMA) and not c.agotado
+    ahora[0] = 61.0
+    assert c.agotado and c.pedir_json("b", ESQUEMA) is None and c.llamadas == 1
+
+
+def test_solo_se_piden_los_cargos_que_se_buscan():
+    class ConPerfiles(Cfg):
+        def perfiles_activos(self, cargo_id):
+            return ["p"] if cargo_id == "c1" else []
+    repo, (c, _) = Repo(), cliente(BUENO)
+    cifras, _ = ampliados.actualizar(repo, ConPerfiles(DISENO, OTRO), cliente=c, ahora=AHORA, opciones=ENCENDIDO)
+    assert cifras["pendientes"] == 1 and c.llamadas == 1

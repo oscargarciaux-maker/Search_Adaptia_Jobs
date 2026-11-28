@@ -357,9 +357,11 @@ def grado(titulo, cargo, cercanos=False):
         if _cuenta(base, canon, cargo, base):  # P-7.F: con la misma guarda del nombre más largo
             regla = "título en español del mapa" if origen == "mapa" else "nombre hermano en español"
             return "similar", {"regla": regla, "termino": t, "grado": "similar"}
-    # P-14.2: los términos ampliados por el LLM, solo si el título los contiene (con la guarda del nombre más largo).
+    # P-14.2: los términos ampliados por el LLM, solo si el título los contiene (con la guarda del nombre más largo y
+    # la vuelta de plurales), nunca por similitud textual.
     for t in cargo.get("terminos_ampliados") or ():
-        if _cuenta(base, _base(t), cargo, base)                 or (plural != base and _cuenta(plural, _base(_singular(_base(t))), cargo, base)):
+        if _cuenta(base, _base(t), cargo, base) or (plural != base and _cuenta(plural, _base(_singular(_base(t))),
+                                                                                cargo, base)):
             return "similar", {"regla": "término ampliado", "termino": t, "grado": "similar"}
     if cercanos:
         for t in cargo.get("terminos_cercanos", []):
@@ -369,49 +371,11 @@ def grado(titulo, cargo, cercanos=False):
     return None, None
 
 
-# P-14.2 (IA acotada, decisión de Oscar del 28 nov): un LLM PROPONE nombres del mismo oficio para buscar; estas
-# funciones arman lo que se le envía (solo el nombre del cargo, sus términos y los idiomas: nunca datos de personas) y filtran lo
-# que devuelve con las mismas reglas deterministas de siempre. Quien decide si un aviso sirve sigue siendo `grado`.
-VERSION_AMPLIADOS = 1  # cambiarla vuelve a pedir los términos de todos los cargos (cambió el prompt o el filtro)
-MAX_AMPLIADOS = 8      # por idioma: cada término nuevo reparte los turnos de búsqueda del cargo
-ESQUEMA_AMPLIADOS = {
-    "type": "object", "additionalProperties": False, "required": ["es", "en"],
-    "properties": {idioma: {"type": "array", "maxItems": 20, "items": {"type": "string", "maxLength": 80}}
-                   for idioma in ("es", "en")}}
-SISTEMA_AMPLIADOS = ("Eres un experto en títulos de ofertas de empleo. Respondes solo con JSON, sin texto alrededor.")
+# P-14.2 (IA acotada, decisión de Oscar del 28 nov): un LLM PROPONE nombres del mismo oficio para buscar
+# (`panel/ampliados.py`). Aquí se filtran con las reglas deterministas de siempre; quien decide si un aviso sirve sigue
+# siendo `grado`, que solo los reconoce contenidos en el título (`_contiene`).
+MAX_AMPLIADOS = 8  # por idioma: cada término nuevo reparte los turnos de búsqueda del cargo
 _CARACTERES = re.compile(r"^[^\W\d_][\w .,/&+#()'-]*$")
-
-
-def _terminos_enviados(cargo):
-    """Lo que se envía al LLM: el nombre y los términos que escribió el operador (sin los aprendidos ni excluidos)."""
-    nombre = " ".join(str(cargo.get("nombre") or "").split())
-    propios = [" ".join(str(x).split()) for k in ("terminos_exactos", "terminos_similares")
-               for x in cargo.get(k) or [] if isinstance(x, str)]
-    return nombre, [x for x in dict.fromkeys(propios) if x and _base(x) != _base(nombre)][:20]
-
-
-def huella_ampliados(cargo):
-    """Huella de lo que se envía: si no cambia, no se vuelve a pedir (caché en `panel_ajustes.terminos_ampliados`)."""
-    import hashlib
-    import json
-    nombre, propios = _terminos_enviados(cargo)
-    datos = [VERSION_AMPLIADOS, _base(nombre), sorted(_base(x) for x in propios)]
-    return hashlib.sha256(json.dumps(datos, ensure_ascii=False).encode("utf-8")).hexdigest()[:24]
-
-
-def prompt_ampliados(cargo):
-    nombre, propios = _terminos_enviados(cargo)
-    ya = "; ".join(propios) if propios else "(ninguno)"
-    return (
-        f"Cargo: {nombre}\nTérminos que ya usamos: {ya}\n\n"
-        "Propón títulos de ofertas de empleo que las empresas publican para ESTE MISMO trabajo con otro nombre: "
-        "sinónimos, variantes regionales (España y Latinoamérica) y la forma habitual en inglés. Reglas:\n"
-        "- El mismo oficio y las mismas funciones. NO oficios vecinos ni más amplios (para «Diseñador UX» no vale "
-        "«Diseñador gráfico» ni «Desarrollador frontend»).\n"
-        "- Sin nivel ni seniority (nada de junior, senior, lead), sin empresa, lugar, modalidad ni herramientas.\n"
-        "- Cada título con al menos dos palabras, como aparece en un aviso real. Sin repetir los que ya usamos.\n"
-        f"- Hasta {MAX_AMPLIADOS} en español y hasta {MAX_AMPLIADOS} en inglés. Si no hay más, devuelve menos.\n"
-        'Responde solo con este JSON: {"es": ["…"], "en": ["…"]}')
 
 
 def _familia_propia(nombre):

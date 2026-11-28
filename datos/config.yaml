@@ -37,6 +37,7 @@ llm:
   clave_env: LLM_API_KEY
   llamadas_por_corrida: 20
   segundos_por_llamada: 30
+  segundos_por_corrida: 300  # tope de tiempo total del LLM en una búsqueda
   reintentos: 2
 
 # Hora de la bodega nocturna en Bogotá (UTC−5). El horario real está en .github/workflows/bodega.yml (paso 7).

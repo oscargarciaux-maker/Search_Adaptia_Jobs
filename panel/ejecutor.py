@@ -262,7 +262,10 @@ def preparar(version, fecha, aprendidos=None, cortos=(), enfocar=None, huellas=N
             lugares_es.update({k: v for k, v in lugares_perfil(p, nombres).items() if k != "REMOTO_MUNDO"})
         similares = raw["terminos_similares"]  # con los títulos aprobados desde «Coincide por funciones» (v25)
         mapa.append({"id": rid, "nombre": c.nombre, "consultas": [c.nombre, *raw["terminos_exactos"], *raw["terminos_similares"],
-                                                                 *raw.get("terminos_ampliados", [])],  # P-14.2
+                                                                 # P-14.2: los de inglés; los de español van solo
+                                                                 # en `consultas_es`, como los nombres hermanos
+                                                                 *[x for x in raw.get("terminos_ampliados", [])
+                                                                   if not en_espanol(x)]],
             "exactos": raw["terminos_exactos"], "similares": similares, "cercanos": raw.get("terminos_cercanos", []),
             # v25: «Coincide por funciones» (otro título) solo con la huella que escribió el operador; la heredada y
             # la automática (v49) van en `_control_cargo` y solo sirven para comprobar los títulos que sí coinciden.
@@ -480,12 +483,9 @@ def ajuste(repo, clave):
         return {}
 
 
-def ampliados_de(repo, cfg):
-    """P-14.2: {cargo_id: términos ampliados por el LLM que siguen valiendo}, solo con `llm.terminos_activo` ({} si
-    está apagado). Entran al cargo operativo (`terminos_ampliados`): la búsqueda, el lote y el panel ven el mismo
-    cargo."""
+def _ampliados(repo, cfg):
     from panel import ampliados
-    return ampliados.leer(repo, {str(c.id): c.model_dump(mode="json") for c in cfg.cargos})
+    return ampliados.preparar(repo, cfg, pedir=False)
 
 
 def guardar_huellas(repo, version, vacantes):
@@ -497,7 +497,7 @@ def guardar_huellas(repo, version, vacantes):
     try:
         bodega.etapa("Calcular la huella de funciones de los cargos")
         cfg = validar_version(version)
-        aprendidos, extra = ajuste(repo, "titulos_aprendidos"), ampliados_de(repo, cfg)
+        aprendidos, extra = ajuste(repo, "titulos_aprendidos"), _ampliados(repo, cfg)
         cargos = [contenido.cargo_operativo(c.model_dump(mode="json"), aprendidos.get(str(c.id)),
                                             ampliados=extra.get(str(c.id)))
                   for c in cfg.cargos if c.activo and not c.funciones]
@@ -511,7 +511,7 @@ def cargos_operativos(repo, cfg):
     """Contrato v49: {id: cargo operativo} con los títulos aprendidos (v25), la huella calculada de noche y (P-14.2)
     los términos ampliados por el LLM."""
     aprendidos, huellas = ajuste(repo, "titulos_aprendidos"), ajuste(repo, "huellas_cargos")
-    extra = ampliados_de(repo, cfg)
+    extra = _ampliados(repo, cfg)
     return {str(c.id): contenido.cargo_operativo(c.model_dump(mode="json"), aprendidos.get(str(c.id)),
                                                  huellas.get(str(c.id)), extra.get(str(c.id))) for c in cfg.cargos}
 
@@ -1047,21 +1047,17 @@ def correr(salida, modo="diario", prueba=False, repo=None, enfoque=ENFOQUE_COMPL
     try:
         # Contrato v25: títulos aprendidos en la bandeja. Contrato v49: y la huella de funciones de la noche anterior,
         # para que la clasificación y el lote usen el mismo cargo operativo que la asignación (`cargos_operativos`).
-        # P-14.2: en la búsqueda del día (no en la captura de cada hora), los términos ampliados de los cargos nuevos o
-        # cambiados. Solo con el interruptor encendido; sin LLM sigue con lo guardado.
-        from panel import ampliados
-        if modo != "incremental" and ampliados.activo():
-            cifras = ampliados.actualizar(repo, validar_version(version))
-            bodega.etapa("Términos ampliados (LLM): {pendientes} cargos sin términos, {pedidos} pedidos, {nuevos} "
-                         "nuevos, {fallidos} fallidos".format(**cifras))
         aprendidos, huellas = ajuste(repo, "titulos_aprendidos"), ajuste(repo, "huellas_cargos")
-        extra = ampliados_de(repo, validar_version(version))
+        # P-14.2: los términos ampliados por el LLM ({} con el interruptor apagado). En la búsqueda del día (no en la
+        # captura de cada hora) antes se piden los de los cargos nuevos o cambiados.
+        from panel import ampliados
+        extra = ampliados.preparar(repo, validar_version(version), pedir=modo != "incremental")
         # Contrato v43 (decisión de Oscar, 18 nov): si la configuración se confirmó hoy después de armar el lote, la
         # siguiente pasada horaria también arma lote para lo que falte (excepción a «la captura horaria no entrega»).
         lote_de = (ejecucion.get("resumen") or {}).get("revision_del_lote")
         arma_lote = modo == "incremental" and lote_de is not None and lote_de != version["revision"]
         with activar(version, fecha, aprendidos, perfiles_cortos(repo, version, fecha) | primero, enfocar, huellas,
-                     **({"ampliados": extra} if extra else {})):  # apagado: la llamada de siempre
+                     extra):
             if arma_lote:
                 bodega._config_operativa["completar_lote"] = True
             if hasattr(repo, "decisiones_ubicacion"):

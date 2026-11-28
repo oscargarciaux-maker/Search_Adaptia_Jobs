@@ -57,18 +57,18 @@ class Perfiles:
                          for idiomas in IDIOMAS for pais in PAISES}
         self._paso = {}
 
-    def paso(self, clave, vid):
-        """Último paso que pasa la vacante para ese perfil: 'cargo' (no pasa el lugar), 'lugar', 'idioma' o
-        'requisitos'."""
+    def ultimo_paso(self, clave, vid):
+        """Último paso que la vacante (ya del cargo) pasa para ese perfil: 'cargo' si el lugar la rechaza, 'lugar' si
+        la rechaza el idioma, 'idioma' si la rechazan los requisitos y 'requisitos' si pasa todo."""
         if (clave, vid) not in self._paso:
-            from panel.afinidad import evaluar, lugar
+            from panel.afinidad import evaluar as evaluar_perfil, lugar
             v, p = self.por_id[vid], self.perfiles[clave]
             if lugar(v, p)[0]:
                 r = "cargo"
             elif v.get("idioma") not in p.idiomas:
                 r = "lugar"
             else:
-                r = "requisitos" if evaluar(v, p, self.hoy)["compatible"] else "idioma"
+                r = "requisitos" if evaluar_perfil(v, p, self.hoy)["compatible"] else "idioma"
             self._paso[clave, vid] = r
         return self._paso[clave, vid]
 
@@ -76,7 +76,7 @@ class Perfiles:
         n = {k: 0 for k in PASOS}
         pasa = set()
         for vid in ids:
-            ultimo = PASOS.index(self.paso(clave, vid))
+            ultimo = PASOS.index(self.ultimo_paso(clave, vid))
             for k in PASOS[:ultimo + 1]:
                 n[k] += 1
             if ultimo == len(PASOS) - 1:

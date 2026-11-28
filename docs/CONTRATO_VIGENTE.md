@@ -132,10 +132,13 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
   nombre del cargo y sus términos exactos y similares, nunca datos de personas. Lo propuesto pasa un filtro
   determinista cada vez que se usa (`terminos.filtrar_ampliados`): al menos dos palabras, el idioma que dice
   `titulos_idioma`, sin repetir lo que el cargo ya usa, sin un excluido del operador o del mapa y sin el nombre de otro
-  oficio del mapa; hasta 8 por idioma. Lo que pasa entra al cargo operativo como un título aprendido (grado similar):
-  se busca y se reconoce con `grado`, en la búsqueda, el lote y el panel. Si el LLM falla, no responde o se llega al
-  tope de llamadas, todo sigue con lo guardado (aviso en el registro). Apagar el interruptor deja de usarlos: lo de
-  hoy que entró solo por uno de ellos queda «ya no encaja» (no se comparte).
+  oficio del mapa ni uno casi igual; hasta 8 por idioma. Lo que pasa entra al cargo operativo en su propio campo
+  (`terminos_ampliados`): los de inglés se buscan en todas las fuentes y los de español solo donde se aceptan avisos
+  en español (`consultas_es`), y `grado` los reconoce (similar) solo si el título los CONTIENE, sin similitud textual;
+  igual en la búsqueda, el lote y el panel. Si el LLM falla, no responde o se llega al tope de llamadas o de tiempo
+  (5 min por corrida), todo sigue con lo guardado (aviso en el registro). Apagar el interruptor deja de usarlos, y
+  editar el nombre o los términos de un cargo deja de usar los suyos hasta la búsqueda del día siguiente (que pide los
+  nuevos): lo de hoy que entró solo por uno de ellos queda «ya no encaja» (no se comparte).
 - Una vacante del lote llega también a perfiles de otro cargo que la reconoce exacta o similar (nunca solo cercana);
   cuenta para su meta, no ocupa cupo del lote y nunca llega dos veces a la misma persona (v43). El `match_grade` es el
   del cargo que la recibe (v49).

@@ -8,8 +8,9 @@ detalles técnicos están en los documentos enlazados al final.
 
 Cada mañana el sistema busca vacantes de empleo en portales públicos y, con los criterios de cada cliente, le asigna
 las que le sirven. El operador las revisa en el panel, las descarga en CSV y le envía a cada cliente su mensaje de
-WhatsApp a mano. **Nada se envía solo y la búsqueda no usa inteligencia artificial**: todo son reglas escritas en
-código y probadas.
+WhatsApp a mano. **Nada se envía solo y la búsqueda no decide con inteligencia artificial**: todo son reglas escritas
+en código y probadas. Lo único (opcional y hoy apagado) es que un LLM proponga nombres de búsqueda para un cargo, que
+después el código filtra y reconoce (P-14.2).
 
 ## 2. Un día normal (hora de Colombia)
 
@@ -85,7 +86,8 @@ Resumen corto; la regla exacta de cada punto está en [CONTRATO_VIGENTE.md](CONT
 
 - No envía mensajes ni correos por su cuenta.
 - No usa la sesión ni las cookies de LinkedIn de nadie.
-- No usa IA para buscar ni para decidir; tampoco para aprender títulos o ubicaciones.
+- No usa IA para decidir qué vacante sirve, ni para aprender títulos o ubicaciones. Para buscar, solo si se enciende
+  `llm.terminos_activo`: un LLM propone nombres del mismo oficio por cargo (sin datos de personas).
 - No hace seguimiento de postulaciones.
 - No inventa datos: lo que el aviso no dice queda vacío.
 - Límites de gasto: Apify como máximo USD 5 al mes. El panel en el plan gratuito se duerme y la primera visita puede

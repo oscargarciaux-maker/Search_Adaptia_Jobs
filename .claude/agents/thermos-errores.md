@@ -31,7 +31,8 @@ y vulnerabilidades. Nada debe escaparse.
     reportes o cachés públicos (`trabajo/`, rama `publicado`);
   - LinkedIn nunca con la sesión ni la cookie de nadie (`li_at`), ni actores de Apify que la pidan;
   - nada se envía solo (WhatsApp solo con wa.me y a mano);
-  - la búsqueda y la afinidad no usan IA;
+  - la afinidad y el aprendizaje no usan IA; en la búsqueda, un LLM solo PROPONE términos por cargo (P-14.2, con
+    interruptor, sin datos de personas y con filtro determinista);
   - no se modifica SQL ya registrado en `supabase/migraciones/`: se añade una migración nueva (y se agrega a
     `ENSAYABLES` y a `pruebas/test_migraciones.py`);
   - no se borra lo entregado, el historial, las reservas ni las colas para «arreglar» un error;
