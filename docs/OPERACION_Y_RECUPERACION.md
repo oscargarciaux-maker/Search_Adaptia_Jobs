@@ -15,6 +15,49 @@ además de las siete anteriores. Auth del proveedor se gestiona aparte. No abrir
 
 ## 1. Qué comprobar cada día
 
+**Desde el 28 nov (P-13.1) lo diario lo hace el «Vigía de avisos»** (`vigia.yml`, `buscador/vigia.py`): si no te llega
+un correo, no hay nada que hacer. Una vez al día (lo pide el Reloj desde las 10:30 de Bogotá; el horario de las 10:40
+es su respaldo) mira, sin buscar nada ni escribir en la base:
+
+| Qué mira | Cuándo avisa |
+|---|---|
+| Bodega nocturna, Captura horaria, Reloj y Copia semanal en `main` | La última terminó en rojo (Captura: 2 seguidas; Reloj: 3), lleva demasiado sin terminar bien (Bodega 30 h, Captura 6 h, Reloj 3 h, Copia 8 días) o el flujo está desactivado (p. ej. por los 60 días sin actividad) |
+| Tamaño de la base (`pg_database_size`) | 80 % de 500 MB (aviso) y 95 % (urgente) |
+| Copias en el bucket `respaldos` | 80 % y 95 % de 1 GB |
+| Archivo más grande de la rama `publicado` | 80 % y 95 % de los 100 MB por archivo de GitHub |
+| Días sin commits en `main` | 30 días (urgente a los 50): GitHub apaga los horarios de un repo público a los 60 |
+| `datos/caducidades.yaml` | Fin de soporte 180 días antes; claves 30 días antes; urgente si ya caducó |
+| Algo que no pudo medir | Siempre («No se pudo comprobar…»): sin medir nadie vigila |
+
+Cada aviso es una frase fija con **un solo paso** («Entra en X y pulsa Y» o «Reenvía este correo a soporte técnico»).
+El texto sale a Healthchecks, un servicio externo: solo lleva frases de la lista blanca de `buscador/vigia.py`, cifras
+enteras, fechas y el texto revisado de `datos/caducidades.yaml`; nunca clientes, lugares, cargos, mensajes de error ni
+claves. El mismo texto queda en el resumen de la corrida (Actions → Vigía de avisos).
+
+### Activar el Vigía (una vez, unos 10 minutos)
+
+1. Entra en healthchecks.io con la cuenta de avisos (la del correo de la persona que atenderá los problemas; ver
+   [ENTREGA_AL_CLIENTE.md](ENTREGA_AL_CLIENTE.md) §4). Si no existe, créala: el plan gratuito basta.
+2. Pulsa **Add Check**. Nombre: `Atención`. En **Schedule** pon *Period* `1 day` y *Grace Time* `12 hours` (GitHub
+   puede retrasar el horario de respaldo). Guarda.
+3. Copia la **Ping URL** del check (empieza por `https://hc-ping.com/`).
+4. En GitHub: Settings → Secrets and variables → Actions → **New repository secret**. Nombre `AVISO_ATENCION_URL`,
+   valor la URL del paso 3. Guarda.
+5. En GitHub: Actions → **Vigía de avisos** → **Run workflow**. En Healthchecks el check pasa a verde («up») o a rojo
+   («down») con el texto de los avisos en **Events**.
+6. En Healthchecks → **Integrations**, comprueba que el correo está activo y pulsa **Test** para ver que llega.
+
+Cómo se comporta: Healthchecks manda un correo cuando el check pasa a rojo (hay avisos, o el Vigía no corrió en
+36 horas) y otro cuando vuelve a verde. Mientras sigue en rojo no repite el correo: el texto del día está en el check
+(**Events**) y en el resumen de la corrida. Sin el secreto el Vigía corre igual y lo dice en el registro, pero no avisa
+a nadie. Entra en Healthchecks al menos una vez al año: según su FAQ, las cuentas inactivas se pueden borrar.
+
+Para añadir una fecha que caduca (otra clave, otra versión) se edita `datos/caducidades.yaml` (solo nombre, fecha y
+un paso; nunca el valor de una clave). Para quitar el aviso de los días sin commits basta un commit en `main`: el
+propio aviso explica cómo hacerlo desde la web cambiando la fecha `revisado` de ese archivo.
+
+### Revisión a mano (si hace falta mirar más a fondo)
+
 1. **Pruebas**: comprobar las del commit de `main` que se desplegó. Un test verde prueba ese código con sus fixtures;
    no prueba que la captura de hoy se haya ejecutado.
 2. **Bodega nocturna**: abrir la ejecución real, leer resumen y comprobar selección por los cargos de la versión activa (seis en legado), faltantes,
@@ -24,8 +67,8 @@ además de las siete anteriores. Auth del proveedor se gestiona aparte. No abrir
 5. **Calidad**: revisar estados y hora de enlaces de la selección del día. La selección histórica puede seguir en 120
    mientras una parte cerró después o está pendiente; no compartir por esa cifra sin mirar el estado actual.
 6. Abrir al menos una muestra de cada rol y revisar cargo afín, residencia, idioma y acceso a postulación.
-7. Revisar avisos/notificaciones GitHub y saldo Apify. Configurar las notificaciones con el responsable; este proyecto
-   no incluye un monitor externo, guardia ni un SLA de respuesta automático.
+7. Revisar el saldo de Apify. El monitor es el Vigía de arriba más los tres checks de Healthchecks de cada tarea; no
+   hay guardia ni un SLA de respuesta automático.
 
 La captura solicita ejecución horaria, no entrega una garantía de latencia de una hora. En el diagnóstico de preparación,
 una captura/ofertas sin observación reciente en dos horas no pasan el criterio; es un umbral de revisión del piloto,
@@ -219,7 +262,8 @@ explícita de archivo/respaldos; cambiar un estado a archived no reduce espacio 
 
 **Mensual y al cambiar cuentas:** comprobar ciclo de crédito Apify, reservas, otros proyectos de la cuenta, permisos,
 expiración de tokens, facturación de alojamiento y restauración de un respaldo. Revisar que el repositorio no quede
-sin actividad de mantenimiento: GitHub puede deshabilitar cron en repositorios públicos inactivos según su política.
+sin actividad de mantenimiento: GitHub puede deshabilitar cron en repositorios públicos inactivos según su política
+(el Vigía avisa a los 30 días sin commits en `main` y si un flujo clave queda desactivado).
 
 Los USD 5 limitan Apify del proyecto, no todos los servicios. En repositorio público las condiciones de Actions difieren
 de uno privado; verificar plan actual. Como orden de magnitud, 24 capturas/día de 4,7 min son 3.384 min/mes, más unas

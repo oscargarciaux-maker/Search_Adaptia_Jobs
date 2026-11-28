@@ -1,0 +1,30 @@
+# Fechas que caducan y que nadie recuerda (P-13.1, Vigía de avisos). Solo nombres públicos y fechas: NUNCA el valor
+# de una clave. El Vigía (buscador/vigia.py) avisa con antelación y el texto de cada entrada sale tal cual a
+# Healthchecks: un servicio externo. Por eso `nombre` y `paso` solo admiten letras, cifras y signos sencillos (sin @,
+# sin enlaces) y el Vigía rechaza la entrada si no cumplen.
+#
+# tipo: soporte (fin de soporte de una pieza: aviso 180 días antes) · clave (una credencial que caduca: 30 días antes).
+# `aviso_dias` cambia esa antelación para una entrada concreta.
+#
+# `revisado`: la fecha en que una persona miró esta lista por última vez. Cambiarla es además la forma más simple de
+# hacer un commit en `main` desde la web de GitHub cuando el Vigía avisa de que faltan días para que GitHub apague los
+# horarios por falta de actividad (regla de los 60 días de los repositorios públicos).
+revisado: 2026-11-28
+
+caducidades:
+  - nombre: Python 3.12
+    tipo: soporte
+    fecha: 2028-10-31
+    paso: Pide a soporte técnico que pase el proyecto a una versión de Python con soporte.
+  - nombre: Node 24
+    tipo: soporte
+    fecha: 2028-04-30
+    paso: Pide a soporte técnico que pase el panel a una versión de Node con soporte.
+  - nombre: Debian 12 (bookworm) del panel
+    tipo: soporte
+    fecha: 2028-06-30
+    paso: Pide a soporte técnico que cambie la imagen del panel a una versión de Debian con soporte.
+  - nombre: Token de Claude (CLAUDE_CODE_OAUTH_TOKEN)
+    tipo: clave
+    fecha: 2027-11-27
+    paso: Genera un token nuevo con «claude setup-token» y pégalo en GitHub → Settings → Secrets and variables → Actions.

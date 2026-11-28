@@ -9,6 +9,7 @@ name: Reloj
 #
 # Activarlo una vez: Settings → Environments → New environment «reloj» → Wait timer 30 (docs/ACTIVAR_RELOJ.md), y
 # después Actions → Reloj → Run workflow. Sin el temporizador el relevo no sigue (no gira sin pausa).
+# Una vez al día pide también el «Vigía de avisos» (vigia.yml, P-13.1).
 # Si la cadena se corta la reanudan el horario de abajo (cuando GitHub lo dispare) y cualquier búsqueda real, incluida
 # «Buscar ahora» (trabajo «reloj» de bodega.yml). Para detenerlo: Actions → Reloj → «Disable workflow».
 
@@ -98,6 +99,19 @@ jobs:
           # `reloj=true`: se trata como la captura programada (respeta la marca de «captura horaria activa»).
           if ! gh workflow run incremental.yml --ref "$RAMA" -f prueba=false -f reloj=true; then
             echo "::warning::No se pudo pedir la captura horaria (¿el flujo «Captura horaria» está desactivado?)."
+          fi
+      - name: Pedir el Vigía de avisos
+        # P-13.1: una vez al día desde las 10:30 de Bogotá (buscador/arranque.py, toca_vigia). Va al final y no pone
+        # el relevo en rojo: la cadena ya siguió y un tropiezo aquí lo cubre el horario propio de vigia.yml.
+        if: steps.decidir.outputs.actuar == 'true'
+        continue-on-error: true
+        env:
+          RAMA: ${{ steps.decidir.outputs.rama }}
+        run: |
+          lista="$RUNNER_TEMP/vigias.json"
+          gh run list --workflow vigia.yml --limit 20 --json databaseId,status,conclusion,createdAt,event,headBranch > "$lista" || exit 0
+          if python3 -m buscador.arranque --avisos "$lista" --rama "$RAMA" | grep -qx 'vigia=true'; then
+            gh workflow run vigia.yml --ref "$RAMA" || echo "::warning::No se pudo pedir el Vigía de avisos."
           fi
       - name: Avisar si falta el temporizador
         # En rojo solo cuando lo arrancó una persona: antes de configurar el entorno, los intentos automáticos no

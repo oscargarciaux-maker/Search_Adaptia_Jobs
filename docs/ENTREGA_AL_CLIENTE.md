@@ -81,11 +81,14 @@ GitHub no avisa cuando una tarea **no llega a ejecutarse**. Healthchecks.io (pla
 "terminé bien" o "fallé", y si no recibe noticias a tiempo, envía un correo.
 
 1. Crear cuenta en healthchecks.io con el correo de avisos.
-2. Crear tres *checks* y anotar la URL de *ping* de cada uno:
+2. Crear cuatro *checks* y anotar la URL de *ping* de cada uno:
    - **Nocturna**: Period 1 day, Grace 3 hours.
    - **Captura horaria**: Period 1 hour, Grace 2 hours.
    - **Copia semanal**: Period 7 days, Grace 1 day.
-3. En GitHub, crear los secretos `AVISO_NOCTURNA_URL`, `AVISO_CAPTURA_URL` y `AVISO_RESPALDO_URL` con esas URL.
+   - **Atención** (Vigía de avisos): Period 1 day, Grace 12 hours. Es el que avisa de fallos y límites con un paso
+     concreto ([OPERACION_Y_RECUPERACION.md](OPERACION_Y_RECUPERACION.md) §1).
+3. En GitHub, crear los secretos `AVISO_NOCTURNA_URL`, `AVISO_CAPTURA_URL`, `AVISO_RESPALDO_URL` y
+   `AVISO_ATENCION_URL` con esas URL.
 4. En Healthchecks, en **Integrations**, usar la opción de prueba junto al correo para comprobar que el aviso llega.
 
 Sin esos secretos todo funciona igual, solo que sin avisos.

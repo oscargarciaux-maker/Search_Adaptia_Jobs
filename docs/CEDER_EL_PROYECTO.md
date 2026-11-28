@@ -31,7 +31,7 @@ Settings* → *Members* → *Invite* con su correo y el rol que corresponda.
 
 | Dónde | Qué |
 |---|---|
-| Secretos de GitHub (Settings → Secrets and variables → Actions) | `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_DB_URL`, `SUPABASE_BACKUP_KEY` y `APIFY_TOKEN`. Opcionales: `AVISO_NOCTURNA_URL`, `AVISO_CAPTURA_URL`, `AVISO_RESPALDO_URL` y, si se activó la API de InfoJobs, `INFOJOBS_CLIENT_ID` e `INFOJOBS_CLIENT_SECRET`. `GITHUB_TOKEN` lo pone GitHub solo |
+| Secretos de GitHub (Settings → Secrets and variables → Actions) | `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_DB_URL`, `SUPABASE_BACKUP_KEY` y `APIFY_TOKEN`. Opcionales: `AVISO_NOCTURNA_URL`, `AVISO_CAPTURA_URL`, `AVISO_RESPALDO_URL`, `AVISO_ATENCION_URL` y, si se activó la API de InfoJobs, `INFOJOBS_CLIENT_ID` e `INFOJOBS_CLIENT_SECRET`. `GITHUB_TOKEN` lo pone GitHub solo |
 | Variables de GitHub | `CAPTURA_HORARIA_ACTIVA` y `ESTADO_SUPABASE_ACTIVO` |
 | Render (panel) | `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `PANEL_ORIGIN`, `PANEL_OPERATOR_EMAILS`, `GITHUB_ACCIONES_TOKEN` y `GITHUB_REPOSITORIO` |
 | Usuarios del panel | Supabase → Authentication → Users, más su correo en `PANEL_OPERATOR_EMAILS` |
