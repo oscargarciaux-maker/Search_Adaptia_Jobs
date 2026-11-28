@@ -9,8 +9,8 @@ import time
 
 from buscador import contrato, enlaces, paises, registro, vacante
 from buscador.normalizar import titulo_base
-from panel.afinidad import (AMPLIACIONES, ETIQUETAS_AMPLIACION, MINIMO_POR_PERFIL, enlace_utilizable, evaluar,
-                            evaluar_ampliada, evaluar_post, post_ubicacion)
+from panel.afinidad import (AMPLIACIONES, ETIQUETAS_AMPLIACION, MINIMO_POR_PERFIL, encaja_asignada, enlace_utilizable,
+                            evaluar, evaluar_ampliada, evaluar_asignada, post_ubicacion)
 from panel.modelos import Perfil
 from panel.repositorio import ErrorRepositorio, hoy, numeros
 from panel.terminos import grado, sugerir
@@ -253,11 +253,7 @@ def calidad(ficha):
 
 
 def _evaluar_asignada(actual, perfil, ampliacion):
-    if ampliacion:
-        return evaluar_ampliada(actual, perfil, hoy(), ampliacion)
-    if actual.get("tipo") == "post":  # contrato v28: post deducido o sin confirmar
-        return evaluar_post(actual, perfil, hoy())
-    return evaluar(actual, perfil, hoy())
+    return evaluar_asignada(actual, perfil, hoy(), ampliacion)
 
 
 # 7.G (decisión de Oscar, 27 nov): marca de la vacante de hoy que ya no encaja; no se comparte.
@@ -355,21 +351,18 @@ def resultados(repo, cliente_id=None, fecha=None):
                 v = dict(v, status="active")
                 row = dict(row, catalogo_vacantes=v)
         ampliacion = next((e["ampliacion"] for e in row.get("explicacion") or [] if isinstance(e, dict) and e.get("ampliacion")), "")
-        filtros = _evaluar_asignada(actual, row["filtros"], ampliacion)
         # Contrato v49: el cargo operativo (con los nombres sugeridos y la huella heredada), también para asignaciones
         # anteriores: antes una vacante que entró por un nombre sugerido quedaba «no corresponde al cargo».
         clave_cargo = json.dumps(row["cargo_configuracion"], sort_keys=True, ensure_ascii=False, default=str)
         if clave_cargo not in operativos:
             operativos[clave_cargo] = contenido.cargo_operativo(row["cargo_configuracion"])
         cargo = operativos[clave_cargo]
-        afinidad_cargo, _ = grado(actual["titulo"], cargo, cercanos=True)  # v27
         # Aprobada por el operador en «Por confirmar» (v25/v49): el título ya se decidió a mano. La marca es
         # `{"aprobada_por": …}`; las asignaciones anteriores a v49 traen `{"funciones": True}`.
         aprobada = any(isinstance(e, dict) and (e.get("aprobada_por") or e.get("funciones") is True)
                        for e in row.get("explicacion") or [])
-        if not afinidad_cargo and not aprobada:
-            filtros["compatible"] = False
-            filtros["motivos"].append("el título actual no corresponde al cargo configurado")
+        # 7.H: la misma regla que usa la Bodega para «ya no encaja» (perfil + título del cargo, con cercanos; v27).
+        filtros = encaja_asignada(actual, row["filtros"], cargo, hoy(), ampliacion, aprobada)
         no_encaja = ""
         if filtros["compatible"] and not pasada:
             no_encaja = vigentes.motivo(row, actual, ampliacion, aprobada)

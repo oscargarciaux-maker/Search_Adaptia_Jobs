@@ -216,6 +216,13 @@ título al cargo · *Comunidad* = el cliente que es el grupo de WhatsApp.
     no se toca; los días anteriores no cambian. En el panel es el estado `no_encaja` de la vacante. El detalle privado
     (`seleccion_actual`, campo `motivo_no_encaja`: `vacante` o `configuracion`) dice cuántas cambiaron por la vacante y
     cuántas por editar el cargo o el perfil. Rige desde que una pasada o «Buscar ahora» toma la versión editada.
+  - **«Ya no encaja» se decide con la regla del panel** (7.H, decisión de Oscar 28 nov): la Bodega
+    (`bodega.afinidad_vigente`) y el panel usan la misma función, `panel.afinidad.encaja_asignada`: la vacante encaja si
+    cumple el perfil (ampliada con su nivel, post con su tolerancia) y su título corresponde al cargo (`grado` con
+    cercanos), **aunque otro cargo la reconozca mejor**. En modo panel la Bodega mira todos los perfiles del cargo
+    (también los de Comunidad); en el modo heredado sigue comparando con el cargo que mejor la reconoce. Se conservan:
+    lo que salió del inventario no encaja, lo que entró por ampliación encaja (va marcado) y el motivo privado.
+    Solo cambia la comprobación final y su aviso, no qué se elige ni qué se comparte.
   - **AVERÍA:** sincronización con Supabase o catálogo sin confirmar, reconciliación sin confirmar (incluido el 57014),
     selección no registrada, operaciones centrales pendientes o sin catálogo válido → corrida en rojo y aviso `/fail`.
     **Solo una avería hace fallar la corrida**; si hay avería y falta a la vez, manda la avería.

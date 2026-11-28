@@ -74,6 +74,31 @@ def evaluar_post(v, perfil, hoy=None):
     return dict(r, tolerada=tolerada)  # contrato v49: se le perdonó el país o la modalidad; cuenta para el tope diario
 
 
+MOTIVO_TITULO_AJENO = "el título actual no corresponde al cargo configurado"
+
+
+def evaluar_asignada(v, perfil, hoy, ampliacion=""):
+    """La evaluación con que se asignó: ampliada con su nivel, post (contrato v28) o la normal."""
+    if ampliacion:
+        return evaluar_ampliada(v, perfil, hoy, ampliacion)
+    if v.get("tipo") == "post":
+        return evaluar_post(v, perfil, hoy)
+    return evaluar(v, perfil, hoy)
+
+
+def encaja_asignada(v, perfil, cargo, hoy, ampliacion="", aprobada=False):
+    """7.H (decisión de Oscar, 28 nov): la regla única de «¿esta vacante le sigue sirviendo a quien se le asignó?», la
+    misma en el panel (`servicio.resultados`) y en la comprobación final de la Bodega (`bodega.afinidad_vigente`). Encaja
+    si cumple el perfil y su título corresponde al cargo operativo (`grado` con cercanos), aunque otro cargo la
+    reconozca mejor. Una aprobada a mano en «Por confirmar» no se vuelve a mirar por el título. Devuelve la evaluación
+    del perfil (con `compatible` y `motivos` ya ajustados por el cargo)."""
+    from panel.terminos import grado  # aquí: terminos carga el mapa de cargos y no hace falta al importar afinidad
+    r = evaluar_asignada(v, perfil, hoy, ampliacion)
+    if not aprobada and not grado(v.get("titulo") or "", cargo, cercanos=True)[0]:
+        r = dict(r, compatible=False, motivos=[*r["motivos"], MOTIVO_TITULO_AJENO])
+    return r
+
+
 def faltas(resultado):
     """Contrato v27: cuántas cosas del perfil no cumple una vacante compatible (0 = encaja en todo). Sirve para ordenar."""
     return len(resultado.get("incumple") or ())
