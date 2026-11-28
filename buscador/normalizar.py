@@ -1,6 +1,7 @@
 """Normalización de textos, títulos y empresas (sin IA)."""
 import re
 import unicodedata
+from contextlib import contextmanager
 from functools import lru_cache
 
 NIVELES = {
@@ -44,42 +45,59 @@ _RUIDO = re.compile(r"\b(remote|remoto|remota|hybrid|hibrido|hibrida|presencial|
                     r"tiempo completo|medio tiempo|m/f|f/m|m/f/d|h/m|m/h|a/o|o/a|\(a\)|ref\s*#?\s*\w+)\b", re.I)
 
 
-# P-12.2 (rendimiento, mismo resultado): la misma descripción se normalizaba unas 11 veces por noche. Las dos funciones
-# son puras (solo dependen del texto), así que se recuerdan con un tope de entradas. La clave es siempre el texto ya
-# convertido con `str(x or "")`, igual que antes, para aceptar los mismos valores (None, números) que la versión sin
-# memoria. `vaciar_cache()` la libera al terminar cada búsqueda (`bodega.correr`).
-# Tope medido sobre la bodega del 27 nov (12.606 vacantes): con 2.000 entradas por función la memoria retenida es de
-# unos 130–160 MB; con 5.000 casi no gana tiempo y con 60.000 retiene unos 500 MB.
+# P-12.2 (solo velocidad, mismo resultado): dentro de una búsqueda la misma descripción se normaliza muchas veces. Las
+# dos funciones son puras, así que mientras dura `con_memoria()` (lo abre `bodega.correr`) recuerdan sus resultados
+# con un tope de entradas; fuera de ella (el servidor del panel, las pruebas) calculan como siempre y no retienen nada.
+# La clave es el texto ya convertido con `str(x or "")`, igual que antes, para aceptar los mismos valores.
+# El tope es el compromiso medido entre tiempo y memoria (docs/HISTORIAL_CAMBIOS.md, sección 12.2). `panel/terminos.py`
+# tiene además su propia caché de `texto` para los títulos, que no depende de esta.
 MAX_CACHE = 2000
+_memoria_activa = False
 
 
-@lru_cache(maxsize=MAX_CACHE)
-def _sin_tildes(texto):
+def _quitar_tildes(texto):
     return "".join(c for c in unicodedata.normalize("NFD", texto) if unicodedata.category(c) != "Mn")
 
 
-def sin_tildes(texto):
-    return _sin_tildes(str(texto or ""))
-
-
-@lru_cache(maxsize=MAX_CACHE)
-def _texto(texto_crudo):
-    t = _sin_tildes(texto_crudo).lower()
+def _limpiar(texto_crudo):
+    t = sin_tildes(texto_crudo).lower()
     t = re.sub(r"[^a-z0-9+#./ ]+", " ", t)
     t = re.sub(r"(?<![a-z0-9])\.|\.(?![a-z0-9])", " ", t)  # puntos sueltos, no los de .net o node.js
     return re.sub(r"\s+", " ", t).strip()
 
 
+_sin_tildes = lru_cache(maxsize=MAX_CACHE)(_quitar_tildes)
+_texto = lru_cache(maxsize=MAX_CACHE)(_limpiar)
+
+
+def sin_tildes(texto):
+    t = str(texto or "")
+    return _sin_tildes(t) if _memoria_activa else _quitar_tildes(t)
+
+
 def texto(texto_crudo):
     """Minúsculas, sin tildes, solo letras, números y espacios simples (conserva '/', '+', '#' y '.' útiles: c#, .net)."""
-    return _texto(str(texto_crudo or ""))
+    t = str(texto_crudo or "")
+    return _texto(t) if _memoria_activa else _limpiar(t)
 
 
 def vaciar_cache():
-    """Libera la memoria de `sin_tildes` y `texto` (P-12.2). Solo cambia la velocidad, nunca el resultado."""
     _sin_tildes.cache_clear()
     _texto.cache_clear()
 
+
+@contextmanager
+def con_memoria():
+    """Activa la memoria de `sin_tildes` y `texto` durante el bloque y la vacía al salir, pase lo que pase. Anidado, solo
+    la vacía el bloque de fuera."""
+    global _memoria_activa
+    anterior, _memoria_activa = _memoria_activa, True
+    try:
+        yield
+    finally:
+        _memoria_activa = anterior
+        if not anterior:
+            vaciar_cache()
 
 
 def nivel(titulo):

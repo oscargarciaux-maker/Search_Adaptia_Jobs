@@ -179,6 +179,12 @@ def seniority(titulo):
 _RANGO_ANOS = re.compile(r"(\d{1,2})\s*(?:-|–|a|to|y|and|ou|or)\s*(\d{1,2})\s*(?:anos|años|years|yrs)", re.I)
 
 
+def anos_minimos(minimo):
+    """El primer valor de `anos`: con `anos_min` entero o None (lo que da `etiquetas.anos_min`) no depende de la
+    descripción, así que no hace falta normalizarla (P-12.2)."""
+    return minimo if minimo is not None and 0 <= minimo <= 40 else ""
+
+
 def anos(descripcion, minimo):
     """(mínimo, máximo) de años de experiencia; el máximo solo si el aviso da un rango."""
     if minimo is None:
@@ -189,7 +195,7 @@ def anos(descripcion, minimo):
         cerca = texto[max(0, m.start() - 80):m.end() + 80].lower()
         if a == minimo and a < b <= 40 and "experien" in cerca:
             return a, b
-    return (minimo, "") if 0 <= minimo <= 40 else ("", "")
+    return anos_minimos(minimo), ""
 
 
 # ── Compensación ───────────────────────────────────────────────────────────────────────────────────────────────────

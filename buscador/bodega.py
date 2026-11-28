@@ -481,13 +481,9 @@ PRUEBA = {"minutos_por_fuente": 3, "linkedin_busquedas": 6, "linkedin_fichas": 8
 
 
 def correr(salida, modo="diario", consulta=None, pais=None, hoy=None, prueba=False):
-    """Una búsqueda completa. La memoria de la normalización (P-12.2) se vacía al empezar y al terminar, pase lo que
-    pase: solo acelera, y así no crece de una búsqueda a otra en el mismo proceso."""
-    normalizar.vaciar_cache()
-    try:
+    """Una búsqueda completa, con la memoria de la normalización activa solo mientras dura (P-12.2)."""
+    with normalizar.con_memoria():
         return _correr(salida, modo, consulta, pais, hoy, prueba)
-    finally:
-        normalizar.vaciar_cache()
 
 
 def _correr(salida, modo, consulta, pais, hoy, prueba):

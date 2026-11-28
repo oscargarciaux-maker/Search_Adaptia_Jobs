@@ -7,6 +7,8 @@ import pytest
 from buscador import bodega, contrato, normalizar
 
 
+# Foto de las funciones tal como eran antes de P-12.2, para comprobar que la memoria no cambia nada. Si algún día se
+# cambia la regla de normalización a propósito, se actualiza aquí también.
 def _sin_tildes_original(texto):
     return "".join(c for c in unicodedata.normalize("NFD", str(texto or "")) if unicodedata.category(c) != "Mn")
 
@@ -24,32 +26,48 @@ ENTRADAS = [None, "", 0, 0.0, False, 12, 3.5, True, "Diseñadora UX/UI Sr.", "S�
 
 
 @pytest.mark.parametrize("entrada", ENTRADAS)
-def test_mismo_resultado_que_sin_memoria(entrada):
-    normalizar.vaciar_cache()
-    for _ in range(2):  # la segunda vez sale de la memoria
-        assert normalizar.sin_tildes(entrada) == _sin_tildes_original(entrada)
-        assert normalizar.texto(entrada) == _texto_original(entrada)
+def test_mismo_resultado_con_y_sin_memoria(entrada):
+    assert normalizar.sin_tildes(entrada) == _sin_tildes_original(entrada)
+    assert normalizar.texto(entrada) == _texto_original(entrada)
+    with normalizar.con_memoria():
+        for _ in range(2):  # la segunda vez sale de la memoria
+            assert normalizar.sin_tildes(entrada) == _sin_tildes_original(entrada)
+            assert normalizar.texto(entrada) == _texto_original(entrada)
 
 
-def test_memoria_acotada_y_se_vacia():
-    normalizar.vaciar_cache()
-    normalizar.texto("Diseñador de producto")
-    assert normalizar._texto.cache_info().currsize == 1
-    assert normalizar._sin_tildes.cache_info().currsize == 1
+def _guardadas():
+    return normalizar._texto.cache_info().currsize + normalizar._sin_tildes.cache_info().currsize
+
+
+def test_sin_busqueda_no_retiene_nada():
+    """El servidor del panel normaliza descripciones fuera de una búsqueda: ahí no se guarda nada en memoria."""
+    normalizar.texto("Diseñador de producto con descripción larga")
+    assert _guardadas() == 0
+
+
+def test_memoria_acotada_y_se_vacia_al_salir():
     assert normalizar._texto.cache_info().maxsize == normalizar._sin_tildes.cache_info().maxsize == normalizar.MAX_CACHE
-    normalizar.vaciar_cache()
-    assert normalizar._texto.cache_info().currsize == normalizar._sin_tildes.cache_info().currsize == 0
+    with normalizar.con_memoria():
+        normalizar.texto("Diseñador de producto")
+        with normalizar.con_memoria():  # anidado: el de dentro no vacía
+            normalizar.texto("Analista")
+        assert _guardadas() == 4
+    assert _guardadas() == 0
+    assert normalizar._memoria_activa is False
 
 
-def test_bodega_vacia_la_memoria_aunque_falle(monkeypatch):
+def test_bodega_usa_la_memoria_y_la_vacia_aunque_falle(monkeypatch):
+    vista = []
+
     def falla(*a, **k):
         normalizar.texto("algo que queda en la memoria")
+        vista.append(_guardadas())
         raise RuntimeError("fallo de prueba")
 
     monkeypatch.setattr(bodega, "_correr", falla)
     with pytest.raises(RuntimeError):
         bodega.correr("/no/se/usa", prueba=True)
-    assert normalizar._texto.cache_info().currsize == 0
+    assert vista == [2] and _guardadas() == 0 and normalizar._memoria_activa is False
 
 
 DESCRIPCIONES = ["", None, "Buscamos 3-5 años de experiencia en diseño.", "Requires 2 to 4 years of experience",
@@ -60,8 +78,9 @@ DESCRIPCIONES = ["", None, "Buscamos 3-5 años de experiencia en diseño.", "Req
 @pytest.mark.parametrize("minimo", [None, 0, 1, 2, 3, 4, 5, 20, 39, 40, 41, -1])
 @pytest.mark.parametrize("descripcion", DESCRIPCIONES)
 def test_minimo_de_anos_no_depende_de_la_descripcion(descripcion, minimo):
-    """`afinidad.evaluar` usa solo el mínimo: calcularlo sin la descripción da exactamente lo mismo (valor y tipo)."""
-    con, sin = contrato.anos(descripcion, minimo)[0], contrato.anos("", minimo)[0]
+    """`afinidad` usa solo el mínimo: sin la descripción da exactamente lo mismo (valor y tipo). `anos_min` siempre es
+    entero o None (`etiquetas.anos_min`)."""
+    con, sin = contrato.anos(descripcion, minimo)[0], contrato.anos_minimos(minimo)
     assert con == sin and type(con) is type(sin)
 
 
