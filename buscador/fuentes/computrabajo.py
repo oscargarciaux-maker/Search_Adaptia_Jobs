@@ -59,7 +59,7 @@ def tarjetas(pagina, sitio):
             re.search(r'<p class="dFlex[^"]*fs16[^"]*">(.*?)</p>', cuerpo, re.S)
         lugar = re.search(r'<p class="fs16 fc_base mt5">\s*<span class="mr10">(.*?)</span>', cuerpo, re.S)
         # «Presencial y remoto» lleva el icono `i_home_office`; el remoto completo, `i_home` (antes no se leía: P-17.1).
-        modo = re.search(r'icon i_home(?:_office)?"></span>(.*?)</span>', cuerpo, re.S)
+        modo = re.search(r'i_home(?:_office)?"></span>(.*?)</span>', cuerpo, re.S)
         if not (enlace and titulo):
             continue
         ruta = enlace.group(1)
@@ -98,10 +98,24 @@ def modalidad(texto):
     return None, ""
 
 
+REMOTO = ":REMOTO"
+
+
 def _remoto_en(lugares):
-    """Países de Computrabajo donde alguien del cargo acepta remoto («REMOTO_CO» en los lugares del panel)."""
-    claves = {x[0] if isinstance(x, (list, tuple)) else x for x in lugares or []}
-    return {c[7:] for c in claves if isinstance(c, str) and c.startswith("REMOTO_") and c[7:] in SITIOS}
+    """Países de Computrabajo donde alguien del cargo acepta remoto: «REMOTO_CO» en los pares (clave, parámetros) de
+    los lugares del panel. Las regiones («REMOTO_REGION_…») y «REMOTO_MUNDO» no son un sitio."""
+    return {clave[7:] for clave, _ in lugares or [] if clave.startswith("REMOTO_")} & SITIOS.keys()
+
+
+def _turnos(fid, resto, es, codigo, sufijo, con_es):
+    """Turnos de un cargo en un país («CO» o, con sufijo, «CO:REMOTO»): los títulos generales y, si alguien de ahí
+    acepta español, los en español («CO:ES», «CO:ES:REMOTO»)."""
+    salida = [(fid, resto, codigo + sufijo, {})] if resto else []
+    if con_es:
+        salida.append((fid, es, codigo + ":ES" + sufijo, {}))
+    elif not resto and es:  # todos sus títulos son en español: un solo turno, sin repetir la misma búsqueda
+        salida.append((fid, es, codigo + sufijo, {}))
+    return salida
 
 
 def combinaciones(mapa, nombres):
@@ -118,16 +132,9 @@ def combinaciones(mapa, nombres):
             if codigo not in SITIOS:
                 continue
             con_es = bool(es) and codigo in (f.get("paises_es") or [])
-            for sufijo, abierto in (("", True), (":REMOTO", codigo in remoto)):
-                if not abierto:
-                    continue
-                if resto:
-                    salida.append((f["id"], resto, codigo + sufijo, {}))
-                if con_es:
-                    if not sufijo or codigo in remoto_es:
-                        salida.append((f["id"], es, codigo + ":ES" + sufijo, {}))
-                elif not resto and es:  # todos sus títulos son en español: un solo turno, sin repetir la misma búsqueda
-                    salida.append((f["id"], es, codigo + sufijo, {}))
+            salida += _turnos(f["id"], resto, es, codigo, "", con_es)
+            if codigo in remoto:
+                salida += _turnos(f["id"], resto, es, codigo, REMOTO, con_es and codigo in remoto_es)
     return salida
 
 
@@ -142,7 +149,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
     todas = cobertura.repartir(todas, estado, hoy, prioritarias)
     avisos, vistos = [], set()
     hechas = fallidas = seguidas = 0
-    remotas = {"busquedas": 0, "avisos": 0}
+    busquedas_remoto = avisos_remoto = 0
     for familia, consultas, lugar, _ in todas:
         codigo = lugar.split(":")[0]
         if hechas >= presupuesto or seguidas >= 4 or (limite_segundos is not None and reloj() - inicio >= limite_segundos):
@@ -152,7 +159,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
             continue
         consulta = b.terminos[0]
         sitio = SITIOS[codigo]
-        en_remoto = lugar.endswith(":REMOTO")
+        en_remoto = lugar.endswith(REMOTO)
         ruta = f"/trabajo-de-{slug(consulta)}" + ("-en-remoto" if en_remoto else "")
         for pagina in range(b.desde + 1, b.desde + max_paginas + 1):  # en Computrabajo las páginas empiezan en 1
             if hechas >= presupuesto:
@@ -160,7 +167,8 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
             url = f"https://{sitio}.computrabajo.com{ruta}" + (f"?p={pagina}" if pagina > 1 else "")
             r = cliente.get(url)
             hechas += 1
-            remotas["busquedas"] += en_remoto
+            if en_remoto:
+                busquedas_remoto += 1
             if r is None or r.status_code != 200:
                 fallidas += 1
                 seguidas += 1
@@ -170,10 +178,10 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
             for f in filas:
                 if f["id"] not in vistos:
                     vistos.add(f["id"])
-                    remotas["avisos"] += en_remoto
-                    # La búsqueda remota solo lista remotas: si la tarjeta no lo dice, lo dice la ruta pedida.
-                    avisos.append(dict(f, pais=codigo, familia=familia,
-                                       modalidad=f["modalidad"] or ("Remoto" if en_remoto else "")))
+                    if en_remoto:
+                        avisos_remoto += 1
+                    # La modalidad sale de la tarjeta («Remoto», icono `i_home`), nunca de la ruta pedida.
+                    avisos.append(dict(f, pais=codigo, familia=familia))
             cobertura.anotar_paginas(estado, b, hoy, pagina, len(filas) < POR_PAGINA)
             if len(filas) < POR_PAGINA:
                 break
@@ -207,7 +215,7 @@ def buscar(cliente, mapa, paises_activos, estado, presupuesto, hoy=None, max_fic
                        "remoto": remoto, "fuente": NOMBRE})
     return crudas, {"busquedas": hechas, "fallidas": fallidas, "avisos": len(avisos), "del_cargo": len(del_cargo),
                     "con_descripcion": con_ficha, "cerradas": cerradas, "combinaciones_total": len(todas),
-                    "busquedas_remoto": remotas["busquedas"], "avisos_remoto": remotas["avisos"]}
+                    "busquedas_remoto": busquedas_remoto, "avisos_remoto": avisos_remoto}
 
 
 def completar_descripciones(cliente, previas, max_fichas, hoy=None, max_dias=30, reloj=time.monotonic,
