@@ -2049,3 +2049,34 @@ test("huecos por país: aviso al aplicar, tabla y copiar pedido de fuente nueva"
     page.getByText(/Aviso de cobertura: Kenia: sin fuente local/),
   ).toBeVisible();
 });
+
+test("P-12.10: al volver a Vacantes se ve la lista anterior mientras llega la nueva", async ({
+  page,
+}) => {
+  await page.goto("/#vacantes");
+  const items = page.locator(".item-vacante");
+  await expect(items.first()).toBeVisible();
+  const primera = await items.first().getAttribute("data-id");
+  await page.getByRole("button", { name: "Volver al resumen" }).click();
+  // La respuesta nueva se retiene hasta que la prueba la suelta.
+  let soltar = () => {};
+  const retenida = new Promise<void>((r) => (soltar = r));
+  await page.route(/\/api\/resultados/, async (route) => {
+    await retenida;
+    await route.continue();
+  });
+  const pedida = page.waitForRequest(/\/api\/resultados/);
+  await tarjeta(page, "Vacantes").click();
+  await pedida;
+  await expect(
+    page.locator(`.item-vacante[data-id="${primera}"]`),
+  ).toBeVisible();
+  await expect(page.getByText("Consultando vacantes…")).toHaveCount(0);
+  const respuesta = page.waitForResponse(/\/api\/resultados/);
+  soltar();
+  await respuesta;
+  await expect(
+    page.locator(`.item-vacante[data-id="${primera}"]`),
+  ).toBeVisible();
+  await page.unroute(/\/api\/resultados/);
+});

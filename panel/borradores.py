@@ -115,10 +115,12 @@ def texto(nombre, grupos, fecha, cliente_id="", mas=0, todas_de_hoy=True):
     return "\n\n".join(partes)
 
 
-def generar(repo, fecha=None, dias_atras=3, resultados=None):
+def generar(repo, fecha=None, dias_atras=3, resultados=None, clientes=None, hilos=4, excluir=()):
     """Crea o actualiza el borrador del día de cada cliente activo con teléfono y consentimiento.
     Solo vacantes con enlace comprobado para compartir; completa hasta MINIMO con días anteriores sin repetir nada que
-    ya le haya ido en otro borrador. No toca borradores abiertos, enviados, descartados o editados a mano."""
+    ya le haya ido en otro borrador. No toca borradores abiertos, enviados, descartados o editados a mano.
+    P-12.10: con `clientes` (ids) rehace solo los de esos clientes y con `excluir` se salta esos, con las mismas
+    reglas; `hilos` es cuántos se calculan a la vez (el servidor del panel usa 1 para no frenar las pantallas)."""
     from panel import servicio
     from concurrent.futures import ThreadPoolExecutor
     fecha = fecha or hoy()
@@ -130,15 +132,17 @@ def generar(repo, fecha=None, dias_atras=3, resultados=None):
                  "por_recomprobar": 0, "clientes_activos": 0}
     # Solo la lista de clientes de la búsqueda del día: sin leer las vacantes de ninguno.
     lista = repo.clientes_de(fecha) if hasattr(repo, "clientes_de") else servicio.resultados(repo, None, fecha).get("clientes", [])
-    clientes = {c["id"]: c for c in lista if c.get("activo", True)}
-    resultado["clientes_activos"] = len(clientes)
-    resultado["sin_contacto"] = sum(1 for cid in clientes if cid not in contactos)
+    activos = {c["id"]: c for c in lista if c.get("activo", True)}
+    solo = None if clientes is None else {str(c) for c in clientes}
+    fuera = {str(c) for c in excluir or ()}
+    resultado["clientes_activos"] = len(activos)
+    resultado["sin_contacto"] = sum(1 for cid in activos if cid not in contactos)
     if not contactos:
         return resultado
     existentes = {b["cliente_id"]: b for b in repo.borradores(fecha=fecha)}
     por_hacer = []
     for cliente_id, contacto in contactos.items():
-        if cliente_id not in clientes:
+        if cliente_id not in activos or (solo is not None and cliente_id not in solo) or cliente_id in fuera:
             continue
         actual = existentes.get(cliente_id)
         if actual and (actual.get("estado") != "pendiente" or actual.get("editado")):
@@ -147,7 +151,7 @@ def generar(repo, fecha=None, dias_atras=3, resultados=None):
         por_hacer.append((cliente_id, contacto))
     # Cada cliente es independiente: se calculan de a cuatro a la vez (antes uno tras otro), pero se guardan aquí, en
     # el orden de siempre (`ex.map` conserva el orden), para que la lista de mensajes no cambie de orden entre días.
-    with ThreadPoolExecutor(4) as ex:
+    with ThreadPoolExecutor(max(1, hilos)) as ex:
         for parcial, fila in ex.map(lambda par: _uno(repo, fecha, dias_atras, resultados, *par), por_hacer):
             for k, n in parcial.items():
                 resultado[k] += n
