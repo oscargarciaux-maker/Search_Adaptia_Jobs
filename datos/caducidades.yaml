@@ -1,6 +1,6 @@
 # Fechas que caducan y que nadie recuerda (P-13.1, Vigía de avisos). Solo nombres públicos y fechas: NUNCA el valor
-# de una clave. El Vigía (buscador/vigia.py) avisa con antelación y el texto de cada entrada sale tal cual a
-# Healthchecks: un servicio externo. Por eso `nombre` y `paso` solo admiten letras, cifras y signos sencillos (sin @,
+# de una clave. El Vigía (buscador/vigia.py) avisa con antelación y el texto de cada entrada sale tal cual en
+# el issue público de GitHub. Por eso `nombre` y `paso` solo admiten letras, cifras y signos sencillos (sin @,
 # sin enlaces) y el Vigía rechaza la entrada si no cumplen.
 #
 # tipo: soporte (fin de soporte de una pieza: aviso 180 días antes) · clave (una credencial que caduca: 30 días antes).

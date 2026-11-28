@@ -1,6 +1,6 @@
 """P-13.1: el Vigía de avisos. Respuestas falsas de GitHub (JSON de `gh`) y de Supabase (conexión y Storage
-simulados), sin red. Avisa al pasar cada umbral, calla debajo, sin el secreto no falla y ningún texto sale de la lista
-blanca."""
+simulados) y de la API de issues, sin red. Avisa al pasar cada umbral, calla debajo, un solo issue abierto y ningún
+texto sale de la lista blanca."""
 from datetime import date, datetime, timedelta, timezone
 import json
 from pathlib import Path
@@ -264,84 +264,132 @@ def test_texto_seguro_cambia_cualquier_linea_no_prevista():
     assert vigia.texto_seguro(["AVISO: La base de Supabase ocupa el 83 % de sus 500 MB. Paso: llama a Ana"]) == [vigia.GENERICO]
 
 
-# ── Envío a Healthchecks ───────────────────────────────────────────────────────────────────────────────────────────
-class Sesion:
-    def __init__(self, estados=(200,)):
-        self.estados, self.llamadas = list(estados), []
+# ── Aviso en GitHub: un solo issue (API simulada) ──────────────────────────────────────────────────────────────────
+class GitHubFalso:
+    """Imita las rutas de la API de issues que usa el Vigía. `fallar` = estado HTTP que devuelve todo."""
 
-    def post(self, url, data=None, timeout=None, headers=None):
-        self.llamadas.append((url, data))
-        estado = self.estados.pop(0) if self.estados else 200
-        if estado == "red":
-            raise requests.ConnectionError("sin red")
-        return SimpleNamespace(status_code=estado)
+    def __init__(self, fallar=None):
+        self.issues, self.comentarios, self.etiquetas, self.llamadas, self.fallar = {}, [], set(), [], fallar
 
+    def request(self, metodo, url, headers=None, json=None, params=None, timeout=None):
+        ruta = url.split("/repos/dueno/repo", 1)[1]
+        self.llamadas.append((metodo, ruta, dict(headers or {})))
+        if self.fallar:
+            return self._r(self.fallar)
+        if metodo == "GET" and ruta == "/issues":
+            abiertos = [{"number": n, **i} for n, i in sorted(self.issues.items())
+                        if i["state"] == "open" and params["labels"] in i["labels"]]
+            return self._r(200, abiertos + [{"number": 99, "title": vigia.TITULO, "pull_request": {}}])
+        if metodo == "POST" and ruta == "/labels":
+            if json["name"] in self.etiquetas:
+                return self._r(422, {})
+            self.etiquetas.add(json["name"])
+            return self._r(201, {})
+        if metodo == "POST" and ruta == "/issues":
+            numero = len(self.issues) + 1
+            self.issues[numero] = {"title": json["title"], "body": json["body"], "labels": json["labels"],
+                                   "state": "open"}
+            return self._r(201, {"number": numero})
+        if metodo == "POST" and ruta.endswith("/comments"):
+            self.comentarios.append((int(ruta.split("/")[2]), json["body"]))
+            return self._r(201, {})
+        if metodo == "PATCH":
+            self.issues[int(ruta.split("/")[2])]["state"] = json["state"]
+            return self._r(200, {})
+        return self._r(404, {})
 
-URL = "https://hc-ping.example.com/ficticio"
-
-
-def test_sin_secreto_no_falla_y_lo_dice(capsys):
-    sesion = Sesion()
-    assert vigia.enviar("", "texto", True, sesion=sesion) is False
-    assert sesion.llamadas == [] and "AVISO_ATENCION_URL" in capsys.readouterr().err
-
-
-def test_todo_bien_va_a_la_url_y_con_avisos_a_fail():
-    sesion = Sesion()
-    assert vigia.enviar(URL + "/", "ok", False, sesion=sesion) and sesion.llamadas[-1][0] == URL
-    assert vigia.enviar(URL, "mal", True, sesion=sesion) and sesion.llamadas[-1] == (URL + "/fail", "mal".encode())
-
-
-def test_reintenta_y_nunca_imprime_la_url(capsys):
-    sesion = Sesion(["red", 500, 503])
-    assert vigia.enviar(URL, "x", True, sesion=sesion, pausa=0) is False
-    assert len(sesion.llamadas) == 3
-    err = capsys.readouterr().err
-    assert "ficticio" not in err and "hc-ping" not in err
-    assert vigia.enviar("http://inseguro", "x", True, sesion=Sesion()) is False
-
-
-def test_de_punta_a_punta_sin_secreto_pasa_y_con_secreto_envia(tmp_path, monkeypatch, capsys):
-    datos = _carpeta(tmp_path, corridas={"bodega": [_corrida(2, "failure")]})
-    medidores = {"base": lambda: 490 * MB, "storage": lambda: 10, "caducidades": _caducidades(tmp_path)}
-    monkeypatch.delenv("AVISO_ATENCION_URL", raising=False)
-    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(tmp_path / "resumen.md"))
-    vigia.main(["--datos", str(datos)], ahora=AHORA, **medidores)  # no lanza
-    salida = capsys.readouterr()
-    assert "2 avisos" in salida.out and "AVISO_ATENCION_URL" in salida.err
-    assert "Vigía de avisos" in (tmp_path / "resumen.md").read_text(encoding="utf-8")
-    monkeypatch.setenv("AVISO_ATENCION_URL", URL)
-    sesion = Sesion()
-    vigia.main(["--datos", str(datos)], ahora=AHORA, sesion=sesion, **medidores)
-    url, cuerpo = sesion.llamadas[-1]  # sin --firma no se sabe cómo quedó el check: antes va un ping de verde
-    assert url == URL + "/fail" and "Bodega nocturna" in cuerpo.decode() and "Buscar ahora" in cuerpo.decode()
+    @staticmethod
+    def _r(estado, datos=None):
+        return SimpleNamespace(status_code=estado, json=lambda: datos)
 
 
-def test_un_aviso_nuevo_con_el_check_ya_en_rojo_se_reenvia(tmp_path, monkeypatch):
-    # Healthchecks solo manda correo al cambiar de estado: con otro aviso ya en rojo, el nuevo pasa por verde primero.
-    monkeypatch.setenv("AVISO_ATENCION_URL", URL)
+TOKEN = "token-ficticio-que-no-debe-salir"
+
+
+@pytest.fixture
+def entorno(monkeypatch):
+    monkeypatch.setenv("GH_REPO", "dueno/repo")
+    monkeypatch.setenv("GH_TOKEN", TOKEN)
+    monkeypatch.setenv("AVISO_GITHUB_USUARIO", "persona-de-soporte")
     monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
-    firma = tmp_path / "firma.txt"
+
+
+def test_mencion_solo_con_un_usuario_valido(capsys):
+    assert vigia.mencion("persona-de-soporte") == vigia.mencion("@persona-de-soporte") == "@persona-de-soporte"
+    for malo in ("", None, "dos palabras", "-guion", "a--b", "x" * 40, "a@b"):
+        assert vigia.mencion(malo) == ""
+    assert "AVISO_GITHUB_USUARIO" in capsys.readouterr().err
+
+
+def test_abre_comenta_solo_lo_nuevo_y_cierra_al_volver_a_verde(tmp_path, entorno, capsys):
+    api, firma = GitHubFalso(), tmp_path / "firma.txt"
     cad = _caducidades(tmp_path)
     vueltas = iter(range(100))
 
     def correr(base, corridas=None):
-        sesion = Sesion()
         carpeta = tmp_path / f"d{next(vueltas)}"
         carpeta.mkdir()
-        datos = _carpeta(carpeta, corridas=corridas)
-        vigia.main(["--datos", str(datos), "--firma", str(firma)], ahora=AHORA, sesion=sesion, base=lambda: base,
-                   storage=lambda: 10, caducidades=cad)
-        return [u.rsplit("/", 1)[-1] for u, _ in sesion.llamadas]
+        vigia.main(["--datos", str(_carpeta(carpeta, corridas=corridas)), "--firma", str(firma)], ahora=AHORA,
+                   sesion=api, base=lambda: base, storage=lambda: 10, caducidades=cad)
 
-    firma.write_text("", encoding="utf-8")                         # ayer todo en orden
-    assert correr(100 * MB) == ["ficticio"] and firma.read_text(encoding="utf-8") == ""
-    assert correr(420 * MB) == ["fail"]                            # pasa a rojo: un correo
-    assert correr(430 * MB) == ["fail"]                            # mismo aviso, otra cifra: no se repite
-    assert correr(430 * MB, corridas={"bodega": [_corrida(2, "failure")]}) == ["ficticio", "fail"]  # uno nuevo
-    assert correr(100 * MB) == ["ficticio"] and firma.read_text(encoding="utf-8") == ""
-    firma.unlink()                                                 # sin firma anterior: se reenvía por si acaso
-    assert correr(420 * MB) == ["ficticio", "fail"]
+    firma.write_text("", encoding="utf-8")                        # ayer todo en orden
+    correr(100 * MB)
+    assert api.issues == {} and api.comentarios == []             # en orden y sin issue: nada
+    correr(420 * MB)                                              # aviso: abre el issue con la mención
+    issue = api.issues[1]
+    assert issue["title"] == "Atención: Adaptia" and issue["labels"] == ["vigia"] and issue["state"] == "open"
+    assert "La base de Supabase ocupa el 84 %" in issue["body"] and issue["body"].endswith("Para @persona-de-soporte.")
+    correr(430 * MB)                                              # mismo aviso, otra cifra: no comenta
+    assert api.comentarios == []
+    correr(430 * MB, corridas={"bodega": [_corrida(2, "failure")]})  # aviso nuevo: comenta en el mismo issue
+    assert len(api.issues) == 1 and api.comentarios[-1][0] == 1 and "Bodega nocturna" in api.comentarios[-1][1]
+    assert "@persona-de-soporte" in api.comentarios[-1][1]
+    correr(100 * MB)                                              # todo en orden: comenta y cierra, sin mención
+    assert api.issues[1]["state"] == "closed" and api.comentarios[-1][1] == "Adaptia · Vigía 2026-11-28: todo en orden."
+    correr(420 * MB)                                              # vuelve a fallar: issue nuevo
+    assert len(api.issues) == 2 and api.issues[2]["state"] == "open"
+    assert TOKEN not in capsys.readouterr().err
+    assert all(h["Authorization"] == f"Bearer {TOKEN}" for _, _, h in api.llamadas)
+
+
+def test_sin_firma_anterior_y_con_issue_abierto_comenta_por_si_acaso():
+    api = GitHubFalso()
+    github = vigia.GitHub("dueno/repo", TOKEN, api)
+    assert vigia.avisar(github, "x", True, True, "@a") == "abierto"
+    assert vigia.avisar(github, "x", True, True, "@a") == "comentado"
+    assert vigia.avisar(github, "x", True, False, "@a") == "nada"
+    assert vigia.avisar(github, "y", False, True) == "cerrado"
+    assert vigia.avisar(github, "y", False, True) == "nada"
+    assert api.etiquetas == {"vigia"}
+
+
+def test_sin_usuario_abre_el_issue_sin_mencion_y_lo_dice(tmp_path, entorno, monkeypatch, capsys):
+    monkeypatch.delenv("AVISO_GITHUB_USUARIO")
+    api = GitHubFalso()
+    datos = _carpeta(tmp_path, corridas={"bodega": [_corrida(2, "failure")]})
+    vigia.main(["--datos", str(datos)], ahora=AHORA, sesion=api, base=lambda: MB, storage=lambda: 10,
+               caducidades=_caducidades(tmp_path))
+    assert "@" not in api.issues[1]["body"] and "Buscar ahora" in api.issues[1]["body"]
+    assert "AVISO_GITHUB_USUARIO" in capsys.readouterr().err
+
+
+def test_si_github_falla_la_corrida_queda_en_rojo_sin_el_token_y_sin_guardar_la_firma(tmp_path, entorno, capsys):
+    firma = tmp_path / "firma.txt"
+    firma.write_text("", encoding="utf-8")
+    datos = _carpeta(tmp_path, corridas={"bodega": [_corrida(2, "failure")]})
+    with pytest.raises(SystemExit) as salida:
+        vigia.main(["--datos", str(datos), "--firma", str(firma)], ahora=AHORA, sesion=GitHubFalso(fallar=403),
+                   base=lambda: MB, storage=lambda: 10, caducidades=_caducidades(tmp_path))
+    assert salida.value.code == 1
+    err = capsys.readouterr().err
+    assert "HTTP 403" in err and TOKEN not in err and firma.read_text(encoding="utf-8") == ""
+
+
+def test_el_cuerpo_del_issue_solo_lleva_lineas_de_la_lista_blanca():
+    texto = vigia.componer(_todos(), date(2026, 11, 28))
+    parrafos = vigia.cuerpo(texto, "@persona").split("\n\n")
+    assert parrafos[-1] == "Para @persona."
+    assert all(any(p.fullmatch(t) for p in vigia.PATRONES) for t in parrafos[:-1])
 
 
 # ── El Reloj lo pide una vez al día ────────────────────────────────────────────────────────────────────────────────
@@ -377,7 +425,7 @@ def _flujo(nombre):
 
 def test_el_flujo_del_vigia_solo_lee_y_no_pega_valores_en_los_guiones():
     flujo = _flujo("vigia.yml")
-    assert flujo["permissions"] == {"actions": "read", "contents": "read"}
+    assert flujo["permissions"] == {"actions": "read", "contents": "read", "issues": "write"}
     assert flujo[True]["schedule"] and "workflow_dispatch" in flujo[True]
     trabajo = flujo["jobs"]["vigia"]
     assert trabajo["if"] == "github.ref == 'refs/heads/main'" and trabajo["timeout-minutes"] <= 15
@@ -387,7 +435,8 @@ def test_el_flujo_del_vigia_solo_lee_y_no_pega_valores_en_los_guiones():
         assert f"{clave}:{f.archivo}" in reunir
     assert "awk '{print $4}'" in reunir  # de `publicado` solo los tamaños, sin nombres de archivo
     revisar = pasos["Revisar y avisar"]
-    assert revisar["env"]["AVISO_ATENCION_URL"] == "${{ secrets.AVISO_ATENCION_URL }}"
+    assert revisar["env"]["AVISO_GITHUB_USUARIO"] == "${{ vars.AVISO_GITHUB_USUARIO }}"
+    assert "secrets." not in json.dumps(revisar["env"]).replace("secrets.SUPABASE", "")  # solo las de Supabase
     assert "pip install --require-hashes" in json.dumps(trabajo)
     for paso in trabajo["steps"]:
         assert "${{" not in paso.get("run", "")

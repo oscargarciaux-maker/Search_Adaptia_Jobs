@@ -29,32 +29,35 @@ es su respaldo) mira, sin buscar nada ni escribir en la base:
 | `datos/caducidades.yaml` | Fin de soporte 180 días antes; claves 30 días antes; urgente si ya caducó |
 | Algo que no pudo medir | Siempre («No se pudo comprobar…»): sin medir nadie vigila |
 
-Cada aviso es una frase fija con **un solo paso** («Entra en X y pulsa Y» o «Reenvía este correo a soporte técnico»).
-El texto sale a Healthchecks, un servicio externo: solo lleva frases de la lista blanca de `buscador/vigia.py`, cifras
-enteras, fechas y el texto revisado de `datos/caducidades.yaml`; nunca clientes, lugares, cargos, mensajes de error ni
-claves. El mismo texto queda en el resumen de la corrida (Actions → Vigía de avisos).
+Avisa en GitHub, sin cuentas nuevas: mantiene **un solo issue abierto «Atención: Adaptia»** (etiqueta `vigia`). Si
+hay avisos nuevos lo abre, o le añade un comentario, mencionando a la persona de la variable `AVISO_GITHUB_USUARIO`;
+cuando todo vuelve a estar en orden comenta «todo en orden» y lo cierra. Los mismos avisos del día anterior no se
+vuelven a comentar (aunque cambie la cifra), así que cada comentario trae algo nuevo. Si no hay ningún issue
+«Atención: Adaptia» abierto, no hay nada que hacer.
 
-### Activar el Vigía (una vez, unos 10 minutos)
+Cada aviso es una frase fija con **un solo paso** («Entra en X y pulsa Y» o «Avisa a soporte técnico con el enlace de
+este issue»). El repositorio es **público** y el issue también: solo lleva frases de la lista blanca de
+`buscador/vigia.py`, cifras enteras, fechas y el texto revisado de `datos/caducidades.yaml`; nunca clientes, lugares,
+cargos, nombres de archivo, mensajes de error ni claves. El mismo texto queda en el resumen de la corrida (Actions →
+Vigía de avisos).
 
-1. Entra en healthchecks.io con la cuenta de avisos (la del correo de la persona que atenderá los problemas; ver
-   [ENTREGA_AL_CLIENTE.md](ENTREGA_AL_CLIENTE.md) §4). Si no existe, créala: el plan gratuito basta.
-2. Pulsa **Add Check**. Nombre: `Atención`. En **Schedule** pon *Period* `1 day` y *Grace Time* `12 hours` (GitHub
-   puede retrasar el horario de respaldo). Guarda.
-3. Copia la **Ping URL** del check (empieza por `https://hc-ping.com/`).
-4. En GitHub: Settings → Secrets and variables → Actions → **New repository secret**. Nombre `AVISO_ATENCION_URL`,
-   valor la URL del paso 3. Guarda.
-5. En GitHub: Actions → **Vigía de avisos** → **Run workflow**. En Healthchecks el check pasa a verde («up») o a rojo
-   («down») con el texto de los avisos en **Events**.
-6. En Healthchecks → **Integrations**, comprueba que el correo está activo y pulsa **Test** para ver que llega.
+### Activar el Vigía (una vez, unos 3 minutos)
 
-Cómo se comporta: Healthchecks manda un correo cuando el check pasa a rojo (hay avisos, o el Vigía no corrió en
-36 horas) y otro cuando vuelve a verde. Si los mismos avisos siguen al día siguiente (aunque cambie la cifra) no se
-repite el correo; si aparece uno **nuevo** mientras el check ya estaba en rojo, el Vigía lo pone un instante en verde y
-otra vez en rojo para que llegue otro correo (guarda solo una huella de qué avisos había, en la caché de Actions). Por
-eso pueden llegar dos correos seguidos («up» y «down»): el que importa es el último, con la lista completa. El texto del
-día está también en el check (**Events**) y en el resumen de la corrida. Sin el secreto el Vigía corre igual y lo dice
-en el registro, pero no avisa a nadie. Entra en Healthchecks al menos una vez al año: según su FAQ, las cuentas
-inactivas se pueden borrar.
+1. En GitHub: Settings → Secrets and variables → Actions → pestaña **Variables** → **New repository variable**.
+   Nombre `AVISO_GITHUB_USUARIO`, valor el usuario de GitHub de la persona que atenderá los avisos (sin «@»). Es una
+   variable, no un secreto: en un repo público ese usuario se verá en el issue.
+2. En GitHub: Actions → **Vigía de avisos** → **Run workflow**. Si hay algo que avisar aparece el issue «Atención:
+   Adaptia» en la pestaña Issues; si no, la corrida queda en verde y no abre nada.
+
+Para que el aviso llegue por correo, esa persona debe tener activado el correo para «Participating, @mentions and
+custom» en GitHub → Settings → Notifications. La documentación de GitHub explica que una mención suscribe a la persona
+y avisa según esa configuración, pero no dice expresamente nada de las menciones hechas por `github-actions[bot]`: la
+primera vez, comprobar que el correo llega. Además, quien vigila el repositorio («Watch») recibe los issues nuevos.
+
+Sin la variable el Vigía abre el issue igual, sin mencionar a nadie, y lo dice en el registro. Si GitHub no deja abrir
+o comentar el issue, la corrida queda en rojo (es la única forma de que se vea). Límite conocido: si el Vigía mismo
+deja de correr (Actions desactivado o los 60 días sin actividad), nadie avisa de eso; el propio Vigía avisa antes, a
+los 30 días sin commits y en cuanto un flujo clave queda desactivado.
 
 Requisitos para que no avise en falso: el Reloj activado (`docs/ACTIVAR_RELOJ.md`) y la copia semanal funcionando
 (`SUPABASE_BACKUP_KEY`); si no, el Vigía avisará de que llevan días sin terminar bien, que es cierto. En la Bodega, los
@@ -76,8 +79,8 @@ propio aviso explica cómo hacerlo desde la web cambiando la fecha `revisado` de
 5. **Calidad**: revisar estados y hora de enlaces de la selección del día. La selección histórica puede seguir en 120
    mientras una parte cerró después o está pendiente; no compartir por esa cifra sin mirar el estado actual.
 6. Abrir al menos una muestra de cada rol y revisar cargo afín, residencia, idioma y acceso a postulación.
-7. Revisar el saldo de Apify. El monitor es el Vigía de arriba más los tres checks de Healthchecks de cada tarea; no
-   hay guardia ni un SLA de respuesta automático.
+7. Revisar el saldo de Apify. El monitor es el Vigía de arriba (más, si se configuraron, los checks opcionales de
+   Healthchecks de [ENTREGA_AL_CLIENTE.md](ENTREGA_AL_CLIENTE.md) §4); no hay guardia ni un SLA de respuesta automático.
 
 La captura solicita ejecución horaria, no entrega una garantía de latencia de una hora. En el diagnóstico de preparación,
 una captura/ofertas sin observación reciente en dos horas no pasan el criterio; es un umbral de revisión del piloto,

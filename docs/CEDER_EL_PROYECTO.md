@@ -31,7 +31,7 @@ Settings* → *Members* → *Invite* con su correo y el rol que corresponda.
 
 | Dónde | Qué |
 |---|---|
-| Secretos de GitHub (Settings → Secrets and variables → Actions) | `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_DB_URL`, `SUPABASE_BACKUP_KEY` y `APIFY_TOKEN`. Opcionales: `AVISO_NOCTURNA_URL`, `AVISO_CAPTURA_URL`, `AVISO_RESPALDO_URL`, `AVISO_ATENCION_URL` y, si se activó la API de InfoJobs, `INFOJOBS_CLIENT_ID` e `INFOJOBS_CLIENT_SECRET`. `GITHUB_TOKEN` lo pone GitHub solo |
+| Secretos de GitHub (Settings → Secrets and variables → Actions) | `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_DB_URL`, `SUPABASE_BACKUP_KEY` y `APIFY_TOKEN`. Opcionales: `AVISO_NOCTURNA_URL`, `AVISO_CAPTURA_URL`, `AVISO_RESPALDO_URL` y, si se activó la API de InfoJobs, `INFOJOBS_CLIENT_ID` e `INFOJOBS_CLIENT_SECRET`. `GITHUB_TOKEN` lo pone GitHub solo |
 | Variables de GitHub | `CAPTURA_HORARIA_ACTIVA` y `ESTADO_SUPABASE_ACTIVO` |
 | Render (panel) | `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `PANEL_ORIGIN`, `PANEL_OPERATOR_EMAILS`, `GITHUB_ACCIONES_TOKEN` y `GITHUB_REPOSITORIO` |
 | Usuarios del panel | Supabase → Authentication → Users, más su correo en `PANEL_OPERATOR_EMAILS` |
@@ -95,7 +95,7 @@ Crea también su usuario del panel en Supabase → Authentication → Users, y c
 | `SUPABASE_SECRET_KEY` | GitHub y Render | Recomendado, al final: él crea una nueva en Supabase (API Keys), se pone en los dos sitios y se borra la vieja. Así solo él la conoce |
 | Contraseña de la base (va dentro de `SUPABASE_DB_URL`) | GitHub | Igual: él la cambia en Supabase (Database → Reset password) y se actualiza el secreto |
 | `SUPABASE_BACKUP_KEY` | GitHub | **No cambiarla**: es la que abre las copias ya hechas. Dársela para que la guarde |
-| Avisos (`AVISO_*`) | GitHub | Si existen, que apunten a un correo suyo |
+| Avisos (`AVISO_*`) | GitHub | La variable `AVISO_GITHUB_USUARIO` (Vigía de avisos) con el usuario de GitHub de quien los atiende; los secretos `AVISO_*_URL`, si existen, que apunten a un correo suyo |
 
 ## Fase 5 · Comprobar (unos 10 minutos)
 

@@ -15,10 +15,12 @@ base: una vez al día (lo pide el Reloj, `arranque.toca_vigia`, y tiene un horar
 
 Umbrales: aviso al 80 % y urgente al 95 %; 30 días sin commits; caducidades 180 días antes (soporte) o 30 (claves).
 
-Avisa con un POST a `AVISO_ATENCION_URL` (un check de Healthchecks): la URL sola si todo está en orden y `/fail` con
-el texto de los avisos si hay alguno. Sin el secreto la corrida pasa con un aviso en el registro y no falla.
+Avisa en GitHub, sin cuentas nuevas (decisión de Oscar, 28 nov): mantiene UN solo issue abierto «Atención: Adaptia»
+(etiqueta `vigia`). Si hay avisos nuevos lo abre o le añade un comentario que menciona a la persona de la variable de
+repositorio `AVISO_GITHUB_USUARIO` (sin la variable, no menciona a nadie y lo dice en el registro); cuando todo vuelve
+a estar en orden comenta «todo en orden» y lo cierra. Los mismos avisos de ayer no se repiten (`firma`).
 
-**Privacidad:** el texto sale a un servicio externo. Se arma solo con plantillas fijas de este archivo (lista blanca
+**Privacidad:** el repo es PÚBLICO y el issue también. El texto se arma solo con plantillas fijas de este archivo (lista blanca
 `PLANTILLAS`), cifras enteras, fechas `AAAA-MM-DD`, los nombres fijos de los flujos y el texto revisado de
 `datos/caducidades.yaml`. Ningún mensaje de error, nombre de cliente, lugar, cargo, URL ni valor de secreto entra
 nunca: `texto_seguro` comprueba cada línea contra la lista blanca y, si una no encaja, la cambia por una genérica.
@@ -32,7 +34,6 @@ import os
 from pathlib import Path
 import re
 import sys
-import time
 from typing import NamedTuple
 
 import requests
@@ -54,7 +55,7 @@ FALLO = {"failure", "timed_out", "startup_failure"}
 VENTANA_ROJO = 24                        # horas: un rojo de la Bodega que no tapó una búsqueda real posterior
 ESPERA_STORAGE = 30                      # segundos por petición a Storage (el job tiene 15 minutos)
 
-SOPORTE = "Reenvía este correo a soporte técnico."
+SOPORTE = "Avisa a soporte técnico con el enlace de este issue."
 PRO = "Entra en Supabase → Organization → Billing y cambia el plan a Pro (o pide a soporte técnico el traspaso a la cuenta Pro del cliente)."
 
 
@@ -70,8 +71,8 @@ class Flujo(NamedTuple):
 
 FLUJOS = {
     "bodega": Flujo("bodega.yml", "Bodega nocturna", 30, 1, True,
-                    "Entra en el panel y pulsa «Buscar ahora»; si vuelve a salir en rojo, reenvía este correo a "
-                    "soporte técnico.", tapable=True),
+                    "Entra en el panel y pulsa «Buscar ahora»; si vuelve a salir en rojo, avisa a soporte técnico "
+                    "con el enlace de este issue.", tapable=True),
     "captura": Flujo("incremental.yml", "Captura horaria", 6, 2, False, SOPORTE),
     "reloj": Flujo("reloj.yml", "Reloj", 3, 3, False, "Entra en GitHub → Actions → Reloj y pulsa «Run workflow»."),
     "respaldo": Flujo("respaldo.yml", "Copia de seguridad semanal", 8 * 24, 1, True,
@@ -291,7 +292,7 @@ def medir_base():
 
 class _SesionCorta(requests.Session):
     """`almacen_respaldos` espera hasta 600 s por petición (subidas de 40 MiB). Para listar basta mucho menos: así un
-    Storage colgado no agota el tope del job y el ping del día sale igual (con «no se pudo comprobar»)."""
+    Storage colgado no agota el tope del job y el aviso del día sale igual (con «no se pudo comprobar»)."""
 
     def request(self, *a, **k):
         k["timeout"] = min(k.get("timeout") or ESPERA_STORAGE, ESPERA_STORAGE)
@@ -310,43 +311,87 @@ def _medir(codigo, funcion, limite, avisos):
         avisos.append(Aviso("no_medido", que=codigo))
 
 
-# ---------------------------------------------------------------- envío
-def _ping(sesion, url, texto, pausa):
-    causa = ""
-    for intento in range(3):
+# ---------------------------------------------------------------- aviso en GitHub (un issue)
+TITULO, ETIQUETA = "Atención: Adaptia", "vigia"
+API = "https://api.github.com"
+_USUARIO = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}")  # reglas de nombres de usuario de GitHub
+_REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+
+
+class ErrorGitHub(RuntimeError):
+    """La API de GitHub no respondió como se esperaba. Solo lleva el estado HTTP o el tipo de error, nunca el token."""
+
+
+def mencion(usuario):
+    """`@usuario` si la variable es un nombre válido de GitHub; vacía (y aviso en el registro) si falta o no lo es."""
+    usuario = (usuario or "").strip().lstrip("@")
+    if _USUARIO.fullmatch(usuario):
+        return f"@{usuario}"
+    print("::warning::Falta la variable AVISO_GITHUB_USUARIO (o no es un usuario de GitHub): el issue del Vigía se "
+          "abre sin mencionar a nadie. Ver docs/OPERACION_Y_RECUPERACION.md §1.", file=sys.stderr)
+    return ""
+
+
+def cuerpo(texto, arroba=""):
+    """Markdown del issue: cada línea de la lista blanca como párrafo y, al final, la mención (si la hay)."""
+    return "\n\n".join(texto.splitlines() + ([f"Para {arroba}."] if arroba else []))
+
+
+class GitHub:
+    def __init__(self, repo, token, sesion=None):
+        if not _REPO.fullmatch(repo or "") or not token:
+            raise ErrorGitHub("faltan GH_REPO o GH_TOKEN")
+        self.repo, self.sesion = repo, sesion or requests.Session()
+        self.cabeceras = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
+                          "X-GitHub-Api-Version": "2022-11-28"}
+
+    def pedir(self, metodo, ruta, aceptar=(), **k):
         try:
-            r = sesion.post(url, data=texto.encode("utf-8"), timeout=10,
-                            headers={"Content-Type": "text/plain; charset=utf-8"})
-            if 200 <= r.status_code < 300:
-                return True
-            causa = f"HTTP {r.status_code}"
+            r = self.sesion.request(metodo, f"{API}/repos/{self.repo}{ruta}", headers=self.cabeceras, timeout=30, **k)
         except requests.RequestException as e:
-            causa = type(e).__name__
-        if intento < 2:
-            time.sleep(pausa)
-    print(f"::warning::No se pudo avisar a Healthchecks ({causa}).", file=sys.stderr)
-    return False
+            raise ErrorGitHub(type(e).__name__) from None
+        if not (200 <= r.status_code < 300 or r.status_code in aceptar):
+            raise ErrorGitHub(f"HTTP {r.status_code}")
+        return r
+
+    def abierto(self):
+        """El número del issue abierto del Vigía (el más antiguo, si hubiera dos), o None."""
+        lista = self.pedir("GET", "/issues", params={"state": "open", "labels": ETIQUETA, "per_page": 50,
+                                                     "sort": "created", "direction": "asc"}).json()
+        propios = [i for i in lista if isinstance(i, dict) and "pull_request" not in i and i.get("title") == TITULO]
+        return propios[0]["number"] if propios else None
+
+    def abrir(self, texto):
+        self.pedir("POST", "/labels", aceptar=(422,),  # 422: la etiqueta ya existe
+                   json={"name": ETIQUETA, "color": "d93f0b", "description": "Avisos del Vigía (buscador/vigia.py)"})
+        return self.pedir("POST", "/issues", json={"title": TITULO, "body": texto, "labels": [ETIQUETA]}).json()["number"]
+
+    def comentar(self, numero, texto):
+        self.pedir("POST", f"/issues/{numero}/comments", json={"body": texto})
+
+    def cerrar(self, numero):
+        self.pedir("PATCH", f"/issues/{numero}", json={"state": "closed", "state_reason": "completed"})
 
 
-def enviar(url, texto, hay_avisos, sesion=None, pausa=5, reavisar=False):
-    """POST al check de Healthchecks: la URL sola si todo va bien y `/fail` si hay avisos. Devuelve True si llegó.
-    Healthchecks solo manda correo cuando el check cambia de estado: si ya estaba en rojo por otro aviso (`reavisar`),
-    primero se pone en verde y luego en rojo, para que el aviso nuevo llegue también por correo.
-    Nunca imprime la URL (es un secreto) ni falla la corrida: si el ping no llega, Healthchecks avisa por su cuenta."""
-    url = (url or "").strip().rstrip("/")
-    if not url:
-        print("::warning::Falta el secreto AVISO_ATENCION_URL: el Vigía revisó todo, pero no avisa a nadie. "
-              "Ver docs/OPERACION_Y_RECUPERACION.md §1.", file=sys.stderr)
-        return False
-    if not url.startswith("https://"):
-        print("::warning::AVISO_ATENCION_URL no empieza por https://: no se envía nada.", file=sys.stderr)
-        return False
-    sesion = sesion or requests
-    if not hay_avisos:
-        return _ping(sesion, url, texto, pausa)
-    if reavisar:
-        _ping(sesion, url, texto, pausa)
-    return _ping(sesion, url + "/fail", texto, pausa)
+def avisar(github, texto, hay_avisos, nuevos, arroba=""):
+    """Un solo issue abierto. Devuelve lo que hizo: «abierto», «comentado», «cerrado» o «nada».
+    - con avisos y sin issue abierto: lo abre (con la mención);
+    - con avisos e issue abierto: comenta solo si son avisos nuevos (`nuevos`), también con la mención;
+    - sin avisos e issue abierto: comenta «todo en orden» y lo cierra; sin issue, nada."""
+    numero = github.abierto()
+    if hay_avisos:
+        if numero is None:
+            github.abrir(cuerpo(texto, arroba))
+            return "abierto"
+        if nuevos:
+            github.comentar(numero, cuerpo(texto, arroba))
+            return "comentado"
+        return "nada"
+    if numero is None:
+        return "nada"
+    github.comentar(numero, cuerpo(texto))
+    github.cerrar(numero)
+    return "cerrado"
 
 
 # ---------------------------------------------------------------- línea de órdenes
@@ -392,7 +437,8 @@ def main(argv=None, ahora=None, sesion=None, base=medir_base, storage=medir_stor
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--datos", required=True, help="Carpeta con lo que reúne vigia.yml (gh run list, etc.)")
     ap.add_argument("--firma", help="Archivo con la firma de los avisos de la corrida anterior; se reescribe con la de "
-                    "hoy (vigia.yml lo guarda en la caché de Actions). Sin él, un cambio de avisos se reenvía siempre.")
+                    "hoy (vigia.yml lo guarda en la caché de Actions). Sin él, unos avisos con el issue abierto se "
+                    "comentan siempre.")
     args = ap.parse_args(argv)
     avisos, hoy = revisar(args.datos, ahora, base=base, storage=storage, caducidades=caducidades)
     texto = componer(avisos, hoy)
@@ -402,9 +448,18 @@ def main(argv=None, ahora=None, sesion=None, base=medir_base, storage=medir_stor
         with open(destino, "a", encoding="utf-8") as f:
             f.write("## Vigía de avisos\n\n" + texto.replace("\n", "\n\n") + "\n")
     nueva = firma(avisos)
-    anterior = _texto(args.firma) if args.firma else None  # None = no se sabe cómo quedó el check
-    reavisar = anterior != "" and anterior != nueva
-    if enviar(os.environ.get("AVISO_ATENCION_URL"), texto, bool(avisos), sesion=sesion, reavisar=reavisar) and args.firma:
+    anterior = _texto(args.firma) if args.firma else None  # None = no se sabe qué avisos había
+    try:
+        github = GitHub(os.environ.get("GH_REPO", ""), os.environ.get("GH_TOKEN", ""), sesion)
+        hecho = avisar(github, texto, bool(avisos), anterior != nueva,
+                       mencion(os.environ.get("AVISO_GITHUB_USUARIO")) if avisos else "")
+    except (ErrorGitHub, KeyError, TypeError, ValueError) as e:
+        # En rojo: es la única forma de que se vea en Actions que el aviso no llegó.
+        print(f"::error::El Vigía no pudo dejar el aviso en GitHub ({e if isinstance(e, ErrorGitHub) else type(e).__name__}).",
+              file=sys.stderr)
+        sys.exit(1)
+    print(f"::notice::Issue del Vigía: {hecho}.", file=sys.stderr)
+    if args.firma:
         Path(args.firma).write_text(nueva, encoding="utf-8")
 
 
