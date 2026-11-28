@@ -1,6 +1,7 @@
 """Normalización de textos, títulos y empresas (sin IA)."""
 import re
 import unicodedata
+from functools import lru_cache
 
 NIVELES = {
     "trainee": "trainee", "intern": "trainee", "internship": "trainee", "pasante": "trainee", "pasantia": "trainee",
@@ -43,16 +44,42 @@ _RUIDO = re.compile(r"\b(remote|remoto|remota|hybrid|hibrido|hibrida|presencial|
                     r"tiempo completo|medio tiempo|m/f|f/m|m/f/d|h/m|m/h|a/o|o/a|\(a\)|ref\s*#?\s*\w+)\b", re.I)
 
 
+# P-12.2 (rendimiento, mismo resultado): la misma descripción se normalizaba unas 11 veces por noche. Las dos funciones
+# son puras (solo dependen del texto), así que se recuerdan con un tope de entradas. La clave es siempre el texto ya
+# convertido con `str(x or "")`, igual que antes, para aceptar los mismos valores (None, números) que la versión sin
+# memoria. `vaciar_cache()` la libera al terminar cada búsqueda (`bodega.correr`).
+# Tope medido sobre la bodega del 27 nov (12.606 vacantes): con 2.000 entradas por función la memoria retenida es de
+# unos 130–160 MB; con 5.000 casi no gana tiempo y con 60.000 retiene unos 500 MB.
+MAX_CACHE = 2000
+
+
+@lru_cache(maxsize=MAX_CACHE)
+def _sin_tildes(texto):
+    return "".join(c for c in unicodedata.normalize("NFD", texto) if unicodedata.category(c) != "Mn")
+
+
 def sin_tildes(texto):
-    return "".join(c for c in unicodedata.normalize("NFD", str(texto or "")) if unicodedata.category(c) != "Mn")
+    return _sin_tildes(str(texto or ""))
+
+
+@lru_cache(maxsize=MAX_CACHE)
+def _texto(texto_crudo):
+    t = _sin_tildes(texto_crudo).lower()
+    t = re.sub(r"[^a-z0-9+#./ ]+", " ", t)
+    t = re.sub(r"(?<![a-z0-9])\.|\.(?![a-z0-9])", " ", t)  # puntos sueltos, no los de .net o node.js
+    return re.sub(r"\s+", " ", t).strip()
 
 
 def texto(texto_crudo):
     """Minúsculas, sin tildes, solo letras, números y espacios simples (conserva '/', '+', '#' y '.' útiles: c#, .net)."""
-    t = sin_tildes(texto_crudo).lower()
-    t = re.sub(r"[^a-z0-9+#./ ]+", " ", t)
-    t = re.sub(r"(?<![a-z0-9])\.|\.(?![a-z0-9])", " ", t)  # puntos sueltos, no los de .net o node.js
-    return re.sub(r"\s+", " ", t).strip()
+    return _texto(str(texto_crudo or ""))
+
+
+def vaciar_cache():
+    """Libera la memoria de `sin_tildes` y `texto` (P-12.2). Solo cambia la velocidad, nunca el resultado."""
+    _sin_tildes.cache_clear()
+    _texto.cache_clear()
+
 
 
 def nivel(titulo):

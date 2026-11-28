@@ -209,7 +209,9 @@ def evaluar(v, perfil, hoy=None):
     except (ValueError, TypeError):
         motivos.append("fecha de publicación sin confirmar")
     # La vista previa precalcula estos dos datos con las mismas funciones para no conservar descripciones.
-    minimo = v["_anos_minimos"] if "_anos_minimos" in v else contrato.anos(v.get("_descripcion", ""), v.get("anos_min"))[0]
+    # P-12.2: el mínimo de `contrato.anos` no depende de la descripción (solo el máximo la lee), así que no se le quitan
+    # las tildes por cada par perfil × vacante (era el 70 % de `elegir`). Mismo valor: `pruebas/test_memoria_normalizar.py`.
+    minimo = v["_anos_minimos"] if "_anos_minimos" in v else contrato.anos("", v.get("anos_min"))[0]
     # Contrato v22: con 2 años o menos, junior abierto (sin aviso de experiencia).
     junior_abierto = p.experiencia_anos is not None and p.experiencia_anos <= 2
     if (p.experiencia_min is not None or p.experiencia_max is not None) and not junior_abierto:
