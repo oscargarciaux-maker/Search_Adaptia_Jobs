@@ -30,6 +30,49 @@ class ErrorRepositorio(Exception):
         super().__init__(mensaje)
 
 
+def paginar(pedir, ruta, clave, params, tamano=500):
+    """Lee TODAS las filas por páginas ordenadas por `clave` (única), pidiendo cada una desde la última leída (keyset),
+    sin tope. P-12.1: antes el ejecutor paginaba con OFFSET, sin orden y se detenía en 5.000 filas sin avisar.
+    Nunca devuelve una lectura a medias en silencio: una respuesta que no es una lista, más larga de lo pedido, sin la
+    clave o que no avanza es un error. Solo una página VACÍA marca el final: si PostgREST devuelve menos filas de las
+    pedidas (su máximo de filas por respuesta es menor que `tamano`), se sigue pidiendo desde la última. Cuesta una
+    petición más por lectura. El `select` debe traer la clave."""
+    ultimo = None
+    while True:
+        lote = pedir("GET", ruta, params={**params, "order": clave, "limit": tamano,
+                                          **({clave: "gt." + str(ultimo)} if ultimo is not None else {})})
+        if not isinstance(lote, list) or len(lote) > tamano:
+            raise ErrorRepositorio("Lectura por páginas con una respuesta inesperada.")
+        if not lote:
+            return
+        if clave not in lote[-1]:
+            raise ErrorRepositorio("Lectura por páginas sin la clave para seguir.")
+        if lote[-1][clave] == ultimo:
+            raise ErrorRepositorio("Lectura por páginas que no avanza.")
+        yield from lote
+        ultimo = lote[-1][clave]
+
+
+def por_ids(pedir, ruta, campo, ids, select, tamano=500, tanda=50):
+    """Filas cuyo `campo` está en `ids`, por tandas de 50 (la dirección de la petición no crece con los clientes) y
+    con `paginar` ordenado por `id`."""
+    if campo == "id":  # desde la segunda página, `id=gt.…` reemplazaría el filtro `id=in.(…)`
+        raise ValueError("por_ids no filtra por la misma clave con que pagina")
+    ids = list(dict.fromkeys(str(i) for i in ids))
+    for inicio in range(0, len(ids), tanda):
+        yield from paginar(pedir, ruta, "id", {campo: "in.(" + ",".join(ids[inicio:inicio + tanda]) + ")",
+                                              "select": select}, tamano)
+
+
+def recibidas_de(pedir, perfil_ids, tamano=1000):
+    """{persona: vacantes que ya recibió} de todo `panel_asignaciones`, con una entrada por cada persona pedida (aunque
+    no tenga historial)."""
+    salida = {str(i): set() for i in perfil_ids}
+    for r in por_ids(pedir, "panel_asignaciones", "perfil_id", perfil_ids, "id,perfil_id,vacante_id", tamano):
+        salida.setdefault(r["perfil_id"], set()).add(r["vacante_id"])
+    return salida
+
+
 # Mensajes de las funciones SQL del panel. Los de SQL 009 (exigen 120 exactos) indican que la base aún no tiene
 # SQL 015 (contrato v21, metas por perfil): se explica cómo instalarla en lugar de un error genérico.
 _SIN_015 = ("Reparte exactamente 120 vacantes", "Los cupos superan 120")
@@ -301,14 +344,7 @@ class RepositorioSupabase:
                    headers={"Prefer": "return=minimal"}, json={"status": "archived", "reason": razon})
 
     def recibidas(self, perfil_ids):
-        salida = {}
-        for inicio in range(0, len(perfil_ids), 50):
-            ids = ",".join(perfil_ids[inicio:inicio + 50])
-            if ids:
-                for r in self._paginas("panel_asignaciones", "id", {"perfil_id": f"in.({ids})",
-                                                                     "select": "id,perfil_id,vacante_id"}, 1000):
-                    salida.setdefault(r["perfil_id"], set()).add(r["vacante_id"])
-        return salida
+        return recibidas_de(self.pedir, perfil_ids)
 
     def con_resumen(self):
         """Contrato v34: si la bandeja ya tiene la columna `resumen` (SQL 018). Se pregunta una vez por instancia."""
@@ -472,14 +508,7 @@ class RepositorioSupabase:
         return self.pedir("GET", "panel_ejecuciones", params={"order": "fecha.desc", "limit": 30})
 
     def _paginas(self, ruta, clave, params, tamano=500):
-        ultimo = ""
-        while True:
-            lote = self.pedir("GET", ruta, params={**params, "order": clave, "limit": tamano,
-                                                    **({clave: "gt." + str(ultimo)} if ultimo else {})})
-            yield from lote
-            if len(lote) < tamano:
-                return
-            ultimo = lote[-1][clave]
+        return paginar(self.pedir, ruta, clave, params, tamano)
 
     # Solo los campos que usan los filtros, leídos dentro de `datos`: ~1 MB en vez de descargar descripciones completas.
     CAMPOS_ESTIMACION = ("id,titulo:datos->>titulo,paises:datos->paises,confianza_pais:datos->>confianza_pais,"

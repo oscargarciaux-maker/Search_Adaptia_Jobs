@@ -12,6 +12,7 @@ from panel import afinidad, ejecutor, servicio, terminos
 from panel.api import crear_app
 from panel.modelos import Configuracion, Expansion, Perfil
 from panel.repositorio import ErrorRepositorio, RepositorioDemo, RepositorioSupabase, configuracion_demo, hoy
+from pruebas.postgrest_falso import como_postgrest, una_pagina
 
 
 @pytest.fixture
@@ -375,6 +376,7 @@ def test_registro_diario_reintentable_preserva_filtros_y_version(cfg):
     class Repo:
         def __init__(self):
             self.ejecucion, self.asignaciones = None, {}
+        @como_postgrest
         def pedir(self, metodo, ruta, **op):
             if ruta == "panel_ejecuciones":
                 if metodo == "GET": return [self.ejecucion] if self.ejecucion else []
@@ -404,6 +406,7 @@ def test_captura_fallida_queda_visible_sin_exponer_clientes(cfg,monkeypatch,tmp_
     cambios=[]
     class Repo:
         def operativa(self, fecha): return {"revision":1,"configuracion":cfg}
+        @como_postgrest
         def pedir(self, metodo, ruta, **op):
             if metodo=="GET": return [{"id":"ejemplo","revision":1}]
             cambios.append(op["json"])
@@ -495,7 +498,7 @@ def test_catalogo_vigente_lee_solo_campos_de_filtro_y_excluye_entregadas_copias_
         tabla = url.rsplit("/", 1)[1]
         llamadas.append((tabla, op["params"]))
         assert "description_full" not in op["params"]["select"]
-        return SimpleNamespace(status_code=200, content=b"x", json=lambda: filas[tabla])
+        return SimpleNamespace(status_code=200, content=b"x", json=lambda: una_pagina(op["params"], filas[tabla]))
     repo = RepositorioSupabase(SimpleNamespace(request=request))
     vacantes = repo.catalogo_vigente()["vacantes"]
     assert [v["id"] for v in vacantes] == ["e" * 16, "f" * 16]
@@ -760,6 +763,7 @@ def test_pasada_posterior_fallida_no_borra_el_resultado_del_dia(cfg, monkeypatch
     cambios = []
     class Repo:
         def operativa(self, fecha): return {"revision": 1, "configuracion": cfg}
+        @como_postgrest
         def pedir(self, metodo, ruta, **op):
             if metodo == "GET":
                 return [{"id": "ejemplo", "revision": 1, "estado": "parcial",
@@ -841,6 +845,7 @@ def test_registro_v27_asigna_sin_marcar_como_ampliada_una_vacante_sin_datos(cfg)
     asignaciones = []
     class Repo:
         ejecucion = None
+        @como_postgrest
         def pedir(self, metodo, ruta, **op):
             if ruta == "panel_ejecuciones":
                 if metodo == "GET": return [self.ejecucion] if self.ejecucion else []
@@ -876,6 +881,7 @@ def test_vacantes_de_un_dia_anterior_se_ven_entregadas_y_no_por_confirmar(cfg):
     asignaciones = []
     class Repo:
         ejecucion = None
+        @como_postgrest
         def pedir(self, metodo, ruta, **op):
             if ruta == "panel_ejecuciones":
                 if metodo == "GET": return [self.ejecucion] if self.ejecucion else []
@@ -1418,6 +1424,7 @@ class _RepoPaginas:
     def __init__(self, filas):
         self.filas, self.pedidos = filas, []
 
+    @como_postgrest
     def pedir(self, metodo, ruta, params=None, **_):
         self.pedidos.append(params)
         return [f for f in self.filas if not params.get("id") or f["id"] > params["id"][3:]][:params["limit"]]

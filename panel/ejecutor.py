@@ -16,7 +16,7 @@ from panel.acciones import CLAVE_PEDIDA, ENFOQUE_COMPLETO, ENFOQUE_FALTANTES, EN
 from panel import contenido
 from panel.modelos import Configuracion
 from pydantic import ValidationError
-from panel.repositorio import RepositorioSupabase, hoy
+from panel.repositorio import RepositorioSupabase, hoy, paginar, por_ids, recibidas_de
 from panel.terminos import en_espanol, grado, hermanos_del_cargo
 
 
@@ -502,17 +502,33 @@ def cargos_operativos(repo, cfg):
                                                  huellas.get(str(c.id))) for c in cfg.cargos}
 
 
-def _paginas(repo, ruta, params, tamano=500, maximo=5000):
-    salida = []
-    for inicio in range(0, maximo, tamano):
-        lote = repo.pedir("GET", ruta, params={**params, "limit": tamano, "offset": inicio}) or []
-        salida.extend(lote)
-        if len(lote) < tamano:
-            break
-    return salida
+def leer_recibidas(repo, perfil_ids):
+    """P-12.1: lo que cada persona ya recibió (`panel_asignaciones`, todo el historial), leído UNA vez por corrida para
+    los tres pasos que completan (reutilizar, rescatar y posts; antes eran tres lecturas). Trae una entrada por cada
+    persona pedida, aunque no tenga historial. Si la lectura falla devuelve None con un aviso sin datos de clientes, y
+    en esta corrida no se completa a nadie (la siguiente vuelve a intentarlo): con un historial a medias podría
+    repetirse una vacante."""
+    try:
+        return recibidas_de(repo.pedir, perfil_ids, tamano=500)
+    except Exception as e:  # noqa: BLE001 — sin el historial completo no se completa a nadie (regla de no repetir)
+        registro.aviso("ejecutor:recibidas", RuntimeError(
+            f"{type(e).__name__}: no se pudo leer completo lo que ya recibió cada persona; en esta corrida no se "
+            "completa a nadie con días anteriores, la bodega ni posts"))
+        return None
 
 
-def _reutilizar(repo, cfg, fecha, completar, filas, fila, operativos):
+def _vistas(recibidas, filas, bajos):
+    """{persona: lo que ya recibió + lo asignado en esta corrida}. `recibidas` se leyó una sola vez; lo que asignaron
+    los pasos anteriores de esta corrida está en `filas`. Una persona sin historial leído es un error: no se completa."""
+    if any(str(p.id) not in recibidas for _, p in bajos):
+        raise RuntimeError("Falta el historial de una persona: no se completa sin él")
+    vistas = {perfil: set(vacantes) for perfil, vacantes in recibidas.items()}
+    for f in filas:
+        vistas.setdefault(f["perfil_id"], set()).add(f["vacante_id"])
+    return vistas
+
+
+def _reutilizar(repo, cfg, fecha, completar, filas, fila, operativos, recibidas):
     """Contrato v11: a cada perfil que no llega a su objetivo (v49: su meta diaria; antes, el mínimo de 5) se le añaden
     vacantes elegidas en días anteriores (para otros clientes o por el cupo) que cumplen sus filtros —con las mismas
     ampliaciones— y que esa persona nunca recibió. No cambia la selección del día ni el cupo: solo la asignación por
@@ -521,24 +537,20 @@ def _reutilizar(repo, cfg, fecha, completar, filas, fila, operativos):
     if not bajos:
         return 0
     desde = (datetime.fromisoformat(fecha) - timedelta(days=DIAS_REUTILIZAR)).date().isoformat()
-    previas = _paginas(repo, "entregas_diarias", {"delivery_date": f"gte.{desde}", "select": "*",
-                                                  "order": "delivery_date.desc,vacante_id"})
-    previas = [r for r in previas if r.get("delivery_date", "") < fecha]
-    ids = ",".join(str(p.id) for _, p in bajos)
-    recibidas = {}
-    for r in _paginas(repo, "panel_asignaciones", {"perfil_id": f"in.({ids})", "select": "perfil_id,vacante_id"}):
-        recibidas.setdefault(r["perfil_id"], set()).add(r["vacante_id"])
-    clientes = ",".join({str(p.cliente_id) for _, p in bajos})
+    previas = list(paginar(repo.pedir, "entregas_diarias", "vacante_id",
+                           {"delivery_date": f"gte.{desde}", "select": "*"}))
+    # Las más recientes primero (y, el mismo día, por vacante), como antes pedía `order`.
+    previas = sorted((r for r in previas if r.get("delivery_date", "") < fecha), key=lambda r: r["delivery_date"],
+                     reverse=True)
+    vistas_por_perfil = _vistas(recibidas, filas, bajos)
     enviadas = {}
-    for b in _paginas(repo, "panel_borradores", {"cliente_id": f"in.({clientes})", "select": "cliente_id,vacantes"}):
+    for b in por_ids(repo.pedir, "panel_borradores", "cliente_id", (str(p.cliente_id) for _, p in bajos),
+                     "id,cliente_id,vacantes"):
         enviadas.setdefault(b["cliente_id"], set()).update(b.get("vacantes") or [])
-    hoy_por_perfil = {}
-    for f in filas:
-        hoy_por_perfil.setdefault(f["perfil_id"], set()).add(f["vacante_id"])
     añadidas = 0
     for cargo, p in bajos:
         raw = operativos[str(cargo.id)]
-        vistas = recibidas.get(str(p.id), set()) | enviadas.get(str(p.cliente_id), set()) | hoy_por_perfil.get(str(p.id), set())
+        vistas = vistas_por_perfil[str(p.id)] | enviadas.get(str(p.cliente_id), set())
         for row in previas:
             if not completar.falta(p):
                 break
@@ -601,8 +613,8 @@ def _comprobables(lista, cupo_ampliadas):
     return salida
 
 
-def _rescatar(repo, cfg, fecha, completar, filas, fila, vacantes, operativos, cache=None, comprobar=None, subir=None,
-              maximo=MAX_COMPROBAR_RESCATE, segundos=SEGUNDOS_RESCATE):
+def _rescatar(repo, cfg, fecha, completar, filas, fila, vacantes, operativos, recibidas, cache=None, comprobar=None,
+              subir=None, maximo=MAX_COMPROBAR_RESCATE, segundos=SEGUNDOS_RESCATE):
     """Contrato v36: a cada perfil que no llega a su objetivo (v49: su meta diaria) se le dan vacantes de toda la bodega de la noche que cumplen
     su ubicación e idioma (lo demás ordena, v27), con enlace comprobado en 24 h, que esa persona nunca recibió —aunque
     otro cliente sí— y con máximo 2 por empresa. Los enlaces que falten se comprueban aquí mismo (como mucho
@@ -614,12 +626,7 @@ def _rescatar(repo, cfg, fecha, completar, filas, fila, vacantes, operativos, ca
     if not bajos or not vacantes:
         return 0
     ahora = datetime.now(timezone.utc)
-    ids = ",".join(str(p.id) for _, p in bajos)
-    vistas = {}
-    for r in _paginas(repo, "panel_asignaciones", {"perfil_id": f"in.({ids})", "select": "perfil_id,vacante_id"}):
-        vistas.setdefault(r["perfil_id"], set()).add(r["vacante_id"])
-    for f in filas:
-        vistas.setdefault(f["perfil_id"], set()).add(f["vacante_id"])
+    vistas = _vistas(recibidas, filas, bajos)
     utiles = [v for v in vacantes if v.get("tipo") != "post" and v.get("titulo")
               and not contrato.entregable(dict(v, verificacion=None), panel=True)]
     # 1) Candidatas de cada perfil, de mejor a peor (grado, lo que no cumple, más reciente).
@@ -706,7 +713,7 @@ def _rescatar(repo, cfg, fecha, completar, filas, fila, vacantes, operativos, ca
 DIAS_POSTS = 2  # un post se comparte el día en que se leyó o el siguiente (su comprobación vale 24 h)
 
 
-def _posts(repo, cfg, fecha, estrictas, filas, fila, operativos):
+def _posts(repo, cfg, fecha, estrictas, filas, fila, operativos, recibidas):
     """Contrato v11 (segunda parte): a cada perfil que sigue bajo el mínimo se le asignan posts de LinkedIn del cargo,
     solo hasta completar el mínimo. Cumplen sus filtros (los datos que el post no dice se admiten como «sin dato»,
     igual que una ampliación) y esa persona nunca los recibió. No cuentan en el cupo ni van a `ofertas`."""
@@ -716,9 +723,11 @@ def _posts(repo, cfg, fecha, estrictas, filas, fila, operativos):
     if not bajos:
         return 0
     desde = (datetime.fromisoformat(fecha) - timedelta(days=DIAS_POSTS)).date().isoformat()
-    posts = _paginas(repo, "catalogo_vacantes", {"status": "eq.active", "datos->>tipo": "eq.post",
-                                                 "observed_at": f"gte.{desde}", "select": "id,datos,description_full",
-                                                 "order": "observed_at.desc"}, maximo=1000)
+    posts = list(paginar(repo.pedir, "catalogo_vacantes", "id", {"status": "eq.active", "datos->>tipo": "eq.post",
+                                                                 "observed_at": f"gte.{desde}",
+                                                                 "select": "id,datos,description_full,observed_at"}))
+    # Los más recientes primero, como antes pedía `order` (antes además se cortaba en 1.000 sin avisar).
+    posts.sort(key=lambda r: r.get("observed_at") or "", reverse=True)
     candidatos = []
     for row in posts:
         datos = vacante_mod.reetiquetar(dict(row.get("datos") or {}, _descripcion=row.get("description_full") or ""),
@@ -727,12 +736,7 @@ def _posts(repo, cfg, fecha, estrictas, filas, fila, operativos):
             candidatos.append({"vacante_id": row["id"], "snapshot": datos})
     if not candidatos:
         return 0
-    ids = ",".join(str(p.id) for _, p in bajos)
-    vistas_por_perfil = {}
-    for r in _paginas(repo, "panel_asignaciones", {"perfil_id": f"in.({ids})", "select": "perfil_id,vacante_id"}):
-        vistas_por_perfil.setdefault(r["perfil_id"], set()).add(r["vacante_id"])
-    for f in filas:
-        vistas_por_perfil.setdefault(f["perfil_id"], set()).add(f["vacante_id"])
+    vistas_por_perfil = _vistas(recibidas, filas, bajos)
     añadidos = 0
     # Contrato v28: primero los posts con ubicación clara, después los deducidos y al final los sin confirmar.
     candidatos.sort(key=lambda row: ("", "deducida", "sin_confirmar").index(post_ubicacion(row["snapshot"])))
@@ -787,7 +791,9 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
         return bool(getattr(clientes.get(str(p.cliente_id)), "comunidad", False))
     operativos = cargos_operativos(repo, cfg)
     cargos_json = {str(c.id): operativos[str(c.id)] for c in cfg.cargos if c.activo}
-    seleccionadas = repo.pedir("GET", "entregas_diarias", params={"delivery_date": "eq." + fecha, "select": "*", "limit": 500})
+    # P-12.1: todo el lote del día (antes se cortaba en 500 sin avisar, con un techo de hasta 600).
+    seleccionadas = list(paginar(repo.pedir, "entregas_diarias", "vacante_id",
+                                 {"delivery_date": "eq." + fecha, "select": "*"}))
     filas, conteos, estrictas, ampliables = [], {}, {}, []
     def fila(row, p, cargo_id, pruebas, extra=()):
         # Contrato v49: el cargo operativo (el mismo con que se clasificó), la coincidencia del cargo que la RECIBE
@@ -860,22 +866,26 @@ def registrar(repo, version, fecha, reporte=None, reglas_info=None, vacantes=Non
     completar = Completar(cfg, estrictas, filas, [r["vacante_id"] for r in seleccionadas], ya_hoy)
     if ya_hoy is None:
         completar.metas = dict.fromkeys(completar.metas, MINIMO_POR_PERFIL)
-    try:
-        reutilizadas = _reutilizar(repo, cfg, fecha, completar, filas, fila, operativos)
-    except Exception as e:  # noqa: BLE001 — completar con días anteriores nunca impide registrar lo del día
-        registro.aviso("ejecutor:329", e)
-    if vacantes:
-        bodega.etapa("Completar a quien va corto con toda la bodega")
+    # P-12.1: una sola lectura de lo que ya recibió cada persona que va corta (los posts solo miran a quien va bajo 5,
+    # que ya está entre ellas). Si falla, esta corrida solo registra el lote: nada se completa con datos a medias.
+    recibidas = leer_recibidas(repo, [str(p.id) for _, p in completar.bajos(cfg)])
+    if recibidas is not None:
         try:
-            rescatadas = _rescatar(repo, cfg, fecha, completar, filas, fila, vacantes, operativos, cache=cache_enlaces,
-                                   maximo=limites_rescate[0], segundos=limites_rescate[1])
-        except Exception as e:  # noqa: BLE001 — completar nunca impide registrar lo del día
-            registro.aviso("ejecutor:rescate-general", e)
-    bodega.etapa(f"Asignadas {len(filas)}; completar con posts a quien va corto")
-    try:
-        posts = _posts(repo, cfg, fecha, estrictas, filas, fila, operativos)
-    except Exception as e:  # noqa: BLE001 — los posts son el último recurso; nunca impiden registrar lo del día
-        registro.aviso("ejecutor:334", e)
+            reutilizadas = _reutilizar(repo, cfg, fecha, completar, filas, fila, operativos, recibidas)
+        except Exception as e:  # noqa: BLE001 — completar con días anteriores nunca impide registrar lo del día
+            registro.aviso("ejecutor:329", e)
+        if vacantes:
+            bodega.etapa("Completar a quien va corto con toda la bodega")
+            try:
+                rescatadas = _rescatar(repo, cfg, fecha, completar, filas, fila, vacantes, operativos, recibidas,
+                                       cache=cache_enlaces, maximo=limites_rescate[0], segundos=limites_rescate[1])
+            except Exception as e:  # noqa: BLE001 — completar nunca impide registrar lo del día
+                registro.aviso("ejecutor:rescate-general", e)
+        bodega.etapa(f"Asignadas {len(filas)}; completar con posts a quien va corto")
+        try:
+            posts = _posts(repo, cfg, fecha, estrictas, filas, fila, operativos, recibidas)
+        except Exception as e:  # noqa: BLE001 — los posts son el último recurso; nunca impiden registrar lo del día
+            registro.aviso("ejecutor:334", e)
     aporte_apify = None
     try:  # 8.2: qué aportó Apify a lo asignado hoy (solo conteos; nunca perfiles ni vacantes)
         from buscador import medicion_apify

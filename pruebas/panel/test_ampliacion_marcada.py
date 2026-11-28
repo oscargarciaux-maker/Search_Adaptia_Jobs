@@ -9,6 +9,7 @@ import pytest
 from panel import ejecutor, servicio
 from panel.afinidad import ETIQUETAS_AMPLIACION, MINIMO_POR_PERFIL
 from panel.repositorio import hoy
+from pruebas.postgrest_falso import como_postgrest
 from pruebas.panel.test_control import SIN_DATO, _elegir, _oferta, cfg, cfg_un_perfil  # noqa: F401 (fixtures)
 
 
@@ -45,6 +46,7 @@ class _Registro:
     def __init__(self, rid, v):
         self.rid, self.v, self.asignaciones = rid, v, []
 
+    @como_postgrest
     def pedir(self, metodo, ruta, **op):
         if ruta == "panel_ejecuciones":
             if metodo == "GET":
@@ -94,6 +96,7 @@ class _Supabase:
     def __init__(self, previas=()):
         self.previas, self.asignaciones = list(previas), []
 
+    @como_postgrest
     def pedir(self, metodo, ruta, **op):
         params = op.get("params") or {}
         if ruta == "panel_ejecuciones":
@@ -166,6 +169,7 @@ class _ConPasadaAnterior(_Supabase):
     def asignadas_de(self, ejecucion_id):
         return self.ya
 
+    @como_postgrest
     def pedir(self, metodo, ruta, **op):
         if ruta == "entregas_diarias" and (op.get("params") or {}).get("delivery_date") == "eq." + hoy():
             return self.lote

@@ -88,6 +88,7 @@ jobs:
           python -m pruebas.probar_revision
           python -m pruebas.probar_inventario
           python -m pruebas.probar_lote_grande
+          python -m pruebas.probar_recibidas
   pruebas:
     runs-on: ubuntu-latest
     timeout-minutes: 15

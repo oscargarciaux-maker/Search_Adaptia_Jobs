@@ -10,6 +10,7 @@ from buscador import familias, vacante
 from buscador.fuentes import indeed, linkedin_publico
 from panel import ejecutor
 from panel.repositorio import configuracion_demo, hoy
+from pruebas.postgrest_falso import como_postgrest
 
 TEXTO = ("We are hiring a Product Designer for our product team. You will run user research, design flows in Figma "
          "and work with engineering every day. ") * 3
@@ -42,6 +43,7 @@ class Repo:
     def __init__(self, recibidas=()):
         self.ejecucion, self.asignaciones, self.recibidas = None, [], list(recibidas)
 
+    @como_postgrest
     def pedir(self, metodo, ruta, **op):
         params = op.get("params") or {}
         if ruta == "panel_ejecuciones":
