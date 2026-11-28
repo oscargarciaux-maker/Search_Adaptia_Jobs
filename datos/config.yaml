@@ -39,6 +39,7 @@ incremental:
   linkedin_busquedas: 24
   linkedin_fichas: 48
   linkedin_relectura: 48     # avisos guardados sin descripción que se releen cada hora (sin ella no se pueden entregar)
+  linkedin_parte_relectura: 0.35  # P-17.3: parte de los 2 min de LinkedIn reservada a esa relectura (antes le quedaban 0 s)
   indeed_busquedas: 6
   ats_detalles: 20
   rotacion_empresas: 30

@@ -60,6 +60,12 @@ def configurar_personas(personas=None):
     BUSQUEDAS.clear()
 
 
+def familias_solo_espanol():
+    """P-17.3: cargos de las personas que solo aceptan avisos en español. Sin descripción no se sabe el idioma y a
+    ellas no les llega nada: sus remotas de países hispanos sin descripción se leen primero."""
+    return {p["familia"] for p in _PERSONAS if set(p.get("idiomas") or ()) == {"es"}}
+
+
 def anotar_busqueda(fuente, familia, lugar):
     BUSQUEDAS[(fuente, familia, str(lugar))] += 1
 
