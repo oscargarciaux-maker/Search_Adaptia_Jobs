@@ -116,13 +116,17 @@ def _con_fuentes_propias():
         c for s in sitemaps_empleo.SITIOS.values() for c in s["sitemaps"]}
 
 
+# Fuentes que buscan para cualquier país del mundo (contrato §9, v44); las demás de `fuentes_en` son locales (8.1).
+FUENTES_GENERICAS = ("LinkedIn", "Portales de empresas", "Get on Board (remotas)")
+
+
 def fuentes_en(pais):
     """Contrato v44 (decisión de Oscar: «cualquier persona, en cualquier país»): fuentes que buscan para alguien que
     vive en `pais`, con títulos en español si solo habla español. LinkedIn y los portales de empresas cubren todo el
     mundo; Get on Board aporta remotas abiertas a cualquier país (y a LATAM); Indeed, sus 62 países; las locales,
     donde existen. Sin IA: sale de las listas de cada fuente."""
     from buscador.fuentes import computrabajo, elempleo, indeed, infojobs, jobint, sitemaps_empleo, tecnoempleo
-    salida = ["LinkedIn", "Portales de empresas", "Get on Board (remotas)"]
+    salida = list(FUENTES_GENERICAS)
     if pais in indeed.PAISES:
         salida.append("Indeed")
     if pais in computrabajo.SITIOS:

@@ -5061,29 +5061,35 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   color: var(--muted);
   font-size: 12px;
 }
-.tabla-cobertura {
+.tabla-cobertura,
+.tabla-huecos {
   overflow-x: auto;
 }
-.tabla-cobertura table {
+.tabla-cobertura table,
+.tabla-huecos table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
 }
 .tabla-cobertura th,
-.tabla-cobertura td {
+.tabla-cobertura td,
+.tabla-huecos th,
+.tabla-huecos td {
   text-align: left;
   padding: 8px 10px;
   border-top: 1px solid var(--line);
   vertical-align: top;
 }
-.tabla-cobertura thead th {
+.tabla-cobertura thead th,
+.tabla-huecos thead th {
   border-top: 0;
   font-size: 12px;
   color: var(--muted);
   font-weight: 600;
   white-space: nowrap;
 }
-.tabla-cobertura .num {
+.tabla-cobertura .num,
+.tabla-huecos .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

@@ -1972,7 +1972,14 @@ test("huecos por país: aviso al aplicar, tabla y copiar pedido de fuente nueva"
   const cab = { Origin: "http://127.0.0.1:8001" };
   const estado = await (await request.get("/api/config")).json();
   const cfg = structuredClone(estado.borrador);
-  cfg.perfiles[0] = { ...cfg.perfiles[0], vive_en: "GH", ubicaciones: [] };
+  // Otras pruebas pueden dejar perfiles a medio editar: aquí todos quedan en remoto, y el primero vive en Ghana.
+  cfg.perfiles = cfg.perfiles.map((p: Record<string, unknown>) => ({
+    ...p,
+    ubicaciones: [],
+    modalidades: ["remoto"],
+    ciudades: [],
+  }));
+  cfg.perfiles[0].vive_en = "GH";
   const r = await request.put("/api/config", {
     headers: cab,
     data: { revision: estado.revision, configuracion: cfg },
@@ -2027,7 +2034,8 @@ test("huecos por país: aviso al aplicar, tabla y copiar pedido de fuente nueva"
     .getByRole("button", { name: "Editar Cliente de ejemplo 02", exact: true })
     .click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel(/Es un grupo de WhatsApp/).check();
+  const grupo = dialog.getByLabel(/Es un grupo de WhatsApp/);
+  await grupo.setChecked(!(await grupo.isChecked())); // otra prueba pudo dejarla marcada
   await dialog.getByRole("button", { name: "Aplicar cambios" }).click();
   await expect(
     page.getByText(/Aviso de cobertura: Kenia: sin fuente local/),

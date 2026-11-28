@@ -84,9 +84,9 @@ export function useConfiguracion(notify: (s: string, error?: boolean) => void) {
             configuracion: config,
           }),
         });
-        riesgo = avisosCobertura(r.avisos_cobertura);
-        delete r.avisos_cobertura;
-        actual = { ...estado, ...r };
+        const { avisos_cobertura, ...guardado } = r;
+        riesgo = avisosCobertura(avisos_cobertura);
+        actual = { ...estado, ...guardado };
         setEstado(actual);
       }
       // También cuando lo pedido ya era lo guardado (p. ej. reactivar lo que se había archivado sin aplicar).

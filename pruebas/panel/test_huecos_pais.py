@@ -60,7 +60,7 @@ def test_estado_por_pais_distingue_cubierto_riesgo_y_hueco():
     assert t["CO"]["estado"] == "cubierto" and t["CO"]["pedido"] == "" and t["CO"]["fuentes_locales"] > 0
     assert t["KE"]["estado"] == "riesgo" and t["KE"]["bajo_minimo"] == 0
     assert t["GH"]["estado"] == "hueco" and t["GH"]["bajo_minimo"] == 1
-    assert t["GH"]["fuentes"] == list(huecos.GENERICAS)
+    assert t["GH"]["fuentes"] == list(huecos.FUENTES_GENERICAS)
     # El cargo que no tiene vacantes en ningún sitio no es un hueco del país: queda solo en riesgo.
     assert t["ET"]["estado"] == "riesgo" and t["ET"]["bajo_minimo"] == 1
     # Híbrido en Tanzania crea país; la remota en Uganda (y en cualquier parte) no.
@@ -84,6 +84,7 @@ def test_las_causas_que_se_leen_existen_en_cobertura():
     """Si `servicio.cobertura` cambia el texto de sus causas, la tabla dejaría de ver huecos: esto lo avisa."""
     fuente = inspect.getsource(servicio.cobertura)
     assert huecos.CAUSA_POCAS_VACANTES in fuente and "oficina en otro país" in servicio.SUGERENCIAS
+    assert "no le sirven por «{m}»" in fuente  # MOTIVO_OTRO_PAIS lee el motivo entre «»
 
 
 def test_el_pedido_solo_lleva_pais_idiomas_familias_y_modalidades():
@@ -111,6 +112,9 @@ def test_aviso_al_guardar_solo_por_paises_nuevos_sin_fuente_local():
     assert huecos.aviso_al_guardar(None, remoto) == ["Tanzania: sin fuente local; riesgo de quedar bajo 5."]
     archivado = _cfg({"gh": {"vive_en": "GH", "activo": False}})
     assert huecos.aviso_al_guardar(None, archivado) == []
+    cliente_archivado = _cfg({"gh": {"vive_en": "GH"}})
+    cliente_archivado["clientes"][0]["activo"] = False  # nadie lo busca: no avisa
+    assert huecos.aviso_al_guardar(None, cliente_archivado) == []
 
 
 def test_api_avisa_al_guardar_sin_bloquear():

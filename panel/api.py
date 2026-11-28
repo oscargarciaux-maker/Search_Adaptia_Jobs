@@ -380,14 +380,17 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
             registro.aviso("api:avisos-cobertura", e)
             return []
 
+    def _borrador_anterior():
+        try:
+            return repo.config().get("borrador")
+        except ErrorRepositorio as e:  # sin lo anterior, se avisa de todos los países sin fuente local
+            registro.aviso("api:config-anterior", e)
+            return None
+
     @app.put("/api/config")
     def guardar(body: Guardar):
         nueva = body.configuracion.model_dump(mode="json")
-        try:
-            anterior = repo.config().get("borrador")
-        except ErrorRepositorio as e:  # sin lo anterior, se avisa de todos los países sin fuente local
-            registro.aviso("api:config-anterior", e)
-            anterior = None
+        anterior = _borrador_anterior()
         r = repo.guardar(body.revision, nueva)
         avisos = _avisos_cobertura(anterior, nueva)
         return {**r, "avisos_cobertura": avisos} if isinstance(r, dict) else r
@@ -411,7 +414,7 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         from panel import importar
         if body.revision is None:
             raise HTTPException(422, "Falta la revisión de la configuración.")
-        anterior = repo.config().get("borrador")
+        anterior = _borrador_anterior()
         r = importar.importar(repo, body.revision, body.contenido, body.actuales, body.confirmacion)
         estado = repo.config()
         return {**r, "estado": a_v8(estado), "avisos_cobertura": _avisos_cobertura(anterior, estado.get("borrador"))}

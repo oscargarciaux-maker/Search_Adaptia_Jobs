@@ -8,12 +8,13 @@
   perfil delataría a un cliente, así que nada de esto sale del panel privado (ni mensajes, ni logs, ni `publicado`).
 Sin IA: sale de las listas de cada fuente (`ejecutor.fuentes_en`) y de las causas que ya calcula `servicio.cobertura`.
 """
+from dataclasses import dataclass, field
+
 from buscador import paises
 from panel.contenido import familia_del_mapa
-from panel.ejecutor import _region_de, fuentes_en
+from panel.ejecutor import FUENTES_GENERICAS, fuentes_en, lugares_perfil
 
-# Fuentes que buscan en cualquier país del mundo (contrato §9, v44): no cuentan como fuente local.
-GENERICAS = ("LinkedIn", "Portales de empresas", "Get on Board (remotas)")
+OFICINA = {"hibrido", "presencial"}
 MODOS = ("remoto", "hibrido", "presencial")
 NOMBRE_MODO = {"remoto": "remoto", "hibrido": "híbrido", "presencial": "presencial"}
 
@@ -25,23 +26,20 @@ MOTIVO_OTRO_PAIS = "«oficina en otro país»"
 
 
 def fuentes_locales(pais):
-    return [f for f in fuentes_en(pais) if f not in GENERICAS]
+    """Decisión de la 8.1: «sin fuente local» = solo la buscan LinkedIn, Portales de empresas y Get on Board. Indeed
+    cuenta como local (aunque el reparto de turnos de v40, `_con_fuentes_propias`, no la cuente)."""
+    return [f for f in fuentes_en(pais) if f not in FUENTES_GENERICAS]
 
 
 def paises_del_perfil(p):
-    """{país: modalidades} de un perfil: donde vive (con todas sus modalidades de esa fila; «remoto en su país» cuenta)
-    y los países donde acepta híbrido o presencial. Una fila de región (Europa, LATAM…) se busca como región y no crea
-    países sueltos; la remota en otros países o en cualquier parte tampoco."""
-    salida = {p.vive_en: set()}
-    for fila in p.filas:
-        oficina = {"hibrido", "presencial"} & set(fila.modalidades)
-        if p.vive_en in fila.paises:
-            salida[p.vive_en] |= set(fila.modalidades)
-        if oficina and not _region_de(fila.paises):
-            for c in fila.paises:
-                salida.setdefault(c, set()).update(oficina)
-    if not salida[p.vive_en]:
-        salida[p.vive_en] = set(p.modalidades)
+    """{país: modalidades} de un perfil: donde vive (con las modalidades de sus filas; «remoto en su país» cuenta) y los
+    países donde se le busca en oficina (híbrido o presencial), los mismos que busca `lugares_perfil` (con una región,
+    sus países principales). La remota en otros países o en cualquier parte no crea país."""
+    oficina = [k for k in lugares_perfil(p) if len(k) == 2 and k.isalpha() and k.isupper()]
+    salida = {}
+    for c in dict.fromkeys([p.vive_en, *oficina]):
+        modos = {m for f in p.filas if c in f.paises for m in f.modalidades}
+        salida[c] = (modos or set(p.modalidades)) if c == p.vive_en else (modos & OFICINA or set(OFICINA))
     return salida
 
 
@@ -61,9 +59,12 @@ def aviso_al_guardar(anterior, nueva):
     from panel.modelos import Perfil
 
     def mapa(cfg):
+        cfg = cfg or {}
+        activos = {str(x.get("id")) for k in ("clientes", "cargos") for x in cfg.get(k) or []
+                   if isinstance(x, dict) and x.get("activo", True)}
         salida = {}
-        for crudo in (cfg or {}).get("perfiles") or []:
-            if not isinstance(crudo, dict) or not crudo.get("activo", True):
+        for crudo in cfg.get("perfiles") or []:
+            if not isinstance(crudo, dict) or not crudo.get("activo", True)                     or not {str(crudo.get("cliente_id")), str(crudo.get("cargo_id"))} <= activos:
                 continue
             try:
                 p = Perfil.model_validate(crudo)
@@ -93,6 +94,18 @@ def pedido(nombre_pais, idiomas, familias, modalidades):
             "Busca portales locales donde se postula ahí mismo, sin sesión. Es para hoy: deja el PR listo para revisar.")
 
 
+@dataclass
+class _Pedido:
+    idiomas: set = field(default_factory=set)
+    familias: set = field(default_factory=set)
+    modos: set = field(default_factory=set)
+
+    def sumar(self, p, familia, modos):
+        self.idiomas.update(p.idiomas)
+        self.familias.add(familia)
+        self.modos.update(modos)
+
+
 def por_pais(cob, cfg):
     """Tabla «Huecos por país» a partir de `servicio.cobertura` y la configuración vigente (validada). Por país: perfiles,
     cuántos quedaron bajo el mínimo en la última búsqueda, fuentes que lo buscan, estado (cubierto / riesgo / hueco) y,
@@ -102,38 +115,34 @@ def por_pais(cob, cfg):
         return []
     minimo = cob["minimo"]
     perfiles = {str(p.id): p for p in cfg.perfiles}
-    cargos = {str(c.id): c for c in cfg.cargos}
     nombres = _nombres()
     filas = {}
     for f in cob["perfiles"]:
         p = perfiles.get(f["perfil_id"])
         if p is None:
             continue
-        familia = _familia(cargos[str(p.cargo_id)].nombre if str(p.cargo_id) in cargos else f.get("cargo"))
+        familia = _familia(f["cargo"])
         donde = paises_del_perfil(p)
         hueco = es_hueco_por_fuentes(f, minimo)
         marcados = [c for c in donde if not fuentes_locales(c)] or [p.vive_en]
         for codigo, modos in donde.items():
             g = filas.setdefault(codigo, {"pais": codigo, "nombre": nombres.get(codigo, codigo), "perfiles": 0,
-                                          "bajo_minimo": 0, "huecos": 0, "_todos": [set(), set(), set()],
-                                          "_hueco": [set(), set(), set()]})
+                                          "bajo_minimo": 0, "huecos": 0, "todos": _Pedido(), "hueco": _Pedido()})
             g["perfiles"] += 1
             if f["dias_medidos"] and f["hoy"] < minimo:
                 g["bajo_minimo"] += 1
-            for destino in [g["_todos"]] + ([g["_hueco"]] if hueco and codigo in marcados else []):
-                destino[0].update(p.idiomas)
-                destino[1].add(familia)
-                destino[2].update(modos)
+            g["todos"].sumar(p, familia, modos)
             if hueco and codigo in marcados:
+                g["hueco"].sumar(p, familia, modos)
                 g["huecos"] += 1
     salida = []
     for codigo, g in filas.items():
         locales = fuentes_locales(codigo)
         estado = "hueco" if g["huecos"] else ("riesgo" if not locales else "cubierto")
-        base = g["_hueco"] if estado == "hueco" else g["_todos"]
+        base = g["hueco"] if estado == "hueco" else g["todos"]
         salida.append({"pais": codigo, "nombre": g["nombre"], "perfiles": g["perfiles"],
                        "bajo_minimo": g["bajo_minimo"], "fuentes": fuentes_en(codigo), "fuentes_locales": len(locales),
-                       "estado": estado, "pedido": pedido(g["nombre"], *base) if estado != "cubierto" else ""})
+                       "estado": estado, "pedido": pedido(g["nombre"], base.idiomas, base.familias, base.modos) if estado != "cubierto" else ""})
     orden = {"hueco": 0, "riesgo": 1, "cubierto": 2}
     salida.sort(key=lambda x: (orden[x["estado"]], -x["bajo_minimo"], x["nombre"]))
     return salida

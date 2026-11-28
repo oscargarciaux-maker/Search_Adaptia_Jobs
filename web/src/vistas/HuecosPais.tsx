@@ -54,7 +54,7 @@ export function HuecosPorPais({
           panel.
         </Ayuda>
       </h3>
-      <div className="tabla-cobertura">
+      <div className="tabla-huecos">
         <table aria-labelledby="huecos-titulo">
           <thead>
             <tr>
