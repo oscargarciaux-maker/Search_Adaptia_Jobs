@@ -99,6 +99,19 @@ jobs:
           cache: pip
       - run: pip install --require-hashes -r requirements.txt
       - run: python -m pytest -q
+  pruebas-windows:
+    # El operador trabaja en Windows: detecta roturas de codificación, rutas y saltos de línea.
+    # Sin PYTHONUTF8 a propósito. Solo pytest.
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install --require-hashes -r requirements.txt
+      - run: python -m pytest -q
   auditoria:
     # PR 1.5 (16 nov): bloquea lo grave (errores de Python, vulnerabilidades conocidas, seguridad alta); lo demás informa.
     runs-on: ubuntu-latest
