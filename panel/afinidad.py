@@ -86,15 +86,20 @@ def evaluar_asignada(v, perfil, hoy, ampliacion=""):
     return evaluar(v, perfil, hoy)
 
 
+def titulo_del_cargo(v, cargo):
+    """¿El título de la vacante corresponde al cargo operativo? (`grado` con cercanos, contrato v27)."""
+    from panel.terminos import grado  # aquí: terminos carga el mapa de cargos y no hace falta al importar afinidad
+    return bool(grado(v.get("titulo") or "", cargo, cercanos=True)[0])
+
+
 def encaja_asignada(v, perfil, cargo, hoy, ampliacion="", aprobada=False):
     """7.H (decisión de Oscar, 28 nov): la regla única de «¿esta vacante le sigue sirviendo a quien se le asignó?», la
     misma en el panel (`servicio.resultados`) y en la comprobación final de la Bodega (`bodega.afinidad_vigente`). Encaja
     si cumple el perfil y su título corresponde al cargo operativo (`grado` con cercanos), aunque otro cargo la
     reconozca mejor. Una aprobada a mano en «Por confirmar» no se vuelve a mirar por el título. Devuelve la evaluación
     del perfil (con `compatible` y `motivos` ya ajustados por el cargo)."""
-    from panel.terminos import grado  # aquí: terminos carga el mapa de cargos y no hace falta al importar afinidad
     r = evaluar_asignada(v, perfil, hoy, ampliacion)
-    if not aprobada and not grado(v.get("titulo") or "", cargo, cercanos=True)[0]:
+    if not aprobada and not titulo_del_cargo(v, cargo):
         r = dict(r, compatible=False, motivos=[*r["motivos"], MOTIVO_TITULO_AJENO])
     return r
 

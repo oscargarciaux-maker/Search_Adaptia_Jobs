@@ -53,9 +53,10 @@ def test_otro_cargo_la_reconoce_mejor_pero_encaja_con_el_perfil_no_cuenta(con_ux
     v = _clasificada(con_ux, trabajo(titulo="UX Designer"))
     pd, ux = por_nombre["Product Designer"], por_nombre["UX Designer"]
     assert not bodega._empata(v, pd, roles)  # la regla vieja: «UX Designer» la reconoce mejor → falso «ya no encaja»
-    assert bodega.afinidad_vigente(v, v, pd, roles, {v["id"]: v})  # 7.H: encaja con el perfil de Product Designer
+    vigente = bodega.afinidad_vigente(v, v, pd, roles, {v["id"]: v})
+    assert vigente  # 7.H: encaja con el perfil de Product Designer
     assert bodega.afinidad_vigente(v, v, ux, roles, {v["id"]: v})
-    entrada = {"id": v["id"], "afinidad_vigente": bodega.afinidad_vigente(v, v, pd, roles, {v["id"]: v}),
+    entrada = {"id": v["id"], "afinidad_vigente": vigente,
                "catalog_status": "active", "verificacion": {"estado": "verificada"}}
     reporte = _reporte(seleccion_actual={"roles": {pd["id"]: {"nombre": pd["nombre"], "vacantes": [entrada]}}})
     assert validacion.estado(reporte) == validacion.COMPLETA and not validacion.cortos(reporte)  # sin aviso
@@ -111,3 +112,11 @@ def test_bodega_y_panel_dan_el_mismo_resultado(con_ux, cambios, encaja):
     ficha = servicio.resultados(repo)["vacantes"][0]
     assert (ficha["estado"] == "lista") is encaja
     assert afinidad.encaja_asignada(v, perfil, pd["_cargo"], hoy())["compatible"] is encaja
+
+
+def test_los_posts_siguen_la_misma_regla(con_ux):
+    por_nombre, roles = _roles(con_ux)
+    pd = por_nombre["Product Designer"]
+    post = dict(_clasificada(con_ux, trabajo()), tipo="post")  # la Bodega ahora usa `evaluar_post`, como el panel
+    assert bodega.afinidad_vigente(post, post, pd, roles, {post["id"]: post})
+    assert afinidad.encaja_asignada(post, pd["_perfiles"][0], pd["_cargo"], hoy())["compatible"]

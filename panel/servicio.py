@@ -10,7 +10,8 @@ import time
 from buscador import contrato, enlaces, paises, registro, vacante
 from buscador.normalizar import titulo_base
 from panel.afinidad import (AMPLIACIONES, ETIQUETAS_AMPLIACION, MINIMO_POR_PERFIL, encaja_asignada, enlace_utilizable,
-                            evaluar, evaluar_ampliada, evaluar_asignada, post_ubicacion)
+                            evaluar, evaluar_ampliada, evaluar_asignada, post_ubicacion,
+                            titulo_del_cargo)
 from panel.modelos import Perfil
 from panel.repositorio import ErrorRepositorio, hoy, numeros
 from panel.terminos import grado, sugerir
@@ -252,10 +253,6 @@ def calidad(ficha):
             -int((ficha.get("publicada") or "0000-00-00").replace("-", "")[:8] or 0))
 
 
-def _evaluar_asignada(actual, perfil, ampliacion):
-    return evaluar_asignada(actual, perfil, hoy(), ampliacion)
-
-
 # 7.G (decisión de Oscar, 27 nov): marca de la vacante de hoy que ya no encaja; no se comparte.
 NO_ENCAJA_PERFIL = "ya no encaja con el cargo: se editó el perfil después de asignarla"
 NO_ENCAJA_CARGO = "ya no encaja con el cargo: se editó el cargo después de asignarla"
@@ -302,12 +299,14 @@ class _ConfiguracionVigente:
         perfil = self.perfil(str(row.get("perfil_id")))
         # Solo si el perfil cambió: sin cambios da lo mismo que la copia y se ahorra evaluar dos veces.
         # Una ampliada vale también si el perfil editado ya la acepta sin ampliar (p. ej. ahora admite remoto).
-        if perfil and perfil != row.get("filtros") and not _evaluar_asignada(actual, perfil, ampliacion)["compatible"] \
-                and not (ampliacion and _evaluar_asignada(actual, perfil, "")["compatible"]):
+        dia = hoy()
+        if perfil and perfil != row.get("filtros") \
+                and not evaluar_asignada(actual, perfil, dia, ampliacion)["compatible"] \
+                and not (ampliacion and evaluar_asignada(actual, perfil, dia)["compatible"]):
             return NO_ENCAJA_PERFIL
         cargo = None if aprobada else self.cargo(str(row.get("cargo_id")))
         if cargo and _cargo_editado(cargo, row.get("cargo_configuracion") or {}) \
-                and not grado(actual["titulo"], cargo, cercanos=True)[0]:
+                and not titulo_del_cargo(actual, cargo):
             return NO_ENCAJA_CARGO
         return ""
 
