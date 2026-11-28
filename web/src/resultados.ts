@@ -13,9 +13,11 @@ export function useResultados(
   tab: string,
   notify: (s: string, error?: boolean) => void,
 ) {
-  const [results, setResults] = useState<Resultados | null>(null);
-  // De qué cliente y día es la lista que se ve: solo esa se deja a la vista mientras llega la nueva.
-  const [deResultados, setDeResultados] = useState("");
+  // La última lista recibida y de qué cliente y día es: solo se muestra si es la del cliente y día elegidos.
+  const [guardada, setGuardada] = useState<{
+    clave: string;
+    datos: Resultados;
+  } | null>(null);
   const peticionResultados = useRef(0);
   // Contrato v48: al llegar desde «Tomar vacantes» del detalle, el foco queda en «Copiar WhatsApp».
   const enfocarWhatsApp = useRef(false);
@@ -24,12 +26,11 @@ export function useResultados(
   const [consultando, setConsultando] = useState(false);
   const [errorResultados, setErrorResultados] = useState(false);
   const clave = selectedClient + "|" + resultDate;
+  const results = guardada?.clave === clave ? guardada.datos : null;
   async function cargarResultados() {
     const turno = ++peticionResultados.current;
     if (!sesion?.sesion) return;
     setConsultando(true);
-    // Otro cliente u otro día: la lista anterior no es de ellos y no se muestra.
-    if (clave !== deResultados) setResults(null);
     setErrorResultados(false);
     try {
       const r = await api<Resultados>(
@@ -40,8 +41,7 @@ export function useResultados(
           }),
       );
       if (turno === peticionResultados.current) {
-        setResults(r);
-        setDeResultados(clave);
+        setGuardada({ clave, datos: r });
         // Contrato v48: al llegar desde «Tomar vacantes», el foco va a «Copiar WhatsApp» con los datos de ese día.
         if (enfocarWhatsApp.current) setFocoWhatsApp((n) => n + 1);
       }
@@ -66,7 +66,7 @@ export function useResultados(
     if (focoWhatsApp) botonWhatsApp.current?.focus();
   }, [focoWhatsApp]);
   // «Consultando vacantes…» solo cuando no hay una lista de ese cliente y día que mostrar mientras tanto.
-  const loadingResults = consultando && (!results || clave !== deResultados);
+  const loadingResults = consultando && !results;
   // Contrato v48: el servidor dice si es de un día anterior y cuántas se pueden copiar.
   const diaResultados = (results?.ejecucion?.fecha || "").slice(0, 10);
   const diaAnterior = Boolean(results?.dia_anterior);

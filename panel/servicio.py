@@ -330,8 +330,8 @@ def _cargo_editado(vigente, guardado):
 # para el idioma, el inglés, los años, el salario y las familias (`vacante.reetiquetar`, 58 % del procesador) y para
 # las funciones del cargo (`contenido.evidencia`, 25 %). Las dos son funciones puras del título, la descripción y el
 # cargo (más el mapa de cargos y los archivos de `datos/`, fijos mientras corre el servidor): se recuerdan en una
-# memoria acotada del proceso. La clave lleva una huella de la descripción (no el texto) para ocupar poco, y el mapa
-# en uso por si alguien lo cambiara (`familias.configurar` solo lo hace la búsqueda, en otro proceso).
+# memoria acotada del proceso. La clave lleva una huella de la descripción (no el texto) para ocupar poco. Solo se
+# usa con el mapa de cargos de siempre: con otro (`familias.configurar`, que solo hace la búsqueda) se calcula.
 MAX_REETIQUETADAS = 4096
 MAX_EVIDENCIAS = 4096
 
@@ -378,25 +378,31 @@ def _reetiquetar_publicada(base):
     if "titulo" not in base:
         return vacante.reetiquetar(base, publicada=True)  # mismo error de siempre
     titulo, descripcion = base["titulo"], base.get("_descripcion", "")
-    if not isinstance(titulo, str) or not isinstance(descripcion, str):
+    if not isinstance(titulo, str) or not isinstance(descripcion, str) or not _mapa_de_siempre():
         return vacante.reetiquetar(base, publicada=True)
 
     def calcular():
         sola = vacante.reetiquetar({"titulo": titulo, "_descripcion": descripcion}, publicada=True)
         return {k: x for k, x in sola.items() if k not in ("titulo", "_descripcion")}
-    etiquetas = _REETIQUETADAS.obtener((titulo, _huella(descripcion), id(familias.mapa())), calcular)
+    etiquetas = _REETIQUETADAS.obtener((titulo, _huella(descripcion)), calcular)
     base.update(deepcopy(etiquetas))
     return base
 
 
-def _avisos_de_funciones(contenido, titulo, descripcion, cargo, clave_cargo):
+def _mapa_de_siempre():
+    return familias.mapa() is familias.mapa_base()
+
+
+def _avisos_de_funciones(titulo, descripcion, cargo, clave_cargo):
     """`contenido.avisos(contenido.evidencia(…))`, recordado por (título, descripción, cargo). `clave_cargo` es la copia
     del cargo de la asignación en JSON: `cargo` sale de ella con `cargo_operativo`, que también es pura."""
-    if not isinstance(titulo, str) or not isinstance(descripcion, (str, type(None))):
-        return contenido.avisos(contenido.evidencia(titulo, descripcion, cargo))
-    clave = (titulo, _huella(descripcion or ""), descripcion is None, clave_cargo, id(familias.mapa()))
-    return list(_EVIDENCIAS.obtener(clave, lambda: tuple(contenido.avisos(contenido.evidencia(titulo, descripcion,
-                                                                                              cargo)))))
+    from panel import contenido
+
+    def calcular():
+        return tuple(contenido.avisos(contenido.evidencia(titulo, descripcion, cargo)))
+    if not isinstance(titulo, str) or not isinstance(descripcion, (str, type(None))) or not _mapa_de_siempre():
+        return list(calcular())
+    return list(_EVIDENCIAS.obtener((titulo, _huella(descripcion or ""), descripcion is None, clave_cargo), calcular))
 
 
 def resultados(repo, cliente_id=None, fecha=None):
@@ -452,7 +458,7 @@ def _calcular_resultados(repo, cliente_id, fecha):
                 filtros["motivos"].append(no_encaja)
         if not aprobada and actual.get("tipo") != "post":  # un post no trae funciones que comparar
             filtros["avisos"] = [*filtros.get("avisos", []), *_avisos_de_funciones(
-                contenido, actual["titulo"], actual.get("_descripcion"), cargo, clave_cargo)]
+                actual["titulo"], actual.get("_descripcion"), cargo, clave_cargo)]
         es_post = actual.get("tipo") == "post"  # contrato v11: post de LinkedIn sin ficha formal, con su etiqueta
         no_apta = contrato.entregable_post(actual) if es_post else contrato.entregable(actual, panel=True)
         enlace = enlace_utilizable(row) if filtros["compatible"] and not no_apta else ""

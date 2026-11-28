@@ -1,6 +1,7 @@
 """Servidor del operador. Demostración explícita; producción cerrada sin autenticación."""
 import argparse
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
+from datetime import date, timedelta
 import hashlib
 import logging
 import os
@@ -50,29 +51,40 @@ def _ciudades_por_pais():
     return {c: limpias(v)[:40] for c, v in salida.items()}
 
 
-# P-12.10 (velocidad): POST que solo calculan o consultan y no guardan nada. No vacían las copias del servidor (antes
-# `vista-previa`, que el formulario manda solo al editar Cargos y metas, obligaba a recalcular Vacantes y la bandeja).
+# P-12.10 (velocidad): POST que no cambian datos que muestren las pantallas (solo calculan, consultan o, al entrar y
+# salir, tocan la sesión). No vacían las copias del servidor (antes `vista-previa`, que el formulario manda solo al
+# editar Cargos y metas, obligaba a recalcular Vacantes y la bandeja).
 SOLO_LECTURA = frozenset({"/api/vista-previa", "/api/estimacion-en-vivo", "/api/cargos/expandir", "/api/cargos/funciones",
                           "/api/clientes/importar/previa", "/api/auth/login", "/api/auth/logout"})
 VIGENCIA_PENDIENTES = 300  # s; la búsqueda escribe la bandeja en otro proceso y 5 min bastan para verla
-ESPERA_BORRADORES = 60     # s sin decisiones nuevas antes de rehacer los mensajes tras «Sirve»
-# Escrituras del repositorio que una decisión de la bandeja hace sin cambiar «Vacantes» (la bandeja y sus reglas).
-_SIN_EFECTO_EN_VACANTES = frozenset({"actualizar_revision", "guardar_regla"})
-_ESCRITURAS = ("guardar", "actualizar", "crear", "archivar", "borrar", "publicar", "resumir", "vencer", "registrar")
+ESPERA_BORRADORES = 60     # s sin decisiones nuevas antes de rehacer los mensajes tras «Sirve»…
+ESPERA_MAXIMA_BORRADORES = 120  # …pero nunca más de 2 min desde la primera decisión de la tanda
+DIAS_MENSAJES = 3          # días anteriores que mira un borrador (`borradores.generar`, `dias_atras`)
+# Métodos del repositorio que una decisión de la bandeja usa sin cambiar «Vacantes»: lecturas y escrituras de la
+# bandeja y sus reglas. Cualquier otro (p. ej. guardar los títulos aprendidos, o uno nuevo) deja viejas todas las copias.
+_SIN_EFECTO_EN_VACANTES = frozenset({
+    "actualizar_revision", "guardar_regla", "guardar_revisiones", "resumir_revisiones", "vencer_revisiones",
+    "ajuste", "asignadas_de", "base_ofertas", "borradores", "candidatas_por_confirmar", "candidatas_por_funciones",
+    "catalogo_vigente", "clientes_de", "con_resumen", "config", "contactos", "contar", "contar_por_confirmar",
+    "conteo_asignaciones", "conteo_dudosas", "decisiones_ubicacion", "descripciones", "ejecucion", "ejecuciones",
+    "filas_catalogo", "numeros", "ofertas_de", "operativa", "recibidas", "reglas", "resultados", "revisiones",
+    "vacante", "vacantes_asignadas", "vacantes_por_cliente", "versiones"})
 
 
 class _DecisionAnotada:
     """P-12.10: el repositorio tal cual, anotando qué cambia una decisión de la bandeja para renovar solo las copias de
     los clientes afectados: los que reciben asignaciones nuevas y los que ya tienen esa vacante (su ficha del catálogo
-    cambió). Cualquier otra escritura (p. ej. los títulos aprendidos, que miran todos los cargos) las renueva todas."""
+    cambió). Cualquier método que no esté en `_SIN_EFECTO_EN_VACANTES` las renueva todas: si falla, falla hacia lo
+    seguro (recalcular de más), nunca hacia mostrar algo viejo."""
 
     def __init__(self, repo):
         self._repo, self.clientes, self.vacantes, self.todas = repo, set(), set(), False
 
     def __getattr__(self, nombre):
-        if nombre.startswith(_ESCRITURAS) and nombre not in _SIN_EFECTO_EN_VACANTES:
+        valor = getattr(self._repo, nombre)
+        if callable(valor) and nombre not in _SIN_EFECTO_EN_VACANTES:
             self.todas = True
-        return getattr(self._repo, nombre)
+        return valor
 
     def crear_asignaciones(self, filas):
         filas = list(filas)
@@ -134,7 +146,7 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
     copias_resultados, copias_fichas = {}, {}
     # P-12.10: los resultados tienen su propio sello. Una decisión de la bandeja no lo sube: deja viejas solo las copias
     # de los clientes afectados (`marcas_cliente`); las demás escrituras las dejan viejas todas, como antes.
-    sello_resultados, marcas_cliente = [0], {}
+    sello_resultados, marcas_cliente, en_curso = [0], {}, Counter()
     # 18 nov (velocidad): copias cortas de lo que se lee en cada pantalla. `sello` cambia con cualquier escritura;
     # `sello_bandeja` con las escrituras que no son una decisión de la bandeja (una decisión retira su fila de la copia
     # de pendientes en vez de obligar a leerlas todas otra vez).
@@ -189,7 +201,11 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         if guardado and guardado[0] == _marca_resultados(clave[0]) and time.monotonic() - guardado[1] < vigencia:
             return guardado[2]
         actual = _marca_resultados(clave[0])  # antes de calcular: lo que cambie mientras tanto la deja vieja
-        valor = servicio.resultados(repo, cliente_id, fecha)
+        en_curso[clave[0]] += 1
+        try:
+            valor = servicio.resultados(repo, cliente_id, fecha)
+        finally:
+            en_curso[clave[0]] -= 1
         if len(copias_resultados) > 200:
             copias_resultados.clear()
         copias_resultados[clave] = (actual, time.monotonic(), valor)
@@ -200,11 +216,12 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
 
     def _renovar_resultados(anotada):
         """Tras una decisión: deja viejas solo las copias de los clientes afectados (y la de «sin cliente», que muestra
-        el primero). Si la decisión cambió algo que mira a todos, las deja viejas todas."""
+        el primero) y las que se estén calculando ahora (pudieron leer la ficha de antes). Si la decisión cambió algo
+        que mira a todos, las deja viejas todas."""
         if anotada.todas:
             sello_resultados[0] += 1
             return
-        afectados = {"", *anotada.clientes}
+        afectados = {"", *anotada.clientes, *(c for c, n in list(en_curso.items()) if n > 0)}
         if anotada.vacantes:
             for (cliente, _), (_, _, valor) in list(copias_resultados.items()):
                 if any(v.get("id") in anotada.vacantes for v in valor.get("vacantes") or []):
@@ -212,12 +229,30 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         for cliente in afectados:
             marcas_cliente[cliente] = marcas_cliente.get(cliente, 0) + 1
 
+    def _clientes_con(vacantes):
+        """Clientes que tienen alguna de esas vacantes en las búsquedas de los días que mira un borrador (solo ids, una
+        lectura ligera por día). None si no se pudo saber: entonces se rehacen todos, como antes."""
+        if not vacantes:
+            return set()
+        try:
+            dias = {(date.fromisoformat(hoy()) - timedelta(days=d)).isoformat() for d in range(DIAS_MENSAJES + 1)}
+            salida = set()
+            for e in repo.ejecuciones() or []:
+                if str(e.get("fecha") or "")[:10] in dias:
+                    salida |= {c for c, ids in repo.vacantes_por_cliente(e["id"]).items() if set(ids) & vacantes}
+            return salida
+        except Exception as e:  # noqa: BLE001 — sin el dato se rehacen todos (lo de siempre)
+            registro.aviso("api:borradores-clientes", e)
+            return None
+
     # Los borradores de WhatsApp se rehacen en segundo plano después de confirmar en la bandeja: la decisión responde
-    # al momento. P-12.10: se espera `ESPERA_BORRADORES` sin decisiones nuevas y se rehacen una vez, solo los de los
-    # clientes que recibieron asignaciones y en un hilo (antes los de todos, de a cuatro, compitiendo con las
-    # pantallas). Empieza después de dejar viejas sus copias (`_renovar_resultados`), así no lee resultados de antes.
+    # al momento. P-12.10: se espera `ESPERA_BORRADORES` sin decisiones nuevas (como mucho `ESPERA_MAXIMA_BORRADORES`)
+    # y se rehacen una vez, en un hilo, solo los de los clientes afectados: los que recibieron asignaciones y los que
+    # ya tenían esas vacantes (antes los de todos, de a cuatro, compitiendo con las pantallas). Empieza después de dejar
+    # viejas sus copias (`_renovar_resultados`), así no lee resultados de antes.
     import threading
-    regenerar = {"clientes": set(), "hasta": 0.0, "corriendo": False}
+    regenerar = {"clientes": set(), "vacantes": set(), "todos": False, "hasta": 0.0, "primera": 0.0,
+                 "corriendo": False}
     cerrojo_regenerar = threading.Lock()
     # Las pruebas pueden cambiar la espera, el reloj y la forma de esperar.
     app.state.espera_borradores, app.state.reloj, app.state.dormir = ESPERA_BORRADORES, time.monotonic, time.sleep
@@ -228,30 +263,39 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
             with cerrojo_regenerar:
                 falta = regenerar["hasta"] - app.state.reloj()
                 if falta <= 0:
-                    clientes, regenerar["clientes"] = regenerar["clientes"], set()
-                    if not clientes:
+                    clientes, vacantes, todos = regenerar["clientes"], regenerar["vacantes"], regenerar["todos"]
+                    regenerar.update(clientes=set(), vacantes=set(), todos=False)
+                    if not clientes and not todos:
                         regenerar["corriendo"] = False
                         return
             if falta > 0:
                 app.state.dormir(falta)
                 continue
             try:
-                b.generar(repo, resultados=_resultados, clientes=clientes, hilos=1)
+                otros = None if todos else _clientes_con(vacantes)
+                b.generar(repo, resultados=_resultados, clientes=None if otros is None else clientes | otros, hilos=1)
             except Exception as e:  # noqa: BLE001 — la decisión ya quedó guardada; el borrador se rehace la próxima vez
                 registro.aviso("api:borradores", e)
             sello_mensajes[0] += 1
 
-    def pedir_borradores(clientes):
-        clientes = {str(c) for c in clientes if c}
+    def pedir_borradores(anotada):
+        clientes = {str(c) for c in anotada.clientes if c}
         if not clientes:
             return
         with cerrojo_regenerar:
+            ahora = app.state.reloj()
+            if not regenerar["clientes"] and not regenerar["todos"]:
+                regenerar["primera"] = ahora  # empieza una tanda
             regenerar["clientes"] |= clientes
-            regenerar["hasta"] = app.state.reloj() + app.state.espera_borradores
+            regenerar["vacantes"] |= anotada.vacantes
+            regenerar["todos"] |= anotada.todas
+            regenerar["hasta"] = min(ahora + app.state.espera_borradores,
+                                     regenerar["primera"] + max(app.state.espera_borradores, ESPERA_MAXIMA_BORRADORES))
             if regenerar["corriendo"]:
                 return
             regenerar["corriendo"] = True
-        threading.Thread(target=_rehacer_borradores, daemon=True).start()
+        app.state.hilo_borradores = threading.Thread(target=_rehacer_borradores, name="rehacer-borradores", daemon=True)
+        app.state.hilo_borradores.start()
 
     app.state.pedir_borradores = pedir_borradores
 
@@ -727,7 +771,7 @@ def crear_app(demo=False, repositorio=None, origen=None, operadores=None, accion
         if pendientes_copia.get("filas") is not None:  # la copia sigue valiendo sin las filas ya decididas
             pendientes_copia["filas"] = [r for r in pendientes_copia["filas"] if r["vacante_id"] not in decididas]
         if body.decision == "sirve" and resultado.get("asignadas"):
-            pedir_borradores(anotada.clientes)
+            pedir_borradores(anotada)
         return resultado
 
     @app.get("/api/busqueda")

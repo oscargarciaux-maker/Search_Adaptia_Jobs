@@ -3,7 +3,6 @@ que no vacían las copias, decisiones que renuevan solo a sus clientes y mensaje
 from copy import deepcopy
 import json
 import threading
-import time
 
 from fastapi.testclient import TestClient
 import pytest
@@ -51,7 +50,7 @@ def _huella(r):
 def _sin_memoria(monkeypatch):
     monkeypatch.setattr(servicio, "_reetiquetar_publicada", lambda b: vacante.reetiquetar(b, publicada=True))
     monkeypatch.setattr(servicio, "_avisos_de_funciones",
-                        lambda c, t, d, cargo, clave: c.avisos(c.evidencia(t, d, cargo)))
+                        lambda t, d, cargo, clave: contenido.avisos(contenido.evidencia(t, d, cargo)))
 
 
 def test_la_memoria_da_exactamente_lo_mismo_que_calcular(monkeypatch):
@@ -98,8 +97,8 @@ def test_avisos_de_funciones_recordados_igual_que_calculados():
     clave = json.dumps(cargo_cfg, sort_keys=True, ensure_ascii=False, default=str)
     for desc in ("Figma, wireframes y prototipos con el equipo de producto. " * 6, "corta", None):
         esperado = contenido.avisos(contenido.evidencia("Product Designer", desc, cargo))
-        assert servicio._avisos_de_funciones(contenido, "Product Designer", desc, cargo, clave) == esperado
-        assert servicio._avisos_de_funciones(contenido, "Product Designer", desc, cargo, clave) == esperado
+        assert servicio._avisos_de_funciones("Product Designer", desc, cargo, clave) == esperado
+        assert servicio._avisos_de_funciones("Product Designer", desc, cargo, clave) == esperado
 
 
 def test_memoria_de_normalizar_con_bloques_en_varios_hilos():
@@ -128,7 +127,14 @@ def _cuerpos():
             "/api/estimacion-en-vivo": {"configuracion": cfg, "perfil_id": cfg["perfiles"][0]["id"]},
             "/api/cargos/expandir": {"cargo": "Product Designer", "rapido": True},
             "/api/cargos/funciones": {"nombre": "Product Designer"},
-            "/api/clientes/importar/previa": {"contenido": "nombre\nCliente nuevo\n"}}
+            "/api/clientes/importar/previa": {"contenido": "nombre\nCliente nuevo\n"},
+            "/api/auth/login": {"email": "operador@example.org", "password": "x"},
+            "/api/auth/logout": None}
+
+
+def test_la_lista_de_solo_lectura_es_la_que_se_prueba():
+    from panel import api as modulo
+    assert set(_cuerpos()) == modulo.SOLO_LECTURA
 
 
 def test_los_post_de_solo_lectura_no_vacian_las_copias():
@@ -189,12 +195,19 @@ def test_sirve_renueva_solo_las_copias_de_sus_clientes(monkeypatch):
     for c in (destino, otro):
         api.get(f"/api/resultados?cliente_id={c}")
     r = api.post("/api/revisiones/rev-demo-0", json={"decision": "sirve", "paises": ["CO"]}, headers=H)
-    soltar.set()
     assert r.status_code == 200 and r.json()["asignadas"] >= 1
     for c in (destino, otro):
         api.get(f"/api/resultados?cliente_id={c}")
+    soltar.set()  # los mensajes, después: también leen resultados
     assert repo.lecturas[f"resultados:{destino}"] == 2  # recibió la asignación: se recalcula
     assert repo.lecturas[f"resultados:{otro}"] == 1     # no le tocó: sale de la copia
+    _esperar_mensajes(app)
+
+
+def _esperar_mensajes(app):
+    hilo = app.state.hilo_borradores
+    hilo.join(5)
+    assert not hilo.is_alive()
 
 
 def test_cinco_sirve_seguidos_rehacen_los_mensajes_una_vez_y_solo_de_sus_clientes(monkeypatch):
@@ -225,11 +238,7 @@ def test_cinco_sirve_seguidos_rehacen_los_mensajes_una_vez_y_solo_de_sus_cliente
             nuevos |= {p["cliente_id"] for p in repo.estado["asignaciones_extra"] if p["vacante_id"] == vid}
     assert llamadas == []  # mientras siguen llegando decisiones, se espera
     soltar.set()
-    for _ in range(100):
-        if llamadas:
-            break
-        time.sleep(0.02)
-    time.sleep(0.2)  # por si quedara otra vuelta pendiente
+    _esperar_mensajes(app)  # el hilo terminó: no queda otra vuelta
     assert len(llamadas) == 1
     assert llamadas[0]["clientes"] == nuevos and llamadas[0]["hilos"] == 1 and llamadas[0]["recalculo"]
 
@@ -252,3 +261,40 @@ def test_generar_solo_para_los_clientes_pedidos():
         return {"vacantes": []}
     borradores.generar(Repo(), resultados=resultados, clientes=[ids[1], ids[3]], hilos=1)
     assert set(pedidos) == {ids[1], ids[3]}
+
+
+def test_la_tanda_de_mensajes_no_espera_mas_de_dos_minutos(monkeypatch):
+    from panel import api as modulo
+    llamadas = []
+    monkeypatch.setattr(borradores, "generar", lambda *a, **k: llamadas.append(k.get("clientes")) or {})
+    app = crear_app(demo=True, repositorio=RepositorioDemo())
+    ahora, esperas, soltar, durmiendo = [0.0], [], threading.Event(), threading.Event()
+
+    def dormir(segundos):
+        esperas.append(segundos)
+        durmiendo.set()
+        soltar.wait(5)
+        soltar.clear()
+    app.state.reloj, app.state.dormir = (lambda: ahora[0]), dormir
+
+    class Decision:
+        clientes, vacantes, todas = {"c1"}, set(), False
+    app.state.pedir_borradores(Decision())
+    assert durmiendo.wait(5)
+    for t in (50, 100):  # una decisión cada 50 s: la espera de 60 s se reinicia…
+        ahora[0] = t
+        app.state.pedir_borradores(Decision())
+    ahora[0] = modulo.ESPERA_MAXIMA_BORRADORES + 1  # …pero a los 2 min de la primera ya se rehacen
+    soltar.set()
+    _esperar_mensajes(app)
+    assert esperas == [modulo.ESPERA_BORRADORES] and llamadas == [{"c1"}]
+
+
+def test_una_decision_que_usa_otro_metodo_renueva_todas():
+    from panel.api import _DecisionAnotada
+    anotada = _DecisionAnotada(RepositorioDemo())
+    anotada.revisiones(estado="pendiente")
+    anotada.ajuste("titulos_aprendidos", {})
+    assert not anotada.todas  # lecturas conocidas
+    anotada.guardar_ajuste("titulos_aprendidos", {})
+    assert anotada.todas  # cualquier otro método: falla hacia lo seguro
