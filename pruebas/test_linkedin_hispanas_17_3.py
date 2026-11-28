@@ -3,7 +3,7 @@ quien solo acepta español (365 así en la bodega del 28 nov), y la captura hora
 quedaban 0 s). Mismo ritmo: solo cambia el orden."""
 import pytest
 
-from buscador import cobertura, incremental
+from buscador import cobertura, incremental, paises
 from buscador.fuentes import linkedin_publico
 
 TEXTO = "Buscamos una persona para pruebas de software, automatización y calidad en un equipo remoto. " * 4
@@ -27,14 +27,16 @@ class _Respuesta:
 
 class _Fichas:
     """Responde la ficha de cada aviso; `vacios` responden 200 sin texto (aviso borrado), `bloqueados` 429."""
-    def __init__(self, vacios=(), bloqueados=()):
-        self.pedidas, self.vacios, self.bloqueados = [], set(vacios), set(bloqueados)
+    def __init__(self, vacios=(), bloqueados=(), borrados=()):
+        self.pedidas, self.vacios, self.bloqueados, self.borrados = [], set(vacios), set(bloqueados), set(borrados)
 
     def get(self, url, params=None, **_):
         n = url.rsplit("/", 1)[1]
         self.pedidas.append(n)
         if n in self.bloqueados:
             return _Respuesta("", 429)
+        if n in self.borrados:
+            return _Respuesta("", 404)
         return _Respuesta("" if n in self.vacios else f'<div class="show-more-less-html__markup">{TEXTO}</div>')
 
 
@@ -54,11 +56,14 @@ def _orden(previas, estado=None, maximo=10, cliente=None):
 
 def test_remota_hispana_es_de_un_pais_hispano_sin_alcance_mundial():
     assert linkedin_publico.remota_hispana({"modalidad": "remoto", "paises": ["ES"], "paises_mundo": []})  # «Madrid»
-    assert linkedin_publico.remota_hispana({"modalidad": "remoto", "paises": [], "paises_mundo": ["CO"]})
+    assert linkedin_publico.remota_hispana({"modalidad": "remoto", "paises": ["CO"], "paises_mundo": ["CO"]})
+    # Con la regla de la entrega (`paises.abiertos`): nombrar Colombia sin estar abierta a ella no cuenta.
+    assert not linkedin_publico.remota_hispana({"modalidad": "remoto", "paises": [], "paises_mundo": ["CO"]})
     assert not linkedin_publico.remota_hispana({"modalidad": "remoto", "paises_mundo": ["SE"]})
     assert not linkedin_publico.remota_hispana({"modalidad": "remoto", "paises": ["BR"], "paises_mundo": ["BR"]})
     assert not linkedin_publico.remota_hispana({"modalidad": "hibrido", "paises": ["CO"]})
-    assert not linkedin_publico.remota_hispana({"modalidad": "remoto", "paises": ["CO", "MX"], "alcance_mundial": True})
+    assert not linkedin_publico.remota_hispana({"modalidad": "remoto", "paises": paises.datos()["codigos"],
+                                                "alcance_mundial": True})
 
 
 def test_la_relectura_lee_primero_las_remotas_hispanas_de_quien_solo_acepta_espanol(personas):
@@ -67,11 +72,13 @@ def test_la_relectura_lee_primero_las_remotas_hispanas_de_quien_solo_acepta_espa
     hispanas = [_guardada(20, "cargo:qa", "CO"), _guardada(21, "cargo:qa", "ES")]  # no son de su país: iban al final
     otras = [_guardada(30, "cargo:qa", "CO", modalidad="presencial"),         # no es remota
              _guardada(31, "cargo:qa", "SE"),                                 # remota de un país no hispano
-             _guardada(32, "cargo:qa", "CO", alcance_mundial=True),           # remota mundial
+             _guardada(32, "cargo:qa", "CO", alcance_mundial=True, paises=paises.datos()["codigos"],
+                       paises_mundo=[]),                                     # remota mundial («Worldwide»)
              _guardada(33, "cargo:qa", "CO", idioma="en"),                    # ya se sabe el idioma
              _guardada(34, "cargo:pm", "CO")]                                 # cargo de quien acepta inglés
     pedidas, stats = _orden(del_corto + otras + hispanas)
-    assert pedidas[:2] == ["20", "21"] and pedidas[2:5] == ["10", "11", "12"]  # el resto, en el orden de antes
+    assert pedidas[:2] == ["20", "21"]
+    assert pedidas[2:] == [v["id"] for v in cobertura.por_necesidad(del_corto + otras)]  # el resto, en el orden de antes
     assert stats["remotas_hispanas"] == 2 and stats["hispanas_con_descripcion"] == 2
 
 
@@ -102,6 +109,8 @@ def test_un_bloqueo_de_linkedin_no_cuenta_como_ficha_sin_texto(personas):
     estado = {}
     _orden([_guardada(20, "cargo:qa", "CO")], estado, cliente=_Fichas(bloqueados={"20"}))
     assert estado[linkedin_publico.RELEIDAS] == {}
+    _orden([_guardada(20, "cargo:qa", "CO")], estado, cliente=_Fichas(borrados={"20"}))  # un 404 sí es del aviso
+    assert estado[linkedin_publico.RELEIDAS] == {"20": "2026-11-28"}
 
 
 # ── Búsqueda: entre los avisos del cargo, primero las remotas hispanas de quien solo acepta español ────────────────
@@ -158,11 +167,12 @@ def test_la_captura_horaria_reserva_tiempo_para_releer(monkeypatch, tmp_path):
     cfg = {"incremental": {"minutos_por_fuente": 2, "linkedin_relectura": 48}, "paises_activos": [],
            "dias_maximos": 30}
     estado = {}
-    incremental.recoger(cfg, estado, "2026-11-28", tmp_path, previas=[{"enlace": "x"}])
+    sin_texto = {"enlace": "https://www.linkedin.com/jobs/view/1", "_descripcion": ""}
+    incremental.recoger(cfg, estado, "2026-11-28", tmp_path, previas=[sin_texto])
     b = llamadas["buscar"]
-    assert b["limite_segundos"] == pytest.approx(120 * 0.65)
-    assert b["limite_segundos"] * b["fraccion_busqueda"] == pytest.approx(60)  # las páginas, con la mitad de siempre
+    assert b["limite_segundos"] == 120 and b["reserva"] == pytest.approx(0.35)  # las páginas, con la mitad de siempre
     assert llamadas["releer"]["limite_segundos"] > 120 * 0.3 and llamadas["releer"]["estado"] is estado["linkedin"]
     llamadas.clear()
-    incremental.recoger(cfg, {}, "2026-11-28", tmp_path, previas=[])  # sin nada que releer, todo el tiempo a la búsqueda
-    assert llamadas["buscar"]["limite_segundos"] == 120 and "releer" not in llamadas
+    # Sin avisos de LinkedIn guardados sin descripción, todo el tiempo a la búsqueda.
+    incremental.recoger(cfg, {}, "2026-11-28", tmp_path, previas=[dict(sin_texto, _descripcion="x" * 300)])
+    assert llamadas["buscar"]["reserva"] == 0 and "releer" not in llamadas
