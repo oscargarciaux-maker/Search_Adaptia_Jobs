@@ -36,6 +36,22 @@ def _bloqueadas(archivo="requirements.txt"):
     return salida
 
 
+def _bloque_sugerido(nombre, base):
+    """Bloque exacto para pegar en `{base}.txt`: la línea del .in (con su marcador) y, si la misma versión ya está
+    bloqueada en el otro lock, sus huellas y su comentario `# via`; si no, dice cómo obtenerlas."""
+    linea = next(l.split("#")[0].strip() for l in (RAIZ / (base + ".in")).read_text(encoding="utf-8").splitlines()
+                 if re.match(rf"{re.escape(nombre)}(\[[^\]]+\])?==", l.strip().lower().replace("_", "-")))
+    otro = "requirements-auditoria" if base == "requirements" else "requirements"
+    texto = (RAIZ / (otro + ".txt")).read_text(encoding="utf-8")
+    m = re.search(rf"^{re.escape(linea)} \\\n((?:    --hash=sha256:[0-9a-f]+(?: \\)?\n)+)", texto, re.M)
+    if m:
+        huellas = [h.rstrip(" \\") for h in m.group(1).splitlines()]
+        cuerpo = " \\\n".join([linea, *huellas]).replace(linea + " \\\n", linea + " \\\n", 1)
+        return f"{cuerpo}\n    # via -r {base}.in"
+    return (f"{linea} \\\n    --hash=sha256:<huella 1> \\\n    --hash=sha256:<huella 2>\n    # via -r {base}.in\n"
+            "(las huellas salen de https://pypi.org/pypi/<paquete>/<versión>/json, campo digests.sha256 de cada archivo)")
+
+
 import pytest
 
 
@@ -45,10 +61,12 @@ def test_lock_coincide_con_requirements_y_todo_lleva_huella(base):
     for nombre, (version, marcador) in directas.items():
         if marcador and nombre not in bloqueadas:
             raise AssertionError(f"{nombre} ({marcador}) falta en {base}.txt: pip-compile la omite fuera de esa "
-                                 "plataforma; cópiala a mano del .in con su marcador y sus huellas de PyPI")
+                                 "plataforma; pega este bloque en el .txt, en su sitio alfabético:\n" + _bloque_sugerido(nombre, base))
         assert nombre in bloqueadas, f"{nombre} falta en el .txt compilado; regenera con: {COMANDO}"
         assert bloqueadas[nombre][:2] == (version, marcador), \
-            f"{nombre} difiere del .txt compilado (versión o marcador); regenera con: {COMANDO}"
+            (f"{nombre} difiere del .txt compilado (versión o marcador); regenera con: {COMANDO}" +
+             (("\nSi es una pieza solo de Windows, deja en el .txt este bloque:\n" + _bloque_sugerido(nombre, base))
+              if directas[nombre][1] else ""))
     assert all(con_huella for *_, con_huella in bloqueadas.values()), "toda pieza del lock lleva su sha256"
 
 

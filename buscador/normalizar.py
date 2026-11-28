@@ -1,6 +1,8 @@
 """Normalización de textos, títulos y empresas (sin IA)."""
 import re
 import unicodedata
+from contextlib import contextmanager
+from functools import lru_cache
 
 NIVELES = {
     "trainee": "trainee", "intern": "trainee", "internship": "trainee", "pasante": "trainee", "pasantia": "trainee",
@@ -43,16 +45,59 @@ _RUIDO = re.compile(r"\b(remote|remoto|remota|hybrid|hibrido|hibrida|presencial|
                     r"tiempo completo|medio tiempo|m/f|f/m|m/f/d|h/m|m/h|a/o|o/a|\(a\)|ref\s*#?\s*\w+)\b", re.I)
 
 
-def sin_tildes(texto):
-    return "".join(c for c in unicodedata.normalize("NFD", str(texto or "")) if unicodedata.category(c) != "Mn")
+# P-12.2 (solo velocidad, mismo resultado): dentro de una búsqueda la misma descripción se normaliza muchas veces. Las
+# dos funciones son puras, así que mientras dura `con_memoria()` (lo abre `bodega.correr`) recuerdan sus resultados
+# con un tope de entradas; fuera de ella (el servidor del panel, las pruebas) calculan como siempre y no retienen nada.
+# La clave es el texto ya convertido con `str(x or "")`, igual que antes, para aceptar los mismos valores.
+# El tope es el compromiso medido entre tiempo y memoria (docs/HISTORIAL_CAMBIOS.md, sección 12.2). `panel/terminos.py`
+# tiene además su propia caché de `texto` para los títulos, que no depende de esta.
+MAX_CACHE = 2000
+_memoria_activa = False
 
 
-def texto(texto_crudo):
-    """Minúsculas, sin tildes, solo letras, números y espacios simples (conserva '/', '+', '#' y '.' útiles: c#, .net)."""
+def _quitar_tildes(texto):
+    return "".join(c for c in unicodedata.normalize("NFD", texto) if unicodedata.category(c) != "Mn")
+
+
+def _limpiar(texto_crudo):
     t = sin_tildes(texto_crudo).lower()
     t = re.sub(r"[^a-z0-9+#./ ]+", " ", t)
     t = re.sub(r"(?<![a-z0-9])\.|\.(?![a-z0-9])", " ", t)  # puntos sueltos, no los de .net o node.js
     return re.sub(r"\s+", " ", t).strip()
+
+
+_sin_tildes = lru_cache(maxsize=MAX_CACHE)(_quitar_tildes)
+_texto = lru_cache(maxsize=MAX_CACHE)(_limpiar)
+
+
+def sin_tildes(texto):
+    t = str(texto or "")
+    return _sin_tildes(t) if _memoria_activa else _quitar_tildes(t)
+
+
+def texto(texto_crudo):
+    """Minúsculas, sin tildes, solo letras, números y espacios simples (conserva '/', '+', '#' y '.' útiles: c#, .net)."""
+    t = str(texto_crudo or "")
+    return _texto(t) if _memoria_activa else _limpiar(t)
+
+
+def vaciar_cache():
+    _sin_tildes.cache_clear()
+    _texto.cache_clear()
+
+
+@contextmanager
+def con_memoria():
+    """Activa la memoria de `sin_tildes` y `texto` durante el bloque y la vacía al salir, pase lo que pase. Anidado, solo
+    la vacía el bloque de fuera."""
+    global _memoria_activa
+    anterior, _memoria_activa = _memoria_activa, True
+    try:
+        yield
+    finally:
+        _memoria_activa = anterior
+        if not anterior:
+            vaciar_cache()
 
 
 def nivel(titulo):
