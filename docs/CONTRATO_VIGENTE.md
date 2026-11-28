@@ -411,6 +411,15 @@ puede comprobar (v50). Presupuestos en `datos/config.yaml`.
   rama principal cuenta como «ya corrió»: las pruebas se lanzan desde otra rama (v51).
 - La captura horaria no consume Apify ni crea entregas, salvo cuando la configuración cambió después del lote del día
   (v2, v43).
+- **Vigía de avisos** (`vigia.yml`, P-13.1, 28 nov): el Reloj lo pide una vez al día desde las 10:30 a. m.
+  (`toca_vigia`, como mucho 3 veces si GitHub lo cancela); un horario a las 10:40 es su respaldo. Solo lee: corridas de
+  Bodega, Captura, Reloj y Copia semanal; base contra 500 MB y copias contra 1 GB (80 % aviso, 95 % urgente); archivo
+  más grande de `publicado` contra 100 MB; 30 días sin commits en `main`; `datos/caducidades.yaml` (180 días antes
+  para soporte, 30 para claves). Avisa en un solo issue abierto «Atención: Adaptia» (etiqueta `vigia`, permiso
+  `issues: write` solo en vigia.yml): lo abre o comenta si hay avisos nuevos, mencionando a la variable
+  `AVISO_GITHUB_USUARIO` (sin ella, sin mención), y lo cierra cuando todo vuelve a estar en orden. Si GitHub no deja
+  abrir o comentar, la corrida queda en rojo. El texto es de lista blanca: frases fijas de 1 paso, cifras y fechas, nunca datos
+  de clientes ni claves. No reintenta ni arregla nada: una Bodega en rojo sigue sin repetirse sola.
 
 ## 15. Panel
 

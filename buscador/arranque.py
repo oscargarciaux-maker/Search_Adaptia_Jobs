@@ -7,7 +7,9 @@ hoy?», leyendo el registro de entregas (trabajo/metricas_entrega.json: solo fec
 - el «Reloj» (contrato v51, reloj.yml): desde el 17 nov GitHub solo dispara los horarios de este repositorio cada 8 a
   12 horas, pero lo que se pide (workflow_dispatch) arranca al momento. El reloj es una cadena de relevos: cada uno
   espera con el temporizador del entorno `reloj`, pide el siguiente y lanza lo que toque. `--reloj` imprime
-  actuar/seguir/captura/diaria; `--reloj-vivo` imprime revivir=true/false para quien deba reanudar la cadena.
+  actuar/seguir/captura/diaria; `--reloj-vivo` imprime revivir=true/false para quien deba reanudar la cadena;
+- el «Vigía de avisos» (P-13.1, vigia.yml; no es el vigía de la captura horaria): `--avisos` imprime avisos=true/false
+  para que el Reloj lo pida una vez al día.
 
 Las capturas horarias que completan el lote (v43) escriben el registro con `pasadas` sin sumar: no cuentan."""
 import argparse
@@ -25,6 +27,7 @@ DIARIA_HASTA = (19, 0)   # más tarde ya no se empieza: terminaría de noche y c
 # Reloj (v51)
 ESPERA_MINIMA = 20       # minutos; un relevo que esperó menos corre en un entorno sin temporizador: no sigue
 CADA_CAPTURA = 55        # minutos entre capturas horarias (el relevo llega cada 30)
+AVISOS_DESDE = (10, 30)  # Vigía de avisos (P-13.1): la Bodega de las 6:30 y su segunda pasada ya terminaron
 MAX_PEDIDAS = 3          # veces que el Reloj pide la búsqueda diaria en un día si GitHub la cancela en la cola
 
 # Horario de bodega.yml → pasada. Un horario que no esté aquí es un error (no trabaja a ciegas).
@@ -194,6 +197,30 @@ def toca_diaria(dia, diarias, rama, ahora=None, desde=DIARIA_DESDE, max_pedidas=
     return True, "Es la hora de la búsqueda diaria y hoy no ha corrido: se pide ahora."
 
 
+def toca_vigia(vigias, rama, ahora=None):
+    """Vigía de avisos (P-13.1): ¿lo pide ahora el Reloj? Una vez al día desde las 10:30 de Bogotá, si en la rama
+    principal no hay uno de hoy en marcha ni que haya corrido. Uno que GitHub canceló cuenta como no corrido (la misma
+    `_cancelada_sin_empezar` de la búsqueda diaria; su lista no trae `empezo`), pero no se pide más de `MAX_PEDIDAS`
+    veces al día. No comparte `toca_diaria`: esa mira además el registro de entregas y su propio horario límite.
+    Devuelve (lanzar, motivo)."""
+    ahora = ahora or datetime.now(timezone.utc)
+    local = ahora.astimezone(BOGOTA)
+    if (local.hour, local.minute) < AVISOS_DESDE:
+        return False, "Aún es temprano para el Vigía de avisos (desde las 10:30 de Bogotá)."
+    lista = _de_la_rama(vigias, rama)
+    if lista is None:
+        return False, "No se pudo leer la lista de corridas del Vigía: no se pide a ciegas."
+    hoy = hoy_bogota(ahora)
+    de_hoy = [c for c in lista if _fecha_bogota(c.get("createdAt", "")) == hoy]
+    if any(_activa(c) for c in de_hoy):
+        return False, "El Vigía de hoy ya está en marcha."
+    if any(not _cancelada_sin_empezar(c) for c in de_hoy):
+        return False, "El Vigía de hoy ya corrió."
+    if sum(c.get("event") == "workflow_dispatch" for c in de_hoy) >= MAX_PEDIDAS:
+        return False, "Hoy ya se pidió el Vigía varias veces: no se insiste."
+    return True, "Toca el Vigía de avisos de hoy."
+
+
 def hace_falta_revivir(relojes, rama):
     """¿Hay que reanudar la cadena del reloj? Sí cuando no queda ningún relevo vivo en la rama principal."""
     lista = _de_la_rama(relojes, rama)
@@ -244,7 +271,8 @@ def main(argv=None, ahora=None):
     modo.add_argument("--reloj", metavar="CARPETA", help="Carpeta con relojes.json, diarias.json y capturas.json; "
                       "imprime actuar, seguir, captura, diaria, captura_sin_diaria y falta_temporizador")
     modo.add_argument("--reloj-vivo", metavar="RELOJES", help="JSON de gh run list de reloj.yml; imprime revivir=…")
-    ap.add_argument("--rama", default="", help="Rama principal (con --vigia y el reloj; vacía = no lanza)")
+    modo.add_argument("--avisos", metavar="VIGIAS", help="JSON de gh run list de vigia.yml (Vigía de avisos); imprime avisos=true/false")
+    ap.add_argument("--rama", default="", help="Rama principal (con --vigia, --avisos y el reloj; vacía = no lanza)")
     ap.add_argument("--yo", default="", help="Con --reloj: el número de esta corrida (GITHUB_RUN_ID)")
     args = ap.parse_args(argv)
     ahora = ahora or datetime.now(timezone.utc)
@@ -252,6 +280,11 @@ def main(argv=None, ahora=None):
         revivir, motivo = hace_falta_revivir(_leer_json(args.reloj_vivo), args.rama)
         print(f"::notice::{motivo}", file=sys.stderr)
         print(f"revivir={_si(revivir)}")
+        return
+    if args.avisos is not None:
+        lanzar, motivo = toca_vigia(_leer_json(args.avisos), args.rama, ahora)
+        print(f"::notice::{motivo}", file=sys.stderr)
+        print(f"avisos={_si(lanzar)}")
         return
     dia = leer_dia(args.trabajo, hoy_bogota(ahora))
     if args.reloj is not None:

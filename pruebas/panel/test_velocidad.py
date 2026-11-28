@@ -61,9 +61,11 @@ def test_otra_escritura_si_obliga_a_releer_la_bandeja():
 
 def test_confirmar_responde_sin_rehacer_borradores_y_los_rehace_en_segundo_plano(monkeypatch):
     llamadas = []
-    monkeypatch.setattr(borradores, "generar", lambda repo, fecha=None, dias_atras=3, resultados=None:
-                        llamadas.append(resultados is not None) or {})
-    api = TestClient(crear_app(demo=True, repositorio=RepositorioDemo()))
+    monkeypatch.setattr(borradores, "generar", lambda repo, fecha=None, dias_atras=3, resultados=None, clientes=None,
+                        hilos=4: llamadas.append(resultados is not None) or {})
+    app = crear_app(demo=True, repositorio=RepositorioDemo())
+    app.state.espera_borradores = 0  # P-12.10: sin la espera de la tanda (se prueba en test_vacantes_rapida)
+    api = TestClient(app)
     primera = api.get("/api/revisiones").json()["pendientes"][0]
     r = api.post(f"/api/revisiones/{primera['vacante_id']}", json={"decision": "sirve", "paises": ["CO"]}, headers=H)
     assert r.status_code == 200 and r.json()["asignadas"] >= 1
