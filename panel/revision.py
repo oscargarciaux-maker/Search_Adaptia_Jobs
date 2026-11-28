@@ -241,15 +241,17 @@ def _revisiones_sin_texto(repo, estado=None):
         return repo.revisiones(estado=estado)
 
 
-def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, avance=None):
+def preparar_cola(repo, cfg, fecha, estrictas, filas_hoy=(), completa=False, avance=None, recibidas=None):
     """Arma la cola del día al final de la búsqueda (panel/ejecutor.registrar). Devuelve solo conteos.
     `completa` (contrato v17, botón «Cargar todas las dudosas»): todas las vacantes por confirmar del catálogo, también
-    las que hoy no le sirven a ningún cliente, para depurar la base entera."""
+    las que hoy no le sirven a ningún cliente, para depurar la base entera.
+    `recibidas` (P-12.15): lo que ya recibió cada persona, si la búsqueda ya lo leyó (no se vuelve a leer ni se cambia)."""
     perfiles = [(c, p) for c in cfg.cargos if c.activo for p in cfg.perfiles_activos(str(c.id))]
     if not perfiles and not completa:
         return {"por_confirmar": 0}
     desde = None if completa else (datetime.fromisoformat(fecha) - timedelta(days=2)).date().isoformat()
-    recibidas = repo.recibidas([str(p.id) for _, p in perfiles])
+    recibidas = {perfil: set(vacantes) for perfil, vacantes in (
+        repo.recibidas([str(p.id) for _, p in perfiles]) if recibidas is None else recibidas).items()}
     for f in filas_hoy:
         recibidas.setdefault(f["perfil_id"], set()).add(f["vacante_id"])
     candidatos, leidas, fuera_idioma, ya_claras = [], 0, 0, 0
