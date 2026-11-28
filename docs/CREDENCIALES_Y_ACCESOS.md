@@ -48,6 +48,40 @@ La web antigua de Cloudflare y la búsqueda con Brave se retiraron: sus claves y
 **La contraseña PostgreSQL y `SUPABASE_DB_URL` no son dos contraseñas diferentes:** la segunda es una dirección que lleva
 la primera dentro. `SUPABASE_SECRET_KEY` y `SUPABASE_BACKUP_KEY` sí son claves diferentes, con funciones independientes.
 
+## Tabla de secretos: quién los crea, si caducan y qué falla (28 nov 2026)
+
+**Nunca se escriben valores aquí.** «Dónde» es donde el programa los lee. «Renovar» es el único paso para sustituirlo
+(guardar primero en el gestor y después pegar en GitHub o Render).
+
+| Secreto | Para qué sirve | Dónde | Quién lo crea | Caduca | Qué falla si caduca o falta | Renovar en 1 paso |
+|---|---|---|---|---|---|---|
+| `SUPABASE_URL` | Dirección de la API del proyecto | Actions y Render | Supabase, al crear el proyecto | No | Todo el programa y el panel quedan sin base | Copiar la URL del proyecto nuevo a Actions y Render |
+| `SUPABASE_SECRET_KEY` | Clave de API del servidor (lee y escribe vacantes y estado) | Actions y Render | Supabase → Settings → API Keys (cuenta del cliente) | Las claves *legacy* `service_role` se retiran a principios de 2027; una `sb_secret_…` no caduca | Actions y panel sin base | Crear una clave `sb_secret_…` y pegarla en Actions y en Render (las dos, siempre juntas) |
+| `SUPABASE_DB_URL` | Conexión directa a PostgreSQL (migraciones, copias, diagnóstico) | Actions | Quien tiene la contraseña de la base | No, salvo que se cambie la contraseña | Bodega, copias y migraciones en rojo | Restablecer la contraseña en Supabase y regenerar la URI (ver abajo) |
+| `SUPABASE_BACKUP_KEY` | Cifra y descifra las copias de seguridad | Actions | Quien entrega, una sola vez (32 bytes aleatorios) | No | Las copias dejan de poder restaurarse; sin la clave guardada fuera de GitHub no se pueden descifrar | No se renueva: se **custodia** en el gestor. Si se cambia, conservar la anterior mientras existan copias con ella |
+| `APIFY_TOKEN` | Búsquedas pagadas de refuerzo en LinkedIn (tope mensual) | Actions | Cuenta de Apify del cliente | No (Apify admite caducidad opcional al crearlo) | El rescate con Apify se salta; el programa sigue sin él | Crear un token nuevo en Apify → Settings → Integrations y pegarlo en Actions |
+| `INFOJOBS_CLIENT_ID` e `INFOJOBS_CLIENT_SECRET` (optativos) | API oficial de InfoJobs | Actions | developer.infojobs.net | No | InfoJobs se lee por su página, con menos datos | Regenerar el par en InfoJobs y pegar los dos |
+| `AVISO_NOCTURNA_URL`, `AVISO_CAPTURA_URL`, `AVISO_RESPALDO_URL` (optativos) | Direcciones de Healthchecks para los avisos | Actions | Healthchecks del cliente | **Sí: Healthchecks borra la cuenta si no se entra al menos 1 vez al año** | Se acaban los avisos y nadie se entera de las caídas | Entrar a Healthchecks 1 vez al año; si se borró, crear los 3 chequeos y pegar las URL nuevas |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Flujos «Claude» y «Claude Code Review» de los PR | Actions | Quien tiene la suscripción (hoy Oscar): `claude setup-token` | **Sí: dura 1 año** (guardado el 27 nov 2026, vence hacia el 27 nov 2027) y va ligado a esa suscripción | Los dos flujos salen en rojo en cada PR y consumen la cuenta de quien lo creó. No afecta a la búsqueda ni al panel | `claude setup-token` y pegar el resultado; o borrar los dos flujos si el cliente no los usa |
+| `GITHUB_ACCIONES_TOKEN` | «Buscar ahora» del panel (lanza `bodega.yml`) | Render | El dueño del repositorio: token fino, solo este repositorio, permiso «Actions: lectura y escritura» | Admite «sin caducidad», pero **GitHub lo revoca si pasa 1 año sin usarse**; si se creó con fecha, vence en esa fecha | «Buscar ahora» da error (el panel lo explica); la búsqueda automática sigue | Crear un token fino nuevo y pegarlo en Render → Environment |
+| `PANEL_OPERATOR_EMAILS` y `PANEL_ORIGIN` (no son claves) | Quién entra al panel y su dirección HTTPS | Render | El cliente | No | Nadie entra al panel o la sesión se rechaza | Editar el valor en Render |
+| `SUPABASE_URL_DESTINO`, `SUPABASE_SECRET_KEY_DESTINO`, `SUPABASE_DB_URL_DESTINO` | Solo al traspasar a otro proyecto de Supabase (`traspaso.yml`) | Actions | El cliente, con su proyecto nuevo | No | Solo falla el traspaso | Se borran al terminar el traspaso |
+| `GITHUB_TOKEN` | Lo pone GitHub en cada corrida | Actions | GitHub | Dura lo que la corrida | Nada que hacer | — |
+
+**Dos caducidades de GitHub que no son un secreto pero apagan todo:**
+
+- Un token personal que no se usa durante **1 año** lo revoca GitHub.
+- En un repositorio público, GitHub desactiva los horarios (`schedule`) tras **60 días sin actividad** en el repositorio
+  (por ejemplo, sin commits). Se desactiva cada flujo programado, también el Reloj. Para reactivarlos: Actions → elegir el
+  flujo → **Enable workflow**. Con el Vigía activo se avisa antes; sin él, hacer un commit pequeño al mes lo evita.
+
+**GitHub Pages no se usa.** Si Settings → Pages sigue activo, desactivarlo (Settings → Pages, o con
+`gh api -X DELETE repos/<dueño>/<repositorio>/pages`). Ningún flujo ni código lee `PAGES_POR_ACTIONS` ni el entorno
+`github-pages`.
+
+**No hacer privado el repositorio en el plan Free:** el Wait timer del Reloj desaparece y los minutos de Actions dejan de
+ser gratis (ver [TRASPASO.md](TRASPASO.md) §6).
+
 ## Recuperar los valores que ya se configuraron
 
 GitHub Secrets no permite mostrar el valor guardado. Si todavía no existe una entrada en el gestor, buscar el original
